@@ -49,6 +49,8 @@ bun test
 | `src/server` | Bun + Hono server: project storage and the API, serves the UI. |
 | `src/web` | Svelte UI, drawing in SVG. |
 
+Drawings use [osifont](https://github.com/hikikomori82/osifont) (ISO 3098 lettering, LGPL-3 with font exception), bundled in `src/web/fonts`. It is the only font on drawings and is embedded in the PDFs.
+
 Wire routing uses [libavoid-js](https://github.com/Aksem/libavoid-js) (LGPL-2.1-or-later), loaded as a separate WebAssembly file.
 
 ## Using the editor

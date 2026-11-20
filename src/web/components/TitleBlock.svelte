@@ -7,9 +7,9 @@
 
   const tb = $derived(titleBlock(project, page));
 
-  /** Squeeze text that would overrun its box (rough Arial width). */
+  /** Squeeze text that would overrun its box (osifont averages ~0.45 em per character). */
   function fit(text: string, size: number, room: number): number | undefined {
-    return text.length * size * 0.56 > room ? room : undefined;
+    return text.length * size * 0.5 > room ? room : undefined;
   }
 </script>
 
@@ -59,14 +59,11 @@
     stroke-width: 0.35;
   }
   text {
-    font-family: Arial, Helvetica, sans-serif;
+    font-family: var(--drawing-font);
     fill: #000;
   }
   .label {
     font-size: 1.8px;
-  }
-  .value.big {
-    font-weight: bold;
   }
   .rev {
     font-size: 2.4px;

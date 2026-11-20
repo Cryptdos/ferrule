@@ -47,9 +47,6 @@
   text {
     fill: #000;
     stroke: none;
-    font-family: Arial, Helvetica, sans-serif;
-  }
-  text.tag {
-    font-weight: bold;
+    font-family: var(--drawing-font);
   }
 </style>

@@ -8,11 +8,16 @@
   $effect(() => {
     document.title = `${project.project.drawingNo || project.project.title} — print`;
     document.body.classList.add("printing");
-    // Give the browser a frame to lay out the sheets before printing.
-    requestAnimationFrame(() => {
-      document.body.dataset.ready = "1";
-      if (autoprint) setTimeout(() => window.print(), 200);
-    });
+    // Wait for the drawing font, then a frame to lay out, before printing.
+    void document.fonts
+      .load('10px "osifont"')
+      .catch(() => {})
+      .then(() =>
+        requestAnimationFrame(() => {
+          document.body.dataset.ready = "1";
+          if (autoprint) setTimeout(() => window.print(), 200);
+        }),
+      );
   });
 </script>
 

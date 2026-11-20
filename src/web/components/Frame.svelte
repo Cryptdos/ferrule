@@ -41,7 +41,7 @@
     stroke-width: 0.25;
   }
   text {
-    font-family: Arial, Helvetica, sans-serif;
+    font-family: var(--drawing-font);
     font-size: 2.4px;
     fill: #000;
   }
