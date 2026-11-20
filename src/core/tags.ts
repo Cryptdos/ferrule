@@ -1,20 +1,36 @@
 import { STANDARDS } from "./designations";
 import type { Element, Project } from "./model";
-import { requireSymbol } from "./symbols";
+import { requireSymbol, type GeometryText } from "./symbols";
+import { masterOf, xrefText } from "./xref";
 
 /** Tag prefix for an element under the project's designation standard. */
 export function tagPrefix(el: Element, project: Pick<Project, "designation">): string {
   const kind = requireSymbol(el.symbol).kind(el);
   if (!kind) return "";
+  // Terminals are numbered by position alone; the strip groups them.
+  if (kind === "terminal" && el.symbol === "terminal") return "";
   const override = project.designation.overrides[kind];
   if (override) return override;
   const std = STANDARDS.find((s) => s.id === project.designation.standard) ?? STANDARDS[0]!;
   return std.prefixes[kind];
 }
 
-/** The tag as drawn: the element's own tag, or `prefix?` until it's numbered. */
-export function displayTag(el: Element, project: Pick<Project, "designation">): string {
+/**
+ * The tag as drawn: a contact driven by a coil shows the coil's tag;
+ * otherwise the element's own tag, or `prefix?` until it's numbered.
+ */
+export function displayTag(el: Element, project: Project): string {
+  const m = masterOf(project, el);
+  if (m) return displayTag(m.el, project);
   if (el.tag) return el.tag;
   const prefix = tagPrefix(el, project);
+  if (el.symbol === "terminal") return "?";
   return prefix ? `${prefix}?` : "";
+}
+
+/** Everything an element needs to draw its texts. */
+export function elementTexts(el: Element, project: Project): GeometryText {
+  const m = masterOf(project, el);
+  const masterTag = m ? displayTag(m.el, project) : "";
+  return { tag: displayTag(el, project), xref: xrefText(project, el, masterTag), label: el.label };
 }

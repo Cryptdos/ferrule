@@ -1,5 +1,6 @@
 <script lang="ts">
   import { deleteElements, deleteSegments, duplicateElements, moveElements, rotateElements } from "../../core/ops";
+  import { renumber } from "../../core/renumber";
   import type { Editor } from "../editor.svelte";
   import Canvas from "./Canvas.svelte";
   import Palette from "./Palette.svelte";
@@ -33,6 +34,13 @@
       editor.flash(`PDF export failed: ${(e as Error).message}`);
     } finally {
       exporting = false;
+    }
+  }
+
+  function doRenumber() {
+    let r = { tags: 0, terminals: 0, wires: 0 };
+    if (editor.apply((p) => (r = renumber(p)))) {
+      editor.flash(`Renumbered ${r.tags} tags, ${r.terminals} terminals, ${r.wires} wires. Undo puts them back.`);
     }
   }
 
@@ -145,6 +153,7 @@
       <span class="sep"></span>
       <button onclick={() => canvas?.fit()} title="Fit sheet (F)">Fit</button>
       <span class="sep"></span>
+      <button onclick={doRenumber} title="Recalculate tags, terminal and wire numbers (locked ones are kept)">Renumber</button>
       <button onclick={() => (showProject = true)} title="Project details and revisions (title block)">Project…</button>
       <button onclick={exportPdf} disabled={exporting} title="Download every sheet as an A4 PDF">
         {exporting ? "Exporting…" : "Export PDF"}

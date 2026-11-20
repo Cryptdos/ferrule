@@ -169,3 +169,27 @@ export function connectionDots(page: Page): Vec[] {
   }
   return [...count.values()].filter((c) => c.tap || c.n >= 3).map((c) => c.at);
 }
+
+/**
+ * Where a wire's number is printed: beside the middle of its longest leg,
+ * reading up the page on vertical legs. Null for legs too short to label.
+ */
+export function wireLabelSpot(points: Vec[], minLength = 3): { at: Vec; vertical: boolean } | null {
+  let best = -1;
+  let len = 0;
+  for (let i = 0; i < points.length - 1; i++) {
+    const a = points[i]!;
+    const b = points[i + 1]!;
+    const l = Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]);
+    if (l > len) {
+      len = l;
+      best = i;
+    }
+  }
+  if (best < 0 || len < minLength) return null;
+  const a = points[best]!;
+  const b = points[best + 1]!;
+  const vertical = a[0] === b[0];
+  const mid: Vec = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+  return { at: vertical ? [mid[0] - 0.35, mid[1]] : [mid[0], mid[1] - 0.35], vertical };
+}

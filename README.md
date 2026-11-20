@@ -5,7 +5,7 @@ A lightweight, browser-based tool for drafting control panel schematics: symbols
 - [Design document](docs/DESIGN.md)
 - [Benchmark: LSP-01 life safety panel](docs/benchmark-lsp01.md)
 
-Status: milestones 1–3 (skeleton, wires, pages + title block + PDF).
+Status: milestones 1–4 (skeleton, wires, pages + title block + PDF, numbering + cross-references).
 
 ## Running it
 
@@ -63,5 +63,7 @@ Wire routing uses [libavoid-js](https://github.com/Aksem/libavoid-js) (LGPL-2.1-
 - Wires route themselves at right angles around symbols. Select a wire and drag one of its legs to adjust it by hand; *Reset route* hands it back to the router.
 - Saving is automatic.
 - **Sheets** (top left): `+` adds a sheet after the current one, `⧉` duplicates it, arrows reorder, `✕` deletes. `PgUp`/`PgDn` switch sheets. With nothing selected, the right panel edits the sheet title.
+- **Numbering:** tags show as `K?`, `S?`… until you press **Renumber**. Position scheme (default): tags and wire numbers are the sheet-column where they are, e.g. `K3-16`, wire `3-22`; the highest in a column keeps the plain number and the rest get A, B, C. Wires on a named rail take its name (CCT, 0V). Sequential (K1, K2…, wire 100, 101…) can be chosen under Project…. Lock a tag or wire number to keep it.
+- **Links:** select a contact and pick its coil under *Driven by coil*: it takes the coil's tag and pole number (13/14, 23/24, 31/32…), and the coil gets a contact table showing where each contact is. Off-page arrows pair up under *Continues at*: each shows where the other is, and the wire keeps its number across sheets.
 - **Project…** sets the title block fields (project, panel, job no., drawing ref., drawn/checked) and the revision table.
 - **Export PDF** downloads every sheet as one A4 landscape PDF. **Print** opens the same sheets in a browser tab and prints them, if PDF export isn't available.

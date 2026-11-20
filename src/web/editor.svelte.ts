@@ -119,6 +119,16 @@ export class Editor {
     this.selection = [];
   }
 
+  /** Show an element: switch to its sheet and select it. */
+  goTo(id: string): void {
+    const page = this.project.pages.find((p) => p.elements.some((e) => e.id === id) || p.segments.some((s) => s.id === id));
+    if (!page) return;
+    this.setPage(page.id);
+    this.selection = [id];
+    this.tool = "select";
+    this.placeSymbol = null;
+  }
+
   flash(msg: string): void {
     this.message = msg;
     setTimeout(() => {

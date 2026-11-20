@@ -12,7 +12,7 @@
   } from "../../core/geometry";
   import { addElement, moveElements, setManualRoute, wire, type WireEnd } from "../../core/ops";
   import { localGeometry, defaultParams, type Geometry } from "../../core/symbols";
-  import { displayTag } from "../../core/tags";
+  import { elementTexts } from "../../core/tags";
   import { routePage } from "../../core/routing";
   import { distanceToRoute, dragLeg, nearestPointOnRoute, routeOf, simpleRoute, simplifyRoute } from "../../core/wires";
   import type { Element, Page, Segment } from "../../core/model";
@@ -46,7 +46,7 @@
 
   const page = $derived(editor.page);
   const geoms = $derived(
-    new Map<string, Geometry>(page.elements.map((e) => [e.id, localGeometry(e, displayTag(e, editor.project))])),
+    new Map<string, Geometry>(page.elements.map((e) => [e.id, localGeometry(e, elementTexts(e, editor.project))])),
   );
   const selected = $derived(new Set(editor.selection));
 

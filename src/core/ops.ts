@@ -9,6 +9,7 @@ import { refreshConductors } from "./conductors";
 import { type Element, type Page, type ParamValue, type Project, type Segment, type TerminalRef, newId } from "./model";
 import { defaultParams, requireSymbol, terminalPoint } from "./symbols";
 import { isOrthogonal, routeOf, simplifyRoute } from "./wires";
+import { isMaster, isSlave, locate } from "./xref";
 
 export class OpError extends Error {}
 
@@ -80,7 +81,7 @@ export function deleteElements(project: Project, pageId: string, ids: string[]):
   const gone = new Set(ids);
   page.elements = page.elements.filter((e) => !gone.has(e.id));
   page.segments = page.segments.filter((s) => !gone.has(s.from[0]) && !gone.has(s.to[0]));
-  for (const el of page.elements) el.links = el.links.filter((l) => !gone.has(l));
+  for (const pg of project.pages) for (const el of pg.elements) el.links = el.links.filter((l) => !gone.has(l));
   dropOrphanJunctions(page);
   refreshConductors(project);
 }
@@ -387,4 +388,58 @@ export function updateRevision(project: Project, index: number, patch: Partial<P
 export function deleteRevision(project: Project, index: number): void {
   if (!project.revisions[index]) throw new OpError(`No revision ${index + 1}`);
   project.revisions.splice(index, 1);
+}
+
+// ---------------------------------------------------------------------------
+// Links (coil ↔ contacts, off-page pairs)
+
+function unlinkAll(project: Project, el: Element, keep: (other: Element) => boolean): void {
+  for (const id of [...el.links]) {
+    const o = locate(project, id);
+    if (o && keep(o.el)) continue;
+    el.links = el.links.filter((l) => l !== id);
+    if (o) o.el.links = o.el.links.filter((l) => l !== el.id);
+  }
+}
+
+/** Drive a contact from a coil (or detach it, with null). The contact takes the coil's tag. */
+export function linkContact(project: Project, contactId: string, coilId: string | null): void {
+  const c = locate(project, contactId);
+  if (!c) throw new OpError(`No element "${contactId}"`);
+  if (!isSlave(c.el)) throw new OpError("Only contacts can be linked to a coil");
+  unlinkAll(project, c.el, (o) => !isMaster(o));
+  if (!coilId) return;
+  const m = locate(project, coilId);
+  if (!m || !isMaster(m.el)) throw new OpError("That isn't a coil");
+  c.el.links.push(m.el.id);
+  if (!m.el.links.includes(c.el.id)) m.el.links.push(c.el.id);
+  c.el.tag = "";
+}
+
+/** Pair two off-page arrows (or unpair, with null). Their wires become one conductor. */
+export function linkOffpage(project: Project, aId: string, bId: string | null): void {
+  const a = locate(project, aId);
+  if (!a || a.el.symbol !== "offpage") throw new OpError("That isn't an off-page arrow");
+  unlinkAll(project, a.el, () => false);
+  if (bId) {
+    const b = locate(project, bId);
+    if (!b || b.el.symbol !== "offpage" || b.el.id === a.el.id) throw new OpError("Pick another off-page arrow");
+    unlinkAll(project, b.el, () => false);
+    a.el.links.push(b.el.id);
+    b.el.links.push(a.el.id);
+  }
+  refreshConductors(project);
+}
+
+/** Set a wire number by hand. Locked numbers survive renumbering. */
+export function setConductorNumber(project: Project, conductorId: string, number: string, locked = true): void {
+  const c = project.conductors.find((x) => x.id === conductorId);
+  if (!c) throw new OpError(`No conductor "${conductorId}"`);
+  c.number = number.trim();
+  if (locked && c.number) c.locked = true;
+  else delete c.locked;
+}
+
+export function setNumberingScheme(project: Project, scheme: Project["numbering"]["scheme"]): void {
+  project.numbering = { scheme };
 }

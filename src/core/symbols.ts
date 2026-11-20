@@ -33,7 +33,7 @@ export type Prim =
   | { t: "arc"; from: Vec; to: Vec; r: number; sweep: 0 | 1 }
   | { t: "text"; at: Vec; text: string; size: number; anchor: Anchor; role: TextRole };
 
-export type TextRole = "tag" | "label" | "term" | "note";
+export type TextRole = "tag" | "label" | "term" | "note" | "xref";
 
 export interface TerminalDef {
   name: string;
@@ -124,11 +124,21 @@ function bool(el: Element, key: string, fallback: boolean): boolean {
   return typeof v === "boolean" ? v : fallback;
 }
 
-/** Tag on the left of a vertical symbol, label under it. */
+/**
+ * Tag on the left of a vertical symbol, its cross-reference under it, and
+ * the label under that. An empty cross-reference closes up.
+ */
 function tagAndLabel(x: number, el: Element): Prim[] {
-  const out: Prim[] = [text(x, 0.55, "{tag}", TAG, "end", "tag")];
-  if (el.label) out.push(text(x, 2.2, el.label, LABEL, "end", "label"));
+  const out: Prim[] = [text(x, 0.55, "{tag}", TAG, "end", "tag"), text(x, 1.95, "{xref}", TERM, "end", "xref")];
+  if (el.label) out.push(text(x, 3.35, "{label}", LABEL, "end", "label"));
   return out;
+}
+
+/** Contact terminal markings from the pole number set by renumbering: 1 → 13/14, 2 → 23/24… */
+function poleMarks(el: Element, base: [string, string]): [string, string] {
+  const pole = num(el, "pole", 0, 0, 9);
+  if (!pole) return base;
+  return [`${pole}${base[0].slice(-1)}`, `${pole}${base[1].slice(-1)}`];
 }
 
 const vterms = (a: string, b: string, half = 3): TerminalDef[] => [
@@ -153,9 +163,11 @@ function ncContact(dx = 0): Prim[] {
 const NO_MID: Vec = [-0.6, 0];
 const NC_MID: Vec = [0.65, -0.15];
 
-function contactTerms(labels: [string, string]): { prims: Prim[]; terminals: TerminalDef[] } {
+/** Terminal names are fixed (wires refer to them); the printed marks follow the pole number. */
+function contactTerms(labels: [string, string], el?: Element): { prims: Prim[]; terminals: TerminalDef[] } {
+  const marks = el ? poleMarks(el, labels) : labels;
   return {
-    prims: [term(0.45, -2.2, labels[0]), term(0.45, 2.9, labels[1])],
+    prims: [term(0.45, -2.2, marks[0]), term(0.45, 2.9, marks[1])],
     terminals: vterms(labels[0], labels[1]),
   };
 }
@@ -201,7 +213,7 @@ const SYMBOLS: SymbolDef[] = [
     params: [familyParam],
     kind: familyKind,
     draw(el) {
-      const t = contactTerms(["13", "14"]);
+      const t = contactTerms(["13", "14"], el);
       return {
         prims: [...noContact(), ...t.prims, ...tagAndLabel(-1.9, el)],
         terminals: t.terminals,
@@ -217,7 +229,7 @@ const SYMBOLS: SymbolDef[] = [
     params: [familyParam],
     kind: familyKind,
     draw(el) {
-      const t = contactTerms(["21", "22"]);
+      const t = contactTerms(["21", "22"], el);
       return {
         prims: [...ncContact(), ...t.prims, ...tagAndLabel(-0.8, el)],
         terminals: t.terminals,
@@ -239,9 +251,9 @@ const SYMBOLS: SymbolDef[] = [
           line([-2, -3], [-2, -1.5], [-0.9, -1.5]),
           line([0, 1.5], [0, 3]),
           line([0, 1.5], [-1.1, -1.7]),
-          term(0.45, -2.2, "14"),
-          term(-2.45, -2.2, "12", "end"),
-          term(0.45, 2.9, "11"),
+          term(0.45, -2.2, poleMarks(el, ["14", "11"])[0]),
+          term(-2.45, -2.2, poleMarks(el, ["12", "11"])[0], "end"),
+          term(0.45, 2.9, poleMarks(el, ["14", "11"])[1]),
           ...tagAndLabel(-2.6, el).map((p) => (p.t === "text" ? { ...p, at: [p.at[0], p.at[1] + 1.2] as Vec } : p)),
         ],
         terminals: [
@@ -297,7 +309,7 @@ const SYMBOLS: SymbolDef[] = [
           line([mid[0], mid[1] - 0.15], [ax, -0.15]),
           line([mid[0], mid[1] + 0.15], [ax, 0.15]),
           arc,
-          ...contactTerms(labels).prims,
+          ...contactTerms(labels, el).prims,
           ...tagAndLabel(-3, el),
         ],
         terminals: vterms(labels[0], labels[1]),
@@ -393,6 +405,17 @@ const SYMBOLS: SymbolDef[] = [
     group: "Protection",
     palette: true,
     params: [
+      {
+        key: "function",
+        label: "Function",
+        type: "select",
+        default: "isolator",
+        options: [
+          { value: "isolator", label: "Isolator / switch-disconnector (Q)" },
+          { value: "contactor", label: "Contactor main contacts (Q)" },
+          { value: "breaker", label: "Circuit breaker / MCB (F)" },
+        ],
+      },
       { key: "poles", label: "Main poles", type: "number", min: 1, max: 4, default: 3 },
       { key: "aux", label: "Auxiliary poles (NO)", type: "number", min: 0, max: 3, default: 0 },
       { key: "operator", label: "Operator", type: "select", default: "turn", options: [
@@ -401,8 +424,12 @@ const SYMBOLS: SymbolDef[] = [
         { value: "none", label: "None" },
       ] },
     ],
-    kind: () => "isolator",
+    kind: (el) => {
+      const f = str(el, "function", "isolator");
+      return f === "contactor" ? "contactor" : f === "breaker" ? "breaker" : "isolator";
+    },
     draw(el) {
+      const fn = str(el, "function", "isolator");
       const poles = num(el, "poles", 3, 1, 4);
       const aux = num(el, "aux", 0, 0, 3);
       const gap = 3;
@@ -415,12 +442,16 @@ const SYMBOLS: SymbolDef[] = [
         const a = isAux ? `${i - poles + 1}3` : `${2 * i + 1}`;
         const b = isAux ? `${i - poles + 1}4` : `${2 * i + 2}`;
         prims.push(...noContact(x));
-        if (!isAux) prims.push(line([x - 0.5, -1.5], [x + 0.5, -1.5]));
+        if (!isAux && fn === "isolator") prims.push(line([x - 0.5, -1.5], [x + 0.5, -1.5]));
+        // IEC contactor function: a small arc at the fixed contact.
+        if (!isAux && fn === "contactor") prims.push({ t: "arc", from: [x, -1.5], to: [x, -0.5], r: 0.5, sweep: 1 });
+        // Circuit breaker function: a cross at the fixed contact.
+        if (!isAux && fn === "breaker") prims.push(line([x - 0.4, -1.9], [x + 0.4, -1.1]), line([x - 0.4, -1.1], [x + 0.4, -1.9]));
         prims.push(term(x + 0.45, -2.2, a), term(x + 0.45, 2.9, b));
         terminals.push({ name: a, at: [x, -3], dir: "up" }, { name: b, at: [x, 3], dir: "down" });
       }
       const lastX = (total - 1) * gap + (aux > 0 ? 1 : 0);
-      const op = str(el, "operator", "turn");
+      const op = fn === "contactor" ? "none" : str(el, "operator", "turn");
       const hx = -2.4;
       prims.push(dashed([op === "none" ? NO_MID[0] : hx, 0], [lastX + NO_MID[0], 0]));
       if (op === "turn") prims.push(...turnHead(hx));
@@ -575,7 +606,7 @@ const SYMBOLS: SymbolDef[] = [
     name: "Terminal",
     group: "Connection",
     palette: true,
-    params: [],
+    params: [{ key: "strip", label: "Terminal strip", type: "text", default: "X1" }],
     kind: () => "terminal",
     bridged: () => [["1", "2"]],
     draw(el) {
@@ -712,7 +743,7 @@ const SYMBOLS: SymbolDef[] = [
           heavy(BAR_W, [0, 0], [len, 0]),
           ...(name ? [text(-0.8, 0.5, name, LABEL, "end", "note")] : []),
           text(len / 2, -1, "{tag}", TAG, "middle", "tag"),
-          ...(el.label ? [text(len / 2, 2.2, el.label, LABEL, "middle", "label")] : []),
+          ...(el.label ? [text(len / 2, 2.2, "{label}", LABEL, "middle", "label")] : []),
         ],
         terminals: railTerminals(el),
         body: { x: 0, y: -0.3, w: len, h: 0.6 },
@@ -764,16 +795,15 @@ const SYMBOLS: SymbolDef[] = [
     name: "Off-page arrow",
     group: "Drawing",
     palette: true,
-    params: [{ key: "ref", label: "Reference", type: "text", default: "" }],
+    params: [{ key: "ref", label: "Reference (if not linked)", type: "text", default: "" }],
     kind: () => null,
     draw(el) {
-      const ref = str(el, "ref", "");
       return {
         prims: [
           line([0, -2], [0, 0]),
           { t: "poly", pts: [[-0.8, 0], [0.8, 0], [0, 1.3]], fill: false },
-          ...(ref ? [text(1.2, 1, ref, LABEL, "start", "note")] : []),
-          ...(el.label ? [text(-1.2, 1, el.label, LABEL, "end", "label")] : []),
+          text(1.2, 1, "{xref}", LABEL, "start", "xref"),
+          ...(el.label ? [text(-1.2, 1, "{label}", LABEL, "end", "label")] : []),
         ],
         terminals: [{ name: "1", at: [0, -2], dir: "up" }],
         body: { x: -0.8, y: 0, w: 1.6, h: 1.3 },
@@ -880,16 +910,36 @@ function primBounds(p: Prim): Rect | null {
   }
 }
 
+export interface GeometryText {
+  /** Tag as drawn. */
+  tag: string;
+  /** Cross-reference under the tag (e.g. where the coil is). */
+  xref?: string;
+  /** Label with any fields filled in. Defaults to the element's label. */
+  label?: string;
+}
+
 /**
- * Element geometry relative to its origin, already rotated.
- * `tag` replaces the `{tag}` placeholder in tag texts.
+ * Element geometry relative to its origin, already rotated, with the tag,
+ * cross-reference and label placeholders filled in.
  */
-export function localGeometry(el: Element, tag: string): Geometry {
+export function localGeometry(el: Element, texts: string | GeometryText): Geometry {
+  const t: GeometryText = typeof texts === "string" ? { tag: texts } : texts;
   const def = requireSymbol(el.symbol);
   const d = def.draw(el);
-  const prims = d.prims.map((p) => {
+  // With no cross-reference, close up the gap it would have left.
+  let raw = d.prims;
+  const xrefPrim = raw.find((p) => p.t === "text" && p.text === "{xref}");
+  if (xrefPrim && xrefPrim.t === "text" && !t.xref) {
+    const y0 = xrefPrim.at[1];
+    raw = raw
+      .filter((p) => p !== xrefPrim)
+      .map((p) => (p.t === "text" && p.role === "label" && p.at[1] > y0 ? { ...p, at: [p.at[0], p.at[1] - 1.4] as Vec } : p));
+  }
+  const fill = (s: string) => (s === "{tag}" ? t.tag : s === "{xref}" ? (t.xref ?? "") : s === "{label}" ? (t.label ?? el.label) : s);
+  const prims = raw.map((p) => {
     const q = rotatePrim(p, el.rot);
-    return q.t === "text" && q.text === "{tag}" ? { ...q, text: tag } : q;
+    return q.t === "text" ? { ...q, text: fill(q.text) } : q;
   });
   const terminals = d.terminals.map((t) => ({ ...t, at: rotate(t.at, el.rot), dir: rotateDir(t.dir, el.rot) }));
   const body = rotateRect(d.body, el.rot);

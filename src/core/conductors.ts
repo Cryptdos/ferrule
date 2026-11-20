@@ -16,6 +16,9 @@ const unkey = (k: string): TerminalRef => k.split("\u0000") as TerminalRef;
 
 class UnionFind {
   private parent = new Map<string, string>();
+  has(x: string) {
+    return this.parent.has(x);
+  }
   add(x: string) {
     if (!this.parent.has(x)) this.parent.set(x, x);
   }
@@ -77,6 +80,18 @@ export function refreshConductors(project: Project): void {
     }
   }
 
+  // Linked off-page arrows carry the conductor onto the other page.
+  for (const page of project.pages) {
+    for (const el of page.elements) {
+      if (el.symbol !== "offpage") continue;
+      for (const other of el.links) {
+        const a = key([el.id, "1"]);
+        const b = key([other, "1"]);
+        if (uf.has(a) && uf.has(b)) uf.union(a, b);
+      }
+    }
+  }
+
   const old = project.conductors;
   const oldOf = new Map<string, Conductor>();
   for (const c of old) for (const t of c.terminals) oldOf.set(key(t), c);
@@ -97,6 +112,7 @@ export function refreshConductors(project: Project): void {
     const conductor: Conductor = {
       id: best?.id ?? newId("c"),
       number: best?.number ?? "",
+      ...(best?.locked ? { locked: true } : {}),
       terminals: group.map(unkey),
     };
     used.add(conductor.id);

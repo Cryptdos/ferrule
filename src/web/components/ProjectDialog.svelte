@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { addRevision, deleteRevision, updateProjectInfo, updateRevision } from "../../core/ops";
+  import { addRevision, deleteRevision, setNumberingScheme, updateProjectInfo, updateRevision } from "../../core/ops";
   import type { ProjectInfo, Revision } from "../../core/model";
   import type { Editor } from "../editor.svelte";
 
@@ -42,6 +42,21 @@
         </label>
       {/each}
     </div>
+    <h3>Numbering</h3>
+    <label class="inline">
+      Scheme
+      <select
+        value={editor.project.numbering.scheme}
+        onchange={(e) => {
+          const v = e.currentTarget.value as "position" | "sequential";
+          editor.apply((p) => setNumberingScheme(p, v));
+        }}
+      >
+        <option value="position">Position: K10-16, wire 11-22 (sheet-column)</option>
+        <option value="sequential">Sequential: K1, K2…, wire 100, 101…</option>
+      </select>
+    </label>
+    <p class="hint">Takes effect next time you press Renumber.</p>
     <h3>Revisions</h3>
     <table>
       <thead>

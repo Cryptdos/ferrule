@@ -1,8 +1,20 @@
 <script lang="ts">
   import { columnOf } from "../../core/geometry";
-  import { deleteElements, deleteSegments, renamePage, resetRoute, rotateElements, updateElement, type ElementPatch } from "../../core/ops";
+  import {
+    deleteElements,
+    deleteSegments,
+    linkContact,
+    linkOffpage,
+    renamePage,
+    resetRoute,
+    rotateElements,
+    setConductorNumber,
+    updateElement,
+    type ElementPatch,
+  } from "../../core/ops";
+  import { address, contactMarks, contactType, isMaster, isSlave, masterOf, partnerOf, slavesOf } from "../../core/xref";
   import { requireSymbol } from "../../core/symbols";
-  import { tagPrefix } from "../../core/tags";
+  import { displayTag, tagPrefix } from "../../core/tags";
   import type { ParamValue } from "../../core/model";
   import type { Editor } from "../editor.svelte";
 
@@ -29,21 +41,95 @@
   function setParam(key: string, value: ParamValue) {
     patch({ params: { [key]: value } });
   }
+
+  /** Every coil in the project, for the contact link dropdown. */
+  const coils = $derived(
+    editor.project.pages.flatMap((pg) =>
+      pg.elements.filter(isMaster).map((el) => ({ el, label: `${displayTag(el, editor.project)}  (sheet ${pg.number}, col ${columnOf(el.pos[0])})${el.label ? " " + el.label : ""}` })),
+    ),
+  );
+  const arrows = $derived(
+    editor.project.pages.flatMap((pg) =>
+      pg.elements
+        .filter((e) => e.symbol === "offpage" && e.id !== one?.id)
+        .map((el) => ({ el, label: `${address(pg, el.pos)}${el.label ? " " + el.label : ""}` })),
+    ),
+  );
 </script>
 
 <div class="props">
   {#if one && def}
     <h3>{def.name}</h3>
     <div class="pos">Sheet {page.number} · column {columnOf(one.pos[0])} · ({one.pos[0]}, {one.pos[1]})</div>
-    {#if def.kind(one)}
+    {@const master = masterOf(editor.project, one)}
+    {#if isSlave(one)}
+      <label>
+        Driven by coil
+        <select
+          value={master?.el.id ?? ""}
+          onchange={(e) => {
+            const v = e.currentTarget.value || null;
+            const id = one.id;
+            editor.apply((p) => linkContact(p, id, v));
+          }}
+        >
+          <option value="">Not linked</option>
+          {#each coils as c (c.el.id)}
+            <option value={c.el.id}>{c.label}</option>
+          {/each}
+        </select>
+      </label>
+      {#if master}
+        <button class="link-btn" onclick={() => editor.goTo(master.el.id)}>Go to coil {displayTag(master.el, editor.project)} →</button>
+      {/if}
+    {/if}
+    {#if def.kind(one) && !master}
       <label>
         Tag
         <input
           value={one.tag}
-          placeholder="{tagPrefix(one, editor.project)}? (numbered later)"
+          placeholder={one.symbol === "terminal" ? "numbered by Renumber" : `${tagPrefix(one, editor.project)}? (numbered by Renumber)`}
           onchange={(e) => patch({ tag: e.currentTarget.value })}
         />
       </label>
+      <label class="check">
+        <input type="checkbox" checked={one.params.locked === true} onchange={(e) => setParam("locked", e.currentTarget.checked)} />
+        Lock tag (Renumber keeps it)
+      </label>
+    {/if}
+    {#if isMaster(one)}
+      {@const slaves = slavesOf(editor.project, one)}
+      <div class="sub">Contacts ({slaves.length})</div>
+      {#if slaves.length === 0}
+        <p class="hint">None yet. Select a contact and pick this coil under “Driven by coil”.</p>
+      {/if}
+      {#each slaves as s (s.el.id)}
+        <button class="link-btn" onclick={() => editor.goTo(s.el.id)}>
+          {contactType(s.el)} {contactMarks(s.el)} at {address(s.page, s.el.pos)} →
+        </button>
+      {/each}
+    {/if}
+    {#if one.symbol === "offpage"}
+      {@const partner = partnerOf(editor.project, one)}
+      <label>
+        Continues at
+        <select
+          value={partner?.el.id ?? ""}
+          onchange={(e) => {
+            const v = e.currentTarget.value || null;
+            const id = one.id;
+            editor.apply((p) => linkOffpage(p, id, v));
+          }}
+        >
+          <option value="">Not linked</option>
+          {#each arrows as a (a.el.id)}
+            <option value={a.el.id}>{a.label}</option>
+          {/each}
+        </select>
+      </label>
+      {#if partner}
+        <button class="link-btn" onclick={() => editor.goTo(partner.el.id)}>Go to {address(partner.page, partner.el.pos)} →</button>
+      {/if}
     {/if}
     {#if one.symbol !== "junction" && one.symbol !== "rail"}
       <label>
@@ -99,7 +185,34 @@
     {@const cond = editor.project.conductors.find((c) => c.id === seg.conductor)}
     <h3>Wire</h3>
     <div class="pos">{describe(seg.from)} → {describe(seg.to)}</div>
-    <div class="row">Conductor: {cond?.number || "not numbered yet"} ({cond?.terminals.length ?? 0} terminals)</div>
+    {#if cond}
+      <label>
+        Wire number
+        <input
+          value={cond.number}
+          placeholder="set by Renumber"
+          onchange={(e) => {
+            const v = e.currentTarget.value;
+            const id = cond.id;
+            editor.apply((p) => setConductorNumber(p, id, v, true));
+          }}
+        />
+      </label>
+      <label class="check">
+        <input
+          type="checkbox"
+          checked={cond.locked === true}
+          onchange={(e) => {
+            const locked = e.currentTarget.checked;
+            const id = cond.id;
+            const n = cond.number;
+            editor.apply((p) => setConductorNumber(p, id, n, locked));
+          }}
+        />
+        Lock number (Renumber keeps it)
+      </label>
+      <div class="row">Conductor joins {cond.terminals.length} terminals</div>
+    {/if}
     <div class="row">Route: {seg.route === "manual" ? "adjusted by hand" : "automatic"}</div>
     <p class="hint">Drag a leg of the wire to move it. The ends stay on their terminals.</p>
     <div class="buttons">
@@ -203,6 +316,17 @@
   .row {
     font-size: 12px;
     color: #445;
+  }
+  .sub {
+    font-size: 12px;
+    font-weight: 600;
+    color: #334;
+    margin-top: 4px;
+  }
+  .link-btn {
+    text-align: left;
+    font-size: 12px;
+    padding: 3px 8px;
   }
   .buttons {
     display: flex;

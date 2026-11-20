@@ -56,8 +56,10 @@ export interface Segment {
 
 export interface Conductor {
   id: string;
-  /** Wire number; empty until numbered (milestone 4). */
+  /** Wire number; empty until numbered. */
   number: string;
+  /** Keep this number when renumbering. */
+  locked?: boolean;
   terminals: TerminalRef[];
 }
 
@@ -77,11 +79,15 @@ export interface Revision {
   description: string;
 }
 
+export type NumberingScheme = "position" | "sequential";
+
 export interface Project {
   format: typeof FORMAT;
   version: number;
   id: string;
   project: ProjectInfo;
+  /** How renumbering assigns tags and wire numbers (DESIGN.md §8). */
+  numbering: { scheme: NumberingScheme };
   designation: { standard: string; overrides: Record<string, string> };
   titleBlock: string;
   plant: unknown[];
@@ -124,6 +130,7 @@ export function newProject(id: string, title = "Untitled project"): Project {
     version: FORMAT_VERSION,
     id,
     project: emptyInfo(title),
+    numbering: { scheme: "position" },
     designation: { standard: "iec-81346-2-2019", overrides: {} },
     titleBlock: "default-a4",
     plant: [],
