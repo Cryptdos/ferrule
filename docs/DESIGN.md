@@ -175,7 +175,7 @@ Each page has a real boundary between panel internals and field equipment, not j
 - Each project picks a **designation standard** from a list, e.g. IEC 81346 or BS 3939. This sets the letter prefixes for every component type (relay, contactor, fuse, lamp, switch, terminal, transformer, motor, sensor).
 - The standard is applied project-wide. Changing it relabels the whole project.
 - Custom overrides (e.g. R for relays) are allowed per component type, but discouraged: they sit behind an "advanced" option and the project shows that it deviates from its standard.
-- Exact prefix tables for each standard are to be confirmed against the standards before implementation.
+- Prefix tables: see [`designations.md`](designations.md). IEC 81346-2:2019 single-letter table is done; BS 3939 needs a copy of the standard.
 
 ### Position-based numbering (default)
 
@@ -267,12 +267,14 @@ Reference drawings from other companies are proprietary. They are never committe
 | Designations | Selectable standard (IEC, BS 3939…), custom overrides discouraged |
 | Numbering | Position-based (page-column) by default |
 | PDF | Flat, no clickable links |
+| Designation default | IEC 81346-2:2019, single-letter prefixes |
 | Collisions | Topmost keeps plain address; then A, B, C… down the column |
 | CI | GitHub Actions: install, type-check, test on every push and PR |
 
 ## 16. Open questions
 
-- Exact prefix tables for each supported standard.
+- Two-letter IEC 81346-2 subclass codes (needs the full standard; we only have the preview).
+- BS 3939 prefix table (needs a copy of the standard).
 
 ## 17. CI
 
