@@ -5,7 +5,7 @@ A lightweight, browser-based tool for drafting control panel schematics: symbols
 - [Design document](docs/DESIGN.md)
 - [Benchmark: LSP-01 life safety panel](docs/benchmark-lsp01.md)
 
-Status: milestone 1 (skeleton).
+Status: milestone 2 (wires).
 
 ## Running it
 
@@ -37,10 +37,14 @@ bun test
 | `src/server` | Bun + Hono server: project storage and the API, serves the UI. |
 | `src/web` | Svelte UI, drawing in SVG. |
 
+Wire routing uses [libavoid-js](https://github.com/Aksem/libavoid-js) (LGPL-2.1-or-later), loaded as a separate WebAssembly file.
+
 ## Using the editor
 
 - Pick a symbol on the left and click on the sheet to place it. `Esc` goes back to selecting.
 - Drag to move (snaps to the grid), drag on empty paper to box-select, `Shift`/`Ctrl`+click to add to the selection.
 - `R` rotate, `Del` delete, `Ctrl+D` duplicate, arrow keys nudge, `Ctrl+Z`/`Ctrl+Y` undo/redo, `F` fit.
 - Scroll to zoom, middle-drag or `Space`+drag to pan.
+- `W` wire tool: click a terminal, then another. Click part-way along a wire to tee into it (a junction dot is added). Wires to a rail drop straight onto it. `S` or `Esc` goes back to selecting.
+- Wires route themselves at right angles around symbols. Select a wire and drag one of its legs to adjust it by hand; *Reset route* hands it back to the router.
 - Saving is automatic.

@@ -5,7 +5,10 @@
  */
 import type { Project } from "../core/model";
 import { OpError } from "../core/ops";
+import { routePage } from "../core/routing";
+import { refreshConductors } from "../core/conductors";
 import { api } from "./api";
+import { getAvoid } from "./avoid";
 
 export type Tool = "select" | "place" | "wire";
 export type SaveState = "saved" | "pending" | "saving" | "error";
@@ -33,10 +36,24 @@ export class Editor {
   constructor(project: Project) {
     this.project = project;
     this.pageId = project.pages[0]?.id ?? "";
+    // Wires added outside the editor may not have routes yet.
+    for (const page of this.project.pages) {
+      if (page.segments.some((s) => s.points.length < 2)) routePage(getAvoid(), page);
+    }
   }
 
   get page() {
     return this.project.pages.find((p) => p.id === this.pageId) ?? this.project.pages[0]!;
+  }
+
+  get selectedElements() {
+    const ids = new Set(this.selection);
+    return this.page.elements.filter((e) => ids.has(e.id));
+  }
+
+  get selectedSegments() {
+    const ids = new Set(this.selection);
+    return this.page.segments.filter((s) => ids.has(s.id));
   }
 
   get pageIndex() {
@@ -48,6 +65,9 @@ export class Editor {
     const before = JSON.stringify($state.snapshot(this.project));
     try {
       fn(this.project);
+      // Keep every wire on the current page attached and routed.
+      routePage(getAvoid(), this.page);
+      refreshConductors(this.project);
     } catch (e) {
       // Roll back anything the operation changed before it failed.
       this.project = JSON.parse(before);
@@ -82,7 +102,7 @@ export class Editor {
   private restore(json: string): void {
     this.project = JSON.parse(json);
     if (!this.project.pages.some((p) => p.id === this.pageId)) this.pageId = this.project.pages[0]!.id;
-    const ids = new Set(this.page.elements.map((e) => e.id));
+    const ids = new Set([...this.page.elements.map((e) => e.id), ...this.page.segments.map((s) => s.id)]);
     this.selection = this.selection.filter((id) => ids.has(id));
     this.syncHistoryFlags();
     this.scheduleSave();

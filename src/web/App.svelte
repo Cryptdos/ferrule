@@ -1,5 +1,6 @@
 <script lang="ts">
   import { api } from "./api";
+  import { loadAvoid } from "./avoid";
   import { Editor } from "./editor.svelte";
   import EditorView from "./components/EditorView.svelte";
   import Picker from "./components/Picker.svelte";
@@ -20,7 +21,7 @@
       return;
     }
     try {
-      const project = await api.load(id);
+      const [project] = await Promise.all([api.load(id), loadAvoid()]);
       editor = new Editor(project);
       const url = `?project=${encodeURIComponent(id)}`;
       if (location.search !== url) history.pushState(null, "", url);

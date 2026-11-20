@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { deleteElements, duplicateElements, moveElements, rotateElements } from "../../core/ops";
+  import { deleteElements, deleteSegments, duplicateElements, moveElements, rotateElements } from "../../core/ops";
   import type { Editor } from "../editor.svelte";
   import Canvas from "./Canvas.svelte";
   import Palette from "./Palette.svelte";
@@ -21,7 +21,8 @@
   function onKey(e: KeyboardEvent) {
     if (isTyping(e)) return;
     const ctrl = e.ctrlKey || e.metaKey;
-    const ids = editor.selection;
+    const ids = editor.selectedElements.map((el) => el.id);
+    const segIds = editor.selectedSegments.map((s) => s.id);
     const pageId = editor.pageId;
     if (ctrl && e.key.toLowerCase() === "z") {
       e.preventDefault();
@@ -35,7 +36,10 @@
       void editor.saveNow();
     } else if (ctrl && e.key.toLowerCase() === "a") {
       e.preventDefault();
-      editor.selection = editor.page.elements.map((el) => el.id);
+      editor.selection = [
+        ...editor.page.elements.filter((el) => el.symbol !== "junction").map((el) => el.id),
+        ...editor.page.segments.map((s) => s.id),
+      ];
     } else if (ctrl && e.key.toLowerCase() === "d") {
       e.preventDefault();
       if (!ids.length) return;
@@ -45,16 +49,26 @@
       });
       editor.selection = copies;
     } else if (e.key === "Delete" || e.key === "Backspace") {
-      if (!ids.length) return;
+      if (!ids.length && !segIds.length) return;
       e.preventDefault();
-      editor.apply((p) => deleteElements(p, pageId, ids));
+      editor.apply((p) => {
+        deleteSegments(p, pageId, segIds);
+        deleteElements(p, pageId, ids);
+      });
       editor.selection = [];
     } else if (e.key === "r" || e.key === "R") {
       if (ids.length) editor.apply((p) => rotateElements(p, pageId, ids));
     } else if (e.key === "Escape") {
+      if (canvas?.cancel()) return;
       editor.tool = "select";
       editor.placeSymbol = null;
       editor.selection = [];
+    } else if (e.key === "w" || e.key === "W") {
+      editor.tool = "wire";
+      editor.placeSymbol = null;
+    } else if (e.key === "s" || e.key === "S") {
+      editor.tool = "select";
+      editor.placeSymbol = null;
     } else if (e.key.startsWith("Arrow") && ids.length) {
       e.preventDefault();
       const step = e.shiftKey ? 2 : 1;
@@ -84,6 +98,9 @@
     <div class="tools">
       <button class:active={editor.tool === "select"} onclick={() => ((editor.tool = "select"), (editor.placeSymbol = null))}>
         Select
+      </button>
+      <button class:active={editor.tool === "wire"} onclick={() => ((editor.tool = "wire"), (editor.placeSymbol = null))} title="Draw wires (W)">
+        Wire
       </button>
       <span class="sep"></span>
       <button disabled={!editor.canUndo} onclick={() => editor.undo()} title="Undo (Ctrl+Z)">Undo</button>

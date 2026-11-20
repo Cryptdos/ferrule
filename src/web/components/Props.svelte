@@ -1,6 +1,6 @@
 <script lang="ts">
   import { columnOf } from "../../core/geometry";
-  import { deleteElements, rotateElements, updateElement, type ElementPatch } from "../../core/ops";
+  import { deleteElements, deleteSegments, resetRoute, rotateElements, updateElement, type ElementPatch } from "../../core/ops";
   import { requireSymbol } from "../../core/symbols";
   import { tagPrefix } from "../../core/tags";
   import type { ParamValue } from "../../core/model";
@@ -10,6 +10,14 @@
 
   const page = $derived(editor.page);
   const sel = $derived(page.elements.filter((e) => editor.selection.includes(e.id)));
+  const segs = $derived(page.segments.filter((s) => editor.selection.includes(s.id)));
+  const describe = (ref: [string, string]) => {
+    const el = page.elements.find((e) => e.id === ref[0]);
+    if (!el) return "?";
+    if (el.symbol === "junction") return "junction";
+    const name = el.tag || requireSymbol(el.symbol).name;
+    return `${name}:${ref[1]}`;
+  };
   const one = $derived(sel.length === 1 ? sel[0]! : null);
   const def = $derived(one ? requireSymbol(one.symbol) : null);
 
@@ -86,13 +94,48 @@
     <div class="row">
       <span>Rotation {one.rot}°</span>
     </div>
-  {:else if sel.length > 1}
-    <h3>{sel.length} elements selected</h3>
+  {:else if segs.length === 1 && sel.length === 0}
+    {@const seg = segs[0]!}
+    {@const cond = editor.project.conductors.find((c) => c.id === seg.conductor)}
+    <h3>Wire</h3>
+    <div class="pos">{describe(seg.from)} → {describe(seg.to)}</div>
+    <div class="row">Conductor: {cond?.number || "not numbered yet"} ({cond?.terminals.length ?? 0} terminals)</div>
+    <div class="row">Route: {seg.route === "manual" ? "adjusted by hand" : "automatic"}</div>
+    <p class="hint">Drag a leg of the wire to move it. The ends stay on their terminals.</p>
+    <div class="buttons">
+      <button
+        disabled={seg.route !== "manual"}
+        onclick={() => editor.apply((p) => resetRoute(p, editor.pageId, [seg.id]))}>Reset route</button
+      >
+      <button
+        class="danger"
+        onclick={() => {
+          editor.apply((p) => deleteSegments(p, editor.pageId, [seg.id]));
+          editor.selection = [];
+        }}>Delete</button
+      >
+    </div>
+  {:else if sel.length + segs.length > 1}
+    <h3>{sel.length} elements, {segs.length} wires selected</h3>
+    {#if segs.some((s) => s.route === "manual")}
+      <div class="buttons">
+        <button
+          onclick={() => {
+            const ids = segs.map((s) => s.id);
+            editor.apply((p) => resetRoute(p, editor.pageId, ids));
+          }}>Reset wire routes</button
+        >
+      </div>
+    {/if}
   {:else}
     <h3>Sheet {page.number}</h3>
     <p class="hint">
       Pick a symbol on the left and click to place it. Drag to move, <kbd>R</kbd> to rotate, <kbd>Del</kbd> to delete,
       <kbd>Ctrl</kbd>+<kbd>D</kbd> to duplicate. Scroll to zoom, middle-drag or <kbd>Space</kbd>+drag to pan.
+    </p>
+    <p class="hint">
+      <kbd>W</kbd> wire tool: click a terminal, then another. Click on a wire to tee into it. <kbd>Esc</kbd> cancels,
+      <kbd>S</kbd> back to select.
     </p>
   {/if}
   {#if sel.length > 0}
@@ -107,7 +150,11 @@
         class="danger"
         onclick={() => {
           const ids = sel.map((e) => e.id);
-          editor.apply((p) => deleteElements(p, editor.pageId, ids));
+          const segIds = segs.map((s) => s.id);
+          editor.apply((p) => {
+            deleteSegments(p, editor.pageId, segIds);
+            deleteElements(p, editor.pageId, ids);
+          });
           editor.selection = [];
         }}>Delete</button
       >

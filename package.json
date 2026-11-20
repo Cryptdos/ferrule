@@ -20,6 +20,7 @@
     "vite": "^6"
   },
   "dependencies": {
-    "hono": "^4"
+    "hono": "^4",
+    "libavoid-js": "0.5.0-beta.6"
   }
 }
