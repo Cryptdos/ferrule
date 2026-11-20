@@ -112,7 +112,7 @@ Draft shape:
 
 Decisions:
 
-- **Units:** grid units throughout. Millimetres only appear when fitting a page to A3 for printing. Control drawings have no scale.
+- **Units:** grid units throughout. Millimetres only appear when fitting a page to paper for printing. Control drawings have no scale.
 - **Conductors (potentials):** a conductor is every terminal joined by wire without passing through a component. It has one ID/number and a 1-to-many set of terminals: a start, and any number of mid and end points. Example: 102 starts at L, loops into R1 and on to S1; the R1–S1 link is still 102. The number only changes once the circuit passes through a contact, coil or other component. The drawn wire segments belong to a conductor, and numbering is a trace of the circuit.
 - **Templates and symbols:** live in a shared library. Using one copies it into the project, so library changes never alter existing projects.
 
