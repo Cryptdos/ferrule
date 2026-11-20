@@ -42,24 +42,25 @@ Class names are summarised, not quoted. See the standard for the definitions.
 
 ### Ferrule symbol mapping
 
-This is our application of the class definitions to the v1 symbol set (DESIGN.md §5). Mappings marked † are judgement calls worth checking against the full standard.
+This is our application of the class definitions to the v1 symbol set (DESIGN.md §5). The examples given for each class (supplied by the user from the standard) settle the earlier judgement calls: circuit breakers and motor protection switches are Q, not F.
 
 | Symbol | Prefix | Reasoning |
 |---|---|---|
 | Control relay coil and its contacts | K | Processes a signal and gives an output |
 | Timer relay coil and its contacts | K | As above, with time behaviour |
 | Contactor (power) and its contacts | Q | Controls the flow of energy to a load |
-| Isolator / switch-disconnector | Q | Controls energy flow (operated by hand, but its function is switching power) † |
+| Isolator / switch-disconnector | Q | Controls energy flow |
 | Fuse | F | Protecting |
-| MCB / circuit breaker | F † | Protecting. Some practice puts breakers under Q, since they also switch |
+| MCB / circuit breaker | Q | Listed under Q (controlling access or flow), with motor protection switches |
+| Surge protective device | F | Listed under F |
 | Push button | S | Detects a human action |
 | Selector switch / keyswitch | S | Detects a human action |
-| Lamp | P | Presents information |
+| Indicator lamp | P | Indicator lights are P. Lighting lamps would be E (emitting), but those aren't in our symbol set |
 | Motor | M | Driving |
 | Transformer | T | Transforming |
 | Terminal | X | Interfacing |
 | Socket outlet | X | Interfacing |
-| Earth terminal | X | Interfacing |
+| Earth terminal | X | Interfacing (terminals). Not listed explicitly |
 | Distribution block / busbar | W | Guiding (leads energy from one place to another) |
 | Cable | W | Guiding |
 | Differential pressure switch | B (BP) | Sensing; BP is pressure sensing, listed in the preview |
@@ -68,7 +69,7 @@ This is our application of the class definitions to the v1 symbol set (DESIGN.md
 Not tagged with a class letter:
 
 - **Off-page / continuation arrow:** a drawing feature, not an object.
-- **Plant views:** plant keeps its own user-defined tag (e.g. `SF-01`), shown on every view.
+- **Plant views:** plant keeps its own user-defined tag (e.g. `SF-01`), shown on every view. If a class letter is wanted later, fans and pumps are G and actuators are M.
 
 ## BS 3939
 

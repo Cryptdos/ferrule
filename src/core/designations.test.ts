@@ -17,6 +17,15 @@ describe("standards", () => {
   });
 });
 
+describe("IEC 81346-2:2019 mapping", () => {
+  test("breakers are Q, fuses are F, indicator lamps are P", () => {
+    const std = STANDARDS[0]!;
+    expect(std.prefixes.breaker).toBe("Q");
+    expect(std.prefixes.fuse).toBe("F");
+    expect(std.prefixes.lamp).toBe("P");
+  });
+});
+
 describe("validateOverride", () => {
   test("accepts a local habit like R for relays", () => {
     expect(validateOverride("R")).toBeNull();
