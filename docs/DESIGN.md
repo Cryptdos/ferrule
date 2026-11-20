@@ -310,6 +310,18 @@ GitHub Actions, in `.github/workflows/ci.yml`. Runs on every push and pull reque
 
 Later: render the LSP-01 benchmark and compare it against a stored result, so layout changes are caught.
 
+## 19. First build plan (agreed 2026-11-20)
+
+- **Scope:** milestones 1–3 (skeleton, wires with routing, pages + title block + A4 PDF export). Stop for review after that.
+- **Git:** one branch and pull request per milestone; the user reviews and merges. CI must pass on each PR.
+- **Delivery:** a portable Windows .exe built with `bun build --compile`. The user double-clicks it and opens the browser. Nothing to install on the Work PC.
+- **Drawing defaults:**
+  - Plain black and white.
+  - Terminal markings: A1/A2 on coils, 13/14 on NO contacts, 21/22 on NC contacts, L/N on lamps.
+  - Control rails: 24 V AC, labelled CCT and 0V. Further control circuits are CCT1, CCT2 … as needed.
+- **Symbols:** IEC 60617 shapes in our own plain style.
+- **Reference drawings** stay in the user's C:\Temp\eCAD folder and are never committed.
+
 ## 18. References
 
 - IEC symbol shapes for reference: https://symbols.radicasoftware.com/225/iec-symbols (draw our own; don't copy files unless the licence allows reuse).

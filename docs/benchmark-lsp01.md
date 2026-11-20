@@ -23,7 +23,7 @@ Each fan has a local isolator in the field.
 
 ## Drawing conventions
 
-- A3 landscape, columns 0–9 across the top, rows A–E down the side.
+- The original is A3 landscape, with columns 0–9 across the top and rows A–E down the side. Ferrule reproduces it on A4 landscape using its own grid (DESIGN.md §4a).
 - Title block along the bottom: status ticks (Provisional / For approval / Issued for construction / As built / As fitted), revision table, drawing number, sheet x of y, title, panel title, client.
 - A thick horizontal bar near the bottom of each sheet is the terminal rail and the panel boundary. Panel internals sit above it, field plant below it, joined by dashed field cables.
 - Each functional area is enclosed in a dashed **section box** with a label in the top-left corner.
@@ -78,4 +78,4 @@ Each fan has a local isolator in the field.
 3. Section titles, motor labels and door labels come from plant tags. Copy-paste tag mismatches must be impossible.
 4. Sheets 3–6 come from one section template, and sheets 8–9 from one controls template.
 5. The simulator runs the duty/standby, airflow-proving, timer trip and fans-fail latch logic as drawn, and exposes any faults in it. Finding real bugs in the original counts as a pass for the simulator, not a failure of the drawing test.
-6. The set exports to a clean A3 PDF with the title block filled from project data.
+6. The set exports to a clean A4 PDF with the title block filled from project data.
