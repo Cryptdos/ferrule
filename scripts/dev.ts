@@ -1,4 +1,5 @@
 /** Runs the server (with reload) and the Vite dev server together. */
+export {};
 const procs = [
   Bun.spawn(["bun", "run", "--watch", "src/server/main.ts", "--no-open"], { stdio: ["inherit", "inherit", "inherit"] }),
   Bun.spawn(["bunx", "vite"], { stdio: ["inherit", "inherit", "inherit"] }),
