@@ -4,8 +4,9 @@ A lightweight, browser-based tool for drafting control panel schematics: symbols
 
 - [Design document](docs/DESIGN.md)
 - [Benchmark: LSP-01 life safety panel](docs/benchmark-lsp01.md)
+- [MCP server: letting Claude draft drawings](docs/mcp.md)
 
-Status: milestones 1–7 (skeleton, wires, pages + title block + PDF, numbering + cross-references, plant + boundary + sections, element list + table view, templates + revisions).
+Status: milestones 1–8 (skeleton, wires, pages + title block + PDF, numbering + cross-references, plant + boundary + sections, element list + table view, templates + revisions, MCP server).
 
 ## Running it
 
@@ -30,6 +31,8 @@ bun run start      # start the server and open http://127.0.0.1:4810/
 Projects are saved as `<id>.ferrule.json` in a `projects` folder (next to the program when running as the .exe, otherwise in the current folder). The previous save is kept as `.bak`.
 
 Set `FERRULE_BROWSER` to the path of a Chromium-based browser to choose which one makes PDFs.
+
+**Claude:** Ferrule is also an MCP server, at `http://127.0.0.1:4810/mcp`, or `ferrule.exe --mcp` over stdio. See [docs/mcp.md](docs/mcp.md).
 
 Server options: `--port 4810`, `--host 0.0.0.0` (to reach it from another machine), `--projects <folder>`, `--no-open`.
 

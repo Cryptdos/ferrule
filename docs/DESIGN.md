@@ -297,6 +297,8 @@ Reference drawings from other companies are proprietary. They are never committe
 | PDF engine | Headless Edge/Chrome `--print-to-pdf` of the print view, not Playwright: Edge is on every Windows PC, so the portable .exe needs nothing installed. Browser *Print* as fallback |
 | Font | osifont (ISO 3098 lettering), LGPL-3 + font exception variant, bundled. The only font on drawings, screen and PDF; single weight, no bold |
 | Grid unit | 1 unit = 1.385 mm on A4 (2 units per column); symbols and terminals snap to whole units |
+| MCP transport | Streamable HTTP at /mcp (JSON replies, no SSE stream needed) plus `--mcp` stdio, which relays to a running Ferrule or starts one, so editor and Claude share one server |
+| Concurrent edits | Project files carry a version (file mtime). Saves send If-Match and are refused if someone else saved since; open editors get change events (file watch → SSE) and reload |
 | Wires to rails | Rail taps slide to sit directly above/below the other end, so rung wires stay straight when symbols move |
 
 ## 16. Open questions

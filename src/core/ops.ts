@@ -17,7 +17,7 @@ import {
   type TerminalRef,
   newId,
 } from "./model";
-import { defaultParams, requireSymbol, terminalPoint } from "./symbols";
+import { defaultParams, getSymbol, requireSymbol, terminalPoint } from "./symbols";
 import { isOrthogonal, routeOf, simplifyRoute } from "./wires";
 import { isMaster, isSlave, locate } from "./xref";
 
@@ -50,7 +50,7 @@ export function addElement(
   pos: Vec,
   opts: AddElementOptions = {},
 ): Element {
-  requireSymbol(symbol);
+  if (!getSymbol(symbol)) throw new OpError(`Unknown symbol "${symbol}" (see list_symbols)`);
   const page = getPage(project, pageId);
   const el: Element = {
     id: newId("e"),

@@ -3,7 +3,10 @@
   import type { Project } from "../../core/model";
   import Sheet from "./Sheet.svelte";
 
-  let { project, autoprint = false }: { project: Project; autoprint?: boolean } = $props();
+  /** `solo`: show just that sheet, filling the window (for screenshots). */
+  let { project, autoprint = false, solo = 0 }: { project: Project; autoprint?: boolean; solo?: number } = $props();
+
+  const pages = $derived(solo ? project.pages.filter((p) => p.number === solo) : project.pages);
 
   $effect(() => {
     document.title = `${project.project.drawingNo || project.project.title} — print`;
@@ -21,12 +24,13 @@
   });
 </script>
 
-{#each project.pages as page (page.id)}
+{#each pages as page (page.id)}
   <svg
     class="sheet"
+    class:solo={!!solo}
     xmlns="http://www.w3.org/2000/svg"
-    width="{SHEET_MM.w}mm"
-    height="{SHEET_MM.h}mm"
+    width={solo ? "100%" : `${SHEET_MM.w}mm`}
+    height={solo ? "100%" : `${SHEET_MM.h}mm`}
     viewBox="0 0 {SHEET_MM.w} {SHEET_MM.h}"
   >
     <Sheet {project} {page} />
@@ -42,6 +46,12 @@
     margin: 8mm auto;
     background: #fff;
     box-shadow: 0 1px 6px rgba(0, 0, 0, 0.4);
+  }
+  .sheet.solo {
+    position: fixed;
+    inset: 0;
+    margin: 0;
+    box-shadow: none;
   }
   @media print {
     :global(body.printing) {

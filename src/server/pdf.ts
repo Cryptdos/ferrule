@@ -12,6 +12,8 @@ import { join } from "node:path";
 export interface PdfRenderer {
   /** Print a page to PDF. */
   render(url: string): Promise<Uint8Array>;
+  /** Screenshot a page as PNG. */
+  screenshot?(url: string, width: number, height: number): Promise<Uint8Array>;
 }
 
 export class PdfError extends Error {}
@@ -30,7 +32,11 @@ function candidates(): string[] {
       join(pf, "Google\\Chrome\\Application\\chrome.exe"),
       join(pf86, "Google\\Chrome\\Application\\chrome.exe"),
     );
-    if (local) list.push(join(local, "Google\\Chrome\\Application\\chrome.exe"), join(local, "Chromium\\Application\\chrome.exe"));
+    if (local)
+      list.push(
+        join(local, "Google\\Chrome\\Application\\chrome.exe"),
+        join(local, "Chromium\\Application\\chrome.exe"),
+      );
   } else if (process.platform === "darwin") {
     list.push(
       "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
@@ -52,49 +58,51 @@ export function findBrowser(): string | null {
 }
 
 export function headlessBrowserRenderer(timeoutMs = 90_000): PdfRenderer {
+  async function run(url: string, ext: "pdf" | "png", outputArgs: (out: string) => string[]): Promise<Uint8Array> {
+    const browser = findBrowser();
+    if (!browser) {
+      throw new PdfError(
+        "No Edge or Chrome found to make the PDF. Use Print in the browser instead, or set FERRULE_BROWSER to a Chromium-based browser.",
+      );
+    }
+    const dir = await mkdtemp(join(tmpdir(), "ferrule-pdf-"));
+    const out = join(dir, `out.${ext}`);
+    try {
+      const proc = Bun.spawn(
+        [
+          browser,
+          "--headless",
+          "--disable-gpu",
+          "--no-first-run",
+          "--no-default-browser-check",
+          "--disable-extensions",
+          "--disable-background-networking",
+          "--disable-sync",
+          // Needed when running as root in a Linux container; not used elsewhere.
+          ...(process.platform === "linux" ? ["--no-sandbox"] : []),
+          `--user-data-dir=${join(dir, "profile")}`,
+          "--virtual-time-budget=15000",
+          ...outputArgs(out),
+          url,
+        ],
+        { stdout: "ignore", stderr: "pipe" },
+      );
+      const timer = setTimeout(() => proc.kill(), timeoutMs);
+      const code = await proc.exited;
+      clearTimeout(timer);
+      if (!existsSync(out)) {
+        const err = (await new Response(proc.stderr).text()).trim().split("\n").slice(-3).join(" ");
+        throw new PdfError(`The browser didn't produce the ${ext.toUpperCase()} (exit ${code}). ${err}`.trim());
+      }
+      return new Uint8Array(await readFile(out));
+    } finally {
+      await rm(dir, { recursive: true, force: true }).catch(() => {});
+    }
+  }
   return {
-    async render(url) {
-      const browser = findBrowser();
-      if (!browser) {
-        throw new PdfError(
-          "No Edge or Chrome found to make the PDF. Use Print in the browser instead, or set FERRULE_BROWSER to a Chromium-based browser.",
-        );
-      }
-      const dir = await mkdtemp(join(tmpdir(), "ferrule-pdf-"));
-      const out = join(dir, "out.pdf");
-      try {
-        const proc = Bun.spawn(
-          [
-            browser,
-            "--headless",
-            "--disable-gpu",
-            "--no-first-run",
-            "--no-default-browser-check",
-            "--disable-extensions",
-            "--disable-background-networking",
-            "--disable-sync",
-            // Needed when running as root in a Linux container; not used elsewhere.
-            ...(process.platform === "linux" ? ["--no-sandbox"] : []),
-            `--user-data-dir=${join(dir, "profile")}`,
-            "--no-pdf-header-footer",
-            "--print-to-pdf-no-header",
-            "--virtual-time-budget=15000",
-            `--print-to-pdf=${out}`,
-            url,
-          ],
-          { stdout: "ignore", stderr: "pipe" },
-        );
-        const timer = setTimeout(() => proc.kill(), timeoutMs);
-        const code = await proc.exited;
-        clearTimeout(timer);
-        if (!existsSync(out)) {
-          const err = (await new Response(proc.stderr).text()).trim().split("\n").slice(-3).join(" ");
-          throw new PdfError(`The browser didn't produce a PDF (exit ${code}). ${err}`.trim());
-        }
-        return new Uint8Array(await readFile(out));
-      } finally {
-        await rm(dir, { recursive: true, force: true }).catch(() => {});
-      }
-    },
+    render: (url) =>
+      run(url, "pdf", (out) => ["--no-pdf-header-footer", "--print-to-pdf-no-header", `--print-to-pdf=${out}`]),
+    screenshot: (url, width, height) =>
+      run(url, "png", (out) => ["--hide-scrollbars", `--window-size=${width},${height}`, `--screenshot=${out}`]),
   };
 }

@@ -5,7 +5,7 @@
  * drawing.
  */
 import { mkdir, readdir, readFile, rename, stat, writeFile, copyFile } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { existsSync, statSync, watch, type FSWatcher } from "node:fs";
 import { join } from "node:path";
 import { type Project, newProject } from "../core/model";
 import { parseProject, parseTemplate, ProjectFormatError } from "../core/validate";
@@ -40,10 +40,80 @@ export function slugify(title: string): string {
 }
 
 export class Storage {
+  private listeners = new Map<string, Set<(version: string) => void>>();
+  private watcher: FSWatcher | null = null;
+  private timers = new Map<string, ReturnType<typeof setTimeout>>();
+  /** Serialises read-modify-write edits per project (MCP tools). */
+  private locks = new Map<string, Promise<unknown>>();
+
   constructor(readonly dir: string) {}
 
   async init(): Promise<void> {
     await mkdir(this.dir, { recursive: true });
+  }
+
+  /** A project's version: changes every time its file is written, by anyone. */
+  version(id: string): string {
+    const file = this.path(id);
+    if (!existsSync(file)) throw new StorageError(`No project "${id}"`, 404);
+    return String(Math.round(statSync(file).mtimeMs * 1000));
+  }
+
+  /**
+   * Hear about changes to a project's file, whoever made them (this server,
+   * MCP over stdio in another process, a sync tool). Returns an unsubscribe.
+   */
+  subscribe(id: string, fn: (version: string) => void): () => void {
+    this.path(id);
+    this.startWatching();
+    if (!this.listeners.has(id)) this.listeners.set(id, new Set());
+    this.listeners.get(id)!.add(fn);
+    return () => this.listeners.get(id)?.delete(fn);
+  }
+
+  private startWatching(): void {
+    if (this.watcher) return;
+    try {
+      this.watcher = watch(this.dir, (_event, name) => {
+        if (!name || !String(name).endsWith(EXT)) return;
+        const id = String(name).slice(0, -EXT.length);
+        const subs = this.listeners.get(id);
+        if (!subs?.size) return;
+        clearTimeout(this.timers.get(id));
+        this.timers.set(
+          id,
+          setTimeout(() => {
+            let v: string;
+            try {
+              v = this.version(id);
+            } catch {
+              return;
+            }
+            for (const fn of subs) fn(v);
+          }, 120),
+        );
+      });
+    } catch (e) {
+      console.error("Can't watch the projects folder; live updates are off", e);
+    }
+  }
+
+  close(): void {
+    this.watcher?.close();
+    this.watcher = null;
+  }
+
+  /** Load, change and save a project, one edit at a time. */
+  async edit<T>(id: string, fn: (p: Project) => T | Promise<T>): Promise<T> {
+    const prev = this.locks.get(id) ?? Promise.resolve();
+    const run = prev.catch(() => {}).then(async () => {
+      const project = await this.load(id);
+      const out = await fn(project);
+      await this.save(id, project);
+      return out;
+    });
+    this.locks.set(id, run);
+    return run;
   }
 
   private path(id: string): string {
@@ -75,10 +145,18 @@ export class Storage {
     return project;
   }
 
-  async save(id: string, data: unknown): Promise<Project> {
+  /**
+   * Save a project. With `ifVersion`, refuse (409) if the file has changed
+   * since that version was loaded, so one editor can't silently overwrite
+   * another's work.
+   */
+  async save(id: string, data: unknown, ifVersion?: string): Promise<Project> {
     const project = parseProject(data);
     if (project.id !== id) throw new StorageError("Project id does not match the URL");
     const file = this.path(id);
+    if (ifVersion && existsSync(file) && this.version(id) !== ifVersion) {
+      throw new StorageError("This project was changed elsewhere since you opened it", 409);
+    }
     if (existsSync(file)) await copyFile(file, file + ".bak");
     const tmp = file + ".tmp";
     await writeFile(tmp, JSON.stringify(project, null, 1));

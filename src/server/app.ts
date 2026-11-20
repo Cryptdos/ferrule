@@ -3,6 +3,7 @@ import { ProjectFormatError } from "../core/validate";
 import { type Library, type Storage, StorageError } from "./storage";
 import type { AssetSource } from "./assets";
 import { PdfError, type PdfRenderer } from "./pdf";
+import type { McpServer } from "./mcp";
 
 export interface AppOptions {
   storage: Storage;
@@ -12,6 +13,18 @@ export interface AppOptions {
   pdf?: PdfRenderer;
   /** Where the PDF renderer can reach this server, e.g. http://127.0.0.1:4810 */
   selfUrl?: () => string;
+  mcp?: McpServer;
+}
+
+/** Only pages served from this machine may call /mcp from a browser (DNS-rebinding guard). */
+function localOrigin(origin: string | undefined): boolean {
+  if (!origin) return true;
+  try {
+    const h = new URL(origin).hostname;
+    return h === "localhost" || h === "127.0.0.1" || h === "[::1]" || h === "::1";
+  } catch {
+    return false;
+  }
 }
 
 /** Safe file name for a download. */
@@ -19,7 +32,7 @@ function fileName(s: string): string {
   return s.replace(/[^A-Za-z0-9._ -]+/g, "-").trim() || "drawing";
 }
 
-export function createApp({ storage, library, assets, version = "dev", pdf, selfUrl }: AppOptions): Hono {
+export function createApp({ storage, library, assets, version = "dev", pdf, selfUrl, mcp }: AppOptions): Hono {
   const app = new Hono();
 
   app.onError((err, c) => {
@@ -40,11 +53,48 @@ export function createApp({ storage, library, assets, version = "dev", pdf, self
     return c.json(await storage.create(title), 201);
   });
 
-  app.get("/api/projects/:id", async (c) => c.json(await storage.load(c.req.param("id"))));
+  app.get("/api/projects/:id", async (c) => {
+    const id = c.req.param("id");
+    const project = await storage.load(id);
+    c.header("x-ferrule-version", storage.version(id));
+    return c.json(project);
+  });
 
   app.put("/api/projects/:id", async (c) => {
-    const saved = await storage.save(c.req.param("id"), await c.req.json());
-    return c.json({ ok: true, id: saved.id });
+    const id = c.req.param("id");
+    const saved = await storage.save(id, await c.req.json(), c.req.header("if-match") || undefined);
+    return c.json({ ok: true, id: saved.id, version: storage.version(id) });
+  });
+
+  // Server-sent events: tells an open editor when its project's file changes.
+  app.get("/api/projects/:id/events", (c) => {
+    const id = c.req.param("id");
+    storage.version(id);
+    let unsubscribe = () => {};
+    let ping: ReturnType<typeof setInterval>;
+    const enc = new TextEncoder();
+    const stream = new ReadableStream({
+      start(controller) {
+        const send = (s: string) => {
+          try {
+            controller.enqueue(enc.encode(s));
+          } catch {
+            unsubscribe();
+            clearInterval(ping);
+          }
+        };
+        send(`event: hello\ndata: ${storage.version(id)}\n\n`);
+        unsubscribe = storage.subscribe(id, (v) => send(`event: changed\ndata: ${v}\n\n`));
+        ping = setInterval(() => send(`: ping\n\n`), 25_000);
+      },
+      cancel() {
+        unsubscribe();
+        clearInterval(ping);
+      },
+    });
+    return new Response(stream, {
+      headers: { "content-type": "text/event-stream", "cache-control": "no-store", connection: "keep-alive" },
+    });
   });
 
   app.get("/api/projects/:id/pdf", async (c) => {
@@ -70,6 +120,22 @@ export function createApp({ storage, library, assets, version = "dev", pdf, self
 
   app.all("/api/*", (c) => c.json({ error: "Not found" }, 404));
 
+  if (mcp) {
+    app.post("/mcp", async (c) => {
+      if (!localOrigin(c.req.header("origin"))) return c.json({ error: "Forbidden origin" }, 403);
+      let body: unknown;
+      try {
+        body = await c.req.json();
+      } catch {
+        return c.json({ jsonrpc: "2.0", id: null, error: { code: -32700, message: "Parse error" } }, 400);
+      }
+      const reply = await mcp.handle(body);
+      return reply ? c.json(reply) : c.body(null, 202);
+    });
+    // No server-to-client stream: everything is request/response.
+    app.on(["GET", "DELETE"], "/mcp", (c) => c.body(null, 405));
+  }
+
   // Print view: the UI page with the project embedded, so a headless
   // browser can render it without waiting on further requests.
   app.get("/print/:id", async (c) => {
@@ -79,7 +145,8 @@ export function createApp({ storage, library, assets, version = "dev", pdf, self
     const html = await index.text();
     const data = JSON.stringify(project).replace(/</g, "\\u003c");
     const auto = c.req.query("autoprint") === "1";
-    const inject = `<script>window.__FERRULE_PRINT__=${data};window.__FERRULE_AUTOPRINT__=${auto};</script>`;
+    const solo = Number(c.req.query("page")) || 0;
+    const inject = `<script>window.__FERRULE_PRINT__=${data};window.__FERRULE_AUTOPRINT__=${auto};window.__FERRULE_SOLO__=${solo};</script>`;
     return c.html(html.replace("</head>", `${inject}</head>`));
   });
 

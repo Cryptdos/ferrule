@@ -9,6 +9,7 @@
 
   const printData = (window as { __FERRULE_PRINT__?: Project }).__FERRULE_PRINT__;
   const autoprint = (window as { __FERRULE_AUTOPRINT__?: boolean }).__FERRULE_AUTOPRINT__ === true;
+  const solo = (window as { __FERRULE_SOLO__?: number }).__FERRULE_SOLO__ ?? 0;
 
   let editor: Editor | null = $state(null);
   let error = $state("");
@@ -19,15 +20,19 @@
 
   async function open(id: string | null) {
     error = "";
-    if (editor) await editor.saveNow();
+    if (editor) {
+      await editor.saveNow();
+      editor.close();
+    }
     editor = null;
     if (!id) {
       history.replaceState(null, "", location.pathname);
       return;
     }
     try {
-      const [project] = await Promise.all([api.load(id), loadAvoid()]);
-      editor = new Editor(project);
+      const [{ project, version }] = await Promise.all([api.load(id), loadAvoid()]);
+      editor = new Editor(project, version);
+      editor.watch();
       const url = `?project=${encodeURIComponent(id)}`;
       if (location.search !== url) history.pushState(null, "", url);
     } catch (e) {
@@ -41,7 +46,7 @@
 <svelte:window onpopstate={() => void open(currentId())} />
 
 {#if printData}
-  <PrintView project={printData} {autoprint} />
+  <PrintView project={printData} {autoprint} {solo} />
 {:else if editor}
   <EditorView {editor} onclose={() => void open(null)} />
 {:else}

@@ -7,7 +7,7 @@ import type { Project } from "../core/model";
 import { OpError } from "../core/ops";
 import { routePage } from "../core/routing";
 import { refreshConductors } from "../core/conductors";
-import { api } from "./api";
+import { api, ConflictError } from "./api";
 import { getAvoid } from "./avoid";
 
 export type Tool = "select" | "place" | "wire" | "section" | "cloud" | "stamp";
@@ -40,8 +40,15 @@ export class Editor {
   canUndo = $state(false);
   canRedo = $state(false);
 
-  constructor(project: Project) {
+  /** Version of the project file we last loaded or saved. */
+  private version = "";
+  private events: EventSource | null = null;
+  /** A change seen while a save was in flight, to check once it lands. */
+  private remoteSeen: string | null = null;
+
+  constructor(project: Project, version = "") {
     this.project = project;
+    this.version = version;
     this.pageId = project.pages[0]?.id ?? "";
     // Wires added outside the editor may not have routes yet.
     for (const page of this.project.pages) {
@@ -178,11 +185,18 @@ export class Editor {
     this.saveState = "saving";
     const snapshot = $state.snapshot(this.project) as Project;
     this.saving = api
-      .save(snapshot)
-      .then(() => {
+      .save(snapshot, this.version)
+      .then((v) => {
+        this.version = v;
         if (this.saveState === "saving") this.saveState = "saved";
       })
-      .catch((e: Error) => {
+      .catch(async (e: Error) => {
+        if (e instanceof ConflictError) {
+          await this.reloadFromServer(
+            "This project was changed elsewhere (e.g. by Claude) while you were editing. It has been reloaded; your last change wasn't saved.",
+          );
+          return;
+        }
         this.saveState = "error";
         this.flash(`Save failed: ${e.message}`);
       })
@@ -190,6 +204,56 @@ export class Editor {
         this.saving = null;
       });
     await this.saving;
+    if (this.remoteSeen && this.remoteSeen !== this.version) {
+      this.remoteSeen = null;
+      await this.reloadFromServer("Updated with changes made elsewhere.");
+    }
+    this.remoteSeen = null;
+  }
+
+  /** Listen for changes to the project file made by anyone else (MCP, another tab). */
+  watch(): void {
+    if (this.events || typeof EventSource === "undefined") return;
+    this.events = new EventSource(`/api/projects/${encodeURIComponent(this.project.id)}/events`);
+    this.events.addEventListener("changed", (ev) => {
+      const v = (ev as MessageEvent).data as string;
+      if (v === this.version) return;
+      if (this.saving) {
+        this.remoteSeen = v;
+        return;
+      }
+      // Unsaved local edits will meet the conflict when they save.
+      if (this.saveState === "pending") return;
+      void this.reloadFromServer("Updated with changes made elsewhere.");
+    });
+  }
+
+  close(): void {
+    this.events?.close();
+    this.events = null;
+  }
+
+  /** Replace the open project with what's on the server. Undo history is cleared: it no longer applies. */
+  async reloadFromServer(message: string): Promise<void> {
+    try {
+      const { project, version } = await api.load(this.project.id);
+      this.project = project;
+      this.version = version;
+      if (!project.pages.some((p) => p.id === this.pageId)) this.pageId = project.pages[0]!.id;
+      if (this.splitPageId && !project.pages.some((p) => p.id === this.splitPageId)) this.splitPageId = null;
+      const ids = new Set(this.page.elements.map((e) => e.id).concat(this.page.segments.map((s) => s.id)));
+      this.selection = this.selection.filter((id) => ids.has(id));
+      this.undoStack = [];
+      this.redoStack = [];
+      this.syncHistoryFlags();
+      this.saveState = "saved";
+      for (const page of this.project.pages) {
+        if (page.segments.some((s) => s.points.length < 2)) routePage(getAvoid(), page);
+      }
+      this.flash(message);
+    } catch (e) {
+      this.flash(`Couldn't reload: ${(e as Error).message}`);
+    }
   }
 
   get hasUnsaved(): boolean {
