@@ -29,7 +29,7 @@ Status: draft for discussion. Nothing here is fixed until we've agreed it.
 - Title block templates filled from project data.
 - Revision table and revision clouds.
 - Element list sidebar + properties panel, and a project-wide table view.
-- A3 PDF export.
+- A4 PDF export.
 - MCP server so Claude can create and edit drawings.
 
 ### Later
@@ -67,7 +67,7 @@ Status: draft for discussion. Nothing here is fixed until we've agreed it.
 - **Server:** Bun, with a small HTTP framework (Hono or Fastify). Headless, accessed through a browser, so it can run on another machine. Bun can compile it to a single portable .exe.
 - **Front end:** Svelte, rendering in SVG. What's on screen is what gets printed.
 - **Wire routing:** libavoid-js (orthogonal routing around symbols), with manual segment override.
-- **PDF export:** the server renders pages in headless Chromium via Playwright and prints them to a flat A3 PDF (no clickable links needed).
+- **PDF export:** the server renders pages in headless Chromium via Playwright and prints them to a flat A4 PDF (no clickable links needed).
 - **Core module:** data model, numbering, cross-referencing, checks and the simulator live in one shared module, used by the UI, the PDF export and the MCP tools.
 - **Collaboration (later):** every edit is a small operation on the model, so Yjs can be added without a rewrite.
 
@@ -115,6 +115,26 @@ Decisions:
 - **Units:** grid units throughout. Millimetres only appear when fitting a page to A3 for printing. Control drawings have no scale.
 - **Conductors (potentials):** a conductor is every terminal joined by wire without passing through a component. It has one ID/number and a 1-to-many set of terminals: a start, and any number of mid and end points. Example: 102 starts at L, loops into R1 and on to S1; the R1–S1 link is still 102. The number only changes once the circuit passes through a contact, coil or other component. The drawn wire segments belong to a conductor, and numbering is a trace of the circuit.
 - **Templates and symbols:** live in a shared library. Using one copies it into the project, so library changes never alter existing projects.
+
+## 4a. Page format
+
+- **A4 landscape** is the primary target. Technicians on site work from these prints, and A3 is cumbersome in the field. A3 can come later as an option.
+- **100 columns** across the drawing area. Column numbers are printed below the drawing frame every 10 columns (10, 20 … 90), with tick marks on the frame every 5 columns.
+- **No rows.** The left and right edges of the frame carry evenly spaced, unlabelled tick marks, so you can judge where you are vertically on a printout.
+- The panel boundary is a dashed line across the lower part of the drawing area, with terminals sitting on it.
+
+### Title block (v1)
+
+A simple title block along the bottom, with the same fields as the reference set. No logos or company data yet; we're building the framework.
+
+| Area | Fields |
+|---|---|
+| Logo box | Empty placeholder |
+| Project | Project, Panel name, Sheet title |
+| Sheet | Sheet x of y, Job no., Drawn by + date, Checked by + date, Drawing ref. |
+| Revisions | Table of Issue no., Date, Drawn by (latest at the bottom) |
+
+All fields are filled from project data, except the sheet title and sheet number, which come from the page.
 
 ## 5. Symbols
 
@@ -245,7 +265,7 @@ Reference drawings from other companies are proprietary. They are never committe
 
 1. **Skeleton:** server, project JSON load/save, one page, place and move symbols on the grid.
 2. **Wires:** connect terminals, auto-routing, manual drag.
-3. **Pages and title block:** page list, title block template, A3 PDF export.
+3. **Pages and title block:** page list, title block template, A4 PDF export.
 4. **Numbering and cross-references.**
 5. **Plant views, panel boundary, section boxes.**
 6. **Element list, properties panel, table view.**
@@ -267,6 +287,9 @@ Reference drawings from other companies are proprietary. They are never committe
 | Designations | Selectable standard (IEC, BS 3939…), custom overrides discouraged |
 | Numbering | Position-based (page-column) by default |
 | PDF | Flat, no clickable links |
+| Page size | A4 landscape primary; A3 later |
+| Page grid | 100 columns, numbered every 10; unlabelled tick marks down the sides, no rows |
+| Title block | Simple v1: project, panel, title, sheet, job no., drawn/checked, drawing ref., revision table |
 | Designation default | IEC 81346-2:2019, single-letter prefixes |
 | Collisions | Topmost keeps plain address; then A, B, C… down the column |
 | CI | GitHub Actions: install, type-check, test on every push and PR |
