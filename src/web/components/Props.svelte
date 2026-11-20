@@ -9,6 +9,8 @@
     setPlantViewTerminals,
     updateSection,
     deleteSections,
+    cloudsOn,
+    deleteClouds,
     renamePage,
     resetRoute,
     rotateElements,
@@ -139,8 +141,13 @@
     {/if}
     {#if one.symbol !== "junction" && one.symbol !== "rail"}
       <label>
-        Label
-        <FieldInput {editor} value={one.label} onchange={(v) => patch({ label: v })} />
+        {one.symbol === "text" || one.symbol === "plate" ? "Text" : "Label"}
+        <FieldInput
+          {editor}
+          value={one.label}
+          multiline={one.symbol === "text" || one.symbol === "plate"}
+          onchange={(v) => patch({ label: v })}
+        />
       </label>
     {/if}
     {#each def.params as p (p.key)}
@@ -297,15 +304,23 @@
     <h3>Sheet {page.number} of {editor.project.pages.length}</h3>
     <label>
       Sheet title
-      <input
+      <FieldInput
+        {editor}
         value={page.title}
         placeholder="e.g. Controls section: supplies"
-        onchange={(e) => {
-          const v = e.currentTarget.value;
-          editor.apply((p) => renamePage(p, editor.pageId, v));
-        }}
+        onchange={(v) => editor.apply((p) => renamePage(p, editor.pageId, v))}
       />
     </label>
+    {@const clouds = cloudsOn(editor.project, page.id)}
+    {#if clouds.length}
+      <div class="sub">Revision {clouds[0]!.rev} clouds on this sheet</div>
+      {#each clouds as c, i (c.id)}
+        <div class="row">
+          Cloud {i + 1}, columns {columnOf(c.rect[0])}–{columnOf(c.rect[0] + c.rect[2])}
+          <button class="danger small" onclick={() => editor.apply((p) => deleteClouds(p, [c.id]))}>Remove</button>
+        </div>
+      {/each}
+    {/if}
     <label class="check">
       <input
         type="checkbox"
@@ -389,6 +404,11 @@
     font-weight: 600;
     color: #334;
     margin-top: 4px;
+  }
+  button.small {
+    font-size: 11px;
+    padding: 1px 6px;
+    margin-left: 6px;
   }
   .ticks {
     display: flex;

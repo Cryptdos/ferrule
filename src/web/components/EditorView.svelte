@@ -14,12 +14,13 @@
   import ElementList from "./ElementList.svelte";
   import TableView from "./TableView.svelte";
   import SplitPane from "./SplitPane.svelte";
+  import TemplatesDialog from "./TemplatesDialog.svelte";
 
   let { editor, onclose }: { editor: Editor; onclose: () => void } = $props();
 
   let canvas: Canvas | undefined = $state();
   let showProject = $state(false);
-  let dialog: "plant" | "checks" | "schedules" | null = $state(null);
+  let dialog: "plant" | "checks" | "schedules" | "templates" | null = $state(null);
   let tableView = $state(false);
 
   function toggleSplit() {
@@ -117,6 +118,7 @@
       if (ids.length) editor.apply((p) => rotateElements(p, pageId, ids));
     } else if (e.key === "Escape") {
       if (canvas?.cancel()) return;
+      editor.stamp = null;
       editor.tool = "select";
       editor.placeSymbol = null;
       editor.selection = [];
@@ -170,6 +172,9 @@
       <button class:active={editor.tool === "section"} onclick={() => ((editor.tool = "section"), (editor.placeSymbol = null))} title="Draw a section box (B)">
         Section
       </button>
+      <button class:active={editor.tool === "cloud"} onclick={() => ((editor.tool = "cloud"), (editor.placeSymbol = null))} title="Cloud a change for the latest revision">
+        Cloud
+      </button>
       <span class="sep"></span>
       <button disabled={!editor.canUndo} onclick={() => editor.undo()} title="Undo (Ctrl+Z)">Undo</button>
       <button disabled={!editor.canRedo} onclick={() => editor.redo()} title="Redo (Ctrl+Y)">Redo</button>
@@ -179,6 +184,7 @@
       <button class:active={tableView} onclick={() => (tableView = !tableView)} title="Every element in the project as a table">Table</button>
       <span class="sep"></span>
       <button onclick={doRenumber} title="Recalculate tags, terminal and wire numbers (locked ones are kept)">Renumber</button>
+      <button onclick={() => (dialog = "templates")} title="Save and stamp sheet and section templates">Templates…</button>
       <button onclick={() => (dialog = "plant")} title="Field equipment: define plant and place views">Plant…</button>
       <button onclick={() => (dialog = "checks")} title="Check the drawing for problems">Check</button>
       <button onclick={() => (dialog = "schedules")} title="Terminal and cable schedules">Schedules</button>
@@ -214,6 +220,8 @@
   <PlantDialog {editor} onclose={() => (dialog = null)} />
 {:else if dialog === "checks"}
   <ChecksDialog {editor} onclose={() => (dialog = null)} />
+{:else if dialog === "templates"}
+  <TemplatesDialog {editor} onclose={() => (dialog = null)} />
 {:else if dialog === "schedules"}
   <SchedulesDialog {editor} onclose={() => (dialog = null)} />
 {/if}

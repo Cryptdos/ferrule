@@ -1,6 +1,7 @@
 <script lang="ts">
   import { addPage, deletePage, duplicatePage, movePage } from "../../core/ops";
   import type { Editor } from "../editor.svelte";
+  import { resolveFields } from "../../core/fields";
 
   let { editor }: { editor: Editor } = $props();
 
@@ -50,7 +51,7 @@
       <li>
         <button class="page" class:current={page.id === editor.pageId} onclick={() => editor.setPage(page.id)}>
           <span class="num">{page.number}</span>
-          <span class="t">{page.title || "Untitled sheet"}</span>
+          <span class="t">{resolveFields(page.title, editor.project) || "Untitled sheet"}</span>
         </button>
       </li>
     {/each}

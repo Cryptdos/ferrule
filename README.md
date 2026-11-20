@@ -5,7 +5,7 @@ A lightweight, browser-based tool for drafting control panel schematics: symbols
 - [Design document](docs/DESIGN.md)
 - [Benchmark: LSP-01 life safety panel](docs/benchmark-lsp01.md)
 
-Status: milestones 1–6 (skeleton, wires, pages + title block + PDF, numbering + cross-references, plant + boundary + sections, element list + table view).
+Status: milestones 1–7 (skeleton, wires, pages + title block + PDF, numbering + cross-references, plant + boundary + sections, element list + table view, templates + revisions).
 
 ## Running it
 
@@ -72,5 +72,8 @@ Wire routing uses [libavoid-js](https://github.com/Aksem/libavoid-js) (LGPL-2.1-
 - **Right sidebar:** everything on the sheet, in column order and synced with the canvas selection (click a row to select; filter box at the top), with the selection's properties below.
 - **Split** shows another sheet alongside. *Go to* buttons (coil ↔ contacts, off-page pairs) then keep the sheet you came from in view; click the other half to work on it.
 - **Table** lists every element in the project: filter by type, plant or text, edit tags and labels in place, and tick rows to find-and-replace or lock tags in bulk.
+- **Templates…:** save the current sheet, or a selected section box and what's in it, as a template. *Stamp…* makes a copy for other plant (pick existing plant or type a new tag) with fresh tags; sheets go in as a new sheet, sections where you click. *To library* saves a copy in the `library` folder beside `projects` for use in other projects.
+- **Cloud:** drag round a change to cloud it for the latest revision (add revisions under Project…). Only the latest revision's clouds are drawn. Remove them from the sheet panel.
+- **Text**, **Box** and **Label plate** (Drawing group) for cover sheets, general arrangements and door labels. Text can hold fields: `{project:title}`, `{project:drawingNo}`, `{sheets}`, `{rev}` and plant fields.
 - **Project…** sets the title block fields (project, panel, job no., drawing ref., drawn/checked) and the revision table.
 - **Export PDF** downloads every sheet as one A4 landscape PDF. **Print** opens the same sheets in a browser tab and prints them, if PDF export isn't available.

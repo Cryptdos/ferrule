@@ -390,7 +390,7 @@ export function addRevision(project: Project, rev: Partial<Project["revisions"][
   const last = project.revisions[project.revisions.length - 1]?.rev ?? "";
   // A, B, C… or 1, 2, 3… following the last issue.
   const next = /^\d+$/.test(last) ? String(Number(last) + 1) : /^[A-Y]$/.test(last) ? String.fromCharCode(last.charCodeAt(0) + 1) : "A";
-  project.revisions.push({ rev: next, date: "", drawnBy: "", description: "", ...rev });
+  project.revisions.push({ rev: next, date: "", drawnBy: "", description: "", ...rev, clouds: rev.clouds ?? [] });
 }
 
 export function updateRevision(project: Project, index: number, patch: Partial<Project["revisions"][number]>): void {
@@ -637,4 +637,32 @@ export function updateElementAnywhere(project: Project, id: string, patch: Eleme
   const page = project.pages.find((p) => p.elements.some((e) => e.id === id));
   if (!page) throw new OpError(`No element "${id}"`);
   updateElement(project, page.id, id, patch);
+}
+
+// ---------------------------------------------------------------------------
+// Revision clouds
+
+/** Cloud an area of a sheet for the latest revision. */
+export function addCloud(project: Project, pageId: string, rect: [number, number, number, number]): string {
+  getPage(project, pageId);
+  const rev = project.revisions[project.revisions.length - 1];
+  if (!rev) throw new OpError("Add a revision first (Project…)");
+  const id = newId("cl");
+  const [x, y, w, h] = rect;
+  rev.clouds.push({
+    id,
+    pageId,
+    rect: [Math.round(Math.min(x, x + w)), Math.round(Math.min(y, y + h)), Math.max(2, Math.round(Math.abs(w))), Math.max(2, Math.round(Math.abs(h)))],
+  });
+  return id;
+}
+
+export function deleteClouds(project: Project, ids: string[]): void {
+  for (const r of project.revisions) r.clouds = r.clouds.filter((c) => !ids.includes(c.id));
+}
+
+/** The clouds drawn on a sheet: the latest revision's. */
+export function cloudsOn(project: Project, pageId: string): { id: string; rect: [number, number, number, number]; rev: string }[] {
+  const rev = project.revisions[project.revisions.length - 1];
+  return rev ? rev.clouds.filter((c) => c.pageId === pageId).map((c) => ({ id: c.id, rect: c.rect, rev: rev.rev })) : [];
 }

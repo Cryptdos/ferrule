@@ -1,11 +1,12 @@
 import { Hono } from "hono";
 import { ProjectFormatError } from "../core/validate";
-import { type Storage, StorageError } from "./storage";
+import { type Library, type Storage, StorageError } from "./storage";
 import type { AssetSource } from "./assets";
 import { PdfError, type PdfRenderer } from "./pdf";
 
 export interface AppOptions {
   storage: Storage;
+  library?: Library;
   assets?: AssetSource;
   version?: string;
   pdf?: PdfRenderer;
@@ -18,7 +19,7 @@ function fileName(s: string): string {
   return s.replace(/[^A-Za-z0-9._ -]+/g, "-").trim() || "drawing";
 }
 
-export function createApp({ storage, assets, version = "dev", pdf, selfUrl }: AppOptions): Hono {
+export function createApp({ storage, library, assets, version = "dev", pdf, selfUrl }: AppOptions): Hono {
   const app = new Hono();
 
   app.onError((err, c) => {
@@ -60,6 +61,12 @@ export function createApp({ storage, assets, version = "dev", pdf, selfUrl }: Ap
       },
     });
   });
+
+  if (library) {
+    app.get("/api/library", async (c) => c.json(await library.list()));
+    app.get("/api/library/:file", async (c) => c.json(await library.load(c.req.param("file"))));
+    app.post("/api/library", async (c) => c.json({ file: await library.save(await c.req.json()) }, 201));
+  }
 
   app.all("/api/*", (c) => c.json({ error: "Not found" }, 404));
 

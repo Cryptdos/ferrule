@@ -10,7 +10,7 @@ import { dirname, join, resolve } from "node:path";
 import { spawn } from "node:child_process";
 import { createApp } from "./app";
 import { type AssetSource, directoryAssets } from "./assets";
-import { Storage } from "./storage";
+import { Library, Storage } from "./storage";
 import { headlessBrowserRenderer } from "./pdf";
 
 export const VERSION = "0.1.0";
@@ -82,12 +82,15 @@ export async function start(opts: StartOptions = {}): Promise<void> {
   const baseDir = opts.compiled ? dirname(process.execPath) : process.cwd();
   const storage = new Storage(resolve(args.projects ?? join(baseDir, "projects")));
   await storage.init();
+  // The template library sits beside the projects folder.
+  const library = new Library(resolve(join(storage.dir, "..", "library")));
   const assets = opts.assets ?? directoryAssets(resolve(import.meta.dir, "../../dist/web"));
   // Use the requested port, or the next free one.
   let server: ReturnType<typeof Bun.serve> | null = null;
   const local = args.host === "0.0.0.0" || args.host === "::" ? "127.0.0.1" : args.host;
   const app = createApp({
     storage,
+    library,
     assets,
     version: VERSION,
     pdf: headlessBrowserRenderer(),

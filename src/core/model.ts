@@ -92,11 +92,42 @@ export interface PlantItem {
   terminals: string[];
 }
 
+/** A revision cloud around what changed, on one sheet. */
+export interface Cloud {
+  id: string;
+  pageId: string;
+  /** x, y, w, h in grid units. */
+  rect: [number, number, number, number];
+}
+
 export interface Revision {
   rev: string;
   date: string;
   drawnBy: string;
   description: string;
+  /** Clouds marking this revision's changes. Only the latest revision's clouds are drawn. */
+  clouds: Cloud[];
+}
+
+/**
+ * A template (DESIGN.md §2, §4): a sheet or a section drawn once and stamped
+ * out again with new plant and new tags. It carries copies of the plant
+ * items it refers to, so it can go into another project.
+ */
+export interface Template {
+  id: string;
+  name: string;
+  /** "sheet": becomes a new sheet. "section": stamped onto the current sheet. */
+  kind: "sheet" | "section";
+  /** Plant items referred to, as they were when the template was saved. */
+  plant: PlantItem[];
+  title: string;
+  boundaryY: number | null;
+  sections: Section[];
+  elements: Element[];
+  segments: Segment[];
+  /** Size of the stamped area, for section templates. */
+  size: [number, number];
 }
 
 export type NumberingScheme = "position" | "sequential";
@@ -114,6 +145,7 @@ export interface Project {
   pages: Page[];
   conductors: Conductor[];
   revisions: Revision[];
+  templates: Template[];
 }
 
 export function emptyInfo(title = "Untitled project"): ProjectInfo {
@@ -156,6 +188,7 @@ export function newProject(id: string, title = "Untitled project"): Project {
     plant: [],
     pages: [newPage(1, "Sheet 1")],
     conductors: [],
-    revisions: [{ rev: "A", date: "", drawnBy: "", description: "First issue" }],
+    revisions: [{ rev: "A", date: "", drawnBy: "", description: "First issue", clouds: [] }],
+    templates: [],
   };
 }

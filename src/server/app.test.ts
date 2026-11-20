@@ -87,3 +87,25 @@ describe("PDF export", () => {
     expect(res.status).toBe(503);
   });
 });
+
+describe("template library", () => {
+  test("save, list, load", async () => {
+    const { Library } = await import("./storage");
+    const { saveSheetTemplate } = await import("../core/templates");
+    const { addPlant, placePlantView } = await import("../core/ops");
+    const lib = new Library(join(dir, "library"));
+    const a = createApp({ storage: new Storage(dir), library: lib });
+    const p = await new Storage(dir).load("fan-panel");
+    const sf = addPlant(p, "SF-01", "Fan", ["U", "V", "W"]);
+    placePlantView(p, p.pages[0]!.id, sf.id, [20, 100]);
+    const t = saveSheetTemplate(p, p.pages[0]!.id, "Fan starter");
+    const res = await a.request("/api/library", { method: "POST", body: JSON.stringify(t) });
+    expect(res.status).toBe(201);
+    expect((await res.json()).file).toBe("fan-starter");
+    const list = await (await a.request("/api/library")).json();
+    expect(list).toEqual([{ file: "fan-starter", name: "Fan starter", kind: "sheet", plant: ["SF-01"] }]);
+    const back = await (await a.request("/api/library/fan-starter")).json();
+    expect(back.elements).toHaveLength(1);
+    expect((await a.request("/api/library/nope")).status).toBe(404);
+  });
+});

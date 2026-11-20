@@ -13,6 +13,7 @@
   import {
     addElement,
     addSection,
+    addCloud,
     moveElements,
     placePlantView,
     setBoundary,
@@ -24,6 +25,7 @@
   import { localGeometry, defaultParams, type Geometry } from "../../core/symbols";
   import { elementTexts } from "../../core/tags";
   import { routePage } from "../../core/routing";
+  import { stampTemplate } from "../../core/templates";
   import { distanceToRoute, dragLeg, nearestPointOnRoute, routeOf, simpleRoute, simplifyRoute } from "../../core/wires";
   import type { Element, Page, Segment } from "../../core/model";
   import type { Editor } from "../editor.svelte";
@@ -46,7 +48,7 @@
     | { kind: "drag"; start: Vec; delta: Vec; ids: string[] }
     | { kind: "leg"; seg: string; leg: number; start: Vec; original: Vec[]; points: Vec[] }
     | { kind: "band"; start: Vec; cur: Vec; add: boolean }
-    | { kind: "secnew"; start: Vec; cur: Vec }
+    | { kind: "secnew"; start: Vec; cur: Vec; cloud?: boolean }
     | { kind: "secmove"; id: string; start: Vec; rect: Rect4; delta: Vec }
     | { kind: "secsize"; id: string; start: Vec; rect: Rect4; delta: Vec }
     | { kind: "boundary"; y: number }
@@ -219,8 +221,23 @@
       return;
     }
 
-    if (editor.tool === "section") {
-      gesture = { kind: "secnew", start: snapVec(pt), cur: snapVec(pt) };
+    if (editor.tool === "section" || editor.tool === "cloud") {
+      gesture = { kind: "secnew", start: snapVec(pt), cur: snapVec(pt), cloud: editor.tool === "cloud" };
+      return;
+    }
+
+    if (editor.tool === "stamp" && editor.stamp) {
+      const st = editor.stamp;
+      let ids: string[] = [];
+      const ok = editor.apply((p) => {
+        ids = stampTemplate(p, st.templateId, { pageId: editor.pageId, at: snapVec(pt), plant: st.plant }).elementIds;
+      });
+      editor.stamp = null;
+      editor.tool = "select";
+      if (ok) {
+        editor.selection = ids;
+        editor.flash(`Stamped ${st.name}. Press Renumber to give it tags.`);
+      }
       return;
     }
 
@@ -314,6 +331,11 @@
       if (JSON.stringify(pts) !== JSON.stringify(simplifyRoute(g.original))) {
         editor.apply((p) => setManualRoute(p, editor.pageId, g.seg, pts));
       }
+    } else if (g.kind === "secnew" && g.cloud) {
+      const r = bandRect(g.start, g.cur);
+      if (r.w < 2 || r.h < 2) return;
+      editor.apply((p) => addCloud(p, editor.pageId, [r.x, r.y, r.w, r.h]));
+      editor.tool = "select";
     } else if (g.kind === "secnew") {
       const r = bandRect(g.start, g.cur);
       if (r.w < 4 || r.h < 4) return;
@@ -420,7 +442,7 @@
   const cursorClass = $derived(
     gesture?.kind === "pan" || spaceDown
       ? "grab"
-      : editor.tool === "place" || editor.tool === "wire" || editor.tool === "section"
+      : editor.tool !== "select"
         ? "crosshair"
         : "default",
   );
@@ -514,6 +536,10 @@
           <circle class="hover start" cx={pending.at[0]} cy={pending.at[1]} r="0.6" />
         {/if}
       {/if}
+      {#if editor.tool === "stamp" && editor.stamp && pointer}
+        {@const at = snapVec(pointer)}
+        <rect class="stamp" x={at[0]} y={at[1]} width={editor.stamp.size[0]} height={editor.stamp.size[1]} />
+      {/if}
       {#if newSection}
         <rect class="band" x={newSection.x} y={newSection.y} width={newSection.w} height={newSection.h} />
       {/if}
@@ -553,6 +579,12 @@
     stroke: rgba(30, 110, 230, 0.35);
     stroke-width: 0.9;
     stroke-linejoin: round;
+  }
+  .stamp {
+    fill: rgba(30, 160, 60, 0.08);
+    stroke: #1a8f3a;
+    stroke-width: 0.15;
+    stroke-dasharray: 0.8 0.4;
   }
   .handle {
     fill: #fff;

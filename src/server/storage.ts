@@ -8,7 +8,8 @@ import { mkdir, readdir, readFile, rename, stat, writeFile, copyFile } from "nod
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { type Project, newProject } from "../core/model";
-import { parseProject } from "../core/validate";
+import { parseProject, parseTemplate, ProjectFormatError } from "../core/validate";
+import type { Template } from "../core/model";
 
 const EXT = ".ferrule.json";
 const ID_RE = /^[a-z0-9][a-z0-9-]{0,63}$/;
@@ -91,5 +92,69 @@ export class Storage {
     for (let i = 2; existsSync(this.path(id)); i++) id = `${base}-${i}`;
     const project = newProject(id, title.trim() || "Untitled project");
     return this.save(id, project);
+  }
+}
+
+const TEMPLATE_EXT = ".ferrule-template.json";
+
+export interface LibraryEntry {
+  file: string;
+  name: string;
+  kind: Template["kind"];
+  plant: string[];
+}
+
+/**
+ * The shared template library: one file per template in a folder (by
+ * default "library" next to the program). Projects import copies.
+ */
+export class Library {
+  constructor(readonly dir: string) {}
+
+  async init(): Promise<void> {
+    await mkdir(this.dir, { recursive: true });
+  }
+
+  private path(file: string): string {
+    if (!ID_RE.test(file)) throw new StorageError(`Invalid template name "${file}"`);
+    return join(this.dir, file + TEMPLATE_EXT);
+  }
+
+  async list(): Promise<LibraryEntry[]> {
+    await this.init();
+    const out: LibraryEntry[] = [];
+    for (const name of (await readdir(this.dir)).filter((n) => n.endsWith(TEMPLATE_EXT))) {
+      const file = name.slice(0, -TEMPLATE_EXT.length);
+      try {
+        const t = await this.load(file);
+        out.push({ file, name: t.name, kind: t.kind, plant: t.plant.map((p) => p.tag) });
+      } catch {
+        // Unreadable files are left alone.
+      }
+    }
+    return out.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  async load(file: string): Promise<Template> {
+    const path = this.path(file);
+    if (!existsSync(path)) throw new StorageError(`No template "${file}" in the library`, 404);
+    const data = JSON.parse(await readFile(path, "utf8"));
+    if (data?.format !== "ferrule-template" || typeof data.template !== "object") {
+      throw new ProjectFormatError("Not a Ferrule template file");
+    }
+    return parseTemplate(data.template);
+  }
+
+  /** Save a template; returns the file name used. An existing file of the same name is replaced. */
+  async save(template: unknown): Promise<string> {
+    if (typeof template !== "object" || template === null) throw new ProjectFormatError("No template given");
+    const t = parseTemplate(template as Record<string, unknown>);
+    await this.init();
+    const file = slugify(t.name);
+    const path = this.path(file);
+    const tmp = path + ".tmp";
+    await writeFile(tmp, JSON.stringify({ format: "ferrule-template", version: 1, template: t }, null, 1));
+    await rename(tmp, path);
+    return file;
   }
 }

@@ -8,9 +8,10 @@
     value,
     placeholder = "",
     onchange,
-  }: { editor: Editor; value: string; placeholder?: string; onchange: (v: string) => void } = $props();
+    multiline = false,
+  }: { editor: Editor; value: string; placeholder?: string; onchange: (v: string) => void; multiline?: boolean } = $props();
 
-  let input: HTMLInputElement | undefined = $state();
+  let input: HTMLInputElement | HTMLTextAreaElement | undefined = $state();
   const preview = $derived(value.includes("{") ? resolveFields(value, editor.project) : "");
 
   function insert(field: string) {
@@ -22,10 +23,13 @@
 </script>
 
 <div class="field">
-  <input bind:this={input} {value} {placeholder} onchange={(e) => onchange(e.currentTarget.value)} />
-  {#if editor.project.plant.length}
+  {#if multiline}
+    <textarea bind:this={input} {value} {placeholder} rows="3" onchange={(e) => onchange(e.currentTarget.value)}></textarea>
+  {:else}
+    <input bind:this={input} {value} {placeholder} onchange={(e) => onchange(e.currentTarget.value)} />
+  {/if}
     <select
-      title="Insert a plant field: it always shows the plant's current tag or description"
+      title="Insert a field: it always shows the current value (plant tag, project title…)"
       value=""
       onchange={(e) => {
         const v = e.currentTarget.value;
@@ -34,12 +38,18 @@
       }}
     >
       <option value="">+ field</option>
+      <option value={"{project:title}"}>Project title</option>
+      <option value={"{project:panelName}"}>Panel name</option>
+      <option value={"{project:client}"}>Client</option>
+      <option value={"{project:drawingNo}"}>Drawing ref.</option>
+      <option value={"{project:jobNo}"}>Job no.</option>
+      <option value={"{sheets}"}>Sheet count</option>
+      <option value={"{rev}"}>Latest revision</option>
       {#each editor.project.plant as p (p.id)}
         <option value={`{plant:${p.id}.tag}`}>{p.tag} tag</option>
         <option value={`{plant:${p.id}.description}`}>{p.tag} description</option>
       {/each}
     </select>
-  {/if}
 </div>
 {#if preview}<div class="preview">Shows: {preview}</div>{/if}
 
@@ -47,6 +57,13 @@
   .field {
     display: flex;
     gap: 4px;
+  }
+  .field textarea {
+    flex: 1;
+    min-width: 0;
+    font: inherit;
+    font-size: 13px;
+    resize: vertical;
   }
   .field input {
     flex: 1;

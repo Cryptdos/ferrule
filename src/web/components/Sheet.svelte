@@ -5,6 +5,8 @@
   import type { Vec } from "../../core/geometry";
   import { connectionDots, routeOf, wireLabelSpot } from "../../core/wires";
   import { resolveFields } from "../../core/fields";
+  import { cloudsOn } from "../../core/ops";
+  import { cloudPath } from "../../core/titleblock";
   import ElementView from "./ElementView.svelte";
   import Frame from "./Frame.svelte";
   import TitleBlock from "./TitleBlock.svelte";
@@ -38,6 +40,7 @@
   } = $props();
 
   const dots = $derived(routes ? [] : connectionDots(page));
+  const clouds = $derived(cloudsOn(project, page.id));
   const boundaryY = $derived(boundary !== undefined && boundary !== null ? boundary : page.boundaryY);
 
   /** Field cables (a wire with an end out in the field) are drawn dashed. */
@@ -101,6 +104,14 @@
     {@const o = offset?.(el.id)}
     <ElementView {el} {project} dx={o?.[0] ?? 0} dy={o?.[1] ?? 0} />
   {/each}
+  {#each clouds as c (c.id)}
+    {@const [x, y, w] = c.rect}
+    <g class="cloud">
+      <path d={cloudPath(c.rect)} />
+      <polygon points="{x + w + 0.2},{y - 3.2} {x + w + 2.2},{y - 0.2} {x + w - 1.8},{y - 0.2}" />
+      <text x={x + w + 0.2} y={y - 0.75} text-anchor="middle">{c.rev}</text>
+    </g>
+  {/each}
   {@render over?.()}
 </g>
 
@@ -125,6 +136,17 @@
     stroke-dasharray: 1.2 0.6;
   }
   .section text {
+    font-family: var(--drawing-font);
+    font-size: 1.5px;
+    fill: #000;
+  }
+  .cloud path,
+  .cloud polygon {
+    fill: none;
+    stroke: #000;
+    stroke-width: 0.18;
+  }
+  .cloud text {
     font-family: var(--drawing-font);
     font-size: 1.5px;
     fill: #000;

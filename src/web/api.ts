@@ -1,4 +1,11 @@
-import type { Project } from "../core/model";
+import type { Project, Template } from "../core/model";
+
+export interface LibraryEntry {
+  file: string;
+  name: string;
+  kind: "sheet" | "section";
+  plant: string[];
+}
 
 export interface ProjectSummary {
   id: string;
@@ -20,6 +27,9 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  library: () => call<LibraryEntry[]>("/api/library"),
+  libraryLoad: (file: string) => call<Template>(`/api/library/${encodeURIComponent(file)}`),
+  librarySave: (t: Template) => call<{ file: string }>("/api/library", { method: "POST", body: JSON.stringify(t) }),
   list: () => call<ProjectSummary[]>("/api/projects"),
   create: (title: string) => call<Project>("/api/projects", { method: "POST", body: JSON.stringify({ title }) }),
   load: (id: string) => call<Project>(`/api/projects/${encodeURIComponent(id)}`),

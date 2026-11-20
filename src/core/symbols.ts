@@ -84,6 +84,8 @@ const BAR_W = 0.6;
 const TAG = 1.6; // tag text size
 const LABEL = 1.25;
 const TERM = 1.05;
+/** Text sizes for drawing text, in grid units (2.5, 3.5, 5 and 7 mm on paper). */
+const TEXT_SIZES: Record<string, number> = { small: 1.8, normal: 2.53, large: 3.61, title: 5.05 };
 
 const line = (...pts: Vec[]): Prim => ({ t: "line", pts });
 const dashed = (...pts: Vec[]): Prim => ({ t: "line", pts, dash: true });
@@ -853,6 +855,113 @@ const SYMBOLS: SymbolDef[] = [
     },
   },
   {
+    id: "text",
+    name: "Text",
+    group: "Drawing",
+    palette: true,
+    params: [
+      {
+        key: "size",
+        label: "Size",
+        type: "select",
+        default: "normal",
+        options: [
+          { value: "small", label: "Small (2.5 mm)" },
+          { value: "normal", label: "Normal (3.5 mm)" },
+          { value: "large", label: "Large (5 mm)" },
+          { value: "title", label: "Title (7 mm)" },
+        ],
+      },
+      {
+        key: "align",
+        label: "Align",
+        type: "select",
+        default: "start",
+        options: [
+          { value: "start", label: "Left" },
+          { value: "middle", label: "Centre" },
+          { value: "end", label: "Right" },
+        ],
+      },
+    ],
+    kind: () => null,
+    draw(el) {
+      const size = TEXT_SIZES[str(el, "size", "normal")] ?? TEXT_SIZES.normal!;
+      const anchor = str(el, "align", "start") as Anchor;
+      const lines = (el.label || "Text").split("\n");
+      const width = Math.max(...lines.map((l) => l.length)) * size * 0.5;
+      const x0 = anchor === "start" ? 0 : anchor === "middle" ? -width / 2 : -width;
+      return {
+        prims: lines.map((l, i) => text(0, i * size * 1.45, `{line${i}}`, size, anchor, "label")),
+        terminals: [],
+        body: { x: x0, y: -size * 0.8, w: Math.max(1, width), h: lines.length * size * 1.45 },
+      };
+    },
+  },
+  {
+    id: "box",
+    name: "Box",
+    group: "Drawing",
+    palette: true,
+    params: [
+      { key: "w", label: "Width (units)", type: "number", min: 2, max: 200, default: 30 },
+      { key: "h", label: "Height (units)", type: "number", min: 2, max: 112, default: 20 },
+      { key: "dashed", label: "Dashed", type: "bool", default: false },
+      { key: "heavy", label: "Heavy line", type: "bool", default: false },
+    ],
+    kind: () => null,
+    draw(el) {
+      const w = num(el, "w", 30, 2, 200);
+      const h = num(el, "h", 20, 2, 112);
+      const pts: Vec[] = [[0, 0], [w, 0], [w, h], [0, h], [0, 0]];
+      const prim: Prim = { t: "line", pts, dash: bool(el, "dashed", false), w: bool(el, "heavy", false) ? 0.35 : W };
+      return {
+        prims: [prim, ...(el.label ? [text(0.6, 1.8, "{label}", LABEL, "start", "label")] : [])],
+        terminals: [],
+        body: { x: 0, y: 0, w, h },
+      };
+    },
+  },
+  {
+    id: "plate",
+    name: "Label plate",
+    group: "Drawing",
+    palette: true,
+    params: [
+      { key: "w", label: "Width (units)", type: "number", min: 4, max: 200, default: 20 },
+      { key: "h", label: "Height (units)", type: "number", min: 2, max: 60, default: 5 },
+      {
+        key: "size",
+        label: "Text size",
+        type: "select",
+        default: "small",
+        options: [
+          { value: "small", label: "Small (2.5 mm)" },
+          { value: "normal", label: "Normal (3.5 mm)" },
+          { value: "large", label: "Large (5 mm)" },
+        ],
+      },
+    ],
+    kind: () => null,
+    draw(el) {
+      const w = num(el, "w", 20, 4, 200);
+      const h = num(el, "h", 5, 2, 60);
+      const size = TEXT_SIZES[str(el, "size", "small")] ?? TEXT_SIZES.small!;
+      const lines = (el.label || "LABEL").split("\n");
+      const lh = size * 1.3;
+      const top = h / 2 - ((lines.length - 1) * lh) / 2 + size * 0.35;
+      return {
+        prims: [
+          { t: "poly", pts: [[0, 0], [w, 0], [w, h], [0, h]], fill: false },
+          { t: "poly", pts: [[0.4, 0.4], [w - 0.4, 0.4], [w - 0.4, h - 0.4], [0.4, h - 0.4]], fill: false },
+          ...lines.map((l, i) => text(w / 2, top + i * lh, `{line${i}}`, size, "middle", "label")),
+        ],
+        terminals: [],
+        body: { x: 0, y: 0, w, h },
+      };
+    },
+  },
+  {
     id: "junction",
     name: "Junction",
     group: "Drawing",
@@ -980,7 +1089,15 @@ export function localGeometry(el: Element, texts: string | GeometryText): Geomet
       .filter((p) => p !== xrefPrim)
       .map((p) => (p.t === "text" && p.role === "label" && p.at[1] > y0 ? { ...p, at: [p.at[0], p.at[1] - 1.4] as Vec } : p));
   }
-  const fill = (s: string) => (s === "{tag}" ? t.tag : s === "{xref}" ? (t.xref ?? "") : s === "{label}" ? (t.label ?? el.label) : s);
+  const labelLines = (t.label ?? el.label).split("\n");
+  const fill = (s: string) => {
+    if (s === "{tag}") return t.tag;
+    if (s === "{xref}") return t.xref ?? "";
+    if (s === "{label}") return t.label ?? el.label;
+    const m = /^\{line(\d+)\}$/.exec(s);
+    if (m) return labelLines[Number(m[1])] ?? "";
+    return s;
+  };
   const prims = raw.map((p) => {
     const q = rotatePrim(p, el.rot);
     return q.t === "text" ? { ...q, text: fill(q.text) } : q;

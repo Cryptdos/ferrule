@@ -10,7 +10,7 @@ import { refreshConductors } from "../core/conductors";
 import { api } from "./api";
 import { getAvoid } from "./avoid";
 
-export type Tool = "select" | "place" | "wire" | "section";
+export type Tool = "select" | "place" | "wire" | "section" | "cloud" | "stamp";
 export type SaveState = "saved" | "pending" | "saving" | "error";
 
 const HISTORY_LIMIT = 200;
@@ -25,6 +25,9 @@ export class Editor {
   selection: string[] = $state([]);
   tool: Tool = $state("select");
   placeSymbol: string | null = $state(null);
+  /** A section template waiting to be stamped where you click. */
+  stamp: { templateId: string; plant: import("../core/templates").PlantMapping; size: [number, number]; name: string } | null =
+    $state(null);
   /** Extra settings for the symbol being placed (e.g. which plant item a view shows). */
   placeParams: Record<string, string | number | boolean> = $state({});
   saveState: SaveState = $state("saved");

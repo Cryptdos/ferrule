@@ -5,6 +5,7 @@
  */
 import { TITLE_BLOCK_MM } from "./geometry";
 import type { Page, Project } from "./model";
+import { resolveFields } from "./fields";
 
 export interface TitleCell {
   x: number;
@@ -52,7 +53,7 @@ export function titleBlock(project: Project, page: Page): TitleBlock {
   const cells: TitleCell[] = [
     { x: logoW, y: 0, w: projW, h: third, label: "Project", value: info.title, big: true },
     { x: logoW, y: third, w: projW, h: third, label: "Panel", value: info.panelName, big: true },
-    { x: logoW, y: 2 * third, w: projW, h: third, label: "Sheet title", value: page.title, big: true },
+    { x: logoW, y: 2 * third, w: projW, h: third, label: "Sheet title", value: resolveFields(page.title, project), big: true },
     { x: sx, y: 0, w: half, h: third, label: "Sheet", value: sheetNo },
     { x: sx + half, y: 0, w: half, h: third, label: "Job no.", value: info.jobNo },
     { x: sx, y: third, w: half, h: third, label: "Drawn", value: drawn },
@@ -79,4 +80,19 @@ export function titleBlock(project: Project, page: Page): TitleBlock {
       rows,
     },
   };
+}
+
+/** SVG path of a revision cloud round a rectangle (grid units): a run of outward arcs. */
+export function cloudPath([x, y, w, h]: [number, number, number, number], bump = 1.6): string {
+  const nx = Math.max(1, Math.round(w / bump));
+  const ny = Math.max(1, Math.round(h / bump));
+  const sx = w / nx;
+  const sy = h / ny;
+  const r = (s: number) => (s / 2) * 1.15;
+  let d = `M ${x} ${y}`;
+  for (let i = 1; i <= nx; i++) d += ` A ${r(sx)} ${r(sx)} 0 0 1 ${x + i * sx} ${y}`;
+  for (let i = 1; i <= ny; i++) d += ` A ${r(sy)} ${r(sy)} 0 0 1 ${x + w} ${y + i * sy}`;
+  for (let i = nx - 1; i >= 0; i--) d += ` A ${r(sx)} ${r(sx)} 0 0 1 ${x + i * sx} ${y + h}`;
+  for (let i = ny - 1; i >= 0; i--) d += ` A ${r(sy)} ${r(sy)} 0 0 1 ${x} ${y + i * sy}`;
+  return d + " Z";
 }
