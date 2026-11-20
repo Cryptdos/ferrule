@@ -184,7 +184,7 @@ The 100-column grid gives every point on a page an address: `page-column`, e.g. 
 - **Component tags:** prefix + position, e.g. relay coil `K10-16` (sheet 10, column 16). The position is the coil, or the main part of a component.
 - **Conductor numbers:** position of the conductor's start point, e.g. `11-22`.
 - **Terminals:** position of the terminal on the terminal rail, e.g. `10-12`, grouped by terminal strip.
-- **Collisions:** if two items would get the same address, a suffix is added (`10-16.1`).
+- **Collisions:** the item highest on the page keeps the plain address. Each further item in the same column, working down the page, gets a letter: `11-22`, `11-22A`, `11-22B`, `11-22C`… This is common for conductors in vertical rungs. Dots are avoided because they read like decimals on a ferrule.
 - **Stability:** numbers are recalculated on demand ("renumber"), not on every move, so a drawing doesn't change under you while you're working. Items can be locked to keep their number.
 - Sequential numbering (100, 101…, K1, K2…) is available as an alternative scheme.
 
@@ -267,13 +267,24 @@ Reference drawings from other companies are proprietary. They are never committe
 | Designations | Selectable standard (IEC, BS 3939…), custom overrides discouraged |
 | Numbering | Position-based (page-column) by default |
 | PDF | Flat, no clickable links |
+| Collisions | Topmost keeps plain address; then A, B, C… down the column |
+| CI | GitHub Actions: install, type-check, test on every push and PR |
 
 ## 16. Open questions
 
 - Exact prefix tables for each supported standard.
-- Collision suffix format.
-- CI setup.
 
-## 17. References
+## 17. CI
+
+GitHub Actions, in `.github/workflows/ci.yml`. Runs on every push and pull request:
+
+1. Set up Bun.
+2. Install dependencies.
+3. Type-check.
+4. Run tests (core module: numbering, cross-references, checks, simulator).
+
+Later: render the LSP-01 benchmark and compare it against a stored result, so layout changes are caught.
+
+## 18. References
 
 - IEC symbol shapes for reference: https://symbols.radicasoftware.com/225/iec-symbols (draw our own; don't copy files unless the licence allows reuse).
