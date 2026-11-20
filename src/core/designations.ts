@@ -42,7 +42,7 @@ export const IEC_81346_2_2019: DesignationStandard = {
     contactor: "Q",
     isolator: "Q",
     fuse: "F",
-    breaker: "Q",
+    breaker: "F",
     pushButton: "S",
     selector: "S",
     lamp: "P",

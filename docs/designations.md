@@ -42,7 +42,7 @@ Class names are summarised, not quoted. See the standard for the definitions.
 
 ### Ferrule symbol mapping
 
-This is our application of the class definitions to the v1 symbol set (DESIGN.md §5). The examples given for each class (supplied by the user from the standard) settle the earlier judgement calls: circuit breakers and motor protection switches are Q, not F.
+This is our application of the class definitions to the v1 symbol set (DESIGN.md §5). Objects are classed by the function they serve in the design. The standard's examples list circuit breakers under Q, but in Ferrule's control circuits MCBs, RCBOs and RCDs are there for overcurrent and earth-fault protection, so they are F. Devices whose job is switching power (contactors, isolators) are Q.
 
 | Symbol | Prefix | Reasoning |
 |---|---|---|
@@ -51,7 +51,7 @@ This is our application of the class definitions to the v1 symbol set (DESIGN.md
 | Contactor (power) and its contacts | Q | Controls the flow of energy to a load |
 | Isolator / switch-disconnector | Q | Controls energy flow |
 | Fuse | F | Protecting |
-| MCB / circuit breaker | Q | Listed under Q (controlling access or flow), with motor protection switches |
+| MCB / RCBO / RCD | F | Used for protection in control circuits (project decision; the standard's examples list breakers under Q) |
 | Surge protective device | F | Listed under F |
 | Push button | S | Detects a human action |
 | Selector switch / keyswitch | S | Detects a human action |

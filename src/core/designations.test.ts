@@ -18,9 +18,10 @@ describe("standards", () => {
 });
 
 describe("IEC 81346-2:2019 mapping", () => {
-  test("breakers are Q, fuses are F, indicator lamps are P", () => {
+  test("breakers and fuses are F, contactors are Q, indicator lamps are P", () => {
     const std = STANDARDS[0]!;
-    expect(std.prefixes.breaker).toBe("Q");
+    expect(std.prefixes.breaker).toBe("F");
+    expect(std.prefixes.contactor).toBe("Q");
     expect(std.prefixes.fuse).toBe("F");
     expect(std.prefixes.lamp).toBe("P");
   });
