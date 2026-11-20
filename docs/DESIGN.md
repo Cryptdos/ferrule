@@ -293,6 +293,10 @@ Reference drawings from other companies are proprietary. They are never committe
 | Designation default | IEC 81346-2:2019, single-letter prefixes |
 | Collisions | Topmost keeps plain address; then A, B, C… down the column |
 | CI | GitHub Actions: install, type-check, test on every push and PR |
+| Routing results | Routed in the browser (libavoid wasm) and stored in the project as points, so printing, PDF and MCP draw stored routes and don't need the router |
+| PDF engine | Headless Edge/Chrome `--print-to-pdf` of the print view, not Playwright: Edge is on every Windows PC, so the portable .exe needs nothing installed. Browser *Print* as fallback |
+| Grid unit | 1 unit = 1.385 mm on A4 (2 units per column); symbols and terminals snap to whole units |
+| Wires to rails | Rail taps slide to sit directly above/below the other end, so rung wires stay straight when symbols move |
 
 ## 16. Open questions
 

@@ -5,9 +5,19 @@ A lightweight, browser-based tool for drafting control panel schematics: symbols
 - [Design document](docs/DESIGN.md)
 - [Benchmark: LSP-01 life safety panel](docs/benchmark-lsp01.md)
 
-Status: milestone 2 (wires).
+Status: milestones 1–3 (skeleton, wires, pages + title block + PDF).
 
 ## Running it
+
+### Portable Windows .exe
+
+`ferrule.exe` is the whole thing in one file. Put it in a folder (e.g. `C:\Temp\eCAD`), double-click it, and your browser opens on Ferrule. A console window shows the address; close it to stop Ferrule. Projects are saved in a `projects` folder next to the .exe.
+
+PDF export uses Microsoft Edge in the background (or Chrome, if Edge isn't there). Nothing needs installing. Windows may warn the first time because the .exe isn't signed: *More info → Run anyway*.
+
+Build it with `bun run build:exe` (→ `dist/ferrule.exe`). CI also builds it on every pull request; it's attached to the run as the `ferrule-windows` artifact.
+
+### From source
 
 Needs [Bun](https://bun.sh) 1.1 or newer.
 
@@ -18,6 +28,8 @@ bun run start      # start the server and open http://127.0.0.1:4810/
 ```
 
 Projects are saved as `<id>.ferrule.json` in a `projects` folder (next to the program when running as the .exe, otherwise in the current folder). The previous save is kept as `.bak`.
+
+Set `FERRULE_BROWSER` to the path of a Chromium-based browser to choose which one makes PDFs.
 
 Server options: `--port 4810`, `--host 0.0.0.0` (to reach it from another machine), `--projects <folder>`, `--no-open`.
 
@@ -48,3 +60,6 @@ Wire routing uses [libavoid-js](https://github.com/Aksem/libavoid-js) (LGPL-2.1-
 - `W` wire tool: click a terminal, then another. Click part-way along a wire to tee into it (a junction dot is added). Wires to a rail drop straight onto it. `S` or `Esc` goes back to selecting.
 - Wires route themselves at right angles around symbols. Select a wire and drag one of its legs to adjust it by hand; *Reset route* hands it back to the router.
 - Saving is automatic.
+- **Sheets** (top left): `+` adds a sheet after the current one, `⧉` duplicates it, arrows reorder, `✕` deletes. `PgUp`/`PgDn` switch sheets. With nothing selected, the right panel edits the sheet title.
+- **Project…** sets the title block fields (project, panel, job no., drawing ref., drawn/checked) and the revision table.
+- **Export PDF** downloads every sheet as one A4 landscape PDF. **Print** opens the same sheets in a browser tab and prints them, if PDF export isn't available.

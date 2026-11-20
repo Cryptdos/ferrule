@@ -303,3 +303,88 @@ export function wire(project: Project, pageId: string, a: WireEnd, b: WireEnd): 
   const to = resolve(b);
   return connect(project, pageId, from, to);
 }
+
+// ---------------------------------------------------------------------------
+// Pages
+
+function renumberPages(project: Project): void {
+  project.pages.forEach((p, i) => (p.number = i + 1));
+}
+
+/** Add a blank page after `afterId` (or at the end). */
+export function addPage(project: Project, title = "", afterId?: string): Page {
+  const page: Page = { id: newId("pg"), number: 0, title, elements: [], segments: [] };
+  const i = afterId ? project.pages.findIndex((p) => p.id === afterId) : -1;
+  project.pages.splice(i >= 0 ? i + 1 : project.pages.length, 0, page);
+  renumberPages(project);
+  return page;
+}
+
+export function deletePage(project: Project, pageId: string): void {
+  getPage(project, pageId);
+  if (project.pages.length === 1) throw new OpError("A project needs at least one page");
+  project.pages = project.pages.filter((p) => p.id !== pageId);
+  renumberPages(project);
+  refreshConductors(project);
+}
+
+export function renamePage(project: Project, pageId: string, title: string): void {
+  getPage(project, pageId).title = title.trim();
+}
+
+/** Move a page to a new position (0-based). */
+export function movePage(project: Project, pageId: string, toIndex: number): void {
+  const page = getPage(project, pageId);
+  const rest = project.pages.filter((p) => p.id !== pageId);
+  const i = Math.max(0, Math.min(rest.length, Math.round(toIndex)));
+  rest.splice(i, 0, page);
+  project.pages = rest;
+  renumberPages(project);
+}
+
+/** Copy a page and everything on it, after the original. Tags are cleared on the copy. */
+export function duplicatePage(project: Project, pageId: string): Page {
+  const src = getPage(project, pageId);
+  const ids = new Map<string, string>();
+  const copy = addPage(project, src.title ? `${src.title} (copy)` : "", pageId);
+  for (const el of src.elements) {
+    const id = newId("e");
+    ids.set(el.id, id);
+    copy.elements.push({ ...JSON.parse(JSON.stringify(el)), id, tag: "", links: [] });
+  }
+  for (const s of src.segments) {
+    const from = ids.get(s.from[0]);
+    const to = ids.get(s.to[0]);
+    if (!from || !to) continue;
+    copy.segments.push({ ...JSON.parse(JSON.stringify(s)), id: newId("w"), conductor: "", from: [from, s.from[1]], to: [to, s.to[1]] });
+  }
+  refreshConductors(project);
+  return copy;
+}
+
+// ---------------------------------------------------------------------------
+// Project data and revisions
+
+export function updateProjectInfo(project: Project, patch: Partial<Project["project"]>): void {
+  for (const [k, v] of Object.entries(patch)) {
+    if (k in project.project && typeof v === "string") (project.project as unknown as Record<string, string>)[k] = v;
+  }
+}
+
+export function addRevision(project: Project, rev: Partial<Project["revisions"][number]> = {}): void {
+  const last = project.revisions[project.revisions.length - 1]?.rev ?? "";
+  // A, B, C… or 1, 2, 3… following the last issue.
+  const next = /^\d+$/.test(last) ? String(Number(last) + 1) : /^[A-Y]$/.test(last) ? String.fromCharCode(last.charCodeAt(0) + 1) : "A";
+  project.revisions.push({ rev: next, date: "", drawnBy: "", description: "", ...rev });
+}
+
+export function updateRevision(project: Project, index: number, patch: Partial<Project["revisions"][number]>): void {
+  const r = project.revisions[index];
+  if (!r) throw new OpError(`No revision ${index + 1}`);
+  Object.assign(r, patch);
+}
+
+export function deleteRevision(project: Project, index: number): void {
+  if (!project.revisions[index]) throw new OpError(`No revision ${index + 1}`);
+  project.revisions.splice(index, 1);
+}

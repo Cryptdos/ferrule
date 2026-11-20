@@ -4,6 +4,11 @@
   import { Editor } from "./editor.svelte";
   import EditorView from "./components/EditorView.svelte";
   import Picker from "./components/Picker.svelte";
+  import PrintView from "./components/PrintView.svelte";
+  import type { Project } from "../core/model";
+
+  const printData = (window as { __FERRULE_PRINT__?: Project }).__FERRULE_PRINT__;
+  const autoprint = (window as { __FERRULE_AUTOPRINT__?: boolean }).__FERRULE_AUTOPRINT__ === true;
 
   let editor: Editor | null = $state(null);
   let error = $state("");
@@ -30,12 +35,14 @@
     }
   }
 
-  void open(currentId());
+  if (!printData) void open(currentId());
 </script>
 
 <svelte:window onpopstate={() => void open(currentId())} />
 
-{#if editor}
+{#if printData}
+  <PrintView project={printData} {autoprint} />
+{:else if editor}
   <EditorView {editor} onclose={() => void open(null)} />
 {:else}
   {#if error}<p class="error">{error}</p>{/if}

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { columnOf } from "../../core/geometry";
-  import { deleteElements, deleteSegments, resetRoute, rotateElements, updateElement, type ElementPatch } from "../../core/ops";
+  import { deleteElements, deleteSegments, renamePage, resetRoute, rotateElements, updateElement, type ElementPatch } from "../../core/ops";
   import { requireSymbol } from "../../core/symbols";
   import { tagPrefix } from "../../core/tags";
   import type { ParamValue } from "../../core/model";
@@ -128,7 +128,18 @@
       </div>
     {/if}
   {:else}
-    <h3>Sheet {page.number}</h3>
+    <h3>Sheet {page.number} of {editor.project.pages.length}</h3>
+    <label>
+      Sheet title
+      <input
+        value={page.title}
+        placeholder="e.g. Controls section: supplies"
+        onchange={(e) => {
+          const v = e.currentTarget.value;
+          editor.apply((p) => renamePage(p, editor.pageId, v));
+        }}
+      />
+    </label>
     <p class="hint">
       Pick a symbol on the left and click to place it. Drag to move, <kbd>R</kbd> to rotate, <kbd>Del</kbd> to delete,
       <kbd>Ctrl</kbd>+<kbd>D</kbd> to duplicate. Scroll to zoom, middle-drag or <kbd>Space</kbd>+drag to pan.

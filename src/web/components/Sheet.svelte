@@ -6,6 +6,7 @@
   import { connectionDots, routeOf } from "../../core/wires";
   import ElementView from "./ElementView.svelte";
   import Frame from "./Frame.svelte";
+  import TitleBlock from "./TitleBlock.svelte";
 
   let {
     project,
@@ -34,6 +35,7 @@
 
 <rect class="paper" x="0" y="0" width={SHEET_MM.w} height={SHEET_MM.h} />
 <Frame />
+<TitleBlock {project} {page} />
 <g transform="translate({AREA_MM.x} {AREA_MM.y}) scale({UNIT_MM})">
   {#if grid}
     <rect class="grid" x="0" y="0" width={AREA_UNITS.w} height={AREA_UNITS.h} fill="url(#ferrule-grid)" />

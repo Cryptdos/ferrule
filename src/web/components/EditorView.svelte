@@ -4,10 +4,42 @@
   import Canvas from "./Canvas.svelte";
   import Palette from "./Palette.svelte";
   import Props from "./Props.svelte";
+  import PageList from "./PageList.svelte";
+  import ProjectDialog from "./ProjectDialog.svelte";
 
   let { editor, onclose }: { editor: Editor; onclose: () => void } = $props();
 
   let canvas: Canvas | undefined = $state();
+  let showProject = $state(false);
+  let exporting = $state(false);
+
+  async function exportPdf() {
+    exporting = true;
+    try {
+      await editor.saveNow();
+      const res = await fetch(`/api/projects/${encodeURIComponent(editor.project.id)}/pdf`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error ?? res.statusText);
+      }
+      const blob = await res.blob();
+      const name = /filename="([^"]+)"/.exec(res.headers.get("content-disposition") ?? "")?.[1] ?? "drawing.pdf";
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = name;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
+    } catch (e) {
+      editor.flash(`PDF export failed: ${(e as Error).message}`);
+    } finally {
+      exporting = false;
+    }
+  }
+
+  async function print() {
+    await editor.saveNow();
+    window.open(`/print/${encodeURIComponent(editor.project.id)}?autoprint=1`, "_blank");
+  }
 
   const saveText = $derived(
     { saved: "Saved", pending: "Unsaved changes", saving: "Saving…", error: "Save failed" }[editor.saveState],
@@ -19,7 +51,7 @@
   }
 
   function onKey(e: KeyboardEvent) {
-    if (isTyping(e)) return;
+    if (isTyping(e) || showProject) return;
     const ctrl = e.ctrlKey || e.metaKey;
     const ids = editor.selectedElements.map((el) => el.id);
     const segIds = editor.selectedSegments.map((s) => s.id);
@@ -75,6 +107,11 @@
       const d: [number, number] =
         e.key === "ArrowLeft" ? [-step, 0] : e.key === "ArrowRight" ? [step, 0] : e.key === "ArrowUp" ? [0, -step] : [0, step];
       editor.apply((p) => moveElements(p, pageId, ids, d));
+    } else if (e.key === "PageDown" || e.key === "PageUp") {
+      e.preventDefault();
+      const pages = editor.project.pages;
+      const i = editor.pageIndex + (e.key === "PageDown" ? 1 : -1);
+      if (pages[i]) editor.setPage(pages[i].id);
     } else if (e.key === "f" || e.key === "F") {
       canvas?.fit();
     }
@@ -107,10 +144,17 @@
       <button disabled={!editor.canRedo} onclick={() => editor.redo()} title="Redo (Ctrl+Y)">Redo</button>
       <span class="sep"></span>
       <button onclick={() => canvas?.fit()} title="Fit sheet (F)">Fit</button>
+      <span class="sep"></span>
+      <button onclick={() => (showProject = true)} title="Project details and revisions (title block)">Project…</button>
+      <button onclick={exportPdf} disabled={exporting} title="Download every sheet as an A4 PDF">
+        {exporting ? "Exporting…" : "Export PDF"}
+      </button>
+      <button onclick={print} title="Open the print view and print from the browser">Print</button>
     </div>
     <span class="status" class:error={editor.saveState === "error"}>{saveText}</span>
   </header>
   <aside class="left">
+    <PageList {editor} />
     <Palette {editor} />
   </aside>
   <main>
@@ -121,6 +165,9 @@
     <Props {editor} />
   </aside>
 </div>
+{#if showProject}
+  <ProjectDialog {editor} onclose={() => (showProject = false)} />
+{/if}
 
 <style>
   .editor {

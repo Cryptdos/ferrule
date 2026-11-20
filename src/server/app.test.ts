@@ -47,3 +47,43 @@ describe("project API", () => {
     expect(wrong.status).toBe(400);
   });
 });
+
+describe("PDF export", () => {
+  test("prints the project's print page and names the file after the drawing", async () => {
+    const storage = new Storage(dir);
+    const urls: string[] = [];
+    const pdfApp = createApp({
+      storage,
+      selfUrl: () => "http://127.0.0.1:9999",
+      pdf: {
+        async render(url) {
+          urls.push(url);
+          return new TextEncoder().encode("%PDF-1.4 fake");
+        },
+      },
+    });
+    const p = await storage.load("fan-panel");
+    p.project.drawingNo = "LSP-01/E/001";
+    await storage.save("fan-panel", p);
+    const res = await pdfApp.request("/api/projects/fan-panel/pdf");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("application/pdf");
+    expect(res.headers.get("content-disposition")).toContain('filename="LSP-01-E-001.pdf"');
+    expect(urls).toEqual(["http://127.0.0.1:9999/print/fan-panel"]);
+  });
+
+  test("print page embeds the project", async () => {
+    const storage = new Storage(dir);
+    const html = "<html><head></head><body></body></html>";
+    const a = createApp({ storage, assets: { get: async (path) => (path === "/index.html" ? new Response(html) : null) } });
+    const res = await a.request("/print/fan-panel");
+    const text = await res.text();
+    expect(text).toContain("window.__FERRULE_PRINT__=");
+    expect(text).toContain('"id":"fan-panel"');
+  });
+
+  test("without a renderer the API says so", async () => {
+    const res = await app.request("/api/projects/fan-panel/pdf");
+    expect(res.status).toBe(503);
+  });
+});
