@@ -69,3 +69,21 @@ describe("element operations", () => {
     expect(copy.params.colour).toBe("G");
   });
 });
+
+describe("bulk edits", () => {
+  test("replace in tags and labels, lock tags, edit anywhere", async () => {
+    const { addPage, replaceInElements, setTagLocks, updateElementAnywhere } = await import("./ops");
+    const { p, pg } = setup();
+    const pg2 = addPage(p, "Two").id;
+    const a = addElement(p, pg, "lamp", [10, 10], { tag: "H1", label: "SF-01 RUNNING" });
+    const b = addElement(p, pg2, "lamp", [10, 10], { tag: "H2", label: "SF-01 TRIPPED" });
+    expect(replaceInElements(p, [a.id, b.id], "SF-01", "SF-02", { label: true })).toBe(2);
+    expect(b.label).toBe("SF-02 TRIPPED");
+    expect(replaceInElements(p, [a.id], "H", "P", { tag: true })).toBe(1);
+    expect(a.tag).toBe("P1");
+    setTagLocks(p, [a.id, b.id], true);
+    expect(b.params.locked).toBe(true);
+    updateElementAnywhere(p, b.id, { label: "X" });
+    expect(b.label).toBe("X");
+  });
+});

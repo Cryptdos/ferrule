@@ -11,12 +11,26 @@
   import PlantDialog from "./PlantDialog.svelte";
   import ChecksDialog from "./ChecksDialog.svelte";
   import SchedulesDialog from "./SchedulesDialog.svelte";
+  import ElementList from "./ElementList.svelte";
+  import TableView from "./TableView.svelte";
+  import SplitPane from "./SplitPane.svelte";
 
   let { editor, onclose }: { editor: Editor; onclose: () => void } = $props();
 
   let canvas: Canvas | undefined = $state();
   let showProject = $state(false);
   let dialog: "plant" | "checks" | "schedules" | null = $state(null);
+  let tableView = $state(false);
+
+  function toggleSplit() {
+    if (editor.splitPageId) {
+      editor.splitPageId = null;
+      return;
+    }
+    const pages = editor.project.pages;
+    const next = pages[editor.pageIndex + 1] ?? pages[editor.pageIndex - 1] ?? pages[editor.pageIndex]!;
+    editor.splitPageId = next.id;
+  }
   let exporting = $state(false);
 
   async function exportPdf() {
@@ -60,7 +74,7 @@
 
 
   function onKey(e: KeyboardEvent) {
-    if (isTyping(e.target) || showProject || dialog) return;
+    if (isTyping(e.target) || showProject || dialog || tableView) return;
     const ctrl = e.ctrlKey || e.metaKey;
     const ids = editor.selectedElements.map((el) => el.id);
     const segIds = editor.selectedSegments.map((s) => s.id);
@@ -161,6 +175,8 @@
       <button disabled={!editor.canRedo} onclick={() => editor.redo()} title="Redo (Ctrl+Y)">Redo</button>
       <span class="sep"></span>
       <button onclick={() => canvas?.fit()} title="Fit sheet (F)">Fit</button>
+      <button class:active={!!editor.splitPageId} onclick={toggleSplit} title="Show another sheet alongside">Split</button>
+      <button class:active={tableView} onclick={() => (tableView = !tableView)} title="Every element in the project as a table">Table</button>
       <span class="sep"></span>
       <button onclick={doRenumber} title="Recalculate tags, terminal and wire numbers (locked ones are kept)">Renumber</button>
       <button onclick={() => (dialog = "plant")} title="Field equipment: define plant and place views">Plant…</button>
@@ -178,12 +194,20 @@
     <PageList {editor} />
     <Palette {editor} />
   </aside>
-  <main>
-    <Canvas bind:this={canvas} {editor} />
+  <main class:split={!!editor.splitPageId && !tableView}>
+    {#if tableView}
+      <TableView {editor} onclose={() => (tableView = false)} />
+    {:else}
+      <div class="pane"><Canvas bind:this={canvas} {editor} /></div>
+      {#if editor.splitPageId}
+        <div class="pane"><SplitPane {editor} /></div>
+      {/if}
+    {/if}
     {#if editor.message}<div class="toast">{editor.message}</div>{/if}
   </main>
   <aside class="right">
-    <Props {editor} />
+    <ElementList {editor} />
+    <div class="props-scroll"><Props {editor} /></div>
   </aside>
 </div>
 {#if dialog === "plant"}
@@ -200,7 +224,8 @@
 <style>
   .editor {
     display: grid;
-    grid-template-columns: 200px 1fr 250px;
+    overflow: hidden;
+    grid-template-columns: 200px 1fr 270px;
     grid-template-rows: 40px 1fr;
     grid-template-areas: "head head head" "left main right";
     height: 100vh;
@@ -250,12 +275,31 @@
   .right {
     grid-area: right;
     border-left: 1px solid #cfd4d8;
-    overflow-y: auto;
     background: #fafafa;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .props-scroll {
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
   }
   main {
     grid-area: main;
     position: relative;
+    overflow: hidden;
+    display: grid;
+    grid-template-columns: 1fr;
+    min-height: 0;
+  }
+  main.split {
+    grid-template-columns: 1fr 1fr;
+  }
+  .pane {
+    position: relative;
+    min-width: 0;
+    min-height: 0;
     overflow: hidden;
   }
   .toast {

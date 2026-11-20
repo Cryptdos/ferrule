@@ -19,6 +19,8 @@ const SAVE_DELAY_MS = 600;
 export class Editor {
   project: Project = $state()!;
   pageId: string = $state("");
+  /** Sheet shown in the other half of the split view, or null when it's closed. */
+  splitPageId: string | null = $state(null);
   /** Selected element ids on the current page. */
   selection: string[] = $state([]);
   tool: Tool = $state("select");
@@ -109,6 +111,7 @@ export class Editor {
   private restore(json: string): void {
     this.project = JSON.parse(json);
     if (!this.project.pages.some((p) => p.id === this.pageId)) this.pageId = this.project.pages[0]!.id;
+    if (this.splitPageId && !this.project.pages.some((p) => p.id === this.splitPageId)) this.splitPageId = null;
     const ids = new Set([
       ...this.page.elements.map((e) => e.id),
       ...this.page.segments.map((s) => s.id),
@@ -130,10 +133,22 @@ export class Editor {
     this.selection = [];
   }
 
-  /** Show an element: switch to its sheet and select it. */
+  /** Swap the two halves of the split view. */
+  swapSplit(): void {
+    if (!this.splitPageId) return;
+    const other = this.splitPageId;
+    this.splitPageId = this.pageId;
+    this.setPage(other);
+  }
+
+  /**
+   * Show an element: switch to its sheet and select it. With the split view
+   * open, the sheet you came from stays in view in the other half.
+   */
   goTo(id: string): void {
     const page = this.project.pages.find((p) => p.elements.some((e) => e.id === id) || p.segments.some((s) => s.id === id));
     if (!page) return;
+    if (this.splitPageId && page.id !== this.pageId) this.splitPageId = this.pageId;
     this.setPage(page.id);
     this.selection = [id];
     this.tool = "select";

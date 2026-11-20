@@ -5,7 +5,7 @@ A lightweight, browser-based tool for drafting control panel schematics: symbols
 - [Design document](docs/DESIGN.md)
 - [Benchmark: LSP-01 life safety panel](docs/benchmark-lsp01.md)
 
-Status: milestones 1–5 (skeleton, wires, pages + title block + PDF, numbering + cross-references, plant + boundary + sections).
+Status: milestones 1–6 (skeleton, wires, pages + title block + PDF, numbering + cross-references, plant + boundary + sections, element list + table view).
 
 ## Running it
 
@@ -69,5 +69,8 @@ Wire routing uses [libavoid-js](https://github.com/Aksem/libavoid-js) (LGPL-2.1-
 - **Panel boundary:** tick it in the sheet panel (nothing selected), then drag the dashed line. Everything below is field equipment, and wires to it are drawn as dashed field cables. A wire crossing it without a terminal is flagged by **Check**.
 - **Section** tool (`B`): drag out a dashed section box; select its border to label, move or resize it.
 - **Check** lists problems (boundary crossings, loose contacts, coils without contacts, unpaired off-page arrows, duplicate tags, plant terminals shown nowhere or twice) with a *Show* button. **Schedules** gives terminal and field cable schedules, downloadable as CSV.
+- **Right sidebar:** everything on the sheet, in column order and synced with the canvas selection (click a row to select; filter box at the top), with the selection's properties below.
+- **Split** shows another sheet alongside. *Go to* buttons (coil ↔ contacts, off-page pairs) then keep the sheet you came from in view; click the other half to work on it.
+- **Table** lists every element in the project: filter by type, plant or text, edit tags and labels in place, and tick rows to find-and-replace or lock tags in bulk.
 - **Project…** sets the title block fields (project, panel, job no., drawing ref., drawn/checked) and the revision table.
 - **Export PDF** downloads every sheet as one A4 landscape PDF. **Print** opens the same sheets in a browser tab and prints them, if PDF export isn't available.

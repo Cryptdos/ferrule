@@ -599,3 +599,42 @@ export function deleteSections(project: Project, pageId: string, ids: string[]):
   const page = getPage(project, pageId);
   page.sections = page.sections.filter((s) => !ids.includes(s.id));
 }
+
+// ---------------------------------------------------------------------------
+// Bulk edits (table view)
+
+/** Find and replace in the tags and/or labels of the given elements, anywhere in the project. Returns how many changed. */
+export function replaceInElements(
+  project: Project,
+  ids: string[],
+  find: string,
+  replace: string,
+  fields: { tag?: boolean; label?: boolean },
+): number {
+  if (!find) throw new OpError("Nothing to find");
+  const want = new Set(ids);
+  let n = 0;
+  for (const page of project.pages) {
+    for (const el of page.elements) {
+      if (!want.has(el.id)) continue;
+      const before = el.tag + "\u0000" + el.label;
+      if (fields.tag && el.tag) el.tag = el.tag.split(find).join(replace);
+      if (fields.label) el.label = el.label.split(find).join(replace);
+      if (el.tag + "\u0000" + el.label !== before) n++;
+    }
+  }
+  return n;
+}
+
+/** Lock or unlock the tags of elements anywhere in the project. */
+export function setTagLocks(project: Project, ids: string[], locked: boolean): void {
+  const want = new Set(ids);
+  for (const page of project.pages) for (const el of page.elements) if (want.has(el.id)) el.params.locked = locked;
+}
+
+/** Edit an element anywhere in the project (the table view isn't tied to one sheet). */
+export function updateElementAnywhere(project: Project, id: string, patch: ElementPatch): void {
+  const page = project.pages.find((p) => p.elements.some((e) => e.id === id));
+  if (!page) throw new OpError(`No element "${id}"`);
+  updateElement(project, page.id, id, patch);
+}
