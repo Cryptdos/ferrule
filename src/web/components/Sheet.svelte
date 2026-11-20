@@ -4,6 +4,7 @@
   import type { Page, Project } from "../../core/model";
   import type { Vec } from "../../core/geometry";
   import { connectionDots, routeOf, wireLabelSpot } from "../../core/wires";
+  import { resolveFields } from "../../core/fields";
   import ElementView from "./ElementView.svelte";
   import Frame from "./Frame.svelte";
   import TitleBlock from "./TitleBlock.svelte";
@@ -14,6 +15,8 @@
     grid = false,
     offset,
     routes,
+    sectionRects = null,
+    boundary,
     under,
     over,
   }: {
@@ -24,6 +27,10 @@
     offset?: (id: string) => [number, number] | null;
     /** Temporary routes while dragging, by wire id. */
     routes?: Map<string, Vec[]> | null;
+    /** Temporary section rectangles while dragging, by id. */
+    sectionRects?: Map<string, [number, number, number, number]> | null;
+    /** Temporary boundary height while dragging. */
+    boundary?: number | null;
     /** Extra drawing in grid units, under the elements (selection boxes). */
     under?: Snippet;
     /** Extra drawing in grid units, over the elements (ghosts, handles). */
@@ -31,6 +38,13 @@
   } = $props();
 
   const dots = $derived(routes ? [] : connectionDots(page));
+  const boundaryY = $derived(boundary !== undefined && boundary !== null ? boundary : page.boundaryY);
+
+  /** Field cables (a wire with an end out in the field) are drawn dashed. */
+  const field = $derived.by(() => {
+    const ext = new Set(page.elements.filter((e) => e.zone === "external").map((e) => e.id));
+    return new Set(page.segments.filter((s) => ext.has(s.from[0]) || ext.has(s.to[0])).map((s) => s.id));
+  });
 
   /** Wire numbers, by conductor. Wires on rails aren't labelled: the rail is. */
   const numbers = $derived.by(() => {
@@ -50,11 +64,23 @@
   {#if grid}
     <rect class="grid" x="0" y="0" width={AREA_UNITS.w} height={AREA_UNITS.h} fill="url(#ferrule-grid)" />
   {/if}
+  {#each page.sections as sec (sec.id)}
+    {@const r = sectionRects?.get(sec.id) ?? sec.rect}
+    <g class="section">
+      <rect x={r[0]} y={r[1]} width={r[2]} height={r[3]} />
+      {#if sec.label}
+        <text x={r[0] + 0.8} y={r[1] + 2}>{resolveFields(sec.label, project)}</text>
+      {/if}
+    </g>
+  {/each}
+  {#if boundaryY !== null}
+    <line class="boundary" x1="0" y1={boundaryY} x2={AREA_UNITS.w} y2={boundaryY} />
+  {/if}
   {@render under?.()}
   <g class="wires">
     {#each page.segments as seg (seg.id)}
       {@const pts = routes?.get(seg.id) ?? routeOf(page, seg)}
-      <polyline points={pts.map((p) => p.join(",")).join(" ")} />
+      <polyline class:field={field.has(seg.id)} points={pts.map((p) => p.join(",")).join(" ")} />
       {@const num = numbers.get(seg.conductor)}
       {@const spot = num ? wireLabelSpot(pts) : null}
       {#if num && spot}
@@ -88,6 +114,25 @@
     stroke-width: 0.18;
     stroke-linejoin: miter;
     stroke-linecap: square;
+  }
+  .wires polyline.field {
+    stroke-dasharray: 0.9 0.5;
+  }
+  .section rect {
+    fill: none;
+    stroke: #000;
+    stroke-width: 0.15;
+    stroke-dasharray: 1.2 0.6;
+  }
+  .section text {
+    font-family: var(--drawing-font);
+    font-size: 1.5px;
+    fill: #000;
+  }
+  .boundary {
+    stroke: #000;
+    stroke-width: 0.45;
+    stroke-dasharray: 2 0.8;
   }
   .wires circle {
     fill: #000;

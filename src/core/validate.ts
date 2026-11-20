@@ -44,7 +44,15 @@ export function parseProject(input: unknown): Project {
           : {},
     },
     titleBlock: strOr(input.titleBlock, "default-a4"),
-    plant: arr(input.plant),
+    plant: arr(input.plant)
+      .filter(isObj)
+      .filter((pl) => typeof pl.id === "string")
+      .map((pl) => ({
+        id: pl.id as string,
+        tag: strOr(pl.tag),
+        description: strOr(pl.description),
+        terminals: arr(pl.terminals).filter((t): t is string => typeof t === "string"),
+      })),
     pages: [],
     conductors: [],
     revisions: arr(input.revisions)
@@ -98,7 +106,12 @@ export function parseProject(input: unknown): Project {
           points: arr(s.points).filter(isVec),
         };
       });
-    project.pages.push({ id: pg.id, number: i + 1, title: strOr(pg.title), elements, segments });
+    const sections = arr(pg.sections)
+      .filter(isObj)
+      .filter((sc) => typeof sc.id === "string" && Array.isArray(sc.rect) && sc.rect.length === 4 && sc.rect.every((n) => typeof n === "number"))
+      .map((sc) => ({ id: sc.id as string, label: strOr(sc.label), rect: sc.rect as [number, number, number, number] }));
+    const boundaryY = typeof pg.boundaryY === "number" && Number.isFinite(pg.boundaryY) ? pg.boundaryY : null;
+    project.pages.push({ id: pg.id, number: i + 1, title: strOr(pg.title), boundaryY, sections, elements, segments });
   });
 
   project.conductors = arr(input.conductors)

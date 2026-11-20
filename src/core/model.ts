@@ -63,13 +63,33 @@ export interface Conductor {
   terminals: TerminalRef[];
 }
 
+/** A named dashed box around a functional area (DESIGN.md §2, benchmark). */
+export interface Section {
+  id: string;
+  /** May contain fields, e.g. "{plant:p1.tag} SECTION". */
+  label: string;
+  /** x, y, w, h in grid units. */
+  rect: [number, number, number, number];
+}
+
 export interface Page {
   id: string;
   /** Sheet number. Always index + 1; kept in step by the page operations. */
   number: number;
   title: string;
+  /** Panel boundary (DESIGN.md §7): internal above, field below. Null: no boundary on this sheet. */
+  boundaryY: number | null;
+  sections: Section[];
   elements: Element[];
   segments: Segment[];
+}
+
+/** A piece of field equipment, defined once with all its terminals (DESIGN.md §6). */
+export interface PlantItem {
+  id: string;
+  tag: string;
+  description: string;
+  terminals: string[];
 }
 
 export interface Revision {
@@ -90,7 +110,7 @@ export interface Project {
   numbering: { scheme: NumberingScheme };
   designation: { standard: string; overrides: Record<string, string> };
   titleBlock: string;
-  plant: unknown[];
+  plant: PlantItem[];
   pages: Page[];
   conductors: Conductor[];
   revisions: Revision[];
@@ -121,7 +141,7 @@ export function newId(prefix: string): string {
 }
 
 export function newPage(number: number, title = ""): Page {
-  return { id: newId("pg"), number, title, elements: [], segments: [] };
+  return { id: newId("pg"), number, title, boundaryY: null, sections: [], elements: [], segments: [] };
 }
 
 export function newProject(id: string, title = "Untitled project"): Project {

@@ -5,6 +5,10 @@
     deleteSegments,
     linkContact,
     linkOffpage,
+    setBoundary,
+    setPlantViewTerminals,
+    updateSection,
+    deleteSections,
     renamePage,
     resetRoute,
     rotateElements,
@@ -17,6 +21,7 @@
   import { displayTag, tagPrefix } from "../../core/tags";
   import type { ParamValue } from "../../core/model";
   import type { Editor } from "../editor.svelte";
+  import FieldInput from "./FieldInput.svelte";
 
   let { editor }: { editor: Editor } = $props();
 
@@ -30,6 +35,7 @@
     const name = el.tag || requireSymbol(el.symbol).name;
     return `${name}:${ref[1]}`;
   };
+  const secs = $derived(page.sections.filter((s) => editor.selection.includes(s.id)));
   const one = $derived(sel.length === 1 ? sel[0]! : null);
   const def = $derived(one ? requireSymbol(one.symbol) : null);
 
@@ -134,7 +140,7 @@
     {#if one.symbol !== "junction" && one.symbol !== "rail"}
       <label>
         Label
-        <input value={one.label} onchange={(e) => patch({ label: e.currentTarget.value })} />
+        <FieldInput {editor} value={one.label} onchange={(v) => patch({ label: v })} />
       </label>
     {/if}
     {#each def.params as p (p.key)}
@@ -170,15 +176,62 @@
         </label>
       {/if}
     {/each}
-    <label>
-      Zone
-      <select value={one.zone} onchange={(e) => patch({ zone: e.currentTarget.value as "internal" | "external" })}>
-        <option value="internal">Internal (in panel)</option>
-        <option value="external">External (field)</option>
-      </select>
-    </label>
+    {#if one.symbol === "plant-view"}
+      {@const item = editor.project.plant.find((x) => x.id === one.params.plant)}
+      {@const shown = new Set(String(one.params.show ?? "").split(",").filter(Boolean))}
+      <div class="sub">{item ? `${item.tag} ${item.description}` : "Plant item missing"}</div>
+      {#if item}
+        <div class="sub">Terminals shown on this sheet</div>
+        <div class="ticks">
+          {#each item.terminals as t (t)}
+            <label class="check">
+              <input
+                type="checkbox"
+                checked={shown.has(t)}
+                onchange={(e) => {
+                  const on = e.currentTarget.checked;
+                  const next = item.terminals.filter((x) => (x === t ? on : shown.has(x)));
+                  const id = one.id;
+                  editor.apply((p) => setPlantViewTerminals(p, editor.pageId, id, next));
+                }}
+              />
+              {t}
+            </label>
+          {/each}
+        </div>
+        <p class="hint">Hidden terminals give the box a break line. Edit the plant itself under Plant….</p>
+      {/if}
+    {/if}
     <div class="row">
       <span>Rotation {one.rot}°</span>
+      {#if page.boundaryY !== null}<span> · {one.zone === "external" ? "Field (below boundary)" : "In panel"}</span>{/if}
+    </div>
+  {:else if secs.length === 1 && sel.length === 0 && segs.length === 0}
+    {@const sec = secs[0]!}
+    <h3>Section box</h3>
+    <label>
+      Label
+      <FieldInput
+        {editor}
+        value={sec.label}
+        placeholder="e.g. MAIN INCOMING SECTION"
+        onchange={(v) => {
+          const id = sec.id;
+          editor.apply((p) => updateSection(p, editor.pageId, id, { label: v }));
+        }}
+      />
+    </label>
+    <div class="pos">Columns {columnOf(sec.rect[0])}–{columnOf(sec.rect[0] + sec.rect[2] - 1)}</div>
+    <p class="hint">Drag the border to move it, the corner square to resize.</p>
+    <div class="buttons">
+      <button
+        class="danger"
+        onclick={() => {
+          const id = sec.id;
+          editor.apply((p) => deleteSections(p, editor.pageId, [id]));
+          editor.selection = [];
+        }}>Delete</button
+      >
     </div>
   {:else if segs.length === 1 && sel.length === 0}
     {@const seg = segs[0]!}
@@ -253,6 +306,20 @@
         }}
       />
     </label>
+    <label class="check">
+      <input
+        type="checkbox"
+        checked={page.boundaryY !== null}
+        onchange={(e) => {
+          const y = e.currentTarget.checked ? 88 : null;
+          editor.apply((p) => setBoundary(p, editor.pageId, y));
+        }}
+      />
+      Panel boundary (field equipment below it)
+    </label>
+    {#if page.boundaryY !== null}
+      <p class="hint">Drag the dashed boundary line to move it. Terminals sit on it; wires crossing it must go through one.</p>
+    {/if}
     <p class="hint">
       Pick a symbol on the left and click to place it. Drag to move, <kbd>R</kbd> to rotate, <kbd>Del</kbd> to delete,
       <kbd>Ctrl</kbd>+<kbd>D</kbd> to duplicate. Scroll to zoom, middle-drag or <kbd>Space</kbd>+drag to pan.
@@ -322,6 +389,11 @@
     font-weight: 600;
     color: #334;
     margin-top: 4px;
+  }
+  .ticks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
   }
   .link-btn {
     text-align: left;

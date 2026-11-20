@@ -10,7 +10,17 @@
     snapVec,
     clampToArea,
   } from "../../core/geometry";
-  import { addElement, moveElements, setManualRoute, wire, type WireEnd } from "../../core/ops";
+  import {
+    addElement,
+    addSection,
+    moveElements,
+    placePlantView,
+    setBoundary,
+    setManualRoute,
+    updateSection,
+    wire,
+    type WireEnd,
+  } from "../../core/ops";
   import { localGeometry, defaultParams, type Geometry } from "../../core/symbols";
   import { elementTexts } from "../../core/tags";
   import { routePage } from "../../core/routing";
@@ -18,6 +28,7 @@
   import type { Element, Page, Segment } from "../../core/model";
   import type { Editor } from "../editor.svelte";
   import { getAvoid } from "../avoid";
+  import { isTyping } from "../typing";
   import Sheet from "./Sheet.svelte";
   import ElementView from "./ElementView.svelte";
 
@@ -35,7 +46,12 @@
     | { kind: "drag"; start: Vec; delta: Vec; ids: string[] }
     | { kind: "leg"; seg: string; leg: number; start: Vec; original: Vec[]; points: Vec[] }
     | { kind: "band"; start: Vec; cur: Vec; add: boolean }
+    | { kind: "secnew"; start: Vec; cur: Vec }
+    | { kind: "secmove"; id: string; start: Vec; rect: Rect4; delta: Vec }
+    | { kind: "secsize"; id: string; start: Vec; rect: Rect4; delta: Vec }
+    | { kind: "boundary"; y: number }
     | null;
+  type Rect4 = [number, number, number, number];
   let gesture = $state<Gesture>(null);
   let pointer: Vec | null = $state(null);
   let spaceDown = $state(false);
@@ -117,6 +133,20 @@
     return best;
   }
 
+  /** A section's resize handle (bottom-right corner) or its border/label. */
+  function hitSection(pt: Vec): { id: string; part: "move" | "size" } | null {
+    for (let i = page.sections.length - 1; i >= 0; i--) {
+      const sec = page.sections[i]!;
+      const [x, y, w, h] = sec.rect;
+      if (Math.hypot(pt[0] - (x + w), pt[1] - (y + h)) < 1) return { id: sec.id, part: "size" };
+      const nearV = (Math.abs(pt[0] - x) < 0.6 || Math.abs(pt[0] - (x + w)) < 0.6) && pt[1] > y - 0.6 && pt[1] < y + h + 0.6;
+      const nearH = (Math.abs(pt[1] - y) < 0.6 || Math.abs(pt[1] - (y + h)) < 0.6) && pt[0] > x - 0.6 && pt[0] < x + w + 0.6;
+      const onLabel = pt[0] > x && pt[0] < x + 20 && pt[1] > y && pt[1] < y + 2.6;
+      if (nearV || nearH || onLabel) return { id: sec.id, part: "move" };
+    }
+    return null;
+  }
+
   /** The nearest terminal within reach, for wiring. Rails snap to the nearest tap. */
   function hitTerminal(pt: Vec, reach = 1.2): { ref: [string, string]; at: Vec } | null {
     let best: { ref: [string, string]; at: Vec; d: number } | null = null;
@@ -171,11 +201,26 @@
 
     if (editor.tool === "place" && editor.placeSymbol) {
       const symbol = editor.placeSymbol;
+      const params = { ...editor.placeParams };
       let id = "";
       editor.apply((p) => {
-        id = addElement(p, editor.pageId, symbol, clampToArea(snapVec(pt))).id;
+        const at = clampToArea(snapVec(pt));
+        id =
+          symbol === "plant-view"
+            ? placePlantView(p, editor.pageId, String(params.plant), at, String(params.show ?? "").split(",").filter(Boolean)).id
+            : addElement(p, editor.pageId, symbol, at, { params }).id;
       });
       if (id) editor.selection = [id];
+      // A plant view is placed once; other symbols can be placed again and again.
+      if (symbol === "plant-view") {
+        editor.tool = "select";
+        editor.placeSymbol = null;
+      }
+      return;
+    }
+
+    if (editor.tool === "section") {
+      gesture = { kind: "secnew", start: snapVec(pt), cur: snapVec(pt) };
       return;
     }
 
@@ -202,6 +247,17 @@
     // Select tool.
     const hit = hitElement(pt);
     const wireHit = hit ? null : hitWire(pt);
+    const secHit = hit || wireHit ? null : hitSection(pt);
+    if (secHit) {
+      const sec = page.sections.find((x) => x.id === secHit.id)!;
+      editor.selection = [sec.id];
+      gesture = { kind: secHit.part === "size" ? "secsize" : "secmove", id: sec.id, start: pt, rect: [...sec.rect], delta: [0, 0] };
+      return;
+    }
+    if (!hit && !wireHit && page.boundaryY !== null && Math.abs(pt[1] - page.boundaryY) < 0.6) {
+      gesture = { kind: "boundary", y: page.boundaryY };
+      return;
+    }
     const id = hit?.id ?? wireHit?.seg.id;
     if (id) {
       if (e.shiftKey || e.ctrlKey) {
@@ -238,6 +294,12 @@
       g.points = dragLeg(g.original, g.leg, d);
     } else if (g.kind === "band") {
       g.cur = pointer;
+    } else if (g.kind === "secnew") {
+      g.cur = snapVec(pointer);
+    } else if (g.kind === "secmove" || g.kind === "secsize") {
+      g.delta = snapVec([pointer[0] - g.start[0], pointer[1] - g.start[1]]);
+    } else if (g.kind === "boundary") {
+      g.y = Math.round(Math.max(0, Math.min(112, pointer[1])));
     }
   }
 
@@ -252,6 +314,21 @@
       if (JSON.stringify(pts) !== JSON.stringify(simplifyRoute(g.original))) {
         editor.apply((p) => setManualRoute(p, editor.pageId, g.seg, pts));
       }
+    } else if (g.kind === "secnew") {
+      const r = bandRect(g.start, g.cur);
+      if (r.w < 4 || r.h < 4) return;
+      let id = "";
+      editor.apply((p) => {
+        id = addSection(p, editor.pageId, "", [r.x, r.y, r.w, r.h]).id;
+      });
+      editor.tool = "select";
+      if (id) editor.selection = [id];
+    } else if ((g.kind === "secmove" || g.kind === "secsize") && (g.delta[0] || g.delta[1])) {
+      const rect = sectionPreview(g);
+      editor.apply((p) => updateSection(p, editor.pageId, g.id, { rect }));
+    } else if (g.kind === "boundary" && g.y !== page.boundaryY) {
+      const y = g.y;
+      editor.apply((p) => setBoundary(p, editor.pageId, y));
     } else if (g.kind === "band") {
       const r = bandRect(g.start, g.cur);
       if (r.w < 0.2 && r.h < 0.2) return;
@@ -272,6 +349,25 @@
   function bandRect(a: Vec, b: Vec) {
     return { x: Math.min(a[0], b[0]), y: Math.min(a[1], b[1]), w: Math.abs(a[0] - b[0]), h: Math.abs(a[1] - b[1]) };
   }
+
+  function sectionPreview(g: { kind: string; rect: Rect4; delta: Vec }): Rect4 {
+    const [x, y, w, h] = g.rect;
+    return g.kind === "secsize" ? [x, y, Math.max(4, w + g.delta[0]), Math.max(4, h + g.delta[1])] : [x + g.delta[0], y + g.delta[1], w, h];
+  }
+
+  const sectionRects = $derived.by(() => {
+    const g = gesture as Gesture;
+    if (g?.kind !== "secmove" && g?.kind !== "secsize") return null;
+    return new Map([[g.id, sectionPreview(g)]]);
+  });
+  const boundaryPreview = $derived.by(() => {
+    const g = gesture as Gesture;
+    return g?.kind === "boundary" ? g.y : null;
+  });
+  const newSection = $derived.by(() => {
+    const g = gesture as Gesture;
+    return g?.kind === "secnew" ? bandRect(g.start, g.cur) : null;
+  });
 
   function offset(id: string): Vec | null {
     const g = gesture;
@@ -304,7 +400,7 @@
       pos: clampToArea(snapVec(pointer)),
       rot: 0,
       zone: "internal",
-      params: defaultParams(editor.placeSymbol),
+      params: { ...defaultParams(editor.placeSymbol), ...editor.placeParams },
       links: [],
     };
   });
@@ -324,7 +420,7 @@
   const cursorClass = $derived(
     gesture?.kind === "pan" || spaceDown
       ? "grab"
-      : editor.tool === "place" || editor.tool === "wire"
+      : editor.tool === "place" || editor.tool === "wire" || editor.tool === "section"
         ? "crosshair"
         : "default",
   );
@@ -332,11 +428,7 @@
 
 <svelte:window
   onkeydown={(e) => {
-    const t = e.target;
-    if (
-      e.code === "Space" &&
-      !(t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement)
-    ) {
+    if (e.code === "Space" && !isTyping(e.target)) {
       spaceDown = true;
       e.preventDefault();
     }
@@ -368,7 +460,7 @@
     </pattern>
   </defs>
   <rect class="desk" x={view.x - 1000} y={view.y - 1000} width={view.w + 2000} height={viewH + 2000} />
-  <Sheet project={editor.project} {page} grid {offset} routes={previewRoutes}>
+  <Sheet project={editor.project} {page} grid {offset} routes={previewRoutes} {sectionRects} boundary={boundaryPreview}>
     {#snippet under()}
       {#each page.elements as el (el.id)}
         {#if selected.has(el.id)}
@@ -383,6 +475,13 @@
               height={g.bbox.h + 1}
             />
           {/if}
+        {/if}
+      {/each}
+      {#each page.sections as sec (sec.id)}
+        {#if selected.has(sec.id)}
+          {@const r = sectionRects?.get(sec.id) ?? sec.rect}
+          <rect class="sel" x={r[0] - 0.3} y={r[1] - 0.3} width={r[2] + 0.6} height={r[3] + 0.6} />
+          <rect class="handle" x={r[0] + r[2] - 0.6} y={r[1] + r[3] - 0.6} width="1.2" height="1.2" />
         {/if}
       {/each}
       {#each page.segments as seg (seg.id)}
@@ -414,6 +513,9 @@
         {#if pending}
           <circle class="hover start" cx={pending.at[0]} cy={pending.at[1]} r="0.6" />
         {/if}
+      {/if}
+      {#if newSection}
+        <rect class="band" x={newSection.x} y={newSection.y} width={newSection.w} height={newSection.h} />
       {/if}
       {#if band}
         {@const r = bandRect(band.start, band.cur)}
@@ -451,6 +553,11 @@
     stroke: rgba(30, 110, 230, 0.35);
     stroke-width: 0.9;
     stroke-linejoin: round;
+  }
+  .handle {
+    fill: #fff;
+    stroke: #1e6ee6;
+    stroke-width: 0.15;
   }
   .band {
     fill: rgba(30, 110, 230, 0.06);

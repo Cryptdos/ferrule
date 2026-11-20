@@ -21,7 +21,14 @@
     {:else if p.t === "arc"}
       <path d="M {p.from[0]} {p.from[1]} A {p.r} {p.r} 0 0 {p.sweep} {p.to[0]} {p.to[1]}" />
     {:else if p.t === "text" && p.text}
-      <text x={p.at[0]} y={p.at[1]} font-size={p.size} text-anchor={p.anchor} class={p.role}>{p.text}</text>
+      <text
+        x={p.at[0]}
+        y={p.at[1]}
+        font-size={p.size}
+        text-anchor={p.anchor}
+        class={p.role}
+        transform={p.vertical ? `rotate(-90 ${p.at[0]} ${p.at[1]})` : undefined}>{p.text}</text
+      >
     {/if}
   {/each}
 </g>

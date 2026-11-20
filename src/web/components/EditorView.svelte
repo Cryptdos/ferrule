@@ -1,17 +1,22 @@
 <script lang="ts">
-  import { deleteElements, deleteSegments, duplicateElements, moveElements, rotateElements } from "../../core/ops";
+  import { deleteElements, deleteSections, deleteSegments, duplicateElements, moveElements, rotateElements } from "../../core/ops";
   import { renumber } from "../../core/renumber";
+  import { isTyping } from "../typing";
   import type { Editor } from "../editor.svelte";
   import Canvas from "./Canvas.svelte";
   import Palette from "./Palette.svelte";
   import Props from "./Props.svelte";
   import PageList from "./PageList.svelte";
   import ProjectDialog from "./ProjectDialog.svelte";
+  import PlantDialog from "./PlantDialog.svelte";
+  import ChecksDialog from "./ChecksDialog.svelte";
+  import SchedulesDialog from "./SchedulesDialog.svelte";
 
   let { editor, onclose }: { editor: Editor; onclose: () => void } = $props();
 
   let canvas: Canvas | undefined = $state();
   let showProject = $state(false);
+  let dialog: "plant" | "checks" | "schedules" | null = $state(null);
   let exporting = $state(false);
 
   async function exportPdf() {
@@ -53,16 +58,13 @@
     { saved: "Saved", pending: "Unsaved changes", saving: "Saving…", error: "Save failed" }[editor.saveState],
   );
 
-  function isTyping(e: KeyboardEvent) {
-    const t = e.target;
-    return t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement;
-  }
 
   function onKey(e: KeyboardEvent) {
-    if (isTyping(e) || showProject) return;
+    if (isTyping(e.target) || showProject || dialog) return;
     const ctrl = e.ctrlKey || e.metaKey;
     const ids = editor.selectedElements.map((el) => el.id);
     const segIds = editor.selectedSegments.map((s) => s.id);
+    const secIds = editor.selectedSections.map((s) => s.id);
     const pageId = editor.pageId;
     if (ctrl && e.key.toLowerCase() === "z") {
       e.preventDefault();
@@ -89,9 +91,10 @@
       });
       editor.selection = copies;
     } else if (e.key === "Delete" || e.key === "Backspace") {
-      if (!ids.length && !segIds.length) return;
+      if (!ids.length && !segIds.length && !secIds.length) return;
       e.preventDefault();
       editor.apply((p) => {
+        deleteSections(p, pageId, secIds);
         deleteSegments(p, pageId, segIds);
         deleteElements(p, pageId, ids);
       });
@@ -105,6 +108,9 @@
       editor.selection = [];
     } else if (e.key === "w" || e.key === "W") {
       editor.tool = "wire";
+      editor.placeSymbol = null;
+    } else if (e.key === "b" || e.key === "B") {
+      editor.tool = "section";
       editor.placeSymbol = null;
     } else if (e.key === "s" || e.key === "S") {
       editor.tool = "select";
@@ -147,6 +153,9 @@
       <button class:active={editor.tool === "wire"} onclick={() => ((editor.tool = "wire"), (editor.placeSymbol = null))} title="Draw wires (W)">
         Wire
       </button>
+      <button class:active={editor.tool === "section"} onclick={() => ((editor.tool = "section"), (editor.placeSymbol = null))} title="Draw a section box (B)">
+        Section
+      </button>
       <span class="sep"></span>
       <button disabled={!editor.canUndo} onclick={() => editor.undo()} title="Undo (Ctrl+Z)">Undo</button>
       <button disabled={!editor.canRedo} onclick={() => editor.redo()} title="Redo (Ctrl+Y)">Redo</button>
@@ -154,6 +163,9 @@
       <button onclick={() => canvas?.fit()} title="Fit sheet (F)">Fit</button>
       <span class="sep"></span>
       <button onclick={doRenumber} title="Recalculate tags, terminal and wire numbers (locked ones are kept)">Renumber</button>
+      <button onclick={() => (dialog = "plant")} title="Field equipment: define plant and place views">Plant…</button>
+      <button onclick={() => (dialog = "checks")} title="Check the drawing for problems">Check</button>
+      <button onclick={() => (dialog = "schedules")} title="Terminal and cable schedules">Schedules</button>
       <button onclick={() => (showProject = true)} title="Project details and revisions (title block)">Project…</button>
       <button onclick={exportPdf} disabled={exporting} title="Download every sheet as an A4 PDF">
         {exporting ? "Exporting…" : "Export PDF"}
@@ -174,6 +186,13 @@
     <Props {editor} />
   </aside>
 </div>
+{#if dialog === "plant"}
+  <PlantDialog {editor} onclose={() => (dialog = null)} />
+{:else if dialog === "checks"}
+  <ChecksDialog {editor} onclose={() => (dialog = null)} />
+{:else if dialog === "schedules"}
+  <SchedulesDialog {editor} onclose={() => (dialog = null)} />
+{/if}
 {#if showProject}
   <ProjectDialog {editor} onclose={() => (showProject = false)} />
 {/if}

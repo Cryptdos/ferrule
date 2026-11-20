@@ -4,9 +4,19 @@
  * §3, §12). They change the project in place; callers that want undo take
  * a copy first.
  */
-import { type Rotation, type Vec, clampToArea, snapVec } from "./geometry";
+import { AREA_UNITS, type Rotation, type Vec, clampToArea, snapVec } from "./geometry";
 import { refreshConductors } from "./conductors";
-import { type Element, type Page, type ParamValue, type Project, type Segment, type TerminalRef, newId } from "./model";
+import {
+  type Element,
+  type Page,
+  type ParamValue,
+  type PlantItem,
+  type Project,
+  type Section,
+  type Segment,
+  type TerminalRef,
+  newId,
+} from "./model";
 import { defaultParams, requireSymbol, terminalPoint } from "./symbols";
 import { isOrthogonal, routeOf, simplifyRoute } from "./wires";
 import { isMaster, isSlave, locate } from "./xref";
@@ -54,6 +64,7 @@ export function addElement(
     links: [],
   };
   page.elements.push(el);
+  if (page.boundaryY !== null) updateZones(page);
   return el;
 }
 
@@ -65,6 +76,7 @@ export function moveElements(project: Project, pageId: string, ids: string[], de
     const el = getElement(page, id);
     el.pos = clampToArea([el.pos[0] + d[0], el.pos[1] + d[1]]);
   }
+  if (page.boundaryY !== null) updateZones(page);
 }
 
 /** Rotate elements 90° clockwise about their own origins. */
@@ -314,7 +326,7 @@ function renumberPages(project: Project): void {
 
 /** Add a blank page after `afterId` (or at the end). */
 export function addPage(project: Project, title = "", afterId?: string): Page {
-  const page: Page = { id: newId("pg"), number: 0, title, elements: [], segments: [] };
+  const page: Page = { id: newId("pg"), number: 0, title, boundaryY: null, sections: [], elements: [], segments: [] };
   const i = afterId ? project.pages.findIndex((p) => p.id === afterId) : -1;
   project.pages.splice(i >= 0 ? i + 1 : project.pages.length, 0, page);
   renumberPages(project);
@@ -348,6 +360,8 @@ export function duplicatePage(project: Project, pageId: string): Page {
   const src = getPage(project, pageId);
   const ids = new Map<string, string>();
   const copy = addPage(project, src.title ? `${src.title} (copy)` : "", pageId);
+  copy.boundaryY = src.boundaryY;
+  copy.sections = src.sections.map((sc) => ({ ...sc, id: newId("sec"), rect: [...sc.rect] as Section["rect"] }));
   for (const el of src.elements) {
     const id = newId("e");
     ids.set(el.id, id);
@@ -442,4 +456,146 @@ export function setConductorNumber(project: Project, conductorId: string, number
 
 export function setNumberingScheme(project: Project, scheme: Project["numbering"]["scheme"]): void {
   project.numbering = { scheme };
+}
+
+// ---------------------------------------------------------------------------
+// Plant (DESIGN.md §6)
+
+export function getPlant(project: Project, id: string): PlantItem {
+  const p = project.plant.find((x) => x.id === id);
+  if (!p) throw new OpError(`No plant item "${id}"`);
+  return p;
+}
+
+const cleanTerminals = (list: string[]) => [...new Set(list.map((t) => t.trim()).filter(Boolean))];
+
+export function addPlant(project: Project, tag: string, description = "", terminals: string[] = []): PlantItem {
+  const t = tag.trim();
+  if (!t) throw new OpError("A plant item needs a tag");
+  if (project.plant.some((p) => p.tag === t)) throw new OpError(`There's already a plant item ${t}`);
+  const item: PlantItem = { id: newId("p"), tag: t, description: description.trim(), terminals: cleanTerminals(terminals) };
+  project.plant.push(item);
+  return item;
+}
+
+export function updatePlant(
+  project: Project,
+  id: string,
+  patch: { tag?: string; description?: string; terminals?: string[] },
+): void {
+  const item = getPlant(project, id);
+  if (patch.tag !== undefined) {
+    const t = patch.tag.trim();
+    if (!t) throw new OpError("A plant item needs a tag");
+    if (project.plant.some((p) => p.id !== id && p.tag === t)) throw new OpError(`There's already a plant item ${t}`);
+    item.tag = t;
+  }
+  if (patch.description !== undefined) item.description = patch.description.trim();
+  if (patch.terminals !== undefined) item.terminals = cleanTerminals(patch.terminals);
+  syncPlantViews(project);
+}
+
+/** Remove a plant item and every view of it. */
+export function deletePlant(project: Project, id: string): void {
+  getPlant(project, id);
+  project.plant = project.plant.filter((p) => p.id !== id);
+  for (const page of project.pages) {
+    const views = page.elements.filter((e) => e.symbol === "plant-view" && e.params.plant === id).map((e) => e.id);
+    if (views.length) deleteElements(project, page.id, views);
+  }
+}
+
+/** Place a view of a plant item, showing the given terminals (default: all). */
+export function placePlantView(project: Project, pageId: string, plantId: string, pos: Vec, show?: string[]): Element {
+  const item = getPlant(project, plantId);
+  const shown = (show ?? item.terminals).filter((t) => item.terminals.includes(t));
+  const el = addElement(project, pageId, "plant-view", pos, {
+    zone: "external",
+    params: { plant: plantId, show: shown.join(",") },
+  });
+  syncPlantViews(project);
+  return el;
+}
+
+/** Choose which of the plant's terminals a view shows. Wires on terminals that are hidden are removed. */
+export function setPlantViewTerminals(project: Project, pageId: string, elId: string, show: string[]): void {
+  const el = getElement(getPage(project, pageId), elId);
+  if (el.symbol !== "plant-view") throw new OpError("That isn't a plant view");
+  el.params.show = cleanTerminals(show).join(",");
+  syncPlantViews(project);
+}
+
+/** Copy plant data into its views (they draw from their own params) and drop wires on terminals that went away. */
+export function syncPlantViews(project: Project): void {
+  for (const page of project.pages) {
+    for (const el of page.elements) {
+      if (el.symbol !== "plant-view") continue;
+      const item = project.plant.find((p) => p.id === el.params.plant);
+      const terms = item?.terminals ?? [];
+      const show = String(el.params.show ?? "").split(",").filter((t) => terms.includes(t));
+      el.params.terms = terms.join(",");
+      el.params.show = show.join(",");
+      el.params.pdesc = item?.description ?? "";
+      const keep = new Set(show);
+      page.segments = page.segments.filter(
+        (s) => !((s.from[0] === el.id && !keep.has(s.from[1])) || (s.to[0] === el.id && !keep.has(s.to[1]))),
+      );
+    }
+  }
+  refreshConductors(project);
+}
+
+// ---------------------------------------------------------------------------
+// Panel boundary (DESIGN.md §7) and section boxes
+
+/** Put the panel boundary at height y (grid units), or remove it with null. */
+export function setBoundary(project: Project, pageId: string, y: number | null): void {
+  const page = getPage(project, pageId);
+  page.boundaryY = y === null ? null : Math.round(Math.min(AREA_UNITS.h, Math.max(0, y)));
+  updateZones(page);
+}
+
+/** Elements below the boundary are field equipment; on or above it, panel internals. */
+export function updateZones(page: Page): void {
+  for (const el of page.elements) {
+    if (page.boundaryY === null) {
+      if (el.symbol !== "plant-view") el.zone = "internal";
+      continue;
+    }
+    el.zone = el.pos[1] > page.boundaryY ? "external" : "internal";
+  }
+}
+
+export function addSection(project: Project, pageId: string, label: string, rect: [number, number, number, number]): Section {
+  const page = getPage(project, pageId);
+  const sec: Section = { id: newId("sec"), label, rect: normRect(rect) };
+  page.sections.push(sec);
+  return sec;
+}
+
+function normRect([x, y, w, h]: [number, number, number, number]): [number, number, number, number] {
+  const x0 = Math.round(Math.min(x, x + w));
+  const y0 = Math.round(Math.min(y, y + h));
+  const ww = Math.max(4, Math.round(Math.abs(w)));
+  const hh = Math.max(4, Math.round(Math.abs(h)));
+  const cx = Math.min(Math.max(0, x0), AREA_UNITS.w - ww);
+  const cy = Math.min(Math.max(0, y0), AREA_UNITS.h - hh);
+  return [cx, cy, Math.min(ww, AREA_UNITS.w), Math.min(hh, AREA_UNITS.h)];
+}
+
+export function updateSection(
+  project: Project,
+  pageId: string,
+  id: string,
+  patch: { label?: string; rect?: [number, number, number, number] },
+): void {
+  const sec = getPage(project, pageId).sections.find((s) => s.id === id);
+  if (!sec) throw new OpError(`No section "${id}"`);
+  if (patch.label !== undefined) sec.label = patch.label;
+  if (patch.rect) sec.rect = normRect(patch.rect);
+}
+
+export function deleteSections(project: Project, pageId: string, ids: string[]): void {
+  const page = getPage(project, pageId);
+  page.sections = page.sections.filter((s) => !ids.includes(s.id));
 }

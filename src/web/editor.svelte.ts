@@ -10,7 +10,7 @@ import { refreshConductors } from "../core/conductors";
 import { api } from "./api";
 import { getAvoid } from "./avoid";
 
-export type Tool = "select" | "place" | "wire";
+export type Tool = "select" | "place" | "wire" | "section";
 export type SaveState = "saved" | "pending" | "saving" | "error";
 
 const HISTORY_LIMIT = 200;
@@ -23,6 +23,8 @@ export class Editor {
   selection: string[] = $state([]);
   tool: Tool = $state("select");
   placeSymbol: string | null = $state(null);
+  /** Extra settings for the symbol being placed (e.g. which plant item a view shows). */
+  placeParams: Record<string, string | number | boolean> = $state({});
   saveState: SaveState = $state("saved");
   message: string = $state("");
 
@@ -49,6 +51,11 @@ export class Editor {
   get selectedElements() {
     const ids = new Set(this.selection);
     return this.page.elements.filter((e) => ids.has(e.id));
+  }
+
+  get selectedSections() {
+    const ids = new Set(this.selection);
+    return this.page.sections.filter((s) => ids.has(s.id));
   }
 
   get selectedSegments() {
@@ -102,7 +109,11 @@ export class Editor {
   private restore(json: string): void {
     this.project = JSON.parse(json);
     if (!this.project.pages.some((p) => p.id === this.pageId)) this.pageId = this.project.pages[0]!.id;
-    const ids = new Set([...this.page.elements.map((e) => e.id), ...this.page.segments.map((s) => s.id)]);
+    const ids = new Set([
+      ...this.page.elements.map((e) => e.id),
+      ...this.page.segments.map((s) => s.id),
+      ...this.page.sections.map((s) => s.id),
+    ]);
     this.selection = this.selection.filter((id) => ids.has(id));
     this.syncHistoryFlags();
     this.scheduleSave();

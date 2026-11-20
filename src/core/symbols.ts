@@ -31,7 +31,7 @@ export type Prim =
   | { t: "poly"; pts: Vec[]; fill: boolean }
   | { t: "circle"; c: Vec; r: number; fill?: boolean }
   | { t: "arc"; from: Vec; to: Vec; r: number; sweep: 0 | 1 }
-  | { t: "text"; at: Vec; text: string; size: number; anchor: Anchor; role: TextRole };
+  | { t: "text"; at: Vec; text: string; size: number; anchor: Anchor; role: TextRole; vertical?: boolean };
 
 export type TextRole = "tag" | "label" | "term" | "note" | "xref";
 
@@ -611,9 +611,14 @@ const SYMBOLS: SymbolDef[] = [
     bridged: () => [["1", "2"]],
     draw(el) {
       return {
-        prims: [line([0, -1], [0, -0.45]), line([0, 0.45], [0, 1]), circle(0, 0, 0.45), ...tagAndLabel(-0.8, el).map(
-          (p) => (p.t === "text" && p.role === "tag" ? { ...p, size: LABEL } : p),
-        )],
+        prims: [
+          line([0, -1], [0, -0.45]),
+          line([0, 0.45], [0, 1]),
+          circle(0, 0, 0.45),
+          // Terminal numbers read up the page, so a row of terminals doesn't collide.
+          { t: "text", at: [-0.25, -0.75], text: "{tag}", size: TERM, anchor: "start", role: "tag", vertical: true },
+          ...(el.label ? [text(0.8, 0.4, "{label}", TERM, "start", "label")] : []),
+        ],
         terminals: vterms("1", "2", 1),
         body: { x: -0.45, y: -0.45, w: 0.9, h: 0.9 },
       };
@@ -811,6 +816,43 @@ const SYMBOLS: SymbolDef[] = [
     },
   },
   {
+    id: "plant-view",
+    name: "Plant view",
+    group: "Drawing",
+    // Placed from the Plant list, which says which plant item it shows.
+    palette: false,
+    params: [],
+    kind: () => null,
+    draw(el) {
+      const all = str(el, "terms", "").split(",").filter(Boolean);
+      const showSet = new Set(str(el, "show", "").split(",").filter(Boolean));
+      const shown = all.filter((t) => showSet.has(t));
+      const desc = str(el, "pdesc", "");
+      const n = Math.max(1, shown.length);
+      const right = Math.max((n - 1) * 3 + 2, Math.ceil(desc.length * LABEL * 0.5) + 0, 6) ;
+      const left = -2;
+      const h = 6;
+      const prims: Prim[] = [line([right, 0], [left, 0], [left, h], [right, h])];
+      if (shown.length < all.length) {
+        // Break line: there's more to this plant on another sheet.
+        const zig: Vec[] = [[right, 0]];
+        for (let y = 0.75; y < h; y += 1.5) zig.push([right + (Math.round(y / 1.5) % 2 ? 0.6 : -0.6), y]);
+        zig.push([right, h]);
+        prims.push(line(...zig));
+      } else {
+        prims.push(line([right, 0], [right, h]));
+      }
+      const terminals: TerminalDef[] = shown.map((t, i) => ({ name: t, at: [i * 3, -1], dir: "up" as Dir }));
+      shown.forEach((t, i) => {
+        prims.push(line([i * 3, -1], [i * 3, 0]), text(i * 3, 1.5, t, TERM, "middle", "term"));
+      });
+      prims.push(text(left + 0.5, 3.7, "{tag}", TAG, "start", "tag"));
+      if (desc) prims.push(text(left + 0.5, 5.3, desc, LABEL, "start", "note"));
+      if (el.label) prims.push(text(left, h + 1.6, "{label}", LABEL, "start", "label"));
+      return { prims, terminals, body: { x: left, y: 0, w: right - left, h } };
+    },
+  },
+  {
     id: "junction",
     name: "Junction",
     group: "Drawing",
@@ -877,6 +919,8 @@ function rotatePrim(p: Prim, rot: Rotation): Prim {
       let at = rotate(p.at, rot);
       let anchor = p.anchor;
       if (rot === 180) anchor = anchor === "start" ? "end" : anchor === "end" ? "start" : anchor;
+      if (p.vertical && (rot === 90 || rot === 270)) return { ...p, at, vertical: false, anchor: "middle" };
+      if (p.vertical) return { ...p, at };
       if (rot === 90 || rot === 270) {
         anchor = "middle";
         // Terminal numbers sit just above a horizontal lead, not on it.
