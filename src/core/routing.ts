@@ -18,8 +18,8 @@ const BUFFER = 0.25;
 /** How far symbol outlines are pulled in, so terminals sit outside them. */
 const INSET = 0.5;
 
-/** Symbols wires may cross or run along: they're conductors themselves. */
-const NOT_OBSTACLES = new Set(["junction", "rail", "busbar"]);
+/** Symbols wires may cross or run along: conductors themselves, or a cable screen drawn over the cores. */
+const NOT_OBSTACLES = new Set(["junction", "rail", "busbar", "screen"]);
 
 function obstacleRect(el: Element): Rect | null {
   if (NOT_OBSTACLES.has(el.symbol)) return null;

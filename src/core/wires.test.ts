@@ -65,6 +65,22 @@ describe("wiring", () => {
     ]);
   });
 
+  test("a cable screen is drawn over the cores: wires go straight through it", () => {
+    const { p, pg, page } = setup();
+    const a = addElement(p, pg, "contact-no", [20, 20]);
+    const b = addElement(p, pg, "coil", [20, 40]);
+    const c = addElement(p, pg, "contact-no", [23, 20]);
+    const d = addElement(p, pg, "coil", [23, 40]);
+    addElement(p, pg, "screen", [20, 30], { params: { span: 3 } });
+    connect(p, pg, [a.id, "14"], [b.id, "A1"]);
+    connect(p, pg, [c.id, "14"], [d.id, "A1"]);
+    routePage(avoid, page);
+    expect(page.segments.map((w) => w.points)).toEqual([
+      [[20, 23], [20, 37]],
+      [[23, 23], [23, 37]],
+    ]);
+  });
+
   test("auto routes are square, on the grid, and avoid symbol bodies", () => {
     const { p, pg, page } = setup();
     const a = addElement(p, pg, "coil", [10, 20]);
