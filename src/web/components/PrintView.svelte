@@ -38,6 +38,11 @@
 {/each}
 
 <style>
+  /* Empty picture frames are an on-screen hint only. */
+  .sheet :global(.missing),
+  .sheet :global(.missing-text) {
+    display: none;
+  }
   :global(body.printing) {
     background: #888;
   }

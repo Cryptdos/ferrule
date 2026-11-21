@@ -52,6 +52,12 @@
     fill: #99a;
     font-family: var(--drawing-font);
   }
+  @media print {
+    .missing,
+    .missing-text {
+      display: none;
+    }
+  }
   .missing {
     fill: #f4f4f6;
     stroke: #aab;
