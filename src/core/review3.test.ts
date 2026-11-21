@@ -174,3 +174,59 @@ describe("annotations and routing", () => {
     expect(benchOf({ symbol: "box" })).toBe("annotate");
   });
 });
+
+import { blockLabels, routesStale } from "./wires";
+import { setBoundary, moveElements, rotateElements, updateElement } from "./ops";
+import { terminalPoint } from "./symbols";
+
+describe("terminal block on the panel boundary", () => {
+  test("terminals on the boundary become cells, follow it when it moves, and leave when moved off", () => {
+    const { p, pg } = project();
+    setBoundary(p, pg, 80);
+    const t = addElement(p, pg, "terminal", [20, 80.5 as number]);
+    expect(t.pos[1]).toBe(80); // dropped near it: snapped in
+    expect(t.params.onBlock).toBe(true);
+    const g = localGeometry(t, elementTexts(t, p));
+    expect(g.body).toEqual({ x: -0.5, y: -1, w: 1, h: 2 });
+    setBoundary(p, pg, 90);
+    expect(t.pos[1]).toBe(90);
+    moveElements(p, pg, [t.id], [0, -10]);
+    expect(t.params.onBlock).toBeUndefined();
+    moveElements(p, pg, [t.id], [0, 10]);
+    expect(t.params.onBlock).toBe(true);
+    rotateElements(p, pg, [t.id]);
+    expect(t.params.onBlock).toBeUndefined(); // on its side: a circle again
+  });
+
+  test("strip names at the left end and where the strip changes", () => {
+    const { p, pg } = project();
+    setBoundary(p, pg, 80);
+    for (const x of [10, 11, 12]) addElement(p, pg, "terminal", [x, 80], { params: { strip: "X1" } });
+    for (const x of [30, 31]) addElement(p, pg, "terminal", [x, 80], { params: { strip: "X2" } });
+    addElement(p, pg, "terminal", [50, 60], { params: { strip: "X9" } }); // not on the block
+    expect(blockLabels(p.pages[0]!).map((l) => l.text)).toEqual(["X1", "X2"]);
+    expect(blockLabels(p.pages[0]!)[1]!.x).toBeLessThan(30);
+  });
+
+  test("fused and disconnect terminals draw the fuse or knife above, and wires reroute to it", () => {
+    const { p, pg } = project();
+    setBoundary(p, pg, 80);
+    const k = addElement(p, pg, "coil", [20, 60]);
+    const t = addElement(p, pg, "terminal", [20, 80]);
+    connect(p, pg, [k.id, "A2"], [t.id, "1"]);
+    expect(terminalPoint(t, "1")).toEqual([20, 79]);
+    updateElement(p, pg, t.id, { params: { function: "fuse" } });
+    expect(terminalPoint(t, "1")).toEqual([20, 77]);
+    expect(routesStale(p.pages[0]!)).toBe(true); // the editor and the print view route it again
+    const lines = localGeometry(t, elementTexts(t, p)).prims.filter((x) => x.t === "line");
+    expect(lines.length).toBeGreaterThan(2);
+  });
+
+  test("older files: terminals already on a boundary go into the block when loaded", () => {
+    const { p, pg } = project();
+    setBoundary(p, pg, 80);
+    const t = addElement(p, pg, "terminal", [20, 80]);
+    delete t.params.onBlock;
+    expect(parseProject(JSON.parse(JSON.stringify(p))).pages[0]!.elements[0]!.params.onBlock).toBe(true);
+  });
+});

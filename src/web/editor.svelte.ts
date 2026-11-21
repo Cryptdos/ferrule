@@ -6,6 +6,7 @@
 import type { Project } from "../core/model";
 import { OpError } from "../core/ops";
 import { routePage } from "../core/routing";
+import { routesStale } from "../core/wires";
 import { refreshConductors } from "../core/conductors";
 import { api, ConflictError } from "./api";
 import { getAvoid } from "./avoid";
@@ -63,7 +64,7 @@ export class Editor {
     this.pageId = project.pages[0]?.id ?? "";
     // Wires added outside the editor may not have routes yet.
     for (const page of this.project.pages) {
-      if (page.segments.some((s) => s.points.length < 2)) routePage(getAvoid(), page);
+      if (routesStale(page)) routePage(getAvoid(), page);
     }
   }
 
@@ -277,7 +278,7 @@ export class Editor {
       this.syncHistoryFlags();
       this.saveState = "saved";
       for (const page of this.project.pages) {
-        if (page.segments.some((s) => s.points.length < 2)) routePage(getAvoid(), page);
+        if (routesStale(page)) routePage(getAvoid(), page);
       }
       this.flash(message);
     } catch (e) {

@@ -3,7 +3,7 @@
   import { AREA_MM, AREA_UNITS, SHEET_MM, UNIT_MM } from "../../core/geometry";
   import type { Page, Project } from "../../core/model";
   import type { Vec } from "../../core/geometry";
-  import { connectionDots, isFieldWire, routeOf, wireTexts } from "../../core/wires";
+  import { BLOCK_HALF, blockLabels, connectionDots, isFieldWire, routeOf, wireTexts } from "../../core/wires";
   import { resolveFields } from "../../core/fields";
   import { cloudsOn } from "../../core/ops";
   import { cloudPath } from "../../core/titleblock";
@@ -87,7 +87,11 @@
     </g>
   {/each}
   {#if boundaryY !== null}
-    <line class="boundary" x1="0" y1={boundaryY} x2={AREA_UNITS.w} y2={boundaryY} />
+    <!-- Panel boundary: the terminal block, full width; its terminals are cells in it. -->
+    <rect class="block" x="0" y={boundaryY - BLOCK_HALF} width={AREA_UNITS.w} height={BLOCK_HALF * 2} />
+    {#each blockLabels(page) as l (l.x)}
+      <text class="strip" x={l.x} y={boundaryY + 0.37} text-anchor={l.anchor}>{l.text}</text>
+    {/each}
   {/if}
   {@render under?.()}
   <g class="wires">
@@ -173,11 +177,16 @@
     font-size: 1.5px;
     fill: #000;
   }
-  /* Panel boundary: light and evenly dashed, under everything; terminals on it sit over it. */
-  .boundary {
-    stroke: #444;
-    stroke-width: 0.14;
-    stroke-dasharray: 1.2 1.2;
+  /* Panel boundary: the terminal block. */
+  .block {
+    fill: none;
+    stroke: #000;
+    stroke-width: 0.25;
+  }
+  .strip {
+    font-family: var(--drawing-font);
+    font-size: 1px;
+    fill: #000;
   }
   .wires circle {
     fill: #000;

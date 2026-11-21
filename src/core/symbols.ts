@@ -8,6 +8,7 @@
  * Default orientation is vertical, current flowing top to bottom, as in a
  * ladder rung between the CCT and 0V rails.
  */
+import { textWidth } from "./textwidth";
 import { legendTable, notesLayout, revisionTable, type LegendEntry } from "./annotations";
 import {
   type Dir,
@@ -754,25 +755,93 @@ const SYMBOLS: SymbolDef[] = [
     palette: true,
     params: [
       { key: "strip", label: "Terminal strip", type: "text", default: "X1", placeholder: "e.g. X1" },
-      { key: "showStrip", label: "Show the strip identifier beside it", type: "bool", default: false },
+      {
+        key: "function",
+        label: "Type",
+        type: "select",
+        default: "plain",
+        options: [
+          { value: "plain", label: "Terminal" },
+          { value: "fuse", label: "Fused terminal" },
+          { value: "disconnect", label: "Disconnect (knife) terminal" },
+        ],
+      },
+      {
+        key: "showStrip",
+        label: "Show the strip identifier beside it",
+        type: "bool",
+        default: false,
+        when: (el) => el.params.onBlock !== true,
+        fixed: "Shown on the terminal block",
+      },
+      // Set by the sheet: the terminal sits in the panel boundary's terminal block.
+      { key: "onBlock", label: "In the terminal block", type: "bool", default: false, hidden: true },
     ],
     kind: () => "terminal",
     bridged: () => [["1", "2"]],
-    draw(el) {
+    draw(el, t) {
+      const onBlock = el.params.onBlock === true;
+      const fn = str(el, "function", "plain");
+      const prims: Prim[] = [];
+      // A fused or disconnect terminal: the fuse or knife in the lead on the
+      // panel side, right on top of the terminal, so it can't be missed.
+      const top = fn === "fuse" || fn === "disconnect" ? -3 : -1;
+      if (fn === "fuse") {
+        // IEC fuse: a rectangle with the conductor through it.
+        prims.push(line([0, -3], [0, -1]), line([-0.32, -2.75], [0.32, -2.75], [0.32, -1.2], [-0.32, -1.2], [-0.32, -2.75]));
+      } else if (fn === "disconnect") {
+        // Knife link, drawn open: the blade hinged at the bottom.
+        prims.push(
+          line([0, -3], [0, -2.6]),
+          line([-0.3, -2.6], [0.3, -2.6]),
+          line([0, -1.25], [0, -1]),
+          line([0, -1.25], [-0.45, -2.5]),
+          { t: "circle", c: [0, -1.25], r: 0.12, fill: true },
+        );
+      }
+      if (onBlock) {
+        // A cell of the boundary's terminal block, its number written up the cell.
+        prims.push(
+          line([-0.5, -1], [0.5, -1], [0.5, 1], [-0.5, 1], [-0.5, -1]),
+          // As big as fits up the cell (a long number like 3-13A gets a little smaller).
+          {
+            t: "text",
+            at: [0.28, 0],
+            text: "{tag}",
+            size: Math.min(0.8, 1.75 / Math.max(0.1, textWidth(t?.tag ?? el.tag ?? "", 1))),
+            anchor: "middle",
+            role: "tag",
+            vertical: true,
+          },
+          ...(el.label ? [text(0.65, 2.0, "{label}", TERM, "start", "label")] : []),
+        );
+        return {
+          prims,
+          terminals: [
+            { name: "1", at: [0, top], dir: "up" },
+            { name: "2", at: [0, 1], dir: "down" },
+          ],
+          body: { x: -0.5, y: -1, w: 1, h: 2 },
+        };
+      }
       const strip = el.params.showStrip === true ? String(el.params.strip ?? "").trim() : "";
+      prims.push(
+        line([0, -1], [0, -0.45]),
+        line([0, 0.45], [0, 1]),
+        // White inside: a terminal on the panel boundary sits over the line.
+        { t: "circle", c: [0, 0], r: 0.45, bg: true },
+        // The terminal's number sits beside it, across the wire, so it doesn't read as a wire number.
+        text(0.6, -0.15, "{tag}", 0.85, "start", "tag"),
+        // Its strip on the other side, when asked for.
+        ...(strip ? [text(-0.6, -0.15, strip, 0.85, "end", "note")] : []),
+        ...(el.label ? [text(0.65, 1.0, "{label}", TERM, "start", "label")] : []),
+      );
       return {
-        prims: [
-          line([0, -1], [0, -0.45]),
-          line([0, 0.45], [0, 1]),
-          // White inside: a terminal on the panel boundary sits over the line.
-          { t: "circle", c: [0, 0], r: 0.45, bg: true },
-          // The terminal's number sits beside it, across the wire, so it doesn't read as a wire number.
-          text(0.6, -0.15, "{tag}", 0.85, "start", "tag"),
-          // Its strip on the other side, when asked for.
-          ...(strip ? [text(-0.6, -0.15, strip, 0.85, "end", "note")] : []),
-          ...(el.label ? [text(0.65, 1.0, "{label}", TERM, "start", "label")] : []),
+        prims,
+        terminals: [
+          { name: "1", at: [0, top], dir: "up" },
+          { name: "2", at: [0, 1], dir: "down" },
         ],
-        terminals: vterms("1", "2", 1),
         body: { x: -0.45, y: -0.45, w: 0.9, h: 0.9 },
       };
     },

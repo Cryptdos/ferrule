@@ -2,6 +2,8 @@ import { Hono } from "hono";
 import { ProjectFormatError } from "../core/validate";
 import { type Library, type Storage, StorageError } from "./storage";
 import type { DeviceLibrary } from "./devices";
+import { routePage } from "../core/routing";
+import { routesStale } from "../core/wires";
 import type { AssetSource } from "./assets";
 import { PdfError, type PdfRenderer } from "./pdf";
 import type { McpServer } from "./mcp";
@@ -205,6 +207,12 @@ export function createApp({ storage, library, devices, assets, version = "dev", 
   // browser can render it without waiting on further requests.
   app.get("/print/:id", async (c) => {
     const project = await storage.load(c.req.param("id"));
+    // Wires whose parts changed shape since they were routed are routed again for the print.
+    const stale = project.pages.filter(routesStale);
+    if (stale.length) {
+      const avoid = await (await import("./avoid")).loadServerAvoid();
+      for (const page of stale) routePage(avoid, page);
+    }
     const index = await assets?.get("/index.html");
     if (!index) return c.text("UI not built", 500);
     const html = await index.text();

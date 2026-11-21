@@ -1,6 +1,6 @@
 <script lang="ts">
   import { deleteGaItems, rotateGaItems, setGaItemDevice, setGaSettings, setGaSize, updateGaItem, useLibraryDevice } from "../../core/ops";
-  import { GA_SCALES, deviceSize, gaSizes, sizeKey } from "../../core/ga";
+  import { GA_SCALES, deviceSize, gaSizes, sizeKey, stripSize } from "../../core/ga";
   import { deviceLabel } from "../../core/devices";
   import { api } from "../api";
   import { deviceLibrary } from "../devices.svelte";
@@ -27,10 +27,7 @@
   /** The size the part would have without a device from the table. */
   const generic = $derived.by(() => {
     if (!first || !one) return null;
-    if (first.symbol === "terminal") {
-      const t = sizes.terminal!;
-      return { w: Math.round(t.w * (one.refs?.length ?? 1) * 10) / 10, h: t.h };
-    }
+    if (first.symbol === "terminal") return stripSize(editor.project, one.refs ?? []);
     return deviceSize(editor.project, first);
   });
   const suits = (k: string) => !k || k === kind;

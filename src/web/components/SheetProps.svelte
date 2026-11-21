@@ -47,7 +47,7 @@
       Panel boundary (field equipment below it)
     </label>
     {#if page.boundaryY !== null}
-      <p class="hint">Drag the dashed boundary line to move it. Terminals sit on it; wires crossing it must go through one.</p>
+      <p class="hint">The boundary is a terminal block: terminals placed on it become its cells. Drag the block (between terminals) to move it; its terminals go with it. Wires crossing it must go through a terminal.</p>
     {/if}
   {/if}
   {#if clouds.length}

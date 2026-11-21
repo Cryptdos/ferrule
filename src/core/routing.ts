@@ -160,7 +160,7 @@ export function routePage(avoid: Avoid | null, page: Page, opts: RouteOptions = 
       // Tags, ratings and colour codes beside a symbol get their own small obstacles,
       // so a wire doesn't run through them. (Tags and labels are often placed
       // across a rung on purpose; wires going round them would wander.)
-      if (!NOT_OBSTACLES.has(el.symbol) && el.symbol !== "plant-view" && benchOf(el) === "draft") {
+      if (!NOT_OBSTACLES.has(el.symbol) && el.symbol !== "plant-view" && benchOf(el) === "draft" && el.params.onBlock !== true) {
         // Tags aren't known until Renumber: allow for a typical one.
         for (const p of localGeometry(el, el.tag || "K10-10").prims) {
           if (p.t !== "text" || (p.role !== "note" && p.role !== "tag")) continue;

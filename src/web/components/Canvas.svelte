@@ -546,7 +546,7 @@
           : { kind: "secmove", id: sec.id, start: pt, rect: [...sec.rect], delta: [0, 0] };
       return;
     }
-    if (bench === "draft" && !hit && !wireHit && page.boundaryY !== null && Math.abs(pt[1] - page.boundaryY) < 0.6) {
+    if (bench === "draft" && !hit && !wireHit && page.boundaryY !== null && Math.abs(pt[1] - page.boundaryY) < 1.1) {
       gesture = { kind: "boundary", y: page.boundaryY };
       return;
     }

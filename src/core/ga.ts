@@ -61,6 +61,8 @@ export const GA_SIZES: Record<string, GaSize> = {
   isolator: { w: 18, h: 90, label: "DIN isolator, per pole", perPole: true },
   fuse: { w: 18, h: 81, label: "Fuse carrier, per pole", perPole: true },
   terminal: { w: 5.2, h: 45, label: "Terminal (each)" },
+  fuseTerminal: { w: 8.2, h: 65, label: "Fused terminal (each)" },
+  disconnectTerminal: { w: 6.2, h: 60, label: "Disconnect terminal (each)" },
   transformer: { w: 80, h: 75, label: "Control transformer" },
   socket: { w: 45, h: 90, label: "DIN socket outlet" },
   block: { w: 60, h: 50, label: "Distribution block" },
@@ -162,11 +164,26 @@ export function gaCandidates(project: Project, tagOf: (el: Element) => string): 
       out.push({ refs: [el.id], label: tagOf(el) || getSymbol(el.symbol)?.name || el.symbol, sheet: pg.number, door: isDoorDevice(project, el), ...size });
     }
   }
-  const t = gaSizes(project).terminal!;
   for (const [strip, s] of strips) {
-    out.push({ refs: s.refs, label: `${strip} (${s.refs.length} terminals)`, sheet: s.sheet, door: false, w: Math.round(t.w * s.refs.length * 10) / 10, h: t.h });
+    const { w, h } = stripSize(project, s.refs);
+    out.push({ refs: s.refs, label: `${strip} (${s.refs.length} terminals)`, sheet: s.sheet, door: false, w, h });
   }
   return out.sort((a, b) => a.sheet - b.sheet || a.label.localeCompare(b.label, undefined, { numeric: true }));
+}
+
+/** A strip's length on the rail: each terminal's width (fused and disconnect ones are wider), and its tallest. */
+export function stripSize(project: Project, refs: string[]): { w: number; h: number } {
+  const sizes = gaSizes(project);
+  const byId = new Map(project.pages.flatMap((pg) => pg.elements.map((e) => [e.id, e])));
+  let w = 0;
+  let h = 0;
+  for (const id of refs) {
+    const fn = byId.get(id)?.params.function;
+    const t = (fn === "fuse" ? sizes.fuseTerminal : fn === "disconnect" ? sizes.disconnectTerminal : sizes.terminal)!;
+    w += t.w;
+    h = Math.max(h, t.h);
+  }
+  return { w: Math.round(w * 10) / 10, h: h || sizes.terminal!.h };
 }
 
 /** Snap a device onto the nearest DIN rail it's dropped near: centred on the rail's line. */

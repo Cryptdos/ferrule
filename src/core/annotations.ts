@@ -298,6 +298,7 @@ export function legendEntries(project: Project): LegendEntry[] {
       const params = { ...el.params };
       delete params.xrefDx;
       delete params.xrefDy;
+      delete params.onBlock;
       // Rails and busbars are drawn short: the line is the symbol.
       if (el.symbol === "rail" || el.symbol === "busbar") params.length = 10;
       if (el.symbol === "rail") params.name = "";

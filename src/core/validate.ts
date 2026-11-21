@@ -89,6 +89,14 @@ export function parseProject(input: unknown): Project {
       ...(typeof r.note === "string" ? { note: r.note } : {}),
     }));
   project.assets = parseAssets(input.assets);
+  // Terminals on a panel boundary are cells of its terminal block (older files didn't say).
+  for (const pg of project.pages) {
+    for (const el of pg.elements) {
+      if (el.symbol !== "terminal") continue;
+      if (pg.boundaryY !== null && el.pos[1] === pg.boundaryY && (el.rot === 0 || el.rot === 180)) el.params.onBlock = true;
+      else delete el.params.onBlock;
+    }
+  }
   if (isObj(input.gaSizes)) {
     project.gaSizes = {};
     for (const [k, v] of Object.entries(input.gaSizes)) {

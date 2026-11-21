@@ -278,3 +278,39 @@ export function wireTexts(
   }
   return out;
 }
+
+/** Half the height of the terminal block along a panel boundary (grid units). */
+export const BLOCK_HALF = 1;
+
+/**
+ * The strip names along a boundary's terminal block: one at the left end and
+ * one wherever the strip changes, just before its first terminal.
+ */
+export function blockLabels(page: Page): { x: number; text: string; anchor: "start" | "end" }[] {
+  if (page.boundaryY === null) return [];
+  const terms = page.elements
+    .filter((e) => e.symbol === "terminal" && e.params.onBlock === true)
+    .sort((a, b) => a.pos[0] - b.pos[0]);
+  const out: { x: number; text: string; anchor: "start" | "end" }[] = [];
+  let last = "";
+  for (const t of terms) {
+    const strip = String(t.params.strip ?? "X1").trim() || "X1";
+    if (strip === last) continue;
+    out.push(out.length === 0 ? { x: 0.5, text: strip, anchor: "start" } : { x: t.pos[0] - 0.8, text: strip, anchor: "end" });
+    last = strip;
+  }
+  return out;
+}
+
+/** Some wire's stored route no longer meets its ends (a part changed shape since), or has none. */
+export function routesStale(page: Page): boolean {
+  return page.segments.some((s) => {
+    if (s.points.length < 2) return true;
+    const a = endPoint(page, s.from);
+    const b = endPoint(page, s.to);
+    if (!a || !b) return false;
+    const f = s.points[0]!;
+    const l = s.points[s.points.length - 1]!;
+    return f[0] !== a[0] || f[1] !== a[1] || l[0] !== b[0] || l[1] !== b[1];
+  });
+}

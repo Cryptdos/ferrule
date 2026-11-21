@@ -78,6 +78,7 @@ export function addElement(
     links: [],
   };
   page.elements.push(el);
+  snapToBlock(page, el);
   if (page.boundaryY !== null) updateZones(page);
   return el;
 }
@@ -89,6 +90,7 @@ export function moveElements(project: Project, pageId: string, ids: string[], de
   for (const id of ids) {
     const el = getElement(page, id);
     el.pos = clampToArea([el.pos[0] + d[0], el.pos[1] + d[1]]);
+    snapToBlock(page, el);
   }
   if (page.boundaryY !== null) updateZones(page);
 }
@@ -100,6 +102,7 @@ export function rotateElements(project: Project, pageId: string, ids: string[]):
     const el = getElement(page, id);
     el.rot = (((el.rot + 90) % 360) as Rotation);
   }
+  updateZones(page);
 }
 
 export function deleteElements(project: Project, pageId: string, ids: string[]): void {
@@ -824,13 +827,30 @@ export function syncPlantViews(project: Project): void {
 /** Put the panel boundary at height y (grid units), or remove it with null. */
 export function setBoundary(project: Project, pageId: string, y: number | null): void {
   const page = getPage(project, pageId);
+  const before = page.boundaryY;
   page.boundaryY = y === null ? null : Math.round(Math.min(AREA_UNITS.h, Math.max(0, y)));
+  // Terminals in the block move with it.
+  if (before !== null && page.boundaryY !== null && before !== page.boundaryY) {
+    for (const el of page.elements) if (el.params.onBlock === true) el.pos = [el.pos[0], page.boundaryY];
+  }
   updateZones(page);
+}
+
+/** A terminal dropped within a unit of the boundary goes into its terminal block. */
+function snapToBlock(page: Page, el: Element): void {
+  if (page.boundaryY === null || el.symbol !== "terminal" || (el.rot !== 0 && el.rot !== 180)) return;
+  if (Math.abs(el.pos[1] - page.boundaryY) <= 1) el.pos = [el.pos[0], page.boundaryY];
 }
 
 /** Elements below the boundary are field equipment; on or above it, panel internals. */
 export function updateZones(page: Page): void {
   for (const el of page.elements) {
+    if (el.symbol === "terminal") {
+      // Upright terminals on the boundary are cells of its terminal block.
+      const onBlock = page.boundaryY !== null && el.pos[1] === page.boundaryY && (el.rot === 0 || el.rot === 180);
+      if (onBlock) el.params.onBlock = true;
+      else delete el.params.onBlock;
+    }
     if (page.boundaryY === null) {
       if (el.symbol !== "plant-view") el.zone = "internal";
       continue;
