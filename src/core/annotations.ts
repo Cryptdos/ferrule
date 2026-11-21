@@ -272,7 +272,7 @@ function variantName(el: Element): string {
     if (!p || p.type !== "select") continue;
     const v = el.params[key] ?? p.default;
     const opt = p.options?.find((o) => o.value === v);
-    if (!opt || /^(none|default)$/i.test(String(opt.value))) continue;
+    if (!opt || /^(none|default|plain)$/i.test(String(opt.value))) continue;
     const variant = opt.label.split(/[(,]/)[0]!.trim();
     // "Isolator / MCB / contactor: Circuit breaker" reads better as just "Circuit breaker".
     if (["isolator", "coil", "earth"].includes(el.symbol)) {

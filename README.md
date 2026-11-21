@@ -1,12 +1,58 @@
 # Ferrule
 
-A lightweight, browser-based tool for drafting control panel schematics: symbols, wires, position-based numbering, cross-references, plant views, title blocks and PDF export. Functionality first.
+**Control panel schematics, drafted fast.** Ferrule is a lightweight drawing tool for electrical control panels: drop in parts, wire them up, and it numbers everything, cross-references every contact to its coil, draws the title block and exports an A4 PDF set. Then it lets you *run* the drawing to check the logic, lay the panel out at true scale, and hand the lot to Claude to draft for you.
 
-- [Design document](docs/DESIGN.md)
+It's one portable `.exe` for Windows: no install, nothing to configure. Your browser is the screen.
+
+![Ferrule drafting a controls sheet: the browser of sheets and parts on the left, the drawing in the middle, the sheet overview and a timer coil's properties on the right](docs/images/editor-draft.png)
+
+**[Download the latest release](https://github.com/Cryptdos/ferrule/releases/latest)**: unzip `ferrule.exe` anywhere (e.g. `C:\Temp\eCAD`) and double-click it. Status: **0.1.0 preview**, for feature testing.
+
+## What it does
+
+### Draft: the electrical drawing, and nothing else
+
+Pick parts from the browser and click to place them; wires route themselves at right angles around everything. Contacts link to their coils, and the coil gets a contact table showing where each one is. Tags and wire numbers follow the sheet-column scheme (`K9-54`, wire `9-41`), with **Renumber** showing you exactly what will change before it changes anything. Plant (fans, dampers, interfaces by others) is defined once with all its terminals and shown on as many sheets as needed. **Check** finds loose contacts, coils without contacts, unpaired links and wires that leave the panel without a terminal.
+
+### The panel boundary is a terminal block
+
+![Terminal block along the panel boundary: panel wiring above, field cables dashed below, each terminal a numbered cell](docs/images/terminal-block.png)
+
+Everything above the block is in the panel; everything below is out on site, with field cables drawn dashed. Terminals on the boundary become cells of the block with their number up the cell. The strip (`X1`) is named at the left end and wherever it changes, so an engineer reading the drawing sees `9-41` and the person building the panel can still find `X1:9-41`. Terminals can be **fused**, **disconnect** (knife) or **switched fuse**, drawn so you can't miss them.
+
+### Simulate: try the logic before anyone wires it
+
+![Simulating: live wires and rails in red, energised coils filled, a timer counting down, inputs listed in the floating panel](docs/images/simulate.png)
+
+Click switches, selectors, push buttons and field contacts on the drawing. Coils pull in, contacts move, lamps glow in their colour, live wires go red and timers count down (TON, TOF, TP and flashers, named as IEC 61131-3). Power comes from the incoming supply or a transformer, phases kept separate. **Check logic** tries every sequence of operations and reports the shortest one that breaks a rule you set (e.g. two contactors never both on), shorts the supply or makes relays chatter, with a replay.
+
+### GA: the panel at true scale
+
+![A GA backplate at 1:15: DIN rails, trunking and devices placed from the schematic, with a device's properties open](docs/images/ga.png)
+
+General arrangement sheets laid out to scale. Draw DIN rails and trunking, then place every relay, timer, breaker and terminal strip from the schematic: each keeps its tag, snaps onto a rail, and **Check** tells you what's still to place. Sizes start generic; pick real devices from the **device table**, a shared library with sizes, datasheets and pictures that every project can use.
+
+### Annotate: everything the reader needs
+
+![A notes sheet: formatted notes with a cable size table, a revision list and a symbol legend built from the parts used](docs/images/annotate.png)
+
+Text, boxes, label plates, pictures (paste or drag them in), section boxes and revision clouds live in their own workbench, so they never get in the way of the drawing. **Notes** take a small Markdown (headings, bold, lists, tables) for general notes and cable sizes. The **revision list** and **symbol legend** fill themselves from the project. **Spare sheets** hold annotations only, for spacing and organisation.
+
+### The output
+
+![A finished A4 sheet: title block, column numbers, cross-references, terminal block and field equipment](docs/images/drawing-sheet.png)
+
+Every sheet exports as one A4 landscape PDF, in [osifont](https://github.com/hikikomori82/osifont) (ISO 3098 lettering) throughout, with your title block, logo and revision table. Terminal and field cable schedules export as CSV.
+
+### Claude can draft for you
+
+Ferrule is also an [MCP server](docs/mcp.md): connect Claude to it and ask for a starter sheet, a set of plant, or a whole controls section, and watch it appear in the editor. The [LSP-01 example](docs/benchmark-lsp01.md) (on the project list) is a 14-sheet life safety panel drawn entirely with Ferrule's own tools.
+
+## More
+
+- [Design document](docs/DESIGN.md): how it works and every decision taken
 - [Benchmark: LSP-01 life safety panel](docs/benchmark-lsp01.md)
 - [MCP server: letting Claude draft drawings](docs/mcp.md)
-
-Status: milestones 1–10 built (skeleton, wires, pages + title block + PDF, numbering + cross-references, plant + boundary + sections, element list + table view, templates + revisions, MCP server, LSP-01 benchmark, simulation workbench), plus two rounds of review: four workbenches (Draft, Annotate, GA, Simulate), project files anywhere, pictures, true-scale general arrangements.
 
 ## Running it
 
