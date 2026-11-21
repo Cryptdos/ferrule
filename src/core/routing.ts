@@ -9,7 +9,7 @@
 import type { Avoid, ConnRef } from "libavoid-js";
 import type { Rect, Vec } from "./geometry";
 import type { Element, Page, Segment, TerminalRef } from "./model";
-import { localGeometry, type Prim } from "./symbols";
+import { benchOf, localGeometry, type Prim } from "./symbols";
 import { endDir, endPoint, findElement, refitManual, simpleRoute, simplifyRoute } from "./wires";
 
 /** Gap kept between parallel wires, and between wires and symbol bodies. */
@@ -39,7 +39,8 @@ function textRect(el: Element, p: Extract<Prim, { t: "text" }>): Rect | null {
 }
 
 function obstacleRect(el: Element): Rect | null {
-  if (NOT_OBSTACLES.has(el.symbol)) return null;
+  // Annotations (text, boxes, tables, pictures) are drawn over; wires don't avoid them.
+  if (NOT_OBSTACLES.has(el.symbol) || benchOf(el) === "annotate") return null;
   const g = localGeometry(el, "");
   // Outline of everything drawn (leads included), pulled in on the sides
   // that carry terminals so the terminals sit just outside it.
@@ -159,7 +160,7 @@ export function routePage(avoid: Avoid | null, page: Page, opts: RouteOptions = 
       // Tags, ratings and colour codes beside a symbol get their own small obstacles,
       // so a wire doesn't run through them. (Tags and labels are often placed
       // across a rung on purpose; wires going round them would wander.)
-      if (!NOT_OBSTACLES.has(el.symbol) && el.symbol !== "plant-view") {
+      if (!NOT_OBSTACLES.has(el.symbol) && el.symbol !== "plant-view" && benchOf(el) === "draft") {
         // Tags aren't known until Renumber: allow for a typical one.
         for (const p of localGeometry(el, el.tag || "K10-10").prims) {
           if (p.t !== "text" || (p.role !== "note" && p.role !== "tag")) continue;

@@ -29,6 +29,24 @@
     if (els[0]!.symbol === "terminal") return String(els[0]!.params.strip ?? "X1");
     return displayTag(els[0]!, project);
   }
+  /**
+   * How a device's label fits: centred, across the longer side if it won't fit
+   * across the box. Small boxes get smaller text so no line runs through it,
+   * down to a smallest size still readable on an A4 print; below that it stays
+   * at that size and knocks the lines behind it out instead.
+   */
+  const CHAR = 0.62;
+  const BEST = 1.1;
+  const SMALLEST = 0.75;
+  function fitLabel(text: string, w: number, h: number): { size: number; vertical: boolean; halo: boolean } {
+    const n = Math.max(1, text.length);
+    const fits = (len: number, across: number) => Math.min(BEST, (len * 0.9) / (n * CHAR), across * 1.15);
+    const flat = fits(w, h);
+    const up = fits(h, w);
+    const vertical = up > flat + 0.05;
+    const size = vertical ? up : flat;
+    return { size: Math.max(SMALLEST, size), vertical, halo: size < SMALLEST };
+  }
   const scaleText = $derived(Number.isInteger(ga.scale) ? `1:${ga.scale}` : `1:${ga.scale}`);
 </script>
 
@@ -69,7 +87,7 @@
     {:else if it.kind === "device"}
       {@const text = label(it)}
       {@const n = it.refs?.length ?? 0}
-      {@const vertical = h > w && text.length * 1.1 * 0.6 > w}
+      {@const fit = fitLabel(text, w, h)}
       <rect class="device" {x} {y} width={w} height={h} />
       {#if n > 1}
         <!-- A terminal strip: each terminal. -->
@@ -83,10 +101,13 @@
       {/if}
       <text
         class="tag"
+        class:halo={fit.halo}
         x={x + w / 2}
-        y={y + h / 2 + 0.4}
+        y={y + h / 2}
+        font-size={fit.size}
         text-anchor="middle"
-        transform={vertical ? `rotate(-90 ${x + w / 2} ${y + h / 2 + 0.4})` : undefined}>{text}</text
+        dominant-baseline="central"
+        transform={fit.vertical ? `rotate(-90 ${x + w / 2} ${y + h / 2})` : undefined}>{text}</text
       >
     {:else if it.kind === "note"}
       <text class="note" {x} y={y + h * 0.8}>{it.text ?? ""}</text>
@@ -145,7 +166,14 @@
     stroke-width: 0.06;
   }
   .tag {
-    font-size: 1.1px;
+    /* A thin white edge keeps it clean where it crosses a terminal's slice line. */
+    paint-order: stroke;
+    stroke: #fff;
+    stroke-width: 0.12;
+    stroke-linejoin: round;
+  }
+  .tag.halo {
+    stroke-width: 0.35;
   }
   .note {
     font-size: 1.4px;

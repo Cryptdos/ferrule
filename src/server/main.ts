@@ -13,6 +13,7 @@ import { spawn } from "node:child_process";
 import { createApp } from "./app";
 import { type AssetSource, directoryAssets } from "./assets";
 import { Library, Storage } from "./storage";
+import { DeviceLibrary } from "./devices";
 import { headlessBrowserRenderer, type PdfRenderer } from "./pdf";
 import { mkdir, writeFile } from "node:fs/promises";
 import { McpServer, serveStdio } from "./mcp";
@@ -108,6 +109,8 @@ export async function start(opts: StartOptions = {}): Promise<void> {
   await storage.init();
   // The template library sits beside the projects folder.
   const library = new Library(resolve(join(storage.dir, "..", "library")));
+  // The GA device table lives in the library too, with its datasheets and pictures.
+  const devices = new DeviceLibrary(join(library.dir, "devices"));
   const assets = opts.assets ?? directoryAssets(resolve(import.meta.dir, "../../dist/web"));
   // Use the requested port, or the next free one.
   let server: ReturnType<typeof Bun.serve> | null = null;
@@ -125,7 +128,7 @@ export async function start(opts: StartOptions = {}): Promise<void> {
     VERSION,
   );
   const examples = { "lsp-01": async () => buildLsp01(await loadServerAvoid()).project };
-  const app = createApp({ storage, library, assets, version: VERSION, pdf, selfUrl, mcp, examples });
+  const app = createApp({ storage, library, devices, assets, version: VERSION, pdf, selfUrl, mcp, examples });
   for (let port = args.port; port < args.port + 20 && !server; port++) {
     try {
       server = Bun.serve({ port, hostname: args.host, fetch: app.fetch, idleTimeout: 120 });

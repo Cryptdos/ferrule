@@ -71,7 +71,8 @@
     min-width: 0;
   }
   .field select {
-    width: 68px;
+    width: 78px;
+    flex: none;
   }
   .preview {
     font-size: 11px;

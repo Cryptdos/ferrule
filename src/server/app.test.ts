@@ -118,7 +118,7 @@ describe("examples", () => {
     expect(res.status).toBe(201);
     const { id } = await res.json();
     const p = await (await a.request(`/api/projects/${id}`)).json();
-    expect(p.pages).toHaveLength(13);
+    expect(p.pages).toHaveLength(14);
     expect((await a.request("/api/examples/nope", { method: "POST" })).status).toBe(404);
   });
 });
@@ -154,5 +154,47 @@ describe("project files anywhere", () => {
     } finally {
       await rm(elsewhere, { recursive: true, force: true });
     }
+  });
+});
+
+describe("device library", () => {
+  test("add, edit, attach a datasheet and a picture, read them back, delete", async () => {
+    const { DeviceLibrary } = await import("./devices");
+    const devices = new DeviceLibrary(join(dir, "library", "devices"));
+    const a = createApp({ storage: new Storage(dir), devices });
+    const res = await a.request("/api/devices", json({ name: "Relay 4CO", maker: "Weidmüller", part: "7760056085", kind: "relay", w: 30.6, h: 101.8, d: 82.3 }));
+    expect(res.status).toBe(201);
+    const dev = await res.json();
+    expect(dev.id).toBe("relay-4co-7760056085");
+    expect((await a.request("/api/devices", json({ name: "" }))).status).toBe(400);
+
+    const put = await a.request(`/api/devices/${dev.id}`, { method: "PUT", body: JSON.stringify({ h: 100 }), headers: { "content-type": "application/json" } });
+    expect((await put.json()).h).toBe(100);
+
+    const pdf = new TextEncoder().encode("%PDF-1.4 fake");
+    const up = await a.request(`/api/devices/${dev.id}/files?name=${encodeURIComponent("DRM datasheet.pdf")}`, { method: "POST", body: pdf });
+    expect(up.status).toBe(201);
+    const pic = await a.request(`/api/devices/${dev.id}/files?name=photo.png`, { method: "POST", body: new Uint8Array([137, 80, 78, 71]) });
+    const withFiles = await pic.json();
+    expect(withFiles.files.map((f: { name: string; type: string }) => `${f.type}:${f.name}`)).toEqual(["datasheet:DRM datasheet.pdf", "picture:photo.png"]);
+    expect((await a.request(`/api/devices/${dev.id}/files?name=evil.exe`, { method: "POST", body: pdf })).status).toBe(400);
+
+    const got = await a.request(`/api/devices/${dev.id}/files/${encodeURIComponent("DRM datasheet.pdf")}`);
+    expect(got.headers.get("content-type")).toBe("application/pdf");
+    expect(await got.text()).toBe("%PDF-1.4 fake");
+
+    // A fresh library object reads the same file back.
+    const again = await new DeviceLibrary(join(dir, "library", "devices")).list();
+    expect(again[0]!.files).toHaveLength(2);
+
+    await a.request(`/api/devices/${dev.id}/files/photo.png`, { method: "DELETE" });
+    expect((await (await a.request("/api/devices")).json())[0].files).toHaveLength(1);
+    await a.request(`/api/devices/${dev.id}`, { method: "DELETE" });
+    expect(await (await a.request("/api/devices")).json()).toEqual([]);
+  });
+
+  test("a new project can leave the library out", async () => {
+    const created = await (await app.request("/api/projects", json({ title: "No lib", useDeviceLibrary: false }))).json();
+    expect(created.useDeviceLibrary).toBe(false);
   });
 });

@@ -3,6 +3,7 @@ import type { Element, Project } from "./model";
 import { requireSymbol, type GeometryText } from "./symbols";
 import { masterOf, xrefText } from "./xref";
 import { resolveFields } from "./fields";
+import { legendEntries, revisionRows } from "./annotations";
 
 /** Tag prefix for an element under the project's designation standard. */
 export function tagPrefix(el: Element, project: Pick<Project, "designation">): string {
@@ -34,5 +35,8 @@ export function displayTag(el: Element, project: Project): string {
 export function elementTexts(el: Element, project: Project): GeometryText {
   const m = masterOf(project, el);
   const masterTag = m ? displayTag(m.el, project) : "";
-  return { tag: displayTag(el, project), xref: xrefText(project, el, masterTag), label: resolveFields(el.label, project) };
+  const t: GeometryText = { tag: displayTag(el, project), xref: xrefText(project, el, masterTag), label: resolveFields(el.label, project) };
+  if (el.symbol === "revtable") t.rows = revisionRows(project);
+  else if (el.symbol === "legend") t.legend = legendEntries(project);
+  return t;
 }

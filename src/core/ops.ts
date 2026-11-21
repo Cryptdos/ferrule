@@ -4,6 +4,7 @@
  * §3, §12). They change the project in place; callers that want undo take
  * a copy first.
  */
+import { projectCopy, type DeviceEntry, type ProjectDevice } from "./devices";
 import { AREA_UNITS, type Rotation, type Vec, clampToArea, snapVec } from "./geometry";
 import { refreshConductors } from "./conductors";
 import {
@@ -21,7 +22,7 @@ import {
   type TerminalRef,
   newId,
 } from "./model";
-import { defaultParams, getSymbol, plantTerminalName, requireSymbol, terminalPoint } from "./symbols";
+import { benchOf, defaultParams, getSymbol, plantTerminalName, requireSymbol, terminalPoint } from "./symbols";
 import { isOrthogonal, routeOf, simplifyRoute } from "./wires";
 import { isMaster, isSlave, locate } from "./xref";
 import { colourCode, lampColour } from "./wirecolours";
@@ -63,11 +64,13 @@ export function addElement(
 ): Element {
   if (!getSymbol(symbol)) throw new OpError(`Unknown symbol "${symbol}" (see list_symbols)`);
   const page = getPage(project, pageId);
+  if (page.spare && benchOf({ symbol }) !== "annotate")
+    throw new OpError(`Sheet ${page.number} is a spare sheet: only annotations go on it`);
   const el: Element = {
     id: newId("e"),
     symbol,
     tag: opts.tag ?? "",
-    label: opts.label ?? "",
+    label: opts.label ?? (symbol === "notes" ? "## Notes\n1. " : ""),
     pos: clampToArea(snapVec(pos)),
     rot: opts.rot ?? 0,
     zone: opts.zone ?? "internal",
@@ -431,6 +434,26 @@ export function renamePage(project: Project, pageId: string, title: string): voi
   getPage(project, pageId).title = title.trim();
 }
 
+/** Mark a sheet as spare (annotations only) or a working sheet again. */
+export function setPageSpare(project: Project, pageId: string, spare: boolean): void {
+  const page = getPage(project, pageId);
+  if (!spare) {
+    delete page.spare;
+    return;
+  }
+  if (page.ga) throw new OpError("A GA sheet can't be a spare sheet");
+  const drafted = page.elements.filter((e) => benchOf(e) !== "annotate").length + page.segments.length;
+  if (drafted) throw new OpError(`Sheet ${page.number} has ${drafted} drawing items on it: move or delete them first`);
+  page.spare = true;
+}
+
+/** A spare sheet after the given one, titled "Spare". */
+export function addSparePage(project: Project, afterId?: string): Page {
+  const page = addPage(project, "Spare", afterId);
+  page.spare = true;
+  return page;
+}
+
 /** Move a page to a new position (0-based). */
 export function movePage(project: Project, pageId: string, toIndex: number): void {
   const page = getPage(project, pageId);
@@ -447,6 +470,7 @@ export function duplicatePage(project: Project, pageId: string): Page {
   const ids = new Map<string, string>();
   const copy = addPage(project, src.title ? `${src.title} (copy)` : "", pageId);
   copy.boundaryY = src.boundaryY;
+  if (src.spare) copy.spare = true;
   copy.sections = src.sections.map((sc) => ({ ...sc, id: newId("sec"), rect: [...sc.rect] as Section["rect"] }));
   for (const el of src.elements) {
     const id = newId("e");
@@ -1035,4 +1059,96 @@ export function setGaSize(project: Project, key: string, size: { w?: number; h?:
   project.gaSizes ??= {};
   if (!size) delete project.gaSizes[key];
   else project.gaSizes[key] = { ...project.gaSizes[key], ...size };
+}
+
+// ---------------------------------------------------------------------------
+// Device table (GA): devices with real sizes, from the shared library or the project's own
+
+function devicesOf(project: Project): ProjectDevice[] {
+  if (!project.devices) project.devices = [];
+  return project.devices;
+}
+
+/**
+ * Bring a library device into the project (or refresh the project's copy).
+ * GA items using it that still had the old size take the new one.
+ */
+export function useLibraryDevice(project: Project, entry: DeviceEntry): ProjectDevice {
+  const list = devicesOf(project);
+  const copy = projectCopy(entry);
+  const i = list.findIndex((d) => d.id === entry.id);
+  if (i < 0) {
+    list.push(copy);
+    return copy;
+  }
+  const old = list[i]!;
+  list[i] = copy;
+  if (old.w !== copy.w || old.h !== copy.h) resizeDeviceItems(project, entry.id, old, copy);
+  return copy;
+}
+
+/** A device made in this project only (not in the library). */
+export function addProjectDevice(project: Project, d: Omit<ProjectDevice, "id" | "library">): ProjectDevice {
+  if (!d.name.trim()) throw new OpError("A device needs a name");
+  if (!(d.w > 0) || !(d.h > 0)) throw new OpError("A device needs a width and height");
+  const dev: ProjectDevice = { ...d, name: d.name.trim(), id: newId("dev"), library: false };
+  devicesOf(project).push(dev);
+  return dev;
+}
+
+export function updateProjectDevice(project: Project, id: string, patch: Partial<Omit<ProjectDevice, "id" | "library">>): void {
+  const dev = devicesOf(project).find((d) => d.id === id);
+  if (!dev) throw new OpError(`No device "${id}" in this project`);
+  const old = { w: dev.w, h: dev.h };
+  if (patch.name !== undefined) {
+    if (!patch.name.trim()) throw new OpError("A device needs a name");
+    dev.name = patch.name.trim();
+  }
+  if (patch.maker !== undefined) dev.maker = patch.maker.trim();
+  if (patch.part !== undefined) dev.part = patch.part.trim();
+  if (patch.kind !== undefined) dev.kind = patch.kind;
+  if (patch.w !== undefined && patch.w > 0) dev.w = patch.w;
+  if (patch.h !== undefined && patch.h > 0) dev.h = patch.h;
+  if (patch.d !== undefined && patch.d >= 0) dev.d = patch.d;
+  if (old.w !== dev.w || old.h !== dev.h) resizeDeviceItems(project, id, old, dev);
+}
+
+/** Take a device out of the project's table. GA items that were it keep their size. */
+export function removeProjectDevice(project: Project, id: string): void {
+  project.devices = devicesOf(project).filter((d) => d.id !== id);
+  for (const page of project.pages) for (const it of page.gaItems ?? []) if (it.device === id) delete it.device;
+}
+
+/** Items of a device that had its old size (not sized by hand) get the new one, turned the same way. */
+function resizeDeviceItems(project: Project, id: string, old: { w: number; h: number }, now: { w: number; h: number }): void {
+  for (const page of project.pages) {
+    for (const it of page.gaItems ?? []) {
+      if (it.device !== id) continue;
+      const turned = it.w === old.h && it.h === old.w && old.w !== old.h;
+      if ((it.w === old.w && it.h === old.h) || turned) {
+        it.w = turned ? now.h : now.w;
+        it.h = turned ? now.w : now.h;
+      }
+    }
+  }
+}
+
+/**
+ * Make a GA device one from the device table (its size comes from there,
+ * turned the way the item is), or back to a generic size (null).
+ */
+export function setGaItemDevice(project: Project, pageId: string, itemId: string, deviceId: string | null, generic?: { w: number; h: number }): void {
+  const it = gaPage(project, pageId).gaItems.find((x) => x.id === itemId);
+  if (!it) throw new OpError(`No GA item "${itemId}"`);
+  const size = deviceId ? devicesOf(project).find((d) => d.id === deviceId) : generic;
+  if (!size) throw new OpError(deviceId ? `No device "${deviceId}" in this project` : "No size given");
+  // Keep the item turned the way it is: on its side stays on its side.
+  const onSide = it.w > it.h && size.h > size.w;
+  const cx = it.x + it.w / 2;
+  it.w = onSide ? size.h : size.w;
+  it.h = onSide ? size.w : size.h;
+  // Grows about its middle along a rail; the top stays on the rail.
+  it.x = Math.round((cx - it.w / 2) * 2) / 2;
+  if (deviceId) it.device = deviceId;
+  else delete it.device;
 }

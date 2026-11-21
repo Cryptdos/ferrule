@@ -1,4 +1,5 @@
 import type { Project, Template } from "../core/model";
+import type { DeviceEntry } from "../core/devices";
 
 export interface LibraryEntry {
   file: string;
@@ -51,7 +52,28 @@ export const api = {
   duplicate: (id: string) => call<{ id: string }>(`/api/projects/${encodeURIComponent(id)}/duplicate`, { method: "POST" }),
   /** Delete moves the file to the Deleted folder; without `file`, a file from elsewhere just leaves the list. */
   remove: (id: string, file: boolean) => call<{ ok: true }>(`/api/projects/${encodeURIComponent(id)}${file ? "?file=1" : ""}`, { method: "DELETE" }),
-  create: (title: string) => call<Project>("/api/projects", { method: "POST", body: JSON.stringify({ title }) }),
+  create: (title: string, useDeviceLibrary = true) =>
+    call<Project>("/api/projects", { method: "POST", body: JSON.stringify({ title, useDeviceLibrary }) }),
+  devices: {
+    list: () => call<DeviceEntry[]>("/api/devices"),
+    add: (d: Partial<DeviceEntry>) => call<DeviceEntry>("/api/devices", { method: "POST", body: JSON.stringify(d) }),
+    update: (id: string, d: Partial<DeviceEntry>) =>
+      call<DeviceEntry>(`/api/devices/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(d) }),
+    remove: (id: string) => call<{ ok: true }>(`/api/devices/${encodeURIComponent(id)}`, { method: "DELETE" }),
+    addFile: async (id: string, file: File): Promise<DeviceEntry> => {
+      const res = await fetch(`/api/devices/${encodeURIComponent(id)}/files?name=${encodeURIComponent(file.name)}`, {
+        method: "POST",
+        headers: { "content-type": "application/octet-stream" },
+        body: file,
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error ?? `${res.status} ${res.statusText}`);
+      return body as DeviceEntry;
+    },
+    removeFile: (id: string, name: string) =>
+      call<DeviceEntry>(`/api/devices/${encodeURIComponent(id)}/files/${encodeURIComponent(name)}`, { method: "DELETE" }),
+    fileUrl: (id: string, name: string) => `/api/devices/${encodeURIComponent(id)}/files/${encodeURIComponent(name)}`,
+  },
   load: async (id: string): Promise<{ project: Project; version: string }> => {
     const res = await fetch(`/api/projects/${encodeURIComponent(id)}`);
     if (!res.ok) {

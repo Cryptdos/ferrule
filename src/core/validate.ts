@@ -2,6 +2,7 @@
  * Loading project files. Checks the shape, fills in fields added since
  * the file was written, and rejects anything that isn't a Ferrule project.
  */
+import { parseProjectDevices } from "./devices";
 import { FORMAT, FORMAT_VERSION, type GaItem, type Page, type Project, emptyInfo } from "./model";
 import { getSymbol } from "./symbols";
 import { colourCode, lampColour } from "./wirecolours";
@@ -99,6 +100,9 @@ export function parseProject(input: unknown): Project {
     }
   }
   if (typeof input.logo === "string" && project.assets[input.logo]) project.logo = input.logo;
+  const devices = parseProjectDevices(input.devices);
+  if (devices.length) project.devices = devices;
+  if (input.useDeviceLibrary === false) project.useDeviceLibrary = false;
   project.conductors = parseConductors(input.conductors);
   const lamps = new Set(project.pages.flatMap((pg) => pg.elements.filter((e) => e.symbol === "lamp").map((e) => e.id)));
   for (const c of project.conductors) c.terminals = c.terminals.map((t) => upgradeRef(t, lamps));
@@ -275,6 +279,7 @@ function parsePage(pg: Record<string, unknown>, i: number): Project["pages"][num
       h: typeof it.h === "number" && it.h > 0 ? it.h : 20,
       ...(Array.isArray(it.refs) ? { refs: it.refs.filter((r): r is string => typeof r === "string") } : {}),
       ...(typeof it.text === "string" ? { text: it.text } : {}),
+      ...(typeof it.device === "string" && it.device ? { device: it.device } : {}),
     }));
   const boundaryY = typeof pg.boundaryY === "number" && Number.isFinite(pg.boundaryY) ? pg.boundaryY : null;
   return {
@@ -286,6 +291,7 @@ function parsePage(pg: Record<string, unknown>, i: number): Project["pages"][num
     elements,
     segments,
     ...(ga ? { ga, gaItems } : {}),
+    ...(pg.spare === true && !ga ? { spare: true } : {}),
   };
 }
 

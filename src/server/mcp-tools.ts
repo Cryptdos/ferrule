@@ -292,21 +292,22 @@ export const TOOLS: Tool[] = [
   {
     name: "add_page",
     description:
-      "Add a sheet (after a given sheet, or at the end). Optionally with a panel boundary at height boundaryY.",
-    inputSchema: obj({ project, title: { type: "string" }, after: sheet, boundaryY: { type: "number" } }, ["project"]),
+      "Add a sheet (after a given sheet, or at the end). Optionally with a panel boundary at height boundaryY. spare: true makes a spare sheet, for annotations only (notes, revision list, symbol legend).",
+    inputSchema: obj({ project, title: { type: "string" }, after: sheet, boundaryY: { type: "number" }, spare: { type: "boolean" } }, ["project"]),
     run: async (a, ctx) =>
       edit(ctx, str(a, "project"), (p) => {
         const after = a.after !== undefined ? pageByNumber(p, a.after).id : undefined;
-        const page = op.addPage(p, str(a, "title", false), after);
+        const page = a.spare === true ? op.addSparePage(p, after) : op.addPage(p, str(a, "title", false), after);
+        if (a.spare === true && typeof a.title === "string" && a.title.trim()) op.renamePage(p, page.id, a.title);
         if (typeof a.boundaryY === "number") op.setBoundary(p, page.id, a.boundaryY);
         return { sheet: page.number };
       }),
   },
   {
     name: "update_page",
-    description: "Rename a sheet, move it, or set/remove its panel boundary (boundaryY: null removes it).",
+    description: "Rename a sheet, move it, set/remove its panel boundary (boundaryY: null removes it), or mark it spare (annotations only).",
     inputSchema: obj(
-      { project, sheet, title: { type: "string" }, moveTo: sheet, boundaryY: { type: ["number", "null"] } },
+      { project, sheet, title: { type: "string" }, moveTo: sheet, boundaryY: { type: ["number", "null"] }, spare: { type: "boolean" } },
       ["project", "sheet"],
     ),
     run: async (a, ctx) =>
@@ -315,6 +316,7 @@ export const TOOLS: Tool[] = [
         if (typeof a.title === "string") op.renamePage(p, page.id, a.title);
         if ("boundaryY" in a) op.setBoundary(p, page.id, typeof a.boundaryY === "number" ? a.boundaryY : null);
         if (typeof a.moveTo === "number") op.movePage(p, page.id, a.moveTo - 1);
+        if (typeof a.spare === "boolean") op.setPageSpare(p, page.id, a.spare);
         return { sheet: page.number, title: page.title, boundaryY: page.boundaryY };
       }),
   },

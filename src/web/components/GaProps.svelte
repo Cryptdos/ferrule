@@ -1,11 +1,14 @@
 <script lang="ts">
-  import { deleteGaItems, rotateGaItems, setGaSettings, setGaSize, updateGaItem } from "../../core/ops";
-  import { GA_SCALES, gaSizes } from "../../core/ga";
+  import { deleteGaItems, rotateGaItems, setGaItemDevice, setGaSettings, setGaSize, updateGaItem, useLibraryDevice } from "../../core/ops";
+  import { GA_SCALES, deviceSize, gaSizes, sizeKey } from "../../core/ga";
+  import { deviceLabel } from "../../core/devices";
+  import { api } from "../api";
+  import { deviceLibrary } from "../devices.svelte";
   import { displayTag } from "../../core/tags";
   import type { Editor } from "../editor.svelte";
 
   /** GA workbench, right side: the selected item, or the sheet's enclosure and the size library. */
-  let { editor }: { editor: Editor } = $props();
+  let { editor, ondevices }: { editor: Editor; ondevices?: () => void } = $props();
 
   const page = $derived(editor.page);
   const items = $derived((page.gaItems ?? []).filter((i) => editor.selection.includes(i.id)));
@@ -13,6 +16,49 @@
   const byId = $derived(new Map(editor.project.pages.flatMap((pg) => pg.elements.map((e) => [e.id, { e, pg }]))));
   const sizes = $derived(gaSizes(editor.project));
   let showSizes = $state(false);
+
+  // The device table: the project's devices, then the library's (if it's used).
+  const useLib = $derived(editor.project.useDeviceLibrary !== false);
+  $effect(() => {
+    if (useLib) void deviceLibrary.load();
+  });
+  const first = $derived(one?.refs?.[0] ? byId.get(one.refs[0])?.e : undefined);
+  const kind = $derived(first ? (sizeKey(editor.project, first)?.key ?? "") : "");
+  /** The size the part would have without a device from the table. */
+  const generic = $derived.by(() => {
+    if (!first || !one) return null;
+    if (first.symbol === "terminal") {
+      const t = sizes.terminal!;
+      return { w: Math.round(t.w * (one.refs?.length ?? 1) * 10) / 10, h: t.h };
+    }
+    return deviceSize(editor.project, first);
+  });
+  const suits = (k: string) => !k || k === kind;
+  const mine = $derived([...(editor.project.devices ?? [])].sort((a, b) => Number(suits(b.kind)) - Number(suits(a.kind)) || a.name.localeCompare(b.name)));
+  const libOnly = $derived(
+    useLib
+      ? deviceLibrary.list.filter((d) => !mine.some((m) => m.id === d.id)).sort((a, b) => Number(suits(b.kind)) - Number(suits(a.kind)) || a.name.localeCompare(b.name))
+      : [],
+  );
+  const dev = $derived(one?.device ? editor.project.devices?.find((d) => d.id === one.device) : undefined);
+  const libEntry = $derived(dev?.library ? deviceLibrary.get(dev.id) : undefined);
+  /** Sized by hand since the device was picked (either way round). */
+  const handSized = $derived(!!dev && !!one && !((one.w === dev.w && one.h === dev.h) || (one.w === dev.h && one.h === dev.w)));
+
+  function pickDevice(value: string) {
+    if (!one) return;
+    const id = one.id;
+    if (!value) {
+      const g = generic;
+      if (g) editor.apply((p) => setGaItemDevice(p, editor.pageId, id, null, g));
+      return;
+    }
+    const lib = value.startsWith("lib:") ? deviceLibrary.get(value.slice(4)) : undefined;
+    editor.apply((p) => {
+      const devId = lib ? useLibraryDevice(p, lib).id : value;
+      setGaItemDevice(p, editor.pageId, id, devId);
+    });
+  }
   const num = (v: string) => Number(v);
 </script>
 
@@ -34,6 +80,38 @@
         {/each}
         {#if one.refs.length > 12}<span class="hint">and {one.refs.length - 12} more</span>{/if}
       </div>
+    {/if}
+    {#if one.kind === "device" && one.refs?.length}
+      <label>
+        Device
+        <select value={one.device ?? ""} onchange={(e) => pickDevice(e.currentTarget.value)}>
+          <option value="">Generic size{generic ? ` (${generic.w} × ${generic.h})` : ""}</option>
+          {#if mine.length}
+            <optgroup label="This project's devices">
+              {#each mine as d (d.id)}<option value={d.id}>{suits(d.kind) ? "" : "· "}{deviceLabel(d)}</option>{/each}
+            </optgroup>
+          {/if}
+          {#if libOnly.length}
+            <optgroup label="From the shared library">
+              {#each libOnly as d (d.id)}<option value={"lib:" + d.id}>{suits(d.kind) ? "" : "· "}{deviceLabel(d)}</option>{/each}
+            </optgroup>
+          {/if}
+        </select>
+      </label>
+      {#if dev && handSized}
+        <p class="hint">
+          Sized by hand: {one.w} × {one.h} mm (the table says {dev.w} × {dev.h}).
+          <button class="link-btn" onclick={() => pickDevice(dev.id)}>Back to the table size</button>
+        </p>
+      {/if}
+      {#if libEntry?.files.length}
+        <div class="files">
+          {#each libEntry.files as f (f.name)}
+            <a href={api.devices.fileUrl(libEntry.id, f.name)} target="_blank" rel="noreferrer">{f.type === "datasheet" ? "📄" : "🖼"} {f.name}</a>
+          {/each}
+        </div>
+      {/if}
+      <button class="link-btn" onclick={() => ondevices?.()}>Device table…</button>
     {/if}
     {#if one.kind === "note" || one.kind === "device"}
       <label>
@@ -93,7 +171,10 @@
       DIN rail: drag along where it goes (35 mm). Trunking: drag out its size. Devices: pick from the list on the left.
       Positions are measured from the enclosure's top-left corner.
     </p>
-    <button onclick={() => (showSizes = !showSizes)}>{showSizes ? "Hide" : "Device sizes…"}</button>
+    <div class="buttons">
+      <button onclick={() => ondevices?.()} title="Real devices with sizes, datasheets and pictures">Device table…</button>
+      <button onclick={() => (showSizes = !showSizes)} title="The size each kind of part has when no device is picked">{showSizes ? "Hide generic sizes" : "Generic sizes…"}</button>
+    </div>
     {#if showSizes}
       <table class="sizes">
         <thead><tr><th>Part</th><th>W</th><th>H</th></tr></thead>
@@ -107,7 +188,7 @@
           {/each}
         </tbody>
       </table>
-      <p class="hint">Sizes for this project, in mm. Devices already placed keep their size; place them again to pick up a change.</p>
+      <p class="hint">Generic sizes for this project, in mm, for parts with no device picked from the table. Parts already placed keep their size.</p>
     {/if}
   {/if}
 </div>
@@ -165,6 +246,12 @@
     color: #1e6ee6;
     padding: 0;
     cursor: pointer;
+  }
+  .files {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 12px;
   }
   .sizes {
     font-size: 12px;

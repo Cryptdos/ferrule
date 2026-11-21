@@ -15,7 +15,7 @@ await AvoidLib.load();
 const { project: p } = buildLsp01(AvoidLib.getInstance());
 
 describe("LSP-01 benchmark", () => {
-  test("1. twelve sheets, in the order of the original set, then a true-scale GA", () => {
+  test("1. twelve sheets, in the order of the original set, then a true-scale GA and a notes sheet", () => {
     expect(p.pages.map((pg) => resolveFields(pg.title, p))).toEqual([
       "Cover sheet",
       "Main incoming section",
@@ -30,6 +30,7 @@ describe("LSP-01 benchmark", () => {
       "Door labels: power section",
       "Door labels: controls section",
       "General arrangement: controls backplate",
+      "Notes, revisions and symbols",
     ]);
     // The GA has the relays, timers and terminal strips from the schematic on it.
     const ga = p.pages[12]!;

@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { ProjectFormatError } from "../core/validate";
 import { type Library, type Storage, StorageError } from "./storage";
+import type { DeviceLibrary } from "./devices";
 import type { AssetSource } from "./assets";
 import { PdfError, type PdfRenderer } from "./pdf";
 import type { McpServer } from "./mcp";
@@ -8,6 +9,7 @@ import type { McpServer } from "./mcp";
 export interface AppOptions {
   storage: Storage;
   library?: Library;
+  devices?: DeviceLibrary;
   assets?: AssetSource;
   version?: string;
   pdf?: PdfRenderer;
@@ -34,7 +36,7 @@ function fileName(s: string): string {
   return s.replace(/[^A-Za-z0-9._ -]+/g, "-").trim() || "drawing";
 }
 
-export function createApp({ storage, library, assets, version = "dev", pdf, selfUrl, mcp, examples }: AppOptions): Hono {
+export function createApp({ storage, library, devices, assets, version = "dev", pdf, selfUrl, mcp, examples }: AppOptions): Hono {
   const app = new Hono();
 
   app.onError((err, c) => {
@@ -52,7 +54,7 @@ export function createApp({ storage, library, assets, version = "dev", pdf, self
   app.post("/api/projects", async (c) => {
     const body = await c.req.json().catch(() => ({}));
     const title = typeof body?.title === "string" ? body.title : "Untitled project";
-    return c.json(await storage.create(title), 201);
+    return c.json(await storage.create(title, { useDeviceLibrary: body?.useDeviceLibrary !== false }), 201);
   });
 
   // Files anywhere: open, save as, duplicate, delete, and a folder browser for picking them.
@@ -158,6 +160,27 @@ export function createApp({ storage, library, assets, version = "dev", pdf, self
     app.get("/api/library", async (c) => c.json(await library.list()));
     app.get("/api/library/:file", async (c) => c.json(await library.load(c.req.param("file"))));
     app.post("/api/library", async (c) => c.json({ file: await library.save(await c.req.json()) }, 201));
+  }
+
+  if (devices) {
+    // The shared device table for GA sheets.
+    app.get("/api/devices", async (c) => c.json(await devices.list()));
+    app.post("/api/devices", async (c) => c.json(await devices.add(await c.req.json()), 201));
+    app.put("/api/devices/:id", async (c) => c.json(await devices.update(c.req.param("id"), await c.req.json())));
+    app.delete("/api/devices/:id", async (c) => {
+      await devices.remove(c.req.param("id"));
+      return c.json({ ok: true });
+    });
+    app.post("/api/devices/:id/files", async (c) => {
+      const name = c.req.query("name") ?? "file";
+      const data = new Uint8Array(await c.req.arrayBuffer());
+      return c.json(await devices.addFile(c.req.param("id"), name, data), 201);
+    });
+    app.delete("/api/devices/:id/files/:name", async (c) => c.json(await devices.removeFile(c.req.param("id"), c.req.param("name"))));
+    app.get("/api/devices/:id/files/:name", async (c) => {
+      const { data, type } = await devices.readFile(c.req.param("id"), c.req.param("name"));
+      return c.body(data as unknown as ArrayBuffer, 200, { "content-type": type, "content-disposition": `inline; filename="${c.req.param("name").replace(/[^\x20-\x7e]|"/g, "_")}"` });
+    });
   }
 
   app.all("/api/*", (c) => c.json({ error: "Not found" }, 404));

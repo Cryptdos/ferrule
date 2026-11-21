@@ -3,6 +3,7 @@
  * graphics are rebuilt from this data by the symbol library.
  */
 import type { Rotation, Vec } from "./geometry";
+import type { ProjectDevice } from "./devices";
 
 export const FORMAT = "ferrule";
 export const FORMAT_VERSION = 2;
@@ -96,6 +97,8 @@ export interface Page {
   /** A general arrangement sheet: the panel laid out at true scale (no schematic on it). */
   ga?: GaSettings;
   gaItems?: GaItem[];
+  /** A spare sheet: kept for spacing and organisation, only annotations on it (no drafting). */
+  spare?: boolean;
 }
 
 export interface GaSettings {
@@ -118,6 +121,8 @@ export interface GaItem {
   refs?: string[];
   /** A note's text, or a label for a device that isn't on the schematic. */
   text?: string;
+  /** The device from the project's device table it is (its size came from there). */
+  device?: string;
 }
 
 /** A piece of field equipment, defined once with all its terminals (DESIGN.md §6). */
@@ -225,6 +230,10 @@ export interface Project {
   logo?: string;
   /** GA device sizes changed from the generic ones (ga.ts GA_SIZES), mm. */
   gaSizes?: Record<string, { w?: number; h?: number }>;
+  /** Devices from the device table this project uses (copies of library entries, or its own). */
+  devices?: ProjectDevice[];
+  /** Offer the shared device library in this project. Off: only the project's own devices. */
+  useDeviceLibrary?: boolean;
 }
 
 /** An image kept inside the project file. */

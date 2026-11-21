@@ -7,14 +7,11 @@
     deleteSegments,
     linkContact,
     linkOffpage,
-    setBoundary,
     setPlantViewTerminals,
     updateSection,
     deleteSections,
     deleteClouds,
     updateCloud,
-    cloudsOn,
-    renamePage,
     resetRoute,
     reverseSegment,
     setWireKind,
@@ -32,6 +29,8 @@
   import type { ParamValue } from "../../core/model";
   import type { Editor } from "../editor.svelte";
   import FieldInput from "./FieldInput.svelte";
+  import SheetProps from "./SheetProps.svelte";
+  import MarkdownEditor from "./MarkdownEditor.svelte";
 
   let { editor }: { editor: Editor } = $props();
 
@@ -156,7 +155,22 @@
         <button class="link-btn" onclick={() => editor.goTo(partner.el.id)}>Go to {address(partner.page, partner.el.pos)} →</button>
       {/if}
     {/if}
-    {#if one.symbol !== "junction" && one.symbol !== "rail"}
+    {#if one.symbol === "notes"}
+      <div class="sub">Notes</div>
+      <MarkdownEditor
+        value={one.label}
+        oninput={(v) => {
+          const id = one.id;
+          editor.apply((p) => updateElement(p, editor.pageId, id, { label: v }), { merge: `notes:${id}` });
+        }}
+      />
+    {:else if one.symbol === "revtable" || one.symbol === "legend"}
+      <p class="hint">
+        {one.symbol === "revtable"
+          ? "Lists the project's revisions: add and edit them under Project settings."
+          : "One of each part drawn in the project, by name. It keeps itself up to date."}
+      </p>
+    {:else if one.symbol !== "junction" && one.symbol !== "rail"}
       <label>
         {one.symbol === "text" || one.symbol === "plate" ? "Text" : "Label"}
         <FieldInput
@@ -450,6 +464,36 @@
     </div>
   {:else if sel.length + segs.length > 1}
     <h3>{sel.length} elements, {segs.length} wires selected</h3>
+    {@const terms = sel.filter((e) => e.symbol === "terminal")}
+    {#if terms.length}
+      <div class="sub">{terms.length} terminal{terms.length === 1 ? "" : "s"}</div>
+      <label>
+        Terminal strip
+        <input
+          value={terms.every((t) => t.params.strip === terms[0]!.params.strip) ? String(terms[0]!.params.strip ?? "") : ""}
+          placeholder="(mixed)"
+          onchange={(e) => {
+            const v = e.currentTarget.value.trim();
+            if (!v) return;
+            const ids = terms.map((t) => t.id);
+            editor.apply((p) => ids.forEach((id) => updateElement(p, editor.pageId, id, { params: { strip: v } })));
+          }}
+        />
+      </label>
+      <label class="check">
+        <input
+          type="checkbox"
+          checked={terms.every((t) => t.params.showStrip === true)}
+          indeterminate={terms.some((t) => t.params.showStrip === true) && !terms.every((t) => t.params.showStrip === true)}
+          onchange={(e) => {
+            const on = e.currentTarget.checked;
+            const ids = terms.map((t) => t.id);
+            editor.apply((p) => ids.forEach((id) => updateElement(p, editor.pageId, id, { params: { showStrip: on } })));
+          }}
+        />
+        Show the strip identifier beside them
+      </label>
+    {/if}
     {#if segs.some((s) => s.route === "manual")}
       <div class="buttons">
         <button
@@ -461,48 +505,7 @@
       </div>
     {/if}
   {:else}
-    <h3>Sheet {page.number} of {editor.project.pages.length}</h3>
-    <label>
-      Sheet title
-      <FieldInput
-        {editor}
-        value={page.title}
-        placeholder="e.g. Controls section: supplies"
-        onchange={(v) => editor.apply((p) => renamePage(p, editor.pageId, v))}
-      />
-    </label>
-    {@const clouds = cloudsOn(editor.project, page.id)}
-    {#if clouds.length}
-      <div class="sub">Revision {clouds[0]!.rev} clouds on this sheet</div>
-      {#each clouds as c, i (c.id)}
-        <div class="row">
-          Cloud {i + 1}, columns {columnOf(c.rect[0])}–{columnOf(c.rect[0] + c.rect[2])}
-          <button class="danger small" onclick={() => editor.apply((p) => deleteClouds(p, [c.id]))}>Remove</button>
-        </div>
-      {/each}
-    {/if}
-    <label class="check">
-      <input
-        type="checkbox"
-        checked={page.boundaryY !== null}
-        onchange={(e) => {
-          const y = e.currentTarget.checked ? 88 : null;
-          editor.apply((p) => setBoundary(p, editor.pageId, y));
-        }}
-      />
-      Panel boundary (field equipment below it)
-    </label>
-    {#if page.boundaryY !== null}
-      <p class="hint">Drag the dashed boundary line to move it. Terminals sit on it; wires crossing it must go through one.</p>
-    {/if}
-    <p class="hint">
-      Pick a symbol on the left and click to place it. Drag to move, <kbd>R</kbd> to rotate, <kbd>Del</kbd> to delete,
-      <kbd>Ctrl</kbd>+<kbd>D</kbd> to duplicate. Scroll to zoom, middle-drag or <kbd>Space</kbd>+drag to pan.
-    </p>
-    <p class="hint">
-      <kbd>W</kbd> wire tool: click a terminal, then another. Click on a wire to tee into it. <kbd>Esc</kbd> cancels,
-      <kbd>S</kbd> back to select.
-    </p>
+    <SheetProps {editor} />
   {/if}
   {#if sel.length > 0}
     <div class="buttons">
@@ -606,12 +609,5 @@
     color: #556;
     line-height: 1.5;
     margin: 0;
-  }
-  kbd {
-    font-size: 11px;
-    border: 1px solid #ccd;
-    border-radius: 3px;
-    padding: 0 3px;
-    background: #f6f7f8;
   }
 </style>

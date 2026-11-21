@@ -21,6 +21,7 @@ import {
   addElement,
   addGaItem,
   addGaPage,
+  addSparePage,
   addPage,
   addPlant,
   addRevision,
@@ -529,6 +530,30 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
   // --- Revision B: the proving and timer area on sheet 8 is clouded ----------
   addRevision(p, { date: "21/11/26", drawnBy: "FERRULE", description: "Airflow proving revised" });
   addCloud(p, controlsSheet.id, [74, 9, 76, 70]);
+
+  // --- Sheet 14: notes, revisions and the symbol legend (annotations only) ---
+  {
+    const notes = addSparePage(p, p.pages[p.pages.length - 1]!.id);
+    notes.title = "Notes, revisions and symbols";
+    addElement(p, notes.id, "notes", [4, 4], {
+      params: { width: 88 },
+      label: [
+        "## General notes",
+        "1. Control wiring **1.0 mm²** tri-rated, Bu for 24V DC, Bk for 230V AC controls.",
+        "2. Field cables LSF, sizes as below unless the fire strategy says otherwise.",
+        "3. All terminals numbered as drawn; wire numbers at both ends.",
+        "",
+        "| Circuit | Cable | Size |",
+        "|---|---|---|",
+        "| Supply fans | 4C SWA | 2.5 mm² |",
+        "| Extract fans | 4C SWA | 2.5 mm² |",
+        "| Fire alarm interface | 2C FP200 | 1.5 mm² |",
+        "| Airflow proving | 2C screened | 0.75 mm² |",
+      ].join("\n"),
+    });
+    addElement(p, notes.id, "revtable", [102, 4], { params: { rows: 6 } });
+    addElement(p, notes.id, "legend", [4, 40], { params: { cols: 3 } });
+  }
 
   // --- Finish: number everything, route every wire ---------------------------
   for (const pg of p.pages) routePage(avoid, pg);

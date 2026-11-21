@@ -8,6 +8,7 @@
  * Default orientation is vertical, current flowing top to bottom, as in a
  * ladder rung between the CCT and 0V rails.
  */
+import { legendTable, notesLayout, revisionTable, type LegendEntry } from "./annotations";
 import {
   type Dir,
   type Rect,
@@ -83,7 +84,7 @@ export interface SymbolDef {
   id: string;
   name: string;
   /** Palette group. */
-  group: "Contacts" | "Operators" | "Coils" | "Protection" | "Loads" | "Connection" | "Drawing";
+  group: "Contacts" | "Operators" | "Coils" | "Protection" | "Loads" | "Connection" | "Drawing" | "Tables";
   /** Shown in the palette. Junctions are created by wiring, not placed. */
   palette: boolean;
   params: ParamDef[];
@@ -97,7 +98,8 @@ export interface SymbolDef {
    * edited in the Annotate workbench.
    */
   bench?: "draft" | "annotate";
-  draw(el: Element): { prims: Prim[]; terminals: TerminalDef[]; body: Rect };
+  /** `t` carries what the project says about it, where a symbol needs it (tables, notes with fields). */
+  draw(el: Element, t?: GeometryText): { prims: Prim[]; terminals: TerminalDef[]; body: Rect };
 }
 
 // ---------------------------------------------------------------------------
@@ -750,10 +752,14 @@ const SYMBOLS: SymbolDef[] = [
     name: "Terminal",
     group: "Connection",
     palette: true,
-    params: [{ key: "strip", label: "Terminal strip", type: "text", default: "X1", placeholder: "e.g. X1" }],
+    params: [
+      { key: "strip", label: "Terminal strip", type: "text", default: "X1", placeholder: "e.g. X1" },
+      { key: "showStrip", label: "Show the strip identifier beside it", type: "bool", default: false },
+    ],
     kind: () => "terminal",
     bridged: () => [["1", "2"]],
     draw(el) {
+      const strip = el.params.showStrip === true ? String(el.params.strip ?? "").trim() : "";
       return {
         prims: [
           line([0, -1], [0, -0.45]),
@@ -762,6 +768,8 @@ const SYMBOLS: SymbolDef[] = [
           { t: "circle", c: [0, 0], r: 0.45, bg: true },
           // The terminal's number sits beside it, across the wire, so it doesn't read as a wire number.
           text(0.6, -0.15, "{tag}", 0.85, "start", "tag"),
+          // Its strip on the other side, when asked for.
+          ...(strip ? [text(-0.6, -0.15, strip, 0.85, "end", "note")] : []),
           ...(el.label ? [text(0.65, 1.0, "{label}", TERM, "start", "label")] : []),
         ],
         terminals: vterms("1", "2", 1),
@@ -1164,6 +1172,90 @@ const SYMBOLS: SymbolDef[] = [
     },
   },
   {
+    id: "notes",
+    bench: "annotate",
+    name: "Notes (formatted)",
+    group: "Drawing",
+    palette: true,
+    params: [
+      {
+        key: "size",
+        label: "Size",
+        type: "select",
+        default: "small",
+        options: [
+          { value: "small", label: "Small (2.5 mm)" },
+          { value: "normal", label: "Normal (3.5 mm)" },
+          { value: "large", label: "Large (5 mm)" },
+        ],
+      },
+      { key: "width", label: "Width (units)", type: "number", min: 10, max: 200, default: 80 },
+    ],
+    kind: () => null,
+    draw(el, t) {
+      const size = TEXT_SIZES[str(el, "size", "small")] ?? TEXT_SIZES.small!;
+      const md = (t?.label ?? el.label) || "## Notes\n- Write notes here";
+      const n = notesLayout(md, size, num(el, "width", 80, 10, 200));
+      return { prims: n.prims, terminals: [], body: { x: 0, y: 0, w: n.w, h: n.h } };
+    },
+  },
+  {
+    id: "revtable",
+    bench: "annotate",
+    name: "Revision list",
+    group: "Tables",
+    palette: true,
+    params: [
+      { key: "rows", label: "Rows at least", type: "number", min: 1, max: 40, default: 6 },
+      {
+        key: "size",
+        label: "Size",
+        type: "select",
+        default: "small",
+        options: [
+          { value: "small", label: "Small (2.5 mm)" },
+          { value: "normal", label: "Normal (3.5 mm)" },
+        ],
+      },
+    ],
+    kind: () => null,
+    draw(el, t) {
+      const size = TEXT_SIZES[str(el, "size", "small")] ?? TEXT_SIZES.small!;
+      const r = revisionTable(t?.rows ?? [], num(el, "rows", 6, 1, 40), size);
+      return { prims: r.prims, terminals: [], body: { x: 0, y: 0, w: r.w, h: r.h } };
+    },
+  },
+  {
+    id: "legend",
+    bench: "annotate",
+    name: "Symbol legend",
+    group: "Tables",
+    palette: true,
+    params: [
+      { key: "cols", label: "Columns", type: "number", min: 1, max: 4, default: 2 },
+      {
+        key: "size",
+        label: "Size",
+        type: "select",
+        default: "small",
+        options: [
+          { value: "small", label: "Small (2.5 mm)" },
+          { value: "normal", label: "Normal (3.5 mm)" },
+        ],
+      },
+    ],
+    kind: () => null,
+    draw(el, t) {
+      const size = TEXT_SIZES[str(el, "size", "small")] ?? TEXT_SIZES.small!;
+      const entries = t?.legend ?? [];
+      if (!entries.length) {
+        return { prims: [text(0, 2, "SYMBOL LEGEND: no parts drawn yet", size, "start", "label")], terminals: [], body: { x: 0, y: 0, w: 40, h: 3 } };
+      }
+      const r = legendTable(entries, num(el, "cols", 2, 1, 4), size);
+      return { prims: r.prims, terminals: [], body: { x: 0, y: 0, w: r.w, h: r.h } };
+    },
+  },
+  {
     id: "box",
     bench: "annotate",
     name: "Box",
@@ -1412,7 +1504,7 @@ export function paramApplies(def: ParamDef, el: Element): boolean {
 const BY_ID = new Map(SYMBOLS.map((s) => [s.id, s]));
 
 /** Which workbench an element is edited in. */
-export function benchOf(el: Element): "draft" | "annotate" {
+export function benchOf(el: Pick<Element, "symbol">): "draft" | "annotate" {
   return getSymbol(el.symbol)?.bench ?? "draft";
 }
 
@@ -1502,6 +1594,10 @@ export interface GeometryText {
   xref?: string;
   /** Label with any fields filled in. Defaults to the element's label. */
   label?: string;
+  /** Revision list rows (revision table). */
+  rows?: string[][];
+  /** One of each part used (symbol legend). */
+  legend?: LegendEntry[];
 }
 
 /**
@@ -1511,7 +1607,7 @@ export interface GeometryText {
 export function localGeometry(el: Element, texts: string | GeometryText): Geometry {
   const t: GeometryText = typeof texts === "string" ? { tag: texts } : texts;
   const def = requireSymbol(el.symbol);
-  const d = def.draw(el);
+  const d = def.draw(el, t);
   // With no cross-reference, close up the gap it would have left.
   let raw = d.prims;
   const xrefPrim = raw.find((p) => p.t === "text" && p.text === "{xref}");

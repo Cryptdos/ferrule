@@ -1,5 +1,6 @@
 <script lang="ts">
   import { untrack } from "svelte";
+  import Atlas from "./Atlas.svelte";
   import {
     AREA_MM,
     AREA_UNITS,
@@ -51,7 +52,19 @@
   import Sheet from "./Sheet.svelte";
   import ElementView from "./ElementView.svelte";
 
-  let { editor, sim = null }: { editor: Editor; sim?: Simulator | null } = $props();
+  let {
+    editor,
+    sim = null,
+    insetLeft = 0,
+    atlas = false,
+  }: {
+    editor: Editor;
+    sim?: Simulator | null;
+    /** Width (px) covered by the floating browser on the left: Fit centres the sheet in the rest. */
+    insetLeft?: number;
+    /** Show the sheet overview in the top-right corner. */
+    atlas?: boolean;
+  } = $props();
 
   let svg: SVGSVGElement | undefined = $state();
   let box = $state({ w: 1200, h: 800 });
@@ -103,9 +116,12 @@
   });
 
   export function fit(): void {
-    const aspect = box.h / Math.max(1, box.w);
-    const w = Math.max(SHEET_MM.w + 10, (SHEET_MM.h + 10) / aspect);
-    view = { x: SHEET_MM.w / 2 - w / 2, y: SHEET_MM.h / 2 - (w * aspect) / 2, w };
+    // Fit the sheet into the part of the canvas not covered by the browser.
+    const inset = insetLeft < box.w * 0.5 ? insetLeft : 0;
+    const aw = Math.max(1, box.w - inset);
+    const bh = Math.max(1, box.h);
+    const mmPerPx = Math.max((SHEET_MM.w + 10) / aw, (SHEET_MM.h + 10) / bh);
+    view = { x: SHEET_MM.w / 2 - (inset + aw / 2) * mmPerPx, y: SHEET_MM.h / 2 - (bh / 2) * mmPerPx, w: box.w * mmPerPx };
   }
 
   /** Cancel a wire in progress or a drag. Returns true if there was one. */
@@ -956,6 +972,7 @@
   }}
 />
 
+<div class="wrap">
 <svg
   bind:this={svg}
   class="canvas {cursorClass}"
@@ -1163,8 +1180,17 @@
     {/snippet}
   </Sheet>
 </svg>
+{#if atlas}
+  <Atlas project={editor.project} {page} {view} {viewH} onmove={(x, y) => (view = { ...view, x, y })} />
+{/if}
+</div>
 
 <style>
+  .wrap {
+    position: relative;
+    width: 100%;
+    height: 100%;
+  }
   .canvas {
     width: 100%;
     height: 100%;

@@ -113,6 +113,22 @@
       </select>
     </label>
     <p class="hint">Takes effect next time you press Renumber.</p>
+    <h3>GA devices</h3>
+    <label class="inline">
+      <input
+        type="checkbox"
+        checked={editor.project.useDeviceLibrary !== false}
+        onchange={(e) => {
+          const on = e.currentTarget.checked;
+          editor.apply((p) => {
+            if (on) delete p.useDeviceLibrary;
+            else p.useDeviceLibrary = false;
+          });
+        }}
+      />
+      Use the shared device library (sizes, datasheets, pictures)
+    </label>
+    <p class="hint">Off: only this project's own devices are offered. Devices already in use stay.</p>
     <h3>Revisions</h3>
     <table>
       <thead>

@@ -245,11 +245,12 @@ export class Storage {
     await rename(tmp, file);
   }
 
-  async create(title: string): Promise<Project> {
+  async create(title: string, opts: { useDeviceLibrary?: boolean } = {}): Promise<Project> {
     const base = slugify(title);
     let id = base;
     for (let i = 2; existsSync(this.path(id)) || this.recent.some((r) => r.id === id); i++) id = `${base}-${i}`;
     const project = newProject(id, title.trim() || "Untitled project");
+    if (opts.useDeviceLibrary === false) project.useDeviceLibrary = false;
     return this.save(id, project);
   }
 

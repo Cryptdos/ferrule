@@ -37,6 +37,8 @@ export class Editor {
   message: string = $state("");
   /** A schematic device (or terminal strip) being placed on a GA sheet. */
   gaPlace: { refs: string[]; w: number; h: number; label: string } | null = $state(null);
+  /** Sheet settings open in the floating properties box (nothing need be selected). */
+  sheetSettings: boolean = $state(false);
   /** An element just jumped to (goTo): ringed until the selection moves on. */
   highlight: string | null = $state(null);
   /** Bumped by goTo so the canvas scrolls the highlighted element into view. */

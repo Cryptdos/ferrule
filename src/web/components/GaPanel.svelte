@@ -55,7 +55,7 @@
   {:else}
     <div class="title">To place ({forView.length})</div>
     <p class="hint">
-      Click one, then click on the {page.ga.view}. Devices snap onto a DIN rail. Sizes are generic: change them under Device sizes on the right.
+      Click one, then click on the {page.ga.view}. Devices snap onto a DIN rail. Sizes are generic until you pick a real device for a part from the device table (in its properties).
       {#if others}{others} more go on the {page.ga.view === "door" ? "backplate" : "door"}.{/if}
     </p>
     {#each forView as c (c.refs.join(","))}

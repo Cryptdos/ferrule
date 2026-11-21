@@ -75,10 +75,12 @@
     }
   }
 
+  let useLibrary = $state(true);
+
   async function create(e: SubmitEvent) {
     e.preventDefault();
     try {
-      const p = await api.create(title.trim() || "Untitled project");
+      const p = await api.create(title.trim() || "Untitled project", useLibrary);
       onopen(p.id);
     } catch (err) {
       error = (err as Error).message;
@@ -93,8 +95,11 @@
     <button type="submit">Create project</button>
     <button type="button" onclick={() => (browsing = true)} title="Open a .ferrule file from any folder">Open file…</button>
   </form>
+  <label class="uselib" title="GA sheets can take device sizes, datasheets and pictures from the shared device library. Untick to start this project's device table from scratch.">
+    <input type="checkbox" bind:checked={useLibrary} /> Use the shared device library for GA sheets
+  </label>
   <p class="example">
-    Or <button class="link" onclick={example}>add the LSP-01 example</button>: a 12-sheet life safety panel drawn
+    Or <button class="link" onclick={example}>add the LSP-01 example</button>: a 14-sheet life safety panel drawn
     entirely with Ferrule's own tools.
   </p>
   {#if error}<p class="error">{error}</p>{/if}
@@ -129,6 +134,14 @@
 {/if}
 
 <style>
+  .uselib {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: #445;
+    margin: -4px 0 10px;
+  }
   .picker {
     max-width: 760px;
     margin: 48px auto;

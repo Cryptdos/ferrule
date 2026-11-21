@@ -37,7 +37,7 @@ An open editor tab follows changes Claude makes: it reloads the project and says
 | `list_symbols` | Symbol ids, settings and terminal names |
 | `get_page` | Everything on a sheet, with terminal positions and wire numbers |
 | `view_page` | A PNG of a sheet as it prints (needs Edge or Chrome) |
-| `add_page`, `update_page`, `delete_page` | Sheets, titles, order, panel boundary |
+| `add_page`, `update_page`, `delete_page` | Sheets, titles, order, panel boundary, spare sheets (annotations only) |
 | `add_element`, `update_element`, `move_element`, `delete_element` | Symbols, text, boxes, plates (and deleting wires or sections by id) |
 | `connect`, `disconnect` | Wires: terminal to terminal, or tee into a wire |
 | `label_wire` | A wire's number, core colour (IEC 60757, e.g. Bu) and function (e.g. 0V), printed along it |
