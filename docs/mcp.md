@@ -42,7 +42,7 @@ An open editor tab follows changes Claude makes: it reloads the project and says
 | `connect`, `disconnect` | Wires: terminal to terminal, or tee into a wire |
 | `label_wire` | A wire's number, core colour (IEC 60757, e.g. Bu) and function (e.g. 0V), printed along it |
 | `link` | Contact → coil, or pair off-page arrows |
-| `add_plant`, `place_plant_view` | Field equipment (terminals, named terminal groups, information lines) and its views |
+| `add_plant`, `place_plant_view` | Field equipment (prefix or fixed tag, terminals, named terminal groups, information lines, power by others) and its views |
 | `add_section` | Labelled section boxes |
 | `save_template`, `apply_template` | Templates and stamping for other plant |
 | `renumber`, `check`, `schedules` | Tags and wire numbers, rule checks, terminal/cable schedules |

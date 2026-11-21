@@ -118,7 +118,7 @@ describe("examples", () => {
     expect(res.status).toBe(201);
     const { id } = await res.json();
     const p = await (await a.request(`/api/projects/${id}`)).json();
-    expect(p.pages).toHaveLength(12);
+    expect(p.pages).toHaveLength(13);
     expect((await a.request("/api/examples/nope", { method: "POST" })).status).toBe(404);
   });
 });

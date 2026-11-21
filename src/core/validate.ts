@@ -2,7 +2,7 @@
  * Loading project files. Checks the shape, fills in fields added since
  * the file was written, and rejects anything that isn't a Ferrule project.
  */
-import { FORMAT, FORMAT_VERSION, type Project, emptyInfo } from "./model";
+import { FORMAT, FORMAT_VERSION, type GaItem, type Page, type Project, emptyInfo } from "./model";
 import { getSymbol } from "./symbols";
 import { colourCode, lampColour } from "./wirecolours";
 
@@ -88,6 +88,16 @@ export function parseProject(input: unknown): Project {
       ...(typeof r.note === "string" ? { note: r.note } : {}),
     }));
   project.assets = parseAssets(input.assets);
+  if (isObj(input.gaSizes)) {
+    project.gaSizes = {};
+    for (const [k, v] of Object.entries(input.gaSizes)) {
+      if (!isObj(v)) continue;
+      project.gaSizes[k] = {
+        ...(typeof v.w === "number" && v.w > 0 ? { w: v.w } : {}),
+        ...(typeof v.h === "number" && v.h > 0 ? { h: v.h } : {}),
+      };
+    }
+  }
   if (typeof input.logo === "string" && project.assets[input.logo]) project.logo = input.logo;
   project.conductors = parseConductors(input.conductors);
   const lamps = new Set(project.pages.flatMap((pg) => pg.elements.filter((e) => e.symbol === "lamp").map((e) => e.id)));
@@ -243,8 +253,40 @@ function parsePage(pg: Record<string, unknown>, i: number): Project["pages"][num
     s.from = upgradeRef(s.from, lamps);
     s.to = upgradeRef(s.to, lamps);
   }
+  // A GA sheet: settings and its items in real mm.
+  let ga: Page["ga"];
+  if (isObj(pg.ga) && isObj(pg.ga.enclosure)) {
+    const e = pg.ga.enclosure;
+    ga = {
+      scale: typeof pg.ga.scale === "number" && pg.ga.scale > 0 ? pg.ga.scale : 5,
+      enclosure: { w: typeof e.w === "number" && e.w > 0 ? e.w : 600, h: typeof e.h === "number" && e.h > 0 ? e.h : 800 },
+      view: pg.ga.view === "door" ? "door" : "backplate",
+    };
+  }
+  const gaItems = arr(pg.gaItems)
+    .filter(isObj)
+    .filter((it) => typeof it.id === "string" && ["rail", "trunking", "device", "note"].includes(String(it.kind)))
+    .map((it) => ({
+      id: it.id as string,
+      kind: it.kind as GaItem["kind"],
+      x: typeof it.x === "number" ? it.x : 0,
+      y: typeof it.y === "number" ? it.y : 0,
+      w: typeof it.w === "number" && it.w > 0 ? it.w : 20,
+      h: typeof it.h === "number" && it.h > 0 ? it.h : 20,
+      ...(Array.isArray(it.refs) ? { refs: it.refs.filter((r): r is string => typeof r === "string") } : {}),
+      ...(typeof it.text === "string" ? { text: it.text } : {}),
+    }));
   const boundaryY = typeof pg.boundaryY === "number" && Number.isFinite(pg.boundaryY) ? pg.boundaryY : null;
-  return { id: pg.id as string, number: i + 1, title: strOr(pg.title), boundaryY, sections, elements, segments };
+  return {
+    id: pg.id as string,
+    number: i + 1,
+    title: strOr(pg.title),
+    boundaryY,
+    sections,
+    elements,
+    segments,
+    ...(ga ? { ga, gaItems } : {}),
+  };
 }
 
 function parseConductors(v: unknown): Project["conductors"] {

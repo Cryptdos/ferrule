@@ -15,7 +15,7 @@ await AvoidLib.load();
 const { project: p } = buildLsp01(AvoidLib.getInstance());
 
 describe("LSP-01 benchmark", () => {
-  test("1. twelve sheets, in the order of the original set", () => {
+  test("1. twelve sheets, in the order of the original set, then a true-scale GA", () => {
     expect(p.pages.map((pg) => resolveFields(pg.title, p))).toEqual([
       "Cover sheet",
       "Main incoming section",
@@ -29,7 +29,12 @@ describe("LSP-01 benchmark", () => {
       "General arrangement",
       "Door labels: power section",
       "Door labels: controls section",
+      "General arrangement: controls backplate",
     ]);
+    // The GA has the relays, timers and terminal strips from the schematic on it.
+    const ga = p.pages[12]!;
+    expect(ga.ga?.enclosure).toEqual({ w: 1000, h: 1600 });
+    expect(ga.gaItems!.filter((i) => i.kind === "device").length).toBeGreaterThan(10);
   });
 
   test("2. every tag, terminal and wire number is generated", () => {
@@ -67,7 +72,9 @@ describe("LSP-01 benchmark", () => {
   });
 
   test("checks are clean: no errors, no warnings", () => {
-    expect(checkProject(p)).toEqual([]);
+    // Only the note that the GA (deliberately) has more devices to place.
+    expect(checkProject(p).filter((f) => f.level !== "info")).toEqual([]);
+    expect(checkProject(p).map((f) => f.message)).toEqual([expect.stringMatching(/not on a GA yet/)]);
   });
 
   test("the enable loop runs from each controls sheet to its starter as one circuit", () => {

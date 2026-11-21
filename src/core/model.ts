@@ -93,6 +93,31 @@ export interface Page {
   sections: Section[];
   elements: Element[];
   segments: Segment[];
+  /** A general arrangement sheet: the panel laid out at true scale (no schematic on it). */
+  ga?: GaSettings;
+  gaItems?: GaItem[];
+}
+
+export interface GaSettings {
+  /** Drawn at 1:scale. */
+  scale: number;
+  /** Inside of the enclosure (or the door), mm. */
+  enclosure: { w: number; h: number };
+  view: "backplate" | "door";
+}
+
+/** Something on a GA sheet, in real mm from the enclosure's top-left corner. */
+export interface GaItem {
+  id: string;
+  kind: "rail" | "trunking" | "device" | "note";
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  /** Schematic elements this is (a device, or every terminal of a strip). */
+  refs?: string[];
+  /** A note's text, or a label for a device that isn't on the schematic. */
+  text?: string;
 }
 
 /** A piece of field equipment, defined once with all its terminals (DESIGN.md §6). */
@@ -198,6 +223,8 @@ export interface Project {
   assets: Record<string, Asset>;
   /** The title block's logo, an asset id. */
   logo?: string;
+  /** GA device sizes changed from the generic ones (ga.ts GA_SIZES), mm. */
+  gaSizes?: Record<string, { w?: number; h?: number }>;
 }
 
 /** An image kept inside the project file. */

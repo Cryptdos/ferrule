@@ -499,12 +499,14 @@ export const TOOLS: Tool[] = [
       {
         project,
         plant: { type: "string", description: "Existing plant tag or id, to update" },
-        tag: { type: "string" },
+        tag: { type: "string", description: "Fixed tag (locked). Leave out to let Renumber tag it as prefix + sheet-column of its first view, e.g. SEF-3-13" },
+        prefix: { type: "string", description: "Tag prefix, e.g. SEF for a safety extract fan (default U)" },
         description: { type: "string" },
         terminals: { type: "array", items: { type: "string" } },
+        powerByOthers: { type: "boolean", description: "Draw the 'power by others' break on the left of its views" },
         groups: {
           type: "array",
-          description: "Named groups of its terminals, shown in bold inside the box, e.g. [{name: 'ENABLE', terminals: ['1','2']}]",
+          description: "Named groups of its terminals, shown in capitals over the terminal boxes, e.g. [{name: 'R1', terminals: ['C','NO','NC']}]",
           items: { type: "object" },
         },
         info: { type: "string", description: "More lines under the box: model, rating, supply…" },
@@ -520,6 +522,8 @@ export const TOOLS: Tool[] = [
             })
           : undefined;
         const info = typeof a.info === "string" ? a.info : undefined;
+        const prefix = typeof a.prefix === "string" ? a.prefix : undefined;
+        const powerByOthers = typeof a.powerByOthers === "boolean" ? a.powerByOthers : undefined;
         if (typeof a.plant === "string") {
           const item = plantByRef(p, a.plant);
           op.updatePlant(p, item.id, {
@@ -528,16 +532,20 @@ export const TOOLS: Tool[] = [
             terminals: Array.isArray(a.terminals) ? a.terminals.map(String) : undefined,
             groups,
             info,
+            prefix,
+            powerByOthers,
           });
           return item;
         }
-        return op.addPlant(
+        const item = op.addPlant(
           p,
-          str(a, "tag"),
+          typeof a.tag === "string" ? a.tag : "",
           str(a, "description", false),
           Array.isArray(a.terminals) ? a.terminals.map(String) : [],
-          { groups, info },
+          { groups, info, prefix, powerByOthers },
         );
+        if (item.tag) item.locked = true;
+        return item;
       }),
   },
   {

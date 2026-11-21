@@ -2,6 +2,7 @@
  * Rule checks (DESIGN.md §6, §7, §10). Each finding names the elements
  * involved so the UI can jump to them.
  */
+import { gaCandidates } from "./ga";
 import type { Element, Page, Project } from "./model";
 import { terminalNames } from "./symbols";
 import { displayTag } from "./tags";
@@ -137,6 +138,22 @@ export function checkProject(project: Project): Finding[] {
   }
 
   if (unnumbered) out.push({ level: "info", message: `${unnumbered} items not numbered yet: press Renumber`, ids: [] });
+
+  // With a GA drawn, say what isn't on it yet; and GA devices whose schematic part has gone.
+  if (project.pages.some((p) => p.ga)) {
+    const left = gaCandidates(project, (el) => el.tag);
+    if (left.length) {
+      out.push({ level: "info", message: `${left.length} panel device${left.length === 1 ? "" : "s"} not on a GA yet (see the GA workbench)`, ids: [] });
+    }
+    const all = new Set(project.pages.flatMap((p) => p.elements.map((e) => e.id)));
+    for (const page of project.pages) {
+      for (const it of page.gaItems ?? []) {
+        if (it.refs?.length && !it.refs.some((r) => all.has(r))) {
+          out.push({ level: "warning", message: `Sheet ${page.number}: a device on the GA is no longer on the schematic`, pageId: page.id, ids: [it.id] });
+        }
+      }
+    }
+  }
 
   const rank = { error: 0, warning: 1, info: 2 };
   return out.sort((a, b) => rank[a.level] - rank[b.level]);

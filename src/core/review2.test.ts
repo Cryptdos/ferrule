@@ -261,3 +261,29 @@ describe("simulation: push buttons", () => {
     expect(s.lamps[h.id]).toBe(false);
   });
 });
+
+import { addGaItem, addGaPage } from "./ops";
+import { deviceSize, gaCandidates, snapToRail } from "./ga";
+
+describe("GA sheets", () => {
+  test("devices from the schematic, sized from the library, snap onto rails, and leave the to-place list", () => {
+    const { p, pg } = project();
+    const k = addElement(p, pg, "coil", [20, 60]);
+    const q = addElement(p, pg, "isolator", [40, 20], { params: { function: "breaker", poles: 2 } });
+    const t1 = addElement(p, pg, "terminal", [60, 80], { params: { strip: "X1" } });
+    const t2 = addElement(p, pg, "terminal", [63, 80], { params: { strip: "X1" } });
+    addElement(p, pg, "lamp", [80, 60]);
+    expect(deviceSize(p, k)).toEqual({ w: 16, h: 80 });
+    expect(deviceSize(p, q)).toEqual({ w: 36, h: 90 });
+    const ga = addGaPage(p, "", { scale: 5, enclosure: { w: 600, h: 800 }, view: "backplate" });
+    let c = gaCandidates(p, (e) => e.symbol);
+    expect(c.find((x) => x.refs.length === 2)?.refs).toEqual([t1.id, t2.id]); // the strip, together
+    expect(c.find((x) => x.door)).toBeTruthy(); // the lamp goes on the door
+    addGaItem(p, ga.id, { kind: "rail", x: 50, y: 100, w: 500, h: 35 });
+    expect(snapToRail(ga, { x: 60, y: 90, w: 16, h: 80 })).toBe(77.5);
+    addGaItem(p, ga.id, { kind: "device", x: 60, y: 77.5, w: 16, h: 80, refs: [k.id] });
+    c = gaCandidates(p, (e) => e.symbol);
+    expect(c.some((x) => x.refs.includes(k.id))).toBe(false);
+    expect(() => addGaItem(p, ga.id, { kind: "device", x: 0, y: 0, w: 1, h: 1, refs: [k.id] })).toThrow(/already/);
+  });
+});

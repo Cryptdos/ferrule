@@ -11,6 +11,9 @@
   import { benchOf } from "../../core/symbols";
   import { api } from "../api";
   import FileBrowser from "./FileBrowser.svelte";
+  import GaPanel from "./GaPanel.svelte";
+  import GaProps from "./GaProps.svelte";
+  import { deleteGaItems, moveGaItems, rotateGaItems } from "../../core/ops";
   import { isTyping } from "../typing";
   import type { Editor } from "../editor.svelte";
   import Canvas from "./Canvas.svelte";
@@ -58,6 +61,7 @@
     // Each workbench has its own things to pick: start with nothing picked.
     editor.tool = "select";
     editor.placeSymbol = null;
+    editor.gaPlace = null;
     editor.selection = [];
     if (mode === "simulate") {
       tableView = false;
@@ -68,6 +72,13 @@
     }
   }
   $effect(() => () => sim?.stop());
+
+  // A GA sheet is laid out in the GA workbench, a schematic sheet drafted:
+  // moving between them takes you to the right one (Annotate and Simulate stay).
+  $effect(() => {
+    const isGa = !!editor.page.ga;
+    if (isGa && editor.mode === "draft") setMode("ga");
+  });
 
   function toggleSplit() {
     if (editor.splitPageId) {
@@ -121,6 +132,42 @@
   function onKey(e: KeyboardEvent) {
     if (isTyping(e.target) || showProject || dialog || tableView || savingAs) return;
     const ctrl = e.ctrlKey || e.metaKey;
+    // GA: move, turn and delete layout items.
+    if (editor.mode === "ga") {
+      const gaIds = (editor.page.gaItems ?? []).filter((i) => editor.selection.includes(i.id)).map((i) => i.id);
+      if (ctrl && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        if (e.shiftKey) editor.redo();
+        else editor.undo();
+      } else if (ctrl && e.key.toLowerCase() === "y") {
+        e.preventDefault();
+        editor.redo();
+      } else if ((e.key === "Delete" || e.key === "Backspace") && gaIds.length) {
+        e.preventDefault();
+        editor.apply((p) => deleteGaItems(p, editor.pageId, gaIds));
+        editor.selection = [];
+      } else if ((e.key === "r" || e.key === "R") && gaIds.length) {
+        editor.apply((p) => rotateGaItems(p, editor.pageId, gaIds));
+      } else if (e.key.startsWith("Arrow") && gaIds.length) {
+        e.preventDefault();
+        const step = e.shiftKey ? 1 : 5;
+        const d: [number, number] =
+          e.key === "ArrowLeft" ? [-step, 0] : e.key === "ArrowRight" ? [step, 0] : e.key === "ArrowUp" ? [0, -step] : [0, step];
+        editor.apply((p) => moveGaItems(p, editor.pageId, gaIds, d));
+      } else if (e.key === "Escape") {
+        editor.gaPlace = null;
+        editor.tool = "select";
+        editor.selection = [];
+      } else if (e.key === "PageDown" || e.key === "PageUp") {
+        e.preventDefault();
+        const pages = editor.project.pages;
+        const i = editor.pageIndex + (e.key === "PageDown" ? 1 : -1);
+        if (pages[i]) editor.setPage(pages[i].id);
+      } else if (e.key === "f" || e.key === "F") {
+        canvas?.fit();
+      }
+      return;
+    }
     // Simulating: only moving about (sheets, fit); nothing is edited.
     if (editor.mode === "simulate") {
       if (e.key === "PageDown" || e.key === "PageUp") {
@@ -233,6 +280,7 @@
     <div class="workbench" role="group" aria-label="Workbench">
       <button class:active={editor.mode === "draft"} onclick={() => setMode("draft")} title="The electrical drawing: parts, wires, rails, plant">Draft</button>
       <button class:active={editor.mode === "annotate"} onclick={() => setMode("annotate")} title="Text, boxes, label plates, sections, revision clouds and pictures">Annotate</button>
+      <button class:active={editor.mode === "ga"} onclick={() => setMode("ga")} title="General arrangement: the panel laid out at true scale">GA</button>
       <button class:active={editor.mode === "simulate"} onclick={() => setMode("simulate")} title="Try the logic as drawn">Simulate</button>
     </div>
     {#if editor.mode === "simulate"}
@@ -247,6 +295,16 @@
         {#if editor.mode === "draft"}
           <button class:active={editor.tool === "wire"} onclick={() => ((editor.tool = "wire"), (editor.placeSymbol = null))} title="Draw wires (W)">
             Wire
+          </button>
+        {:else if editor.mode === "ga"}
+          <button class:active={editor.tool === "ga-rail"} onclick={() => ((editor.tool = "ga-rail"), (editor.gaPlace = null))} title="Drag along where a DIN rail goes">
+            DIN rail
+          </button>
+          <button class:active={editor.tool === "ga-trunking"} onclick={() => ((editor.tool = "ga-trunking"), (editor.gaPlace = null))} title="Drag out a run of trunking">
+            Trunking
+          </button>
+          <button class:active={editor.tool === "ga-note"} onclick={() => ((editor.tool = "ga-note"), (editor.gaPlace = null))} title="Add a note">
+            Note
           </button>
         {:else if editor.mode === "annotate"}
           <button class:active={editor.tool === "section"} onclick={() => ((editor.tool = "section"), (editor.placeSymbol = null))} title="Draw a section box (B)">
@@ -299,6 +357,7 @@
   <aside class="left">
     <PageList {editor} />
     {#if editor.mode === "draft" || editor.mode === "annotate"}<Palette {editor} />{/if}
+    {#if editor.mode === "ga"}<GaPanel {editor} />{/if}
   </aside>
   <main class:split={!!editor.splitPageId && !tableView}>
     {#if tableView}
@@ -314,6 +373,8 @@
   <aside class="right">
     {#if sim}
       <div class="props-scroll"><SimPanel {editor} {sim} /></div>
+    {:else if editor.mode === "ga"}
+      <div class="props-scroll"><GaProps {editor} /></div>
     {:else}
       <ElementList {editor} />
       <div class="props-scroll"><Props {editor} /></div>

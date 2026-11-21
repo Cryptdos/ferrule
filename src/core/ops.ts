@@ -13,6 +13,8 @@ import {
   type PlantItem,
   type PlantGroup,
   type Asset,
+  type GaItem,
+  type GaSettings,
   type Project,
   type Section,
   type Segment,
@@ -945,4 +947,92 @@ export function addRule(project: Project, kind: "never-both" | "never", a: strin
 
 export function deleteRule(project: Project, id: string): void {
   project.rules = project.rules.filter((r) => r.id !== id);
+}
+
+// ---------------------------------------------------------------------------
+// General arrangement (GA) sheets
+
+/** Add a GA sheet: the panel at true scale, backplate or door. */
+export function addGaPage(project: Project, title: string, ga: GaSettings, afterId?: string): Page {
+  const page = addPage(project, title || (ga.view === "door" ? "General arrangement: door" : "General arrangement: backplate"), afterId);
+  page.ga = { scale: ga.scale, enclosure: { ...ga.enclosure }, view: ga.view };
+  page.gaItems = [];
+  return page;
+}
+
+export function setGaSettings(project: Project, pageId: string, patch: Partial<GaSettings>): void {
+  const page = getPage(project, pageId);
+  if (!page.ga) throw new OpError("That isn't a GA sheet");
+  if (patch.scale !== undefined) {
+    if (!(patch.scale > 0)) throw new OpError("The scale must be more than 0");
+    page.ga.scale = patch.scale;
+  }
+  if (patch.enclosure) {
+    const { w, h } = patch.enclosure;
+    if (!(w > 0 && h > 0)) throw new OpError("The enclosure needs a width and height");
+    page.ga.enclosure = { w, h };
+  }
+  if (patch.view) page.ga.view = patch.view;
+}
+
+function gaPage(project: Project, pageId: string): Page & { ga: GaSettings; gaItems: GaItem[] } {
+  const page = getPage(project, pageId);
+  if (!page.ga) throw new OpError("That isn't a GA sheet");
+  page.gaItems ??= [];
+  return page as Page & { ga: GaSettings; gaItems: GaItem[] };
+}
+
+/** Put something on a GA sheet. Positions and sizes are real mm, rounded to 0.5 mm. */
+export function addGaItem(project: Project, pageId: string, item: Omit<GaItem, "id">): GaItem {
+  const page = gaPage(project, pageId);
+  const r = (v: number) => Math.round(v * 2) / 2;
+  const it: GaItem = { ...item, id: newId("g"), x: r(item.x), y: r(item.y), w: Math.max(1, r(item.w)), h: Math.max(1, r(item.h)) };
+  // A schematic device is on one GA only.
+  if (it.refs?.length) for (const pg of project.pages) for (const other of pg.gaItems ?? []) if (other.refs?.some((x) => it.refs!.includes(x))) throw new OpError("That's already on a GA");
+  page.gaItems.push(it);
+  return it;
+}
+
+export function updateGaItem(project: Project, pageId: string, id: string, patch: Partial<Omit<GaItem, "id" | "kind">>): void {
+  const it = gaPage(project, pageId).gaItems.find((x) => x.id === id);
+  if (!it) throw new OpError(`No GA item "${id}"`);
+  const r = (v: number) => Math.round(v * 2) / 2;
+  if (patch.x !== undefined) it.x = r(patch.x);
+  if (patch.y !== undefined) it.y = r(patch.y);
+  if (patch.w !== undefined) it.w = Math.max(1, r(patch.w));
+  if (patch.h !== undefined) it.h = Math.max(1, r(patch.h));
+  if (patch.text !== undefined) it.text = patch.text;
+}
+
+export function moveGaItems(project: Project, pageId: string, ids: string[], d: Vec): void {
+  const page = gaPage(project, pageId);
+  for (const it of page.gaItems) {
+    if (!ids.includes(it.id)) continue;
+    it.x = Math.round((it.x + d[0]) * 2) / 2;
+    it.y = Math.round((it.y + d[1]) * 2) / 2;
+  }
+}
+
+/** Turn items a quarter turn (swap width and height) about their centres. */
+export function rotateGaItems(project: Project, pageId: string, ids: string[]): void {
+  for (const it of gaPage(project, pageId).gaItems) {
+    if (!ids.includes(it.id)) continue;
+    const cx = it.x + it.w / 2;
+    const cy = it.y + it.h / 2;
+    [it.w, it.h] = [it.h, it.w];
+    it.x = Math.round((cx - it.w / 2) * 2) / 2;
+    it.y = Math.round((cy - it.h / 2) * 2) / 2;
+  }
+}
+
+export function deleteGaItems(project: Project, pageId: string, ids: string[]): void {
+  const page = gaPage(project, pageId);
+  page.gaItems = page.gaItems.filter((x) => !ids.includes(x.id));
+}
+
+/** Change a generic GA size for this project (null: back to the generic one). */
+export function setGaSize(project: Project, key: string, size: { w?: number; h?: number } | null): void {
+  project.gaSizes ??= {};
+  if (!size) delete project.gaSizes[key];
+  else project.gaSizes[key] = { ...project.gaSizes[key], ...size };
 }

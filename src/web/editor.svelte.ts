@@ -10,7 +10,7 @@ import { refreshConductors } from "../core/conductors";
 import { api, ConflictError } from "./api";
 import { getAvoid } from "./avoid";
 
-export type Tool = "select" | "place" | "wire" | "section" | "cloud" | "stamp";
+export type Tool = "select" | "place" | "wire" | "section" | "cloud" | "stamp" | "ga-rail" | "ga-trunking" | "ga-note";
 export type SaveState = "saved" | "pending" | "saving" | "error";
 
 const HISTORY_LIMIT = 200;
@@ -35,6 +35,8 @@ export class Editor {
   placeParams: Record<string, string | number | boolean> = $state({});
   saveState: SaveState = $state("saved");
   message: string = $state("");
+  /** A schematic device (or terminal strip) being placed on a GA sheet. */
+  gaPlace: { refs: string[]; w: number; h: number; label: string } | null = $state(null);
   /** An element just jumped to (goTo): ringed until the selection moves on. */
   highlight: string | null = $state(null);
   /** Bumped by goTo so the canvas scrolls the highlighted element into view. */

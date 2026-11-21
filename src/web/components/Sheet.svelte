@@ -8,6 +8,8 @@
   import { cloudsOn } from "../../core/ops";
   import { cloudPath } from "../../core/titleblock";
   import ElementView from "./ElementView.svelte";
+  import GaLayer from "./GaLayer.svelte";
+  import type { GaItem } from "../../core/model";
   import Frame from "./Frame.svelte";
   import TitleBlock from "./TitleBlock.svelte";
 
@@ -21,6 +23,7 @@
     boundary,
     live = null,
     ops = null,
+    gaPreview = null,
     under,
     over,
   }: {
@@ -39,6 +42,8 @@
     live?: Set<string> | null;
     /** Simulation: elements drawn operated (contacts closed or opened, buttons pressed). */
     ops?: Record<string, boolean> | null;
+    /** GA items being dragged or sized: where they'd go. */
+    gaPreview?: Map<string, GaItem> | null;
     /** Extra drawing in grid units, under the elements (selection boxes). */
     under?: Snippet;
     /** Extra drawing in grid units, over the elements (ghosts, handles). */
@@ -112,6 +117,7 @@
       <circle cx={d[0]} cy={d[1]} r="0.35" />
     {/each}
   </g>
+  {#if page.ga}<GaLayer {project} {page} preview={gaPreview} />{/if}
   {#each page.elements as el (el.id)}
     {@const o = offset?.(el.id)}
     <ElementView el={ops?.[el.id] ? { ...el, params: { ...el.params, __op: true } } : el} {project} dx={o?.[0] ?? 0} dy={o?.[1] ?? 0} />

@@ -19,6 +19,8 @@ import { type Element, type Page, type ParamValue, type Project, newProject } fr
 import {
   addCloud,
   addElement,
+  addGaItem,
+  addGaPage,
   addPage,
   addPlant,
   addRevision,
@@ -32,6 +34,7 @@ import {
   wire,
 } from "../core/ops";
 import { renumber } from "../core/renumber";
+import { fitScale, gaCandidates, type GaCandidate } from "../core/ga";
 import { routePage } from "../core/routing";
 import { saveSheetTemplate, stampTemplate } from "../core/templates";
 import { placePlantView } from "../core/ops";
@@ -478,6 +481,50 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
     plate(132, y + 4, 30, 8, `${tag(b!.id)}\nTRIPPED`);
     plate(166, y + 4, 30, 8, "FANS TRIP\nRESET");
   });
+
+  // ===========================================================================
+  // Sheet 13: general arrangement of the controls backplate, at true scale.
+  // DIN rails and trunking, and the relays, timers and terminals from the
+  // schematic sized from the generic library; the rest wait in the GA
+  // workbench's list to be placed.
+  {
+    const encl = { w: 1000, h: 1600 };
+    const gaPg = addGaPage(p, "General arrangement: controls backplate", { scale: fitScale(encl.w, encl.h), enclosure: encl, view: "backplate" }, p.pages[p.pages.length - 1]!.id);
+    addGaItem(p, gaPg.id, { kind: "trunking", x: 20, y: 20, w: 40, h: 1560 });
+    addGaItem(p, gaPg.id, { kind: "trunking", x: 940, y: 20, w: 40, h: 1560 });
+    const rails = [180, 480, 780, 1080];
+    rails.forEach((y, i) => {
+      addGaItem(p, gaPg.id, { kind: "rail", x: 80, y: y - 17.5, w: 840, h: 35 });
+      addGaItem(p, gaPg.id, { kind: "trunking", x: 80, y: y + 80 + (i === rails.length - 1 ? 40 : 0), w: 840, h: 60 });
+    });
+    addGaItem(p, gaPg.id, { kind: "note", x: 80, y: 1500, w: 300, h: 10, text: "35 mm DIN RAIL. TRUNKING 60 × 60." });
+    // Relays and timers on the first two rails, terminals on the last; the rest left to place by hand.
+    const wanted = (c: GaCandidate) => {
+      const el = p.pages.flatMap((pg) => pg.elements).find((e) => e.id === c.refs[0]);
+      return el && (el.symbol === "coil" || el.symbol === "timer-coil" || el.symbol === "terminal") && !c.door;
+    };
+    const cands = gaCandidates(p, () => "").filter(wanted);
+    // Fill the first two rails with relays and timers, the bottom rail with terminal strips.
+    let rail = 0;
+    let x = 90;
+    let tx = 90;
+    for (const c of cands) {
+      const strip = p.pages.flatMap((pg) => pg.elements).find((e) => e.id === c.refs[0])?.symbol === "terminal";
+      if (strip) {
+        if (tx + c.w > 910) continue;
+        addGaItem(p, gaPg.id, { kind: "device", x: tx, y: rails[3]! - c.h / 2, w: c.w, h: c.h, refs: c.refs });
+        tx += c.w + 10;
+        continue;
+      }
+      if (x + c.w > 910) {
+        rail++;
+        x = 90;
+      }
+      if (rail > 1) continue;
+      addGaItem(p, gaPg.id, { kind: "device", x, y: rails[rail]! - c.h / 2, w: c.w, h: c.h, refs: c.refs });
+      x += c.w + 5;
+    }
+  }
 
   // --- Revision B: the proving and timer area on sheet 8 is clouded ----------
   addRevision(p, { date: "21/11/26", drawnBy: "FERRULE", description: "Airflow proving revised" });

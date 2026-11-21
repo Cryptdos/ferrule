@@ -23,6 +23,9 @@
     cloudsOn,
     addAsset,
     addImage,
+    addGaItem,
+    moveGaItems,
+    updateGaItem,
     updateElement,
     updateSection,
     wire,
@@ -30,6 +33,8 @@
   } from "../../core/ops";
   import { benchOf, localGeometry, defaultParams, plantViewLayout, type Geometry } from "../../core/symbols";
   import { plantInputId } from "../../core/sim";
+  import { GA_ORIGIN, mmToUnits, sheetToGa, snapToRail } from "../../core/ga";
+  import type { GaItem } from "../../core/model";
   import { cloudPath } from "../../core/titleblock";
   import { readImage } from "../images";
   import { elementTexts } from "../../core/tags";
@@ -64,6 +69,9 @@
     | { kind: "secsize"; id: string; start: Vec; rect: Rect4; delta: Vec; edges: string }
     | { kind: "cloudmove"; id: string; start: Vec; rect: Rect4; delta: Vec }
     | { kind: "elsize"; id: string; start: Vec; size: Vec; delta: Vec; keepShape: boolean }
+    | { kind: "gadrag"; ids: string[]; start: Vec; delta: Vec }
+    | { kind: "gasize"; id: string; start: Vec; size: Vec; delta: Vec }
+    | { kind: "ganew"; what: "rail" | "trunking"; start: Vec; cur: Vec }
     | { kind: "cloudsize"; id: string; start: Vec; rect: Rect4; delta: Vec; edges: string }
     | { kind: "table"; coil: string; start: Vec; at: Vec; delta: Vec; row: number }
     | { kind: "boundary"; y: number }
@@ -262,6 +270,117 @@
   }
 
   // -------------------------------------------------------------------------
+  // GA sheets: items in real mm
+
+  const ga = $derived(page.ga ?? null);
+  /** Snap a real-mm distance: 5 mm, or 1 mm with Shift held. */
+  const snapMm = (v: number, fine = false) => Math.round(v / (fine ? 1 : 5)) * (fine ? 1 : 5);
+  const gaRect = (it: GaItem) =>
+    ga ? { x: GA_ORIGIN[0] + mmToUnits(ga, it.x), y: GA_ORIGIN[1] + mmToUnits(ga, it.y), w: mmToUnits(ga, it.w), h: mmToUnits(ga, it.h) } : null;
+
+  function hitGa(pt: Vec): GaItem | null {
+    const items = page.gaItems ?? [];
+    // Devices and notes over rails and trunking.
+    const order = [...items.filter((i) => i.kind === "device" || i.kind === "note"), ...items.filter((i) => i.kind === "rail" || i.kind === "trunking")];
+    for (const it of order) {
+      const r = gaRect(it);
+      if (r && pointInRect(pt, it.kind === "note" ? { ...r, y: r.y - 1, h: r.h + 1, w: Math.max(r.w, (it.text?.length ?? 4) * 0.9) } : r, 0.3)) return it;
+    }
+    return null;
+  }
+
+  /** The one selected GA item's corner handle, for sizing rails, trunking and devices. */
+  function gaCorner(): { it: GaItem; at: Vec } | null {
+    if (editor.selection.length !== 1) return null;
+    const it = (page.gaItems ?? []).find((x) => x.id === editor.selection[0]);
+    const r = it ? gaRect(it) : null;
+    return it && r ? { it, at: [r.x + r.w, r.y + r.h] } : null;
+  }
+
+  function gaPointerDown(pt: Vec, e: PointerEvent): void {
+    if (!ga) return;
+    const mm = sheetToGa(ga, pt);
+    const fine = e.shiftKey;
+    if (editor.gaPlace) {
+      const pl = editor.gaPlace;
+      let at: Vec = [snapMm(mm[0] - pl.w / 2, fine), snapMm(mm[1] - pl.h / 2, fine)];
+      const railY = snapToRail(page, { x: at[0], y: at[1], w: pl.w, h: pl.h });
+      if (railY !== null) at = [at[0], railY];
+      let id = "";
+      const ok = editor.apply((p) => {
+        id = addGaItem(p, editor.pageId, { kind: "device", x: at[0], y: at[1], w: pl.w, h: pl.h, refs: pl.refs }).id;
+      });
+      editor.gaPlace = null;
+      if (ok) editor.selection = [id];
+      return;
+    }
+    if (editor.tool === "ga-rail" || editor.tool === "ga-trunking") {
+      const s: Vec = [snapMm(mm[0], fine), snapMm(mm[1], fine)];
+      gesture = { kind: "ganew", what: editor.tool === "ga-rail" ? "rail" : "trunking", start: s, cur: s };
+      return;
+    }
+    if (editor.tool === "ga-note") {
+      let id = "";
+      editor.apply((p) => {
+        id = addGaItem(p, editor.pageId, { kind: "note", x: snapMm(mm[0]), y: snapMm(mm[1]), w: 60, h: 8, text: "NOTE" }).id;
+      });
+      editor.tool = "select";
+      if (id) editor.selection = [id];
+      return;
+    }
+    const corner = gaCorner();
+    if (corner && corner.it.kind !== "note" && Math.abs(pt[0] - corner.at[0]) < 0.9 && Math.abs(pt[1] - corner.at[1]) < 0.9) {
+      gesture = { kind: "gasize", id: corner.it.id, start: mm, size: [corner.it.w, corner.it.h], delta: [0, 0] };
+      return;
+    }
+    const hit = hitGa(pt);
+    if (hit) {
+      if (e.shiftKey || e.ctrlKey) {
+        editor.selection = selected.has(hit.id) ? editor.selection.filter((x) => x !== hit.id) : [...editor.selection, hit.id];
+        return;
+      }
+      if (!selected.has(hit.id)) editor.selection = [hit.id];
+      gesture = { kind: "gadrag", ids: [...editor.selection], start: mm, delta: [0, 0] };
+      return;
+    }
+    // Annotations on a GA sheet are picked in Annotate; here, empty space pans.
+    editor.selection = [];
+    gesture = { kind: "pan", client: [e.clientX, e.clientY], start: { x: view.x, y: view.y } };
+  }
+
+  const gaPreview = $derived.by((): Map<string, GaItem> | null => {
+    const g = gesture as Gesture;
+    if (!g) return null;
+    const items = page.gaItems ?? [];
+    if (g.kind === "gadrag" && (g.delta[0] || g.delta[1])) {
+      const moved = items.filter((i) => g.ids.includes(i.id)).map((i) => {
+        const n = { ...i, x: i.x + g.delta[0], y: i.y + g.delta[1] };
+        // A lone device snaps onto a rail.
+        if (g.ids.length === 1 && n.kind === "device") {
+          const ry = snapToRail(page, n);
+          if (ry !== null) n.y = ry;
+        }
+        return n;
+      });
+      return new Map(moved.map((i) => [i.id, i]));
+    }
+    if (g.kind === "gasize") {
+      const it = items.find((i) => i.id === g.id);
+      return it ? new Map([[it.id, { ...it, w: Math.max(5, g.size[0] + g.delta[0]), h: Math.max(5, g.size[1] + g.delta[1]) }]]) : null;
+    }
+    return null;
+  });
+
+  const gaNew = $derived.by(() => {
+    const g = gesture as Gesture;
+    if (g?.kind !== "ganew" || !ga) return null;
+    const x = Math.min(g.start[0], g.cur[0]);
+    const y = Math.min(g.start[1], g.cur[1]);
+    const r = gaRect({ id: "", kind: "rail", x, y, w: Math.abs(g.cur[0] - g.start[0]), h: Math.abs(g.cur[1] - g.start[1]) });
+    return r;
+  });
+
+  // -------------------------------------------------------------------------
   // Pointer handling
 
   function onWheel(e: WheelEvent) {
@@ -299,6 +418,15 @@
       } else if (input) {
         sim.operate(input);
       } else gesture = { kind: "pan", client: [e.clientX, e.clientY], start: { x: view.x, y: view.y } };
+      return;
+    }
+
+    if (editor.mode === "ga") {
+      gaPointerDown(pt, e);
+      return;
+    }
+    if (page.ga && editor.mode === "draft") {
+      editor.flash("This is a GA sheet: lay it out in the GA workbench.");
       return;
     }
 
@@ -440,6 +568,14 @@
       g.cur = snapVec(pointer);
     } else if (g.kind === "secmove" || g.kind === "secsize" || g.kind === "cloudmove" || g.kind === "cloudsize") {
       g.delta = snapVec([pointer[0] - g.start[0], pointer[1] - g.start[1]]);
+    } else if (g.kind === "gadrag" || g.kind === "gasize") {
+      if (!ga) return;
+      const mm = sheetToGa(ga, pointer);
+      g.delta = [snapMm(mm[0] - g.start[0], e.shiftKey), snapMm(mm[1] - g.start[1], e.shiftKey)];
+    } else if (g.kind === "ganew") {
+      if (!ga) return;
+      const mm = sheetToGa(ga, pointer);
+      g.cur = [snapMm(mm[0], e.shiftKey), snapMm(mm[1], e.shiftKey)];
     } else if (g.kind === "elsize") {
       let d = snapVec([pointer[0] - g.start[0], pointer[1] - g.start[1]]);
       // A picture keeps its shape (hold Shift to stretch it).
@@ -505,6 +641,37 @@
     } else if ((g.kind === "secmove" || g.kind === "secsize") && (g.delta[0] || g.delta[1])) {
       const rect = sectionPreview(g);
       editor.apply((p) => updateSection(p, editor.pageId, g.id, { rect }));
+    } else if (g.kind === "gadrag" && (g.delta[0] || g.delta[1])) {
+      const moved = gaPreview;
+      editor.apply((p) => {
+        moveGaItems(p, editor.pageId, g.ids, g.delta);
+        // Keep a device's snap onto a rail.
+        if (g.ids.length === 1 && moved?.get(g.ids[0]!)) updateGaItem(p, editor.pageId, g.ids[0]!, { y: moved.get(g.ids[0]!)!.y });
+      });
+    } else if (g.kind === "gasize" && (g.delta[0] || g.delta[1])) {
+      const w = Math.max(5, g.size[0] + g.delta[0]);
+      const h = Math.max(5, g.size[1] + g.delta[1]);
+      editor.apply((p) => updateGaItem(p, editor.pageId, g.id, { w, h }));
+    } else if (g.kind === "ganew") {
+      const x = Math.min(g.start[0], g.cur[0]);
+      const y = Math.min(g.start[1], g.cur[1]);
+      const dx = Math.abs(g.cur[0] - g.start[0]);
+      const dy = Math.abs(g.cur[1] - g.start[1]);
+      // A rail is 35 mm across; trunking as drawn (or 40 mm across if just a line).
+      const horizontal = dx >= dy;
+      const across = g.what === "rail" ? 35 : Math.max(40, horizontal ? dy : dx);
+      const len = Math.max(20, horizontal ? dx : dy);
+      let id = "";
+      editor.apply((p) => {
+        id = addGaItem(p, editor.pageId, {
+          kind: g.what,
+          x: horizontal ? x : x - (g.what === "rail" ? across / 2 : 0),
+          y: horizontal ? y - (g.what === "rail" ? across / 2 : 0) : y,
+          w: horizontal ? len : across,
+          h: horizontal ? across : len,
+        }).id;
+      });
+      if (id) editor.selection = [id];
     } else if (g.kind === "elsize" && (g.delta[0] || g.delta[1])) {
       const w = Math.max(2, g.size[0] + g.delta[0]);
       const h = Math.max(2, g.size[1] + g.delta[1]);
@@ -760,7 +927,7 @@
   const cursorClass = $derived(
     gesture?.kind === "pan" || spaceDown
       ? "grab"
-      : editor.tool !== "select"
+      : editor.tool !== "select" || editor.gaPlace
         ? "crosshair"
         : hoverCursor || "default",
   );
@@ -815,6 +982,7 @@
     boundary={boundaryPreview}
     live={simLive}
     ops={simOps}
+    {gaPreview}
   >
     {#snippet under()}
       {#if sim}
@@ -876,6 +1044,17 @@
           {/each}
         {/if}
       {/each}
+      {#each page.gaItems ?? [] as it (it.id)}
+        {#if selected.has(it.id)}
+          {@const r = gaRect(gaPreview?.get(it.id) ?? it)}
+          {#if r}
+            <rect class="sel" x={r.x - 0.3} y={r.y - 0.3} width={r.w + 0.6} height={r.h + 0.6} />
+            {#if editor.selection.length === 1 && it.kind !== "note"}
+              <rect class="handle" x={r.x + r.w - 0.5} y={r.y + r.h - 0.5} width="1" height="1" />
+            {/if}
+          {/if}
+        {/if}
+      {/each}
       {#each page.segments as seg (seg.id)}
         {#if selected.has(seg.id)}
           {@const pts = previewRoutes?.get(seg.id) ?? routeOf(page, seg)}
@@ -921,6 +1100,15 @@
           {#if g}<rect class="band" x={sz.el.pos[0]} y={sz.el.pos[1]} width={w} height={h} />{/if}
           <rect class="handle corner" x={sz.el.pos[0] + w - 0.6} y={sz.el.pos[1] + h - 0.6} width="1.2" height="1.2" />
         {/if}
+      {/if}
+      {#if gaNew}
+        <rect class="band" x={gaNew.x} y={gaNew.y} width={Math.max(0.2, gaNew.w)} height={Math.max(0.2, gaNew.h)} />
+      {/if}
+      {#if editor.gaPlace && pointer && ga}
+        {@const pl = editor.gaPlace}
+        {@const mm = sheetToGa(ga, pointer)}
+        {@const r = gaRect({ id: "", kind: "device", x: mm[0] - pl.w / 2, y: mm[1] - pl.h / 2, w: pl.w, h: pl.h })}
+        {#if r}<rect class="stamp" x={r.x} y={r.y} width={r.w} height={r.h} />{/if}
       {/if}
       {#if cloudPreview}
         <path class="cloud-ghost" d={cloudPath(cloudPreview)} />
