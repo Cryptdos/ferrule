@@ -20,6 +20,7 @@
     sectionRects = null,
     boundary,
     live = null,
+    ops = null,
     under,
     over,
   }: {
@@ -36,6 +37,8 @@
     boundary?: number | null;
     /** Simulation: conductors connected to the supply. */
     live?: Set<string> | null;
+    /** Simulation: elements drawn operated (contacts closed or opened, buttons pressed). */
+    ops?: Record<string, boolean> | null;
     /** Extra drawing in grid units, under the elements (selection boxes). */
     under?: Snippet;
     /** Extra drawing in grid units, over the elements (ghosts, handles). */
@@ -111,7 +114,7 @@
   </g>
   {#each page.elements as el (el.id)}
     {@const o = offset?.(el.id)}
-    <ElementView {el} {project} dx={o?.[0] ?? 0} dy={o?.[1] ?? 0} />
+    <ElementView el={ops?.[el.id] ? { ...el, params: { ...el.params, __op: true } } : el} {project} dx={o?.[0] ?? 0} dy={o?.[1] ?? 0} />
   {/each}
   {#each clouds as c (c.id)}
     {@const [x, y, w] = c.rect}

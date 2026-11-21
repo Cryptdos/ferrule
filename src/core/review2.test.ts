@@ -149,3 +149,115 @@ describe("parts", () => {
     expect(h.params.colour).toBe("Ye");
   });
 });
+
+import { advance, compile, hold, initialState, operatedNow, plantInputId, timerRemaining, toggle } from "./sim";
+import { parseTerminalSpec } from "./ops";
+
+describe("simulation: supplies", () => {
+  test("an Incoming supply feeds busbars; the isolator cuts them; a transformer makes its own supply", () => {
+    const { p, pg } = project();
+    const sup = addElement(p, pg, "supply", [10, 6], { params: { system: "1ph-n" } });
+    const q = addElement(p, pg, "isolator", [10, 12], { params: { poles: 2 } });
+    const l = addElement(p, pg, "busbar", [4, 20], { params: { length: 80, name: "L" } });
+    const nb = addElement(p, pg, "busbar", [4, 24], { params: { length: 80, name: "N" } });
+    connect(p, pg, [sup.id, "L"], [q.id, "1"]);
+    connect(p, pg, [sup.id, "N"], [q.id, "3"]);
+    connect(p, pg, [q.id, "2"], [l.id, "6"]);
+    connect(p, pg, [q.id, "4"], [nb.id, "9"]);
+    const h = addElement(p, pg, "lamp", [40, 32]);
+    connect(p, pg, [l.id, "36"], [h.id, "V+"]);
+    connect(p, pg, [h.id, "V-"], [nb.id, "36"]);
+    const t = addElement(p, pg, "transformer", [60, 34]);
+    connect(p, pg, [l.id, "56"], [t.id, "P1"]);
+    connect(p, pg, [nb.id, "59"], [t.id, "P2"]);
+    const k = addElement(p, pg, "coil", [60, 50]);
+    connect(p, pg, [t.id, "S1"], [k.id, "A1"]);
+    connect(p, pg, [k.id, "A2"], [t.id, "S2"]);
+    const c = compile(p);
+    let s = initialState(c);
+    expect(s.lamps[h.id]).toBe(true);
+    expect(s.energised[t.id]).toBe(true);
+    expect(s.energised[k.id]).toBe(true);
+    expect(operatedNow(c, s)[q.id]).toBe(true);
+    s = toggle(c, s, q.id); // isolate
+    expect(s.lamps[h.id]).toBe(false);
+    expect(s.energised[k.id]).toBe(false);
+  });
+});
+
+describe("simulation: plant groups", () => {
+  function plantRig(spec: string) {
+    const { p, pg } = project();
+    const cct = addElement(p, pg, "rail", [0, 10], { params: { name: "CCT", length: 100 } });
+    const ov = addElement(p, pg, "rail", [0, 60], { params: { name: "0V", length: 100 } });
+    const parsed = parseTerminalSpec(spec);
+    const item = addPlant(p, "", "Fan", parsed.terminals, { groups: parsed.groups, prefix: "SF" });
+    const v = placePlantView(p, pg, item.id, [20, 90]);
+    return { p, pg, cct, ov, item, v };
+  }
+
+  test("a relay output: C-NO closes and C-NC opens when it's operated", () => {
+    const { p, pg, cct, ov, item, v } = plantRig("R1: C NO NC");
+    const run = addElement(p, pg, "lamp", [20, 40]);
+    const stop = addElement(p, pg, "lamp", [40, 40]);
+    connect(p, pg, [cct.id, "20"], [v.id, "C"]);
+    connect(p, pg, [v.id, "NO"], [run.id, "V+"]);
+    connect(p, pg, [v.id, "NC"], [stop.id, "V+"]);
+    connect(p, pg, [run.id, "V-"], [ov.id, "20"]);
+    connect(p, pg, [stop.id, "V-"], [ov.id, "40"]);
+    const c = compile(p);
+    let s = initialState(c);
+    expect([s.lamps[run.id], s.lamps[stop.id]]).toEqual([false, true]);
+    s = toggle(c, s, plantInputId(item.id, "R1"));
+    expect([s.lamps[run.id], s.lamps[stop.id]]).toEqual([true, false]);
+  });
+
+  test("an output can follow an input after a delay, or the other way round", () => {
+    const { p, pg, cct, ov, item, v } = plantRig("ENABLE: 1 2 | RUNNING: 3 4 | FAULT: 5 6");
+    const sw = addElement(p, pg, "contact-no", [10, 30]);
+    connect(p, pg, [cct.id, "10"], [sw.id, "13"]);
+    connect(p, pg, [sw.id, "14"], [v.id, "1"]);
+    connect(p, pg, [v.id, "2"], [ov.id, "12"]);
+    const run = addElement(p, pg, "lamp", [40, 40]);
+    const fault = addElement(p, pg, "lamp", [60, 40]);
+    connect(p, pg, [cct.id, "30"], [v.id, "3"]);
+    connect(p, pg, [v.id, "4"], [run.id, "V+"]);
+    connect(p, pg, [run.id, "V-"], [ov.id, "40"]);
+    connect(p, pg, [cct.id, "50"], [v.id, "5"]);
+    connect(p, pg, [v.id, "6"], [fault.id, "V+"]);
+    connect(p, pg, [fault.id, "V-"], [ov.id, "60"]);
+    item.groups!.find((g) => g.name === "RUNNING")!.follows = "ENABLE";
+    item.groups!.find((g) => g.name === "RUNNING")!.delay = 3;
+    item.groups!.find((g) => g.name === "FAULT")!.follows = "ENABLE";
+    item.groups!.find((g) => g.name === "FAULT")!.invert = true;
+    const c = compile(p);
+    let s = initialState(c);
+    expect([s.lamps[run.id], s.lamps[fault.id]]).toEqual([false, true]);
+    s = toggle(c, s, sw.id);
+    expect(s.energised[plantInputId(item.id, "ENABLE")]).toBe(true);
+    expect(s.lamps[fault.id]).toBe(false);
+    expect(s.lamps[run.id]).toBe(false);
+    expect(timerRemaining(c, s, `${plantInputId(item.id, "RUNNING")}:f`)).toBe(3);
+    s = advance(c, s, 3);
+    expect(s.lamps[run.id]).toBe(true);
+  });
+});
+
+describe("simulation: push buttons", () => {
+  test("held for as long as they're held", () => {
+    const { p, pg } = project();
+    const cct = addElement(p, pg, "rail", [0, 10], { params: { name: "CCT", length: 100 } });
+    const ov = addElement(p, pg, "rail", [0, 60], { params: { name: "0V", length: 100 } });
+    const b = addElement(p, pg, "pb-no", [20, 25]);
+    const h = addElement(p, pg, "lamp", [20, 45]);
+    connect(p, pg, [cct.id, "20"], [b.id, "13"]);
+    connect(p, pg, [b.id, "14"], [h.id, "V+"]);
+    connect(p, pg, [h.id, "V-"], [ov.id, "20"]);
+    const c = compile(p);
+    let s = hold(c, initialState(c), b.id, true);
+    expect(s.lamps[h.id]).toBe(true);
+    expect(operatedNow(c, s)[b.id]).toBe(true);
+    s = hold(c, s, b.id, false);
+    expect(s.lamps[h.id]).toBe(false);
+  });
+});

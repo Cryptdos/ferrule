@@ -28,7 +28,8 @@
     wire,
     type WireEnd,
   } from "../../core/ops";
-  import { benchOf, localGeometry, defaultParams, type Geometry } from "../../core/symbols";
+  import { benchOf, localGeometry, defaultParams, plantViewLayout, type Geometry } from "../../core/symbols";
+  import { plantInputId } from "../../core/sim";
   import { cloudPath } from "../../core/titleblock";
   import { readImage } from "../images";
   import { elementTexts } from "../../core/tags";
@@ -286,10 +287,18 @@
     const pt = toUnits(e);
 
     if (sim) {
-      // Simulate: clicking an input operates it; nothing is edited.
+      // Simulate: clicking an input operates it; nothing is edited. A push
+      // button is held for as long as the mouse is down (Shift+click latches it).
       const hit = hitElement(pt);
-      if (hit && sim.isInput(hit.id)) sim.operate(hit.id);
-      else gesture = { kind: "pan", client: [e.clientX, e.clientY], start: { x: view.x, y: view.y } };
+      const input = hit ? simInputAt(hit, pt) : null;
+      if (input && sim.isPress(input) && !e.shiftKey) {
+        sim.hold(input, true);
+        heldButton = input;
+      } else if (input && sim.isPress(input)) {
+        sim.hold(input, sim.value(input) !== 1);
+      } else if (input) {
+        sim.operate(input);
+      } else gesture = { kind: "pan", client: [e.clientX, e.clientY], start: { x: view.x, y: view.y } };
       return;
     }
 
@@ -444,7 +453,31 @@
     }
   }
 
+  /** The simulator input under the pointer on an element: the element, or a plant view's group. */
+  function simInputAt(el: Element, pt: Vec): string | null {
+    if (!sim) return null;
+    if (sim.isInput(el.id)) return el.id;
+    if (el.symbol !== "plant-view") return null;
+    const lay = plantViewLayout(el);
+    const x = pt[0] - el.pos[0];
+    // The group whose terminals are nearest across.
+    let best: { name: string; d: number } | null = null;
+    for (const g of lay.groups) {
+      const d = x < g.x0 - 1.5 ? g.x0 - 1.5 - x : x > g.x1 + 1.5 ? x - g.x1 - 1.5 : 0;
+      if (!best || d < best.d) best = { name: g.name, d };
+    }
+    const item = editor.project.plant.find((p) => p.id === el.params.plant);
+    const group = item?.groups?.find((g) => g.name.toUpperCase() === best?.name);
+    const id = item && group ? plantInputId(item.id, group.name) : null;
+    return id && sim.isInput(id) ? id : null;
+  }
+  let heldButton: string | null = null;
+
   function onPointerUp() {
+    if (heldButton && sim) {
+      sim.hold(heldButton, false);
+      heldButton = null;
+    }
     const g = gesture;
     gesture = null;
     if (!g) return;
@@ -704,8 +737,24 @@
   });
 
   const simLive = $derived(sim ? new Set(sim.state.live) : null);
+  const simOps = $derived(sim ? sim.ops : null);
+  /** Rails and busbars on a live conductor, drawn red like live wires. */
+  const liveRails = $derived.by(() => {
+    if (!sim || !simLive) return [];
+    const out: { x1: number; y1: number; x2: number; y2: number; bar: boolean }[] = [];
+    for (const el of page.elements) {
+      if (el.symbol !== "rail" && el.symbol !== "busbar") continue;
+      const c = editor.project.conductors.find((x) => x.terminals.some(([id]) => id === el.id));
+      if (!c || !simLive.has(c.id)) continue;
+      const len = Number(el.params.length) || 0;
+      const v = el.rot === 90 ? [0, 1] : el.rot === 180 ? [-1, 0] : el.rot === 270 ? [0, -1] : [1, 0];
+      out.push({ x1: el.pos[0], y1: el.pos[1], x2: el.pos[0] + v[0]! * len, y2: el.pos[1] + v[1]! * len, bar: el.symbol === "busbar" });
+    }
+    return out;
+  });
   function lampColour(c: unknown): string {
-    return { Gn: "#3cc85a", Rd: "#ff4a4a", Wh: "#e8e8e8", Cl: "#f4f4f4", Bu: "#4a8cff", Ye: "#ffe04a" }[String(c)] ?? "#ffe04a";
+    // White and clear lamps glow a warm white, so they show on white paper.
+    return { Gn: "#3cc85a", Rd: "#ff4a4a", Wh: "#ffe9a8", Cl: "#fff1c2", Bu: "#4a8cff", Ye: "#ffd21f" }[String(c)] ?? "#ffd21f";
   }
 
   const cursorClass = $derived(
@@ -765,22 +814,21 @@
     {sectionRects}
     boundary={boundaryPreview}
     live={simLive}
+    ops={simOps}
   >
     {#snippet under()}
       {#if sim}
         {#each page.elements as el (el.id)}
           {@const g = geoms.get(el.id)}
           {#if g}
-            {@const lit = !!sim.state.energised[el.id] || !!sim.state.lamps[el.id]}
-            {#if lit}
-              <rect
-                class="sim-on"
-                style:fill={el.symbol === "lamp" ? lampColour(el.params.colour) : undefined}
-                x={el.pos[0] + g.body.x - 0.5}
-                y={el.pos[1] + g.body.y - 0.5}
-                width={g.body.w + 1}
-                height={g.body.h + 1}
-              />
+            {#if el.symbol === "lamp" && sim.state.lamps[el.id]}
+              <!-- A lit lamp glows in its own colour. -->
+              <circle class="sim-glow" cx={el.pos[0]} cy={el.pos[1]} r="2.6" style:fill={lampColour(el.params.colour)} />
+              <circle class="sim-ring" cx={el.pos[0]} cy={el.pos[1]} r="1.9" />
+              <circle cx={el.pos[0]} cy={el.pos[1]} r="1.3" style:fill={lampColour(el.params.colour)} />
+            {:else if sim.state.energised[el.id]}
+              <!-- An energised coil (or transformer) is filled. -->
+              <rect class="sim-on" x={el.pos[0] + g.body.x} y={el.pos[1] + g.body.y} width={g.body.w} height={g.body.h} />
             {/if}
             {#if sim.isInput(el.id)}
               <rect
@@ -836,6 +884,23 @@
       {/each}
     {/snippet}
     {#snippet over()}
+      {#each liveRails as r, i (i)}
+        <line class="sim-rail" class:bar={r.bar} x1={r.x1} y1={r.y1} x2={r.x2} y2={r.y2} />
+      {/each}
+      {#if sim}
+        {#each page.elements as el (el.id)}
+          {#if el.symbol === "timer-coil"}
+            {@const left = sim.remaining(el.id)}
+            {#if left !== null}
+              <!-- A timer that's timing shows its count down above it. -->
+              <g class="countdown">
+                <rect x={el.pos[0] - 3.2} y={el.pos[1] - 6.4} width="6.4" height="2.2" rx="0.5" />
+                <text x={el.pos[0]} y={el.pos[1] - 4.75} text-anchor="middle">{left >= 10 ? left.toFixed(0) : left.toFixed(1)} s</text>
+              </g>
+            {/if}
+          {/if}
+        {/each}
+      {/if}
       {#if highlighted}
         {@const { el, g } = highlighted}
         <rect
@@ -970,8 +1035,35 @@
     stroke-dasharray: 0.8 0.4;
   }
   .sim-on {
-    fill: rgba(60, 200, 90, 0.55);
+    fill: rgba(255, 70, 70, 0.35);
     stroke: none;
+  }
+  .sim-glow {
+    opacity: 0.45;
+    filter: blur(0.6px);
+  }
+  .sim-ring {
+    fill: none;
+    stroke: #e0a000;
+    stroke-width: 0.15;
+    stroke-dasharray: 0.4 0.3;
+  }
+  .sim-rail {
+    stroke: #e33;
+    stroke-width: 0.3;
+    stroke-linecap: square;
+  }
+  .sim-rail.bar {
+    stroke-width: 0.6;
+  }
+  .countdown rect {
+    fill: #1b2230;
+    opacity: 0.85;
+  }
+  .countdown text {
+    fill: #fff;
+    font-size: 1.4px;
+    font-family: var(--drawing-font);
   }
   .sim-input {
     fill: none;

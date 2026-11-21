@@ -80,11 +80,11 @@ export function refreshConductors(project: Project): void {
     }
   }
 
-  // Control rails of the same name are one rail, continued across sheets.
+  // Rails and busbars of the same name are one conductor, continued across sheets.
   const railByName = new Map<string, string>();
   for (const page of project.pages) {
     for (const el of page.elements) {
-      if (el.symbol !== "rail" || typeof el.params.name !== "string" || !el.params.name) continue;
+      if ((el.symbol !== "rail" && el.symbol !== "busbar") || typeof el.params.name !== "string" || !el.params.name) continue;
       const tapped = page.segments.flatMap((s) => [s.from, s.to]).find((r) => r[0] === el.id);
       if (!tapped) continue;
       const k = key(tapped);

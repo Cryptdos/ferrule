@@ -17,6 +17,11 @@
     return [t, l].filter(Boolean).join(" ") || el.symbol;
   };
   const loads = $derived(all.filter(({ el }) => isMaster(el) || el.symbol === "lamp"));
+  /** A plant group's input (plant:<id>:<group>) lives on the plant's first view. */
+  const plantViewOf = (inputId: string) => {
+    const m = /^plant:([^:]+):/.exec(inputId);
+    return m ? all.find(({ el }) => el.symbol === "plant-view" && el.params.plant === m[1]) : undefined;
+  };
   const s = $derived(sim.state);
   const on = (id: string) => !!s.energised[id] || !!s.lamps[id];
 
@@ -39,18 +44,34 @@
   </div>
   {#if s.short}<div class="fault">Short circuit: the supply is shorted to 0V through closed contacts.</div>{/if}
   {#if s.unstable}<div class="fault">The circuit doesn't settle: relays chatter.</div>{/if}
-  <p class="hint">Click switches, buttons, selectors and field contacts on the drawing (outlined in orange). Push buttons are pressed and released.</p>
+  <p class="hint">
+    Click switches, selectors and field contacts on the drawing (outlined in orange). A push button is held while the mouse
+    is down (Shift+click holds it until clicked again). Double-click a contact or link arrow to follow it.
+  </p>
 
   <div class="sub">Inputs</div>
   {#each sim.circuit.inputs as i (i.el)}
-    {@const x = byId.get(i.el)}
+    {@const x = byId.get(i.el) ?? plantViewOf(i.el)}
     {#if x}
       <div class="row">
-        <button class="go" onclick={() => editor.goTo(i.el)} title="Show on the drawing">{name(x.el)}</button>
+        <button class="go" onclick={() => editor.goTo(x.el.id)} title="Show on the drawing">{byId.has(i.el) ? name(x.el) : (sim.circuit.names.get(i.el) ?? i.label)}</button>
         <span class="where">sh {x.page.number}</span>
-        <button class="op" class:on={i.kind !== "press" && sim.value(i.el) === 1} onclick={() => sim.operate(i.el)}>
-          {i.kind === "press" ? "Press" : i.kind === "select" ? `Pos ${sim.value(i.el) + 1}` : sim.value(i.el) ? "On" : "Off"}
-        </button>
+        {#if i.kind === "press"}
+          <button
+            class="op"
+            class:on={sim.value(i.el) === 1}
+            title="Held while the mouse button is down; Shift+click to hold it on"
+            onpointerdown={(e) => sim.hold(i.el, e.shiftKey ? sim.value(i.el) !== 1 : true)}
+            onpointerup={(e) => !e.shiftKey && sim.hold(i.el, false)}
+            onpointerleave={(e) => e.buttons && !e.shiftKey && sim.hold(i.el, false)}
+          >
+            {sim.value(i.el) === 1 ? "Held" : "Press"}
+          </button>
+        {:else}
+          <button class="op" class:on={sim.value(i.el) === 1} onclick={() => sim.operate(i.el)}>
+            {i.kind === "select" ? `Pos ${sim.value(i.el) + 1}` : sim.value(i.el) ? "On" : "Off"}
+          </button>
+        {/if}
       </div>
     {/if}
   {/each}

@@ -10,6 +10,9 @@ import {
   initialState,
   inputValue,
   nextTimer,
+  operatedNow,
+  hold,
+  timerRemaining,
   press,
   search,
   toggle,
@@ -45,6 +48,27 @@ export class Simulator {
   private tick(dt: number) {
     if (!this.running || nextTimer(this.circuit, this.state) === null) return;
     this.state = advance(this.circuit, this.state, dt * this.speed);
+  }
+
+  /** Elements to draw operated just now. */
+  get ops(): Record<string, boolean> {
+    return operatedNow(this.circuit, this.state);
+  }
+
+  /** Seconds left on a timer that's timing, or null. */
+  remaining(id: string): number | null {
+    return timerRemaining(this.circuit, this.state, id);
+  }
+
+  /** Is this input a push button (held while the mouse is down)? */
+  isPress(id: string): boolean {
+    return this.circuit.inputs.find((i) => i.el === id)?.kind === "press";
+  }
+
+  /** Hold a push button down, or let it go. */
+  hold(id: string, down: boolean): void {
+    this.state = hold(this.circuit, this.state, id, down);
+    if (down) this.log = [...this.log, { do: "press", el: id }];
   }
 
   isInput(id: string): boolean {

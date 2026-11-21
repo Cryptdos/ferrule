@@ -119,8 +119,10 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
   // Sheet 2: main incoming section
   page = addPage(p, "Main incoming section");
   addSection(p, page.id, "MAIN INCOMING SECTION", [2, 2, 196, 86]);
-  text(26, 5, "415V 3PH+N 50Hz SUPPLY (BY OTHERS)", "small");
+  // Where the power comes in: the simulator's source.
+  const incoming = add("supply", 30, 7, { label: "415V 3PH+N 50Hz SUPPLY (BY OTHERS)", params: { system: "3ph-n" } });
   const x0 = [30, 33, 36, 39].map((x, i) => add("terminal", x, 10, { label: ["L1", "L2", "L3", "N"][i], params: { strip: "X0" } }));
+  x0.forEach((t, i) => w([incoming, ["L1", "L2", "L3", "N"][i]!], [t, "1"]));
   const qMain = add("isolator", 30, 22, { label: "63A DOOR INTERLOCKED", params: { poles: 4, aux: 0, operator: "turn" } });
   x0.forEach((t, i) => w([t, "2"], [qMain, String(2 * i + 1)]));
   const busL1 = bus("L1", 14, 36, 170, "80A DISTRIBUTION BLOCKS");

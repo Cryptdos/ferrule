@@ -712,6 +712,33 @@ export function updatePlant(
   syncPlantViews(project);
 }
 
+/** How a plant group behaves when simulating: role, what it follows, delay, inverted. */
+export function updatePlantGroup(
+  project: Project,
+  plantId: string,
+  group: string,
+  patch: { role?: PlantGroup["role"] | null; follows?: string | null; delay?: number; invert?: boolean },
+): void {
+  const g = getPlant(project, plantId).groups?.find((x) => x.name === group);
+  if (!g) throw new OpError(`No group ${group}`);
+  if (patch.role !== undefined) {
+    if (patch.role) g.role = patch.role;
+    else delete g.role;
+  }
+  if (patch.follows !== undefined) {
+    if (patch.follows) g.follows = patch.follows;
+    else delete g.follows;
+  }
+  if (patch.delay !== undefined) {
+    if (patch.delay > 0) g.delay = patch.delay;
+    else delete g.delay;
+  }
+  if (patch.invert !== undefined) {
+    if (patch.invert) g.invert = true;
+    else delete g.invert;
+  }
+}
+
 /** Remove a plant item and every view of it. */
 export function deletePlant(project: Project, id: string): void {
   getPlant(project, id);

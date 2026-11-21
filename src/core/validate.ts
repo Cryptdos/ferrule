@@ -149,7 +149,14 @@ export function parsePlant(v: unknown): Project["plant"] {
         ? {
             groups: arr(pl.groups)
               .filter(isObj)
-              .map((g) => ({ name: strOr(g.name), terminals: arr(g.terminals).filter((t): t is string => typeof t === "string") }))
+              .map((g) => ({
+                name: strOr(g.name),
+                terminals: arr(g.terminals).filter((t): t is string => typeof t === "string"),
+                ...(g.role === "input" || g.role === "output" || g.role === "none" ? { role: g.role as "input" | "output" | "none" } : {}),
+                ...(typeof g.follows === "string" && g.follows ? { follows: g.follows } : {}),
+                ...(typeof g.delay === "number" && g.delay > 0 ? { delay: g.delay } : {}),
+                ...(g.invert === true ? { invert: true } : {}),
+              }))
               .filter((g) => g.name && g.terminals.length),
           }
         : {}),

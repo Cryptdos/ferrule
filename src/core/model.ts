@@ -124,6 +124,18 @@ export interface PlantItem {
 export interface PlantGroup {
   name: string;
   terminals: string[];
+  /**
+   * What it does when simulating. Unset: worked out from its terminals and
+   * name (C/NO/NC: a relay output; ENABLE, START…: an input; other pairs: a
+   * volt-free output).
+   */
+  role?: "input" | "output" | "none";
+  /** An output that follows one of the plant's input groups (e.g. RUNNING follows ENABLE). */
+  follows?: string;
+  /** Seconds it takes to follow. */
+  delay?: number;
+  /** Follows the opposite way (e.g. FAULT opens when ENABLE is on). */
+  invert?: boolean;
 }
 
 /** A revision cloud around what changed, on one sheet. */

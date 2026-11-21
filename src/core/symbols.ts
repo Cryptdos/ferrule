@@ -181,16 +181,19 @@ const vterms = (a: string, b: string, half = 3): TerminalDef[] => [
 // Contact shapes, vertical, terminals at y = ±3. The blade pivots at the
 // bottom fixed contact (0, 1.5).
 
-function noContact(dx = 0): Prim[] {
-  return [line([dx, -3], [dx, -1.5]), line([dx, 1.5], [dx, 3]), line([dx, 1.5], [dx - 1.2, -1.6])];
+// `op`: drawn operated (simulating): a NO closed, an NC open.
+function noContact(dx = 0, op = false): Prim[] {
+  return [line([dx, -3], [dx, -1.5]), line([dx, 1.5], [dx, 3]), op ? line([dx, 1.5], [dx - 0.25, -1.5]) : line([dx, 1.5], [dx - 1.2, -1.6])];
 }
-function ncContact(dx = 0): Prim[] {
+function ncContact(dx = 0, op = false): Prim[] {
   return [
     line([dx, -3], [dx, -1.5], [dx + 1.1, -1.5]),
     line([dx, 1.5], [dx, 3]),
-    line([dx, 1.5], [dx + 1.3, -1.8]),
+    op ? line([dx, 1.5], [dx - 1.0, -1.5]) : line([dx, 1.5], [dx + 1.3, -1.8]),
   ];
 }
+/** Is this element drawn operated? Set only while simulating. */
+const opOf = (el: Element) => el.params.__op === true;
 /** Blade midpoint, where operators and timing marks attach. */
 const NO_MID: Vec = [-0.6, 0];
 const NC_MID: Vec = [0.65, -0.15];
@@ -245,25 +248,27 @@ export interface TimerFunction {
 }
 
 export const TIMER_FUNCTIONS: TimerFunction[] = [
-  { value: "on", label: "On-delay", short: "On-delay" },
-  { value: "off", label: "Off-delay", short: "Off-delay" },
-  { value: "on-off", label: "On- and off-delay", short: "On/off-delay" },
+  // Names and shorthand as IEC 61131-3 where it has them (TON, TOF, TP);
+  // flashers have no IEC name.
+  { value: "on", label: "TON: on-delay", short: "TON" },
+  { value: "off", label: "TOF: off-delay", short: "TOF" },
+  { value: "on-off", label: "TON+TOF: on- and off-delay", short: "TON/TOF" },
   {
     value: "interval",
-    label: "Interval (on for the time when energised)",
-    short: "Interval",
+    label: "TP: pulse / interval (on for the time when energised)",
+    short: "TP",
     wave: [[0, 0.8], [0.25, 0.8], [0.25, -0.8], [0.75, -0.8], [0.75, 0.8], [1, 0.8]],
   },
   {
     value: "flash-on",
-    label: "Cyclic / flasher, ON first",
-    short: "Cyclic ON",
+    label: "Flasher, ON first (cyclic; no IEC 61131-3 name)",
+    short: "FLASH",
     wave: [[0, 0.8], [0, -0.8], [0.33, -0.8], [0.33, 0.8], [0.67, 0.8], [0.67, -0.8], [1, -0.8]],
   },
   {
     value: "flash-off",
-    label: "Cyclic / flasher, OFF first",
-    short: "Cyclic OFF",
+    label: "Flasher, OFF first (cyclic)",
+    short: "FLASH OFF-1st",
     wave: [[0, 0.8], [0.33, 0.8], [0.33, -0.8], [0.67, -0.8], [0.67, 0.8], [1, 0.8]],
   },
 ];
@@ -297,7 +302,7 @@ const SYMBOLS: SymbolDef[] = [
     draw(el) {
       const t = contactTerms(["13", "14"], el);
       return {
-        prims: [...noContact(), ...t.prims, ...tagAndLabel(-1.9, el)],
+        prims: [...noContact(0, opOf(el)), ...t.prims, ...tagAndLabel(-1.9, el)],
         terminals: t.terminals,
         body: { x: -1.3, y: -1.7, w: 1.4, h: 3.2 },
       };
@@ -313,7 +318,7 @@ const SYMBOLS: SymbolDef[] = [
     draw(el) {
       const t = contactTerms(["21", "22"], el);
       return {
-        prims: [...ncContact(), ...t.prims, ...tagAndLabel(-0.8, el)],
+        prims: [...ncContact(0, opOf(el)), ...t.prims, ...tagAndLabel(-0.8, el)],
         terminals: t.terminals,
         body: { x: -0.1, y: -1.9, w: 1.5, h: 3.4 },
       };
@@ -332,7 +337,7 @@ const SYMBOLS: SymbolDef[] = [
           line([0, -3], [0, -1.5]),
           line([-2, -3], [-2, -1.5], [-0.9, -1.5]),
           line([0, 1.5], [0, 3]),
-          line([0, 1.5], [-1.1, -1.7]),
+          opOf(el) ? line([0, 1.5], [-0.25, -1.5]) : line([0, 1.5], [-1.1, -1.7]),
           term(0.45, -2.2, poleMarks(el, ["14", "11"])[0]),
           term(-2.45, -2.2, poleMarks(el, ["12", "11"])[0], "end"),
           term(0.45, 2.9, poleMarks(el, ["14", "11"])[1]),
@@ -387,7 +392,7 @@ const SYMBOLS: SymbolDef[] = [
         : { t: "arc", from: [ax, -0.6], to: [ax, 0.6], r: 0.6, sweep: 1 };
       return {
         prims: [
-          ...(nc ? ncContact() : noContact()),
+          ...(nc ? ncContact(0, opOf(el)) : noContact(0, opOf(el))),
           line([mid[0], mid[1] - 0.15], [ax, -0.15]),
           line([mid[0], mid[1] + 0.15], [ax, 0.15]),
           arc,
@@ -409,7 +414,7 @@ const SYMBOLS: SymbolDef[] = [
     draw(el) {
       return {
         prims: [
-          ...noContact(),
+          ...noContact(0, opOf(el)),
           dashed(NO_MID, [-2.4, 0]),
           ...pushHead(-2.4),
           ...contactTerms(["13", "14"]).prims,
@@ -430,7 +435,7 @@ const SYMBOLS: SymbolDef[] = [
     draw(el) {
       return {
         prims: [
-          ...ncContact(),
+          ...ncContact(0, opOf(el)),
           dashed(NC_MID, [-2.4, NC_MID[1]]),
           ...pushHead(-2.4).map((p) =>
             p.t === "line" ? { ...p, pts: p.pts.map(([x, y]) => [x, y + NC_MID[1]] as Vec) } : p,
@@ -485,7 +490,7 @@ const SYMBOLS: SymbolDef[] = [
             line([0, -3], [0, -1.5]),
             line([-2, -3], [-2, -1.5], [-0.9, -1.5]),
             line([0, 1.5], [0, 3]),
-            line([0, 1.5], [-1.1, -1.7]),
+            opOf(el) ? line([0, 1.5], [-0.25, -1.5]) : line([0, 1.5], [-1.1, -1.7]),
             dashed([-0.55, -0.1], [hx, -0.1]),
             ...(key ? keyHead(hx) : turnHead(hx)).map((p) => (p.t === "line" ? { ...p, pts: p.pts.map(([x, y]) => [x, y - 0.1] as Vec) } : p)),
             text(hx, -1.5, legend, TERM, "middle", "note"),
@@ -504,7 +509,7 @@ const SYMBOLS: SymbolDef[] = [
       }
       return {
         prims: [
-          ...noContact(),
+          ...noContact(0, opOf(el)),
           dashed(NO_MID, [-2.4, 0]),
           ...(key ? keyHead(-2.4) : turnHead(-2.4)),
           text(-2.4, -1.4, legend, TERM, "middle", "note"),
@@ -564,7 +569,7 @@ const SYMBOLS: SymbolDef[] = [
         const x = i * gap;
         const a = `${2 * i + 1}`;
         const b = `${2 * i + 2}`;
-        prims.push(...noContact(x));
+        prims.push(...noContact(x, opOf(el)));
         if (fn === "isolator") prims.push(line([x - 0.5, -1.5], [x + 0.5, -1.5]));
         // IEC contactor function: a small arc at the fixed contact.
         if (fn === "contactor") prims.push({ t: "arc", from: [x, -1.5], to: [x, -0.5], r: 0.5, sweep: 1 });
@@ -577,7 +582,7 @@ const SYMBOLS: SymbolDef[] = [
       let lastMid = lastX + NO_MID[0];
       for (const [i, p] of isolatorAux(el).entries()) {
         const x = (poles + i) * gap + 1;
-        prims.push(...(p.nc ? ncContact(x) : noContact(x)), term(x + 0.45, -2.2, p.a), term(x + 0.45, 2.9, p.b));
+        prims.push(...(p.nc ? ncContact(x, opOf(el)) : noContact(x, opOf(el))), term(x + 0.45, -2.2, p.a), term(x + 0.45, 2.9, p.b));
         terminals.push({ name: p.a, at: [x, -3], dir: "up" }, { name: p.b, at: [x, 3], dir: "down" });
         lastX = x;
         lastMid = x + (p.nc ? NC_MID[0] : NO_MID[0]);
@@ -1241,6 +1246,46 @@ const SYMBOLS: SymbolDef[] = [
       const w = num(el, "w", 30, 2, 200);
       const h = num(el, "h", 20, 2, 120);
       return { prims: [], terminals: [], body: { x: 0, y: 0, w, h } };
+    },
+  },
+  {
+    id: "supply",
+    name: "Incoming supply",
+    group: "Connection",
+    palette: true,
+    params: [
+      {
+        key: "system",
+        label: "System",
+        type: "select",
+        default: "3ph-n",
+        options: [
+          { value: "3ph-n", label: "3-phase + neutral (L1 L2 L3 N)" },
+          { value: "3ph", label: "3-phase (L1 L2 L3)" },
+          { value: "1ph-n", label: "Single phase (L N)" },
+          { value: "dc", label: "DC (+ -)" },
+        ],
+      },
+    ],
+    kind: () => null,
+    draw(el) {
+      // Where power comes in from outside: an arrow down into each conductor,
+      // 3 units apart like switch poles. The label says what it is (415V 3PH+N 50Hz).
+      const sys = str(el, "system", "3ph-n");
+      const names = sys === "1ph-n" ? ["L", "N"] : sys === "3ph" ? ["L1", "L2", "L3"] : sys === "dc" ? ["+", "-"] : ["L1", "L2", "L3", "N"];
+      const prims: Prim[] = [];
+      const terminals: TerminalDef[] = [];
+      names.forEach((name, i) => {
+        const x = i * 3;
+        prims.push(
+          line([x, -2.6], [x, 0]),
+          { t: "poly", pts: [[x - 0.45, -1.5], [x + 0.45, -1.5], [x, -0.6]], fill: true },
+          text(x, -3.0, name, TERM, "middle", "term"),
+        );
+        terminals.push({ name, at: [x, 0], dir: "down" });
+      });
+      if (el.label) prims.push(text(-0.6, -4.4, "{label}", LABEL, "start", "label"));
+      return { prims, terminals, body: { x: -0.5, y: -2.6, w: (names.length - 1) * 3 + 1, h: 2.6 } };
     },
   },
   {
