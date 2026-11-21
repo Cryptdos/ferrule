@@ -255,15 +255,15 @@ export function timerFunction(el: Element): TimerFunction {
   return TIMER_FUNCTIONS.find((f) => f.value === v) ?? TIMER_FUNCTIONS[0]!;
 }
 
-/** Indicator colours, as the two-letter codes of IEC 60757. */
+/** Indicator colours: IEC 60757 two-letter codes, first letter capital (amber added). */
 export const LAMP_COLOURS = [
-  { code: "RD", name: "red" },
-  { code: "YE", name: "yellow" },
-  { code: "AM", name: "amber" },
-  { code: "GN", name: "green" },
-  { code: "BU", name: "blue" },
-  { code: "WH", name: "white" },
-  { code: "CL", name: "clear" },
+  { code: "Rd", name: "red" },
+  { code: "Ye", name: "yellow" },
+  { code: "Am", name: "amber" },
+  { code: "Gn", name: "green" },
+  { code: "Bu", name: "blue" },
+  { code: "Wh", name: "white" },
+  { code: "Cl", name: "clear" },
 ];
 
 // ---------------------------------------------------------------------------

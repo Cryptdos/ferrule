@@ -3,7 +3,7 @@
   import { AREA_MM, AREA_UNITS, SHEET_MM, UNIT_MM } from "../../core/geometry";
   import type { Page, Project } from "../../core/model";
   import type { Vec } from "../../core/geometry";
-  import { connectionDots, routeOf, wireLabelSpot } from "../../core/wires";
+  import { connectionDots, routeOf, wireTexts } from "../../core/wires";
   import { resolveFields } from "../../core/fields";
   import { cloudsOn } from "../../core/ops";
   import { cloudPath } from "../../core/titleblock";
@@ -52,17 +52,17 @@
     return new Set(page.segments.filter((s) => ext.has(s.from[0]) || ext.has(s.to[0])).map((s) => s.id));
   });
 
-  /** Wire labels, by conductor. Wires on rails aren't labelled: the rail is. */
-  const numbers = $derived.by(() => {
+  /** Conductors on a named rail: the rail's name says what they are, so no number. */
+  const railConds = $derived.by(() => {
     const railIds = new Set(page.elements.filter((e) => e.symbol === "rail" || e.symbol === "busbar").map((e) => e.id));
-    const out = new Map<string, string>();
-    for (const c of project.conductors) {
-      // Number, then core colour and what it carries: "1-66 BU 0V".
-      const text = [c.number, c.colour, c.function].filter(Boolean).join(" ");
-      if (text && !c.terminals.some(([id]) => railIds.has(id))) out.set(c.id, text);
-    }
-    return out;
+    return new Set(project.conductors.filter((c) => c.terminals.some(([id]) => railIds.has(id))).map((c) => c.id));
   });
+  const condById = $derived(new Map(project.conductors.map((c) => [c.id, c])));
+  /** Ends that land on a symbol's terminal (not a rail, busbar or junction) get the wire's function. */
+  const terminalEnd = (ref: [string, string]) => {
+    const el = page.elements.find((e) => e.id === ref[0]);
+    return !!el && el.symbol !== "rail" && el.symbol !== "busbar" && el.symbol !== "junction";
+  };
 </script>
 
 <rect class="paper" x="0" y="0" width={SHEET_MM.w} height={SHEET_MM.h} />
@@ -89,16 +89,23 @@
     {#each page.segments as seg (seg.id)}
       {@const pts = routes?.get(seg.id) ?? routeOf(page, seg)}
       <polyline class:field={field.has(seg.id)} class:live={!!live?.has(seg.conductor)} points={pts.map((p) => p.join(",")).join(" ")} />
-      {@const num = numbers.get(seg.conductor)}
-      {@const spot = num ? wireLabelSpot(pts) : null}
-      {#if num && spot}
-        <text
-          class="wirenum"
-          x={spot.at[0]}
-          y={spot.at[1]}
-          text-anchor="middle"
-          transform={spot.vertical ? `rotate(-90 ${spot.at[0]} ${spot.at[1]})` : undefined}>{num}</text
-        >
+      {@const c = condById.get(seg.conductor)}
+      {#if c}
+        {#each wireTexts(pts, {
+          number: railConds.has(c.id) ? "" : c.number,
+          colour: c.colour,
+          func: c.function,
+          labelFrom: terminalEnd(seg.from),
+          labelTo: terminalEnd(seg.to),
+        }) as t, i (i)}
+          <text
+            class="wirenum"
+            x={t.at[0]}
+            y={t.at[1]}
+            text-anchor={t.anchor}
+            transform={t.vertical ? `rotate(-90 ${t.at[0]} ${t.at[1]})` : undefined}>{t.text}</text
+          >
+        {/each}
       {/if}
     {/each}
     {#each dots as d, i (i)}

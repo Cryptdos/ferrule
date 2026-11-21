@@ -60,7 +60,7 @@ export interface Conductor {
   number: string;
   /** Keep this number when renumbering. */
   locked?: boolean;
-  /** Core colour, as an IEC 60757 code (e.g. "BU", "GNYE"). */
+  /** Core colour, as an IEC 60757 code written "Bu", "GnYe"… */
   colour?: string;
   /** What it carries, e.g. "0V", "24V AC", "L1". */
   function?: string;

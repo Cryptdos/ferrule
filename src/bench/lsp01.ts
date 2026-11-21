@@ -128,7 +128,7 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
   const busN = bus("N", 14, 48, 170);
   [busL1, busL2, busL3, busN].forEach((b, i) => w([qMain, String(2 * i + 2)], tap(b, 30 + 3 * i)));
   const fPower = add("fuse", 150, 62, { params: { rating: "4A" } });
-  const hPower = add("lamp", 150, 76, { label: "POWER ON", params: { colour: "AM" } });
+  const hPower = add("lamp", 150, 76, { label: "POWER ON", params: { colour: "Am" } });
   w(tap(busL1, 150), [fPower, "1"]);
   w([fPower, "2"], [hPower, "V+"]);
   w([hPower, "V-"], tap(busN, 156));
@@ -173,7 +173,7 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
   w([kmCoil, "A2"], tap(ovLocal, 66));
   linkContact(p, km.id, kmCoil.id);
   const kmRun = add("contact-no", 86, 45);
-  const hRun = add("lamp", 86, 70, { label: `${tag(SF1.id)} RUNNING`, params: { colour: "GN" } });
+  const hRun = add("lamp", 86, 70, { label: `${tag(SF1.id)} RUNNING`, params: { colour: "Gn" } });
   w(tap(cctLocal, 86), [kmRun, "13"]);
   w([kmRun, "14"], [hRun, "V+"]);
   w([hRun, "V-"], tap(ovLocal, 86));
@@ -222,7 +222,7 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
   const ov = rail("0V", 44, 88, 150);
   w([smcb, "2"], tap(cct, 48));
   w([tx, "S2"], tap(ov, 48));
-  const hHealthy = add("lamp", 56, 72, { label: "CONTROL CIRCUIT HEALTHY", params: { colour: "WH", testPin: true } });
+  const hHealthy = add("lamp", 56, 72, { label: "CONTROL CIRCUIT HEALTHY", params: { colour: "Wh", testPin: true } });
   w(tap(cct, 56), [hHealthy, "V+"]);
   w([hHealthy, "V-"], tap(ov, 56));
   const faView = placePlantView(p, page.id, FA.id, [70, 100]);
@@ -234,7 +234,7 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
   w([xFa[1]!, "1"], [fr, "A1"]);
   w([fr, "A2"], tap(ov, 80));
   const frLamp = add("contact-no", 104, 64);
-  const hFire = add("lamp", 104, 76, { label: "FIRE ALARM ACTIVATED", params: { colour: "RD", testPin: true } });
+  const hFire = add("lamp", 104, 76, { label: "FIRE ALARM ACTIVATED", params: { colour: "Rd", testPin: true } });
   w(tap(cct, 104), [frLamp, "13"]);
   w([frLamp, "14"], [hFire, "V+"]);
   w([hFire, "V-"], tap(ov, 104));
@@ -368,7 +368,7 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
   // Tripped lamps.
   const tripped = (x: number, t: Element, fanTag: string) => {
     const k = add("timer-contact", x, 30);
-    const h = add("lamp", x, 72, { label: `${fanTag} TRIPPED`, params: { colour: "RD" } });
+    const h = add("lamp", x, 72, { label: `${fanTag} TRIPPED`, params: { colour: "Rd" } });
     w(tap(c, x), [k, "17"]);
     w([k, "18"], [h, "V+"]);
     w([h, "V-"], tap(o, x));

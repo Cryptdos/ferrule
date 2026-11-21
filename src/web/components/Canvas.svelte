@@ -576,7 +576,7 @@
 
   const simLive = $derived(sim ? new Set(sim.state.live) : null);
   function lampColour(c: unknown): string {
-    return { AM: "#ffb52e", GN: "#3cc85a", RD: "#ff4a4a", WH: "#e8e8e8", CL: "#f4f4f4", BU: "#4a8cff", YE: "#ffe04a" }[String(c)] ?? "#ffe04a";
+    return { Am: "#ffb52e", Gn: "#3cc85a", Rd: "#ff4a4a", Wh: "#e8e8e8", Cl: "#f4f4f4", Bu: "#4a8cff", Ye: "#ffe04a" }[String(c)] ?? "#ffe04a";
   }
 
   const cursorClass = $derived(

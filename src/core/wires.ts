@@ -193,3 +193,81 @@ export function wireLabelSpot(points: Vec[], minLength = 3): { at: Vec; vertical
   const mid: Vec = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
   return { at: vertical ? [mid[0] - 0.35, mid[1]] : [mid[0], mid[1] - 0.35], vertical };
 }
+
+export interface WireText {
+  text: string;
+  at: Vec;
+  /** Reads up the page, beside a vertical leg. */
+  vertical: boolean;
+  anchor: "start" | "middle" | "end";
+  role: "number" | "colour" | "function";
+}
+
+/** Rough width of wire text in grid units (osifont is about half an em per character). */
+const WIRE_TEXT = 1.05;
+const textLen = (s: string) => s.length * WIRE_TEXT * 0.55;
+
+/**
+ * Everything printed along a wire, as on a manufacturer's drawing:
+ * - the core colour at the source end (the end the wire was drawn from),
+ *   with the wire number just after it, beside the first leg;
+ * - the function (0V, 24V…) across the wire at each end that lands on a
+ *   terminal;
+ * - with no colour, the number sits beside the middle of the longest leg.
+ */
+export function wireTexts(
+  points: Vec[],
+  info: { number?: string; colour?: string; func?: string; labelFrom?: boolean; labelTo?: boolean },
+): WireText[] {
+  const out: WireText[] = [];
+  if (points.length < 2) return out;
+  const along = (from: Vec, to: Vec, dist: number): Vec => {
+    const len = Math.abs(to[0] - from[0]) + Math.abs(to[1] - from[1]) || 1;
+    return [from[0] + ((to[0] - from[0]) / len) * dist, from[1] + ((to[1] - from[1]) / len) * dist];
+  };
+  const legLen = (a: Vec, b: Vec) => Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]);
+  const beside = (p: Vec, vertical: boolean): Vec => (vertical ? [p[0] - 0.35, p[1]] : [p[0], p[1] - 0.35]);
+
+  if (info.colour) {
+    // Colour then number, from the source end along the first leg (or the longest, if the first is too short).
+    const parts = [info.colour, info.number].filter((s): s is string => !!s);
+    const need = 1 + parts.reduce((s, p) => s + textLen(p) + 0.8, 0);
+    let i = 0;
+    if (legLen(points[0]!, points[1]!) < need) {
+      let best = 0;
+      for (let k = 0; k < points.length - 1; k++) if (legLen(points[k]!, points[k + 1]!) > legLen(points[best]!, points[best + 1]!)) best = k;
+      i = best;
+    }
+    const a = points[i]!;
+    const b = points[i + 1]!;
+    const vertical = a[0] === b[0];
+    let d = i === 0 ? 1 : Math.max(0.6, (legLen(a, b) - need) / 2 + 0.6);
+    for (const [k, p] of parts.entries()) {
+      const w = textLen(p);
+      out.push({ text: p, at: beside(along(a, b, d + w / 2), vertical), vertical, anchor: "middle", role: k === 0 ? "colour" : "number" });
+      d += w + 0.8;
+    }
+  } else if (info.number) {
+    const spot = wireLabelSpot(points);
+    if (spot) out.push({ text: info.number, at: spot.at, vertical: spot.vertical, anchor: "middle", role: "number" });
+  }
+
+  if (info.func) {
+    // Across the wire at each terminal end, like "0V" printed beside a terminal.
+    const ends: [Vec, Vec, boolean | undefined][] = [
+      [points[0]!, points[1]!, info.labelFrom],
+      [points[points.length - 1]!, points[points.length - 2]!, info.labelTo],
+    ];
+    for (const [e, next, show] of ends) {
+      if (show === false || legLen(e, next) < 2.5) continue;
+      const vertical = e[0] === next[0];
+      const p = along(e, next, vertical ? 1.5 : 0.7 + textLen(info.func) / 2);
+      out.push(
+        vertical
+          ? { text: info.func, at: [p[0] + 0.4, p[1] + 0.35], vertical: false, anchor: "start", role: "function" }
+          : { text: info.func, at: [p[0], p[1] - 0.35], vertical: false, anchor: "middle", role: "function" },
+      );
+    }
+  }
+  return out;
+}

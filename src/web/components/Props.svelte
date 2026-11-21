@@ -13,6 +13,7 @@
     deleteClouds,
     renamePage,
     resetRoute,
+    reverseSegment,
     rotateElements,
     setConductorNumber,
     setConductorInfo,
@@ -346,7 +347,16 @@
       <datalist id="ferrule-wire-functions">
         {#each WIRE_FUNCTIONS as f (f)}<option value={f}></option>{/each}
       </datalist>
-      <div class="row">Conductor joins {cond.terminals.length} terminals. Number, colour and function print along the wire.</div>
+      {#if cond.colour}
+        <div class="row">
+          Colour and number print at the {describe(seg.from)} end.
+          <button class="small" onclick={() => editor.apply((p) => reverseSegment(p, editor.pageId, seg.id))}>Other end</button>
+        </div>
+      {/if}
+      <p class="hint">
+        The colour prints at the end the wire was drawn from, the number just after it; the function prints beside each
+        terminal end. Conductor joins {cond.terminals.length} terminals.
+      </p>
     {/if}
     <div class="row">Route: {seg.route === "manual" ? "adjusted by hand" : "automatic"}</div>
     <p class="hint">Drag a leg of the wire to move it. The ends stay on their terminals.</p>

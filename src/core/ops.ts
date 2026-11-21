@@ -21,6 +21,7 @@ import {
 import { defaultParams, getSymbol, requireSymbol, terminalPoint } from "./symbols";
 import { isOrthogonal, routeOf, simplifyRoute } from "./wires";
 import { isMaster, isSlave, locate } from "./xref";
+import { colourCode } from "./wirecolours";
 
 export class OpError extends Error {}
 
@@ -44,6 +45,12 @@ export interface AddElementOptions {
   params?: Record<string, ParamValue>;
 }
 
+/** Lamp colours written the usual way whatever the case they came in ("GN" → "Gn"). */
+function normaliseParams(symbol: string, params: Record<string, ParamValue>): Record<string, ParamValue> {
+  if (symbol === "lamp" && typeof params.colour === "string") params.colour = colourCode(params.colour);
+  return params;
+}
+
 export function addElement(
   project: Project,
   pageId: string,
@@ -61,7 +68,7 @@ export function addElement(
     pos: clampToArea(snapVec(pos)),
     rot: opts.rot ?? 0,
     zone: opts.zone ?? "internal",
-    params: { ...defaultParams(symbol), ...opts.params },
+    params: normaliseParams(symbol, { ...defaultParams(symbol), ...opts.params }),
     links: [],
   };
   page.elements.push(el);
@@ -113,7 +120,7 @@ export function updateElement(project: Project, pageId: string, id: string, patc
   if (patch.label !== undefined) el.label = patch.label;
   if (patch.zone !== undefined) el.zone = patch.zone;
   if (patch.rot !== undefined) el.rot = patch.rot;
-  if (patch.params) el.params = { ...el.params, ...patch.params };
+  if (patch.params) el.params = normaliseParams(el.symbol, { ...el.params, ...patch.params });
 }
 
 /** Copy elements to a new position (Ctrl+D / paste). Returns the new ids. */
@@ -201,6 +208,13 @@ export function resetRoute(project: Project, pageId: string, ids: string[]): voi
     seg.route = "auto";
     seg.points = [];
   }
+}
+
+/** Turn a wire end for end: its colour and number print at the other end. The route stays as it is. */
+export function reverseSegment(project: Project, pageId: string, id: string): void {
+  const seg = getSegment(getPage(project, pageId), id);
+  [seg.from, seg.to] = [seg.to, seg.from];
+  seg.points = [...seg.points].reverse();
 }
 
 /**
@@ -466,7 +480,7 @@ export function setConductorInfo(project: Project, conductorId: string, info: { 
     const v = info[k];
     if (v === undefined) continue;
     const t = v.trim();
-    if (t) c[k] = k === "colour" ? t.toUpperCase() : t;
+    if (t) c[k] = k === "colour" ? colourCode(t) : t;
     else delete c[k];
   }
 }

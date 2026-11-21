@@ -543,7 +543,7 @@ export const TOOLS: Tool[] = [
   {
     name: "label_wire",
     description:
-      "Set what's printed along a wire's conductor: its number (locked so Renumber keeps it), core colour (IEC 60757 code, e.g. BU, BN, GNYE) and function (e.g. 0V, 24V AC). Empty strings clear.",
+      "Set what's printed along a wire's conductor: its number (locked so Renumber keeps it), core colour (IEC 60757 code, e.g. Bu, Bn, GnYe) and function (e.g. 0V, 24V AC). Empty strings clear.",
     inputSchema: obj(
       {
         project,

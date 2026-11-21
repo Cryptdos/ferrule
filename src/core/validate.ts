@@ -4,6 +4,7 @@
  */
 import { FORMAT, FORMAT_VERSION, type Project, emptyInfo } from "./model";
 import { getSymbol } from "./symbols";
+import { colourCode } from "./wirecolours";
 
 export class ProjectFormatError extends Error {}
 
@@ -137,7 +138,7 @@ export function parsePlant(v: unknown): Project["plant"] {
 // Older files
 
 /** Lamp colours were single letters before the IEC 60757 two-letter codes. */
-const OLD_LAMP_COLOURS: Record<string, string> = { A: "AM", G: "GN", R: "RD", W: "WH", B: "BU", Y: "YE" };
+const OLD_LAMP_COLOURS: Record<string, string> = { A: "Am", G: "Gn", R: "Rd", W: "Wh", B: "Bu", Y: "Ye" };
 /** Lamp terminals were L and N before V+ and V- (they're often 24 V DC). */
 const OLD_LAMP_TERMINALS: Record<string, string> = { L: "V+", N: "V-" };
 
@@ -197,8 +198,8 @@ function parsePage(pg: Record<string, unknown>, i: number): Project["pages"][num
     .map((sc) => ({ id: sc.id as string, label: strOr(sc.label), rect: sc.rect as [number, number, number, number] }));
   const lamps = new Set(elements.filter((e) => e.symbol === "lamp").map((e) => e.id));
   for (const e of elements) {
-    if (e.symbol === "lamp" && typeof e.params.colour === "string" && OLD_LAMP_COLOURS[e.params.colour]) {
-      e.params.colour = OLD_LAMP_COLOURS[e.params.colour]!;
+    if (e.symbol === "lamp" && typeof e.params.colour === "string") {
+      e.params.colour = OLD_LAMP_COLOURS[e.params.colour] ?? colourCode(e.params.colour);
     }
   }
   for (const s of segments) {
@@ -217,7 +218,7 @@ function parseConductors(v: unknown): Project["conductors"] {
       id: c.id as string,
       number: strOr(c.number),
       ...(c.locked === true ? { locked: true } : {}),
-      ...(typeof c.colour === "string" && c.colour ? { colour: c.colour } : {}),
+      ...(typeof c.colour === "string" && c.colour ? { colour: colourCode(c.colour) } : {}),
       ...(typeof c.function === "string" && c.function ? { function: c.function } : {}),
       terminals: arr(c.terminals).filter(
         (t): t is [string, string] => Array.isArray(t) && t.length === 2 && t.every((x) => typeof x === "string"),

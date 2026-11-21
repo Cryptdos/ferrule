@@ -40,7 +40,7 @@ An open editor tab follows changes Claude makes: it reloads the project and says
 | `add_page`, `update_page`, `delete_page` | Sheets, titles, order, panel boundary |
 | `add_element`, `update_element`, `move_element`, `delete_element` | Symbols, text, boxes, plates (and deleting wires or sections by id) |
 | `connect`, `disconnect` | Wires: terminal to terminal, or tee into a wire |
-| `label_wire` | A wire's number, core colour (IEC 60757, e.g. BU) and function (e.g. 0V), printed along it |
+| `label_wire` | A wire's number, core colour (IEC 60757, e.g. Bu) and function (e.g. 0V), printed along it |
 | `link` | Contact → coil, or pair off-page arrows |
 | `add_plant`, `place_plant_view` | Field equipment (terminals, named terminal groups, information lines) and its views |
 | `add_section` | Labelled section boxes |

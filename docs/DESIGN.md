@@ -154,7 +154,7 @@ Draft list:
 9. Relay / contactor coil
 10. Timer coil: on-delay, off-delay, on- and off-delay, interval, cyclic ON-first and OFF-first, with the maker's function code (e.g. Selec 600XU "C") printed beside it
 11. Timer contact
-12. Indicator lamp: V+ / V- terminals (they're often 24 V DC), optional lamp-test terminal T beside V+, two-letter IEC 60757 colour code (RD, YE, AM, GN, BU, WH, CL)
+12. Indicator lamp: V+ / V- terminals (they're often 24 V DC), optional lamp-test terminal T beside V+, two-letter IEC 60757 colour code written Rd, Ye, Am, Gn, Bu, Wh, Cl
 13. Terminal
 14. Socket outlet
 15. Transformer
@@ -307,7 +307,7 @@ Reference drawings from other companies are proprietary. They are never committe
 | Simulation | Conductors are nodes; contacts, buttons, selectors, isolators and field plant views are switched links; coils and lamps are loads between a CCT… rail and the 0V rail. Settle until stable; on/off-delay timers on a simulation clock. Plant views act as volt-free field contacts |
 | Logic rules | Breadth-first search over operator actions (operate, press, wait for timers) for the shortest sequence that breaks a rule; also reports shorts and chatter. Only inputs that can influence the rule's coils are searched; isolators and breakers stay closed unless asked |
 | Wires to rails | Rail taps slide to sit directly above/below the other end, so rung wires stay straight when symbols move |
-| Review 1 (2026-11-21) | Palette lists parts by name with a small icon and a search box. Coil contact tables sit to the right of the coil and can be dragged; double-click jumps contact ↔ coil and arrow ↔ arrow, and the part you land on is ringed until you select something else. Section boxes resize from any edge. Text boxes commit when you click away. Wires carry a core colour and function after their number. Smaller symbol text (tag ≈ 1.9 mm). Format version 2: lamp terminals L/N become V+/V-, colour letters become IEC codes, on load |
+| Review 1 (2026-11-21) | Palette lists parts by name with a small icon and a search box. Coil contact tables sit to the right of the coil and can be dragged; double-click jumps contact ↔ coil and arrow ↔ arrow, and the part you land on is ringed until you select something else. Section boxes resize from any edge. Text boxes commit when you click away. Wires carry a core colour (printed at the source end, the number just after it) and a function (printed at each terminal end). Colour codes are written with a capital first letter: Bu, Rd, GnYe. Smaller symbol text (tag ≈ 1.9 mm). Format version 2: lamp terminals L/N become V+/V-, colour letters become IEC codes, on load |
 
 ## 16. Open questions
 

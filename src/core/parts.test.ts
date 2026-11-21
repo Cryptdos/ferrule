@@ -67,7 +67,7 @@ describe("lamps", () => {
     old.version = 1;
     const back = parseProject(old);
     const lamp = back.pages[0]!.elements.find((e) => e.id === h.id)!;
-    expect(lamp.params.colour).toBe("GN");
+    expect(lamp.params.colour).toBe("Gn");
     expect(back.pages[0]!.segments[0]!.to).toEqual([h.id, "V+"]);
     expect(back.conductors.flatMap((c) => c.terminals)).toContainEqual([h.id, "V+"]);
   });
@@ -240,10 +240,45 @@ describe("wire colour and function", () => {
     setConductorInfo(p, s.conductor, { colour: "bu", function: "0V" });
     refreshConductors(p);
     const c = p.conductors.find((x) => x.id === s.conductor)!;
-    expect(c.colour).toBe("BU");
+    expect(c.colour).toBe("Bu");
     expect(c.function).toBe("0V");
     setConductorInfo(p, s.conductor, { colour: "" });
     expect(p.conductors.find((x) => x.id === s.conductor)!.colour).toBeUndefined();
     void updateElement;
+  });
+});
+
+describe("wire text placement", () => {
+  test("colour at the source end, number just after it, function at both terminal ends", () => {
+    const { wireTexts } = require("./wires") as typeof import("./wires");
+    const pts: [number, number][] = [
+      [10, 10],
+      [10, 40],
+    ];
+    const t = wireTexts(pts, { number: "17-38", colour: "Bu", func: "0V", labelFrom: true, labelTo: true });
+    const colour = t.find((x) => x.role === "colour")!;
+    const num = t.find((x) => x.role === "number")!;
+    expect(colour.text).toBe("Bu");
+    expect(colour.vertical).toBe(true);
+    // Colour nearer the source (top), number after it, both beside the wire.
+    expect(colour.at[1]).toBeLessThan(num.at[1]);
+    expect(colour.at[1]).toBeLessThan(14);
+    const fn = t.filter((x) => x.role === "function");
+    expect(fn.map((x) => x.text)).toEqual(["0V", "0V"]);
+    expect(fn[0]!.at[1]).toBeLessThan(15);
+    expect(fn[1]!.at[1]).toBeGreaterThan(35);
+    // No function at a rail or junction end.
+    expect(wireTexts(pts, { func: "0V", labelFrom: false, labelTo: true }).length).toBe(1);
+    // No colour: the number goes mid-wire as before.
+    const plain = wireTexts(pts, { number: "17-38" });
+    expect(plain[0]!.at[1]).toBe(25);
+  });
+
+  test("colour codes are written with a capital first letter", () => {
+    const { colourCode } = require("./wirecolours") as typeof import("./wirecolours");
+    expect(colourCode("BU")).toBe("Bu");
+    expect(colourCode("gnye")).toBe("GnYe");
+    expect(colourCode("Blue")).toBe("Blue");
+    expect(colourCode("RD")).toBe("Rd");
   });
 });
