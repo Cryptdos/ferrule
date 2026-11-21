@@ -1,5 +1,6 @@
 <script lang="ts">
   import { api, type ProjectSummary } from "../api";
+  import FileBrowser from "./FileBrowser.svelte";
 
   let { onopen }: { onopen: (id: string) => void } = $props();
 
@@ -7,6 +8,48 @@
   let loading = $state(true);
   let error = $state("");
   let title = $state("");
+  let browsing = $state(false);
+
+  async function openFile(path: string) {
+    browsing = false;
+    try {
+      onopen((await api.open(path)).id);
+    } catch (e) {
+      error = (e as Error).message;
+    }
+  }
+
+  async function del(p: ProjectSummary) {
+    const what =
+      p.where === "projects"
+        ? `Delete "${p.title}"? Its file moves to the Deleted folder inside the projects folder, so it can be got back.`
+        : `Delete the file for "${p.title}"?\n${p.path}\nIt moves to the Deleted folder inside the projects folder.`;
+    if (!confirm(what)) return;
+    try {
+      await api.remove(p.id, true);
+      await refresh();
+    } catch (e) {
+      error = (e as Error).message;
+    }
+  }
+
+  async function forget(p: ProjectSummary) {
+    try {
+      await api.remove(p.id, false);
+      await refresh();
+    } catch (e) {
+      error = (e as Error).message;
+    }
+  }
+
+  async function duplicate(p: ProjectSummary) {
+    try {
+      await api.duplicate(p.id);
+      await refresh();
+    } catch (e) {
+      error = (e as Error).message;
+    }
+  }
 
   async function refresh() {
     loading = true;
@@ -48,6 +91,7 @@
   <form onsubmit={create}>
     <input bind:value={title} placeholder="New project title" />
     <button type="submit">Create project</button>
+    <button type="button" onclick={() => (browsing = true)} title="Open a .ferrule file from any folder">Open file…</button>
   </form>
   <p class="example">
     Or <button class="link" onclick={example}>add the LSP-01 example</button>: a 12-sheet life safety panel drawn
@@ -62,19 +106,31 @@
     <ul>
       {#each projects as p (p.id)}
         <li>
-          <button class="open" onclick={() => onopen(p.id)}>
+          <button class="open" onclick={() => onopen(p.id)} title={p.path}>
             <strong>{p.title}</strong>
-            <span>{p.pages} {p.pages === 1 ? "sheet" : "sheets"} · {new Date(p.modified).toLocaleString()} · {p.id}</span>
+            <span>{p.pages} {p.pages === 1 ? "sheet" : "sheets"} · saved {new Date(p.modified).toLocaleString()}</span>
+            <span class="path">{p.path}</span>
           </button>
+          <div class="actions">
+            <button onclick={() => duplicate(p)} title="Make a copy beside it">Duplicate</button>
+            <a class="button" href={`/api/projects/${encodeURIComponent(p.id)}/file`} download title="Download the .ferrule file">Download</a>
+            {#if p.where === "elsewhere"}
+              <button onclick={() => forget(p)} title="Take it off this list; the file stays where it is">Remove from list</button>
+            {/if}
+            <button class="danger" onclick={() => del(p)} title="Delete the project file (it moves to the Deleted folder)">Delete</button>
+          </div>
         </li>
       {/each}
     </ul>
   {/if}
 </div>
+{#if browsing}
+  <FileBrowser mode="open" onpick={(path) => void openFile(path)} onclose={() => (browsing = false)} />
+{/if}
 
 <style>
   .picker {
-    max-width: 640px;
+    max-width: 760px;
     margin: 48px auto;
     padding: 0 16px;
   }
@@ -108,6 +164,45 @@
   .open span {
     font-size: 12px;
     color: #667;
+  }
+  .open .path {
+    font-family: ui-monospace, monospace;
+    font-size: 11px;
+    color: #889;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  li {
+    display: flex;
+    gap: 6px;
+    align-items: stretch;
+  }
+  li .open {
+    flex: 1;
+    min-width: 0;
+  }
+  .actions {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 12px;
+  }
+  .actions button,
+  .actions .button {
+    font-size: 11px;
+    padding: 2px 6px;
+  }
+  .button {
+    border: 1px solid #c8ccd2;
+    border-radius: 4px;
+    text-decoration: none;
+    color: inherit;
+    text-align: center;
+    background: #fff;
+  }
+  .danger {
+    color: #a22;
   }
   .example {
     font-size: 13px;

@@ -16,6 +16,17 @@
 <g class="tb" transform="translate({TITLE_BLOCK_MM.x} {TITLE_BLOCK_MM.y})">
   <rect class="outer" x="0" y="0" width={tb.w} height={tb.h} />
   <rect x={tb.logo.x} y={tb.logo.y} width={tb.logo.w} height={tb.logo.h} />
+  {#if project.logo && project.assets?.[project.logo]}
+    <!-- The company logo, fitted inside its cell with a small margin. -->
+    <image
+      href={project.assets[project.logo]!.data}
+      x={tb.logo.x + 1.5}
+      y={tb.logo.y + 1.5}
+      width={tb.logo.w - 3}
+      height={tb.logo.h - 3}
+      preserveAspectRatio="xMidYMid meet"
+    />
+  {/if}
   {#each tb.cells as c (c.label)}
     {@const size = c.big ? 3.0 : 2.4}
     <rect x={c.x} y={c.y} width={c.w} height={c.h} />

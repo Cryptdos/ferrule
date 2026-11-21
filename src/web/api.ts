@@ -12,6 +12,17 @@ export interface ProjectSummary {
   title: string;
   pages: number;
   modified: string;
+  path: string;
+  where: "projects" | "elsewhere";
+  opened?: string;
+}
+
+export interface FolderListing {
+  path: string;
+  parent: string | null;
+  folders: string[];
+  files: { name: string; path: string; modified: string }[];
+  places: { name: string; path: string }[];
 }
 
 export class ConflictError extends Error {}
@@ -33,6 +44,13 @@ export const api = {
   libraryLoad: (file: string) => call<Template>(`/api/library/${encodeURIComponent(file)}`),
   librarySave: (t: Template) => call<{ file: string }>("/api/library", { method: "POST", body: JSON.stringify(t) }),
   list: () => call<ProjectSummary[]>("/api/projects"),
+  browse: (path?: string) => call<FolderListing>(`/api/browse${path ? `?path=${encodeURIComponent(path)}` : ""}`),
+  open: (path: string) => call<{ id: string }>("/api/projects/open", { method: "POST", body: JSON.stringify({ path }) }),
+  saveAs: (id: string, path: string, overwrite = false) =>
+    call<{ id: string }>(`/api/projects/${encodeURIComponent(id)}/save-as`, { method: "POST", body: JSON.stringify({ path, overwrite }) }),
+  duplicate: (id: string) => call<{ id: string }>(`/api/projects/${encodeURIComponent(id)}/duplicate`, { method: "POST" }),
+  /** Delete moves the file to the Deleted folder; without `file`, a file from elsewhere just leaves the list. */
+  remove: (id: string, file: boolean) => call<{ ok: true }>(`/api/projects/${encodeURIComponent(id)}${file ? "?file=1" : ""}`, { method: "DELETE" }),
   create: (title: string) => call<Project>("/api/projects", { method: "POST", body: JSON.stringify({ title }) }),
   load: async (id: string): Promise<{ project: Project; version: string }> => {
     const res = await fetch(`/api/projects/${encodeURIComponent(id)}`);

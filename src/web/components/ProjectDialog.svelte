@@ -1,9 +1,22 @@
 <script lang="ts">
-  import { addRevision, deleteRevision, setNumberingScheme, updateProjectInfo, updateRevision } from "../../core/ops";
+  import { addAsset, addRevision, deleteRevision, setLogo, setNumberingScheme, updateProjectInfo, updateRevision } from "../../core/ops";
+  import { readImage } from "../images";
   import type { ProjectInfo, Revision } from "../../core/model";
   import type { Editor } from "../editor.svelte";
 
   let { editor, onclose }: { editor: Editor; onclose: () => void } = $props();
+
+  /** A picture for the title block's logo box (chosen, dropped or pasted). */
+  async function useLogo(file: Blob | undefined) {
+    if (!file) return;
+    try {
+      const img = await readImage(file);
+      editor.apply((p) => setLogo(p, addAsset(p, img)));
+    } catch (e) {
+      editor.flash((e as Error).message);
+    }
+  }
+  const logo = $derived(editor.project.logo ? editor.project.assets?.[editor.project.logo] : undefined);
 
   const fields: { key: keyof ProjectInfo; label: string }[] = [
     { key: "title", label: "Project" },
@@ -24,6 +37,16 @@
   ];
 </script>
 
+<svelte:window
+  onpaste={(e) => {
+    const f = [...(e.clipboardData?.files ?? [])].find((x) => x.type.startsWith("image/"));
+    if (f) {
+      e.preventDefault();
+      void useLogo(f);
+    }
+  }}
+/>
+
 <div class="backdrop" role="presentation" onclick={(e) => e.target === e.currentTarget && onclose()}>
   <div class="dialog" role="dialog" aria-label="Project details">
     <h2>Project details</h2>
@@ -41,6 +64,39 @@
           />
         </label>
       {/each}
+    </div>
+    <h3>Logo</h3>
+    <div
+      class="logo"
+      role="region"
+      aria-label="Title block logo"
+      ondragover={(e) => e.preventDefault()}
+      ondrop={(e) => {
+        e.preventDefault();
+        void useLogo([...(e.dataTransfer?.files ?? [])].find((f) => f.type.startsWith("image/")));
+      }}
+    >
+      {#if logo}
+        <img src={logo.data} alt="Logo" />
+      {:else}
+        <span class="hint">No logo. Choose one, drop one here, or paste one (Ctrl+V) while this is open.</span>
+      {/if}
+      <div class="logo-buttons">
+        <label class="button">
+          {logo ? "Change…" : "Choose…"}
+          <input
+            type="file"
+            accept="image/*"
+            hidden
+            onchange={(e) => {
+              const f = e.currentTarget.files?.[0];
+              e.currentTarget.value = "";
+              void useLogo(f);
+            }}
+          />
+        </label>
+        {#if logo}<button onclick={() => editor.apply((p) => setLogo(p, null))}>Remove</button>{/if}
+      </div>
     </div>
     <h3>Numbering</h3>
     <label class="inline">
@@ -97,6 +153,31 @@
 </div>
 
 <style>
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border: 1px dashed #c8ccd2;
+    padding: 8px;
+    border-radius: 4px;
+  }
+  .logo img {
+    max-height: 60px;
+    max-width: 180px;
+    object-fit: contain;
+  }
+  .logo-buttons {
+    margin-left: auto;
+    display: flex;
+    gap: 6px;
+  }
+  label.button {
+    border: 1px solid #c8ccd2;
+    border-radius: 4px;
+    padding: 3px 8px;
+    cursor: pointer;
+    font-size: 13px;
+  }
   .backdrop {
     position: fixed;
     inset: 0;

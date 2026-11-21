@@ -12,6 +12,7 @@ import {
   type ParamValue,
   type PlantItem,
   type PlantGroup,
+  type Asset,
   type Project,
   type Section,
   type Segment,
@@ -104,6 +105,45 @@ export function deleteElements(project: Project, pageId: string, ids: string[]):
   for (const pg of project.pages) for (const el of pg.elements) el.links = el.links.filter((l) => !gone.has(l));
   dropOrphanJunctions(page);
   refreshConductors(project);
+  pruneAssets(project);
+}
+
+// ---------------------------------------------------------------------------
+// Pictures
+
+/** Keep a picture in the project. Returns its id. The same picture twice is kept once. */
+export function addAsset(project: Project, asset: Asset): string {
+  project.assets ??= {};
+  for (const [id, a] of Object.entries(project.assets)) if (a.data === asset.data) return id;
+  const id = newId("a");
+  project.assets[id] = { ...asset };
+  return id;
+}
+
+/** Put a picture on a sheet, `width` grid units wide (its height follows its shape). */
+export function addImage(project: Project, pageId: string, assetId: string, pos: Vec, width = 40): Element {
+  const a = project.assets?.[assetId];
+  if (!a) throw new OpError("That picture isn't in the project");
+  const w = Math.max(2, Math.round(width));
+  const h = Math.max(2, Math.min(120, Math.round((w * a.h) / Math.max(1, a.w))));
+  return addElement(project, pageId, "image", pos, { params: { asset: assetId, w, h } });
+}
+
+/** The title block logo; null takes it away. */
+export function setLogo(project: Project, assetId: string | null): void {
+  if (assetId && !project.assets?.[assetId]) throw new OpError("That picture isn't in the project");
+  if (assetId) project.logo = assetId;
+  else delete project.logo;
+  pruneAssets(project);
+}
+
+/** Drop pictures nothing uses any more, so the file doesn't carry them. */
+export function pruneAssets(project: Project): void {
+  if (!project.assets) return;
+  const used = new Set<string>(project.logo ? [project.logo] : []);
+  for (const pg of project.pages) for (const el of pg.elements) if (el.symbol === "image") used.add(String(el.params.asset ?? ""));
+  for (const t of project.templates) for (const el of t.elements) if (el.symbol === "image") used.add(String(el.params.asset ?? ""));
+  for (const id of Object.keys(project.assets)) if (!used.has(id)) delete project.assets[id];
 }
 
 export interface ElementPatch {
@@ -835,6 +875,23 @@ export function addCloud(project: Project, pageId: string, rect: [number, number
     rect: [Math.round(Math.min(x, x + w)), Math.round(Math.min(y, y + h)), Math.max(2, Math.round(Math.abs(w))), Math.max(2, Math.round(Math.abs(h)))],
   });
   return id;
+}
+
+/** Move or resize a cloud, or move it to another revision. */
+export function updateCloud(project: Project, id: string, patch: { rect?: [number, number, number, number]; rev?: string }): void {
+  const from = project.revisions.find((r) => r.clouds.some((c) => c.id === id));
+  if (!from) throw new OpError(`No cloud "${id}"`);
+  const cloud = from.clouds.find((c) => c.id === id)!;
+  if (patch.rect) {
+    const [x, y, w, h] = patch.rect;
+    cloud.rect = [Math.round(x), Math.round(y), Math.max(2, Math.round(w)), Math.max(2, Math.round(h))];
+  }
+  if (patch.rev && patch.rev !== from.rev) {
+    const to = project.revisions.find((r) => r.rev === patch.rev);
+    if (!to) throw new OpError(`No revision ${patch.rev}`);
+    from.clouds = from.clouds.filter((c) => c.id !== id);
+    to.clouds.push(cloud);
+  }
 }
 
 export function deleteClouds(project: Project, ids: string[]): void {

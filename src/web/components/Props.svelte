@@ -11,8 +11,9 @@
     setPlantViewTerminals,
     updateSection,
     deleteSections,
-    cloudsOn,
     deleteClouds,
+    updateCloud,
+    cloudsOn,
     renamePage,
     resetRoute,
     reverseSegment,
@@ -166,7 +167,7 @@
         />
       </label>
     {/if}
-    {#each def.params as p (p.key)}
+    {#each def.params.filter((x) => !x.hidden) as p (p.key)}
       {@const v = one.params[p.key] ?? p.default}
       {#if !paramApplies(p, one)}
         <label class="off" title="Doesn't apply to this {def.name.toLowerCase()} as it's set">
@@ -416,6 +417,37 @@
         }}>Delete</button
       >
     </div>
+  {:else if editor.selectedClouds.length === 1 && sel.length === 0}
+    {@const cloud = editor.selectedClouds[0]!}
+    {@const owner = editor.project.revisions.find((r) => r.clouds.some((c) => c.id === cloud.id))}
+    <h3>Revision cloud</h3>
+    <p class="hint">
+      Marks what changed in a revision. The triangle carries the revision letter. Drag the triangle to move the cloud, an
+      edge or corner to resize it. Only the latest revision's clouds print.
+    </p>
+    <label>
+      Revision
+      <select
+        value={owner?.rev ?? ""}
+        onchange={(e) => {
+          const rev = e.currentTarget.value;
+          const id = cloud.id;
+          editor.apply((p) => updateCloud(p, id, { rev }));
+        }}
+      >
+        {#each editor.project.revisions as r (r.rev)}<option value={r.rev}>{r.rev} {r.description}</option>{/each}
+      </select>
+    </label>
+    <div class="buttons">
+      <button
+        class="danger"
+        onclick={() => {
+          const id = cloud.id;
+          editor.apply((p) => deleteClouds(p, [id]));
+          editor.selection = [];
+        }}>Delete cloud</button
+      >
+    </div>
   {:else if sel.length + segs.length > 1}
     <h3>{sel.length} elements, {segs.length} wires selected</h3>
     {#if segs.some((s) => s.route === "manual")}
@@ -527,9 +559,9 @@
     gap: 6px;
   }
   /* Nothing in the panel may be wider than the panel. */
-  .props :global(input:not([type="checkbox"])),
-  .props :global(select),
-  .props :global(textarea) {
+  .props :global(label > input:not([type="checkbox"])),
+  .props :global(label > select),
+  .props :global(label > textarea) {
     width: 100%;
     min-width: 0;
     box-sizing: border-box;

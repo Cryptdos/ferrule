@@ -55,6 +55,32 @@ export function createApp({ storage, library, assets, version = "dev", pdf, self
     return c.json(await storage.create(title), 201);
   });
 
+  // Files anywhere: open, save as, duplicate, delete, and a folder browser for picking them.
+  app.post("/api/projects/open", async (c) => {
+    const body = await c.req.json().catch(() => ({}));
+    if (typeof body?.path !== "string") return c.json({ error: "No path given" }, 400);
+    return c.json({ id: await storage.open(body.path) });
+  });
+  app.post("/api/projects/:id/save-as", async (c) => {
+    const body = await c.req.json().catch(() => ({}));
+    if (typeof body?.path !== "string") return c.json({ error: "No path given" }, 400);
+    return c.json({ id: await storage.saveAs(c.req.param("id"), body.path, body.overwrite === true) });
+  });
+  app.post("/api/projects/:id/duplicate", async (c) => c.json({ id: await storage.duplicate(c.req.param("id")) }, 201));
+  app.delete("/api/projects/:id", async (c) => {
+    await storage.remove(c.req.param("id"), c.req.query("file") === "1");
+    return c.json({ ok: true });
+  });
+  app.get("/api/projects/:id/file", async (c) => {
+    const id = c.req.param("id");
+    const project = await storage.load(id);
+    const name = fileName(project.project.title || id) + ".ferrule";
+    return new Response(JSON.stringify(project, null, 1), {
+      headers: { "content-type": "application/json", "content-disposition": `attachment; filename="${name}"`, "cache-control": "no-store" },
+    });
+  });
+  app.get("/api/browse", async (c) => c.json(await storage.browse(c.req.query("path") || undefined)));
+
   app.get("/api/projects/:id", async (c) => {
     const id = c.req.param("id");
     const project = await storage.load(id);

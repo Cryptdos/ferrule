@@ -182,6 +182,20 @@ export interface Project {
   templates: Template[];
   /** Logic rules the simulator checks, e.g. two contactors never on together (DESIGN.md §10). */
   rules: LogicRule[];
+  /** Pictures kept in the project file: pasted or dropped images, the title block logo. */
+  assets: Record<string, Asset>;
+  /** The title block's logo, an asset id. */
+  logo?: string;
+}
+
+/** An image kept inside the project file. */
+export interface Asset {
+  /** A data: URL (image/png, image/jpeg or image/svg+xml). */
+  data: string;
+  /** Pixel size, for its shape. */
+  w: number;
+  h: number;
+  name?: string;
 }
 
 export interface LogicRule {
@@ -236,5 +250,6 @@ export function newProject(id: string, title = "Untitled project"): Project {
     revisions: [{ rev: "A", date: "", drawnBy: "", description: "First issue", clouds: [] }],
     templates: [],
     rules: [],
+    assets: {},
   };
 }

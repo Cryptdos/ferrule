@@ -107,7 +107,8 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
   // Sheet 1: cover
   page.title = "Cover sheet";
   box(10, 6, 180, 98);
-  box(20, 12, 36, 16, "LOGO");
+  // The company logo (set under Project…) shows here as well as in the title block.
+  addElement(p, page.id, "image", [20, 12], { params: { asset: "@logo", w: 36, h: 16 } });
   text(100, 40, "{project:title}", "title", "middle");
   text(100, 52, "{project:panelName}", "large", "middle");
   text(100, 62, "ELECTRICAL SCHEMATIC DRAWINGS", "normal", "middle");

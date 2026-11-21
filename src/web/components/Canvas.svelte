@@ -19,12 +19,18 @@
     placePlantView,
     setBoundary,
     setManualRoute,
+    updateCloud,
+    cloudsOn,
+    addAsset,
+    addImage,
     updateElement,
     updateSection,
     wire,
     type WireEnd,
   } from "../../core/ops";
-  import { localGeometry, defaultParams, type Geometry } from "../../core/symbols";
+  import { benchOf, localGeometry, defaultParams, type Geometry } from "../../core/symbols";
+  import { cloudPath } from "../../core/titleblock";
+  import { readImage } from "../images";
   import { elementTexts } from "../../core/tags";
   import { routePage } from "../../core/routing";
   import { stampTemplate } from "../../core/templates";
@@ -55,6 +61,9 @@
     | { kind: "secnew"; start: Vec; cur: Vec; cloud?: boolean }
     | { kind: "secmove"; id: string; start: Vec; rect: Rect4; delta: Vec }
     | { kind: "secsize"; id: string; start: Vec; rect: Rect4; delta: Vec; edges: string }
+    | { kind: "cloudmove"; id: string; start: Vec; rect: Rect4; delta: Vec }
+    | { kind: "elsize"; id: string; start: Vec; size: Vec; delta: Vec; keepShape: boolean }
+    | { kind: "cloudsize"; id: string; start: Vec; rect: Rect4; delta: Vec; edges: string }
     | { kind: "table"; coil: string; start: Vec; at: Vec; delta: Vec; row: number }
     | { kind: "boundary"; y: number }
     | null;
@@ -68,6 +77,9 @@
   let pending: Pending | null = $state(null);
 
   const page = $derived(editor.page);
+  /** What can be picked: drafting (parts, wires, rails…) or annotation (text, boxes, sections, clouds…). */
+  const bench = $derived(editor.mode === "annotate" ? "annotate" : "draft");
+  const clouds = $derived(cloudsOn(editor.project, page.id));
   const geoms = $derived(
     new Map<string, Geometry>(page.elements.map((e) => [e.id, localGeometry(e, elementTexts(e, editor.project))])),
   );
@@ -124,14 +136,54 @@
     const els = page.elements;
     for (let i = els.length - 1; i >= 0; i--) {
       const el = els[i]!;
-      if (el.symbol === "junction") continue;
+      if (el.symbol === "junction" || benchOf(el) !== bench) continue;
       const g = geoms.get(el.id);
-      if (g && pointInRect([pt[0] - el.pos[0], pt[1] - el.pos[1]], g.bbox, 0.5)) return el;
+      if (!g) continue;
+      const local: Vec = [pt[0] - el.pos[0], pt[1] - el.pos[1]];
+      if (el.symbol === "box") {
+        // A box is picked by its outline (or its label), so what's inside it can still be picked.
+        const b = g.body;
+        const inside = pointInRect(local, b, 0.6);
+        const deep = pointInRect(local, { x: b.x + 0.6, y: b.y + 0.6, w: b.w - 1.2, h: b.h - 1.2 }, 0);
+        const onLabel = !!el.label && local[0] < Math.min(b.w, 20) && local[1] < 2.4;
+        if ((inside && !deep) || (deep && onLabel)) return el;
+        continue;
+      }
+      if (pointInRect(local, g.bbox, 0.5)) return el;
+    }
+    return null;
+  }
+
+  /** The one selected element that can be sized by dragging its corner, if any. */
+  function resizable(): { el: Element; size: Vec; corner: Vec } | null {
+    if (sim || editor.selection.length !== 1) return null;
+    const el = page.elements.find((e) => e.id === editor.selection[0]);
+    if (!el || !["image", "box", "plate"].includes(el.symbol) || el.rot !== 0) return null;
+    const size: Vec = [Number(el.params.w) || 20, Number(el.params.h) || 10];
+    return { el, size, corner: [el.pos[0] + size[0], el.pos[1] + size[1]] };
+  }
+
+  /** A revision cloud's edge (resize that side) or its revision triangle (move it). Annotate only. */
+  function hitCloud(pt: Vec): { id: string; part: "move" | "size"; edges: string } | null {
+    if (bench !== "annotate") return null;
+    const near = 0.9;
+    for (const c of clouds) {
+      const [x, y, w, h] = c.rect;
+      if (pt[0] > x + w - 2.4 && pt[0] < x + w + 2.6 && pt[1] > y - 3.4 && pt[1] < y) return { id: c.id, part: "move", edges: "" };
+      const inX = pt[0] > x - near && pt[0] < x + w + near;
+      const inY = pt[1] > y - near && pt[1] < y + h + near;
+      let edges = "";
+      if (inX && Math.abs(pt[1] - y) < near) edges += "n";
+      if (inX && Math.abs(pt[1] - (y + h)) < near) edges += "s";
+      if (inY && Math.abs(pt[0] - x) < near) edges += "w";
+      if (inY && Math.abs(pt[0] - (x + w)) < near) edges += "e";
+      if (edges) return { id: c.id, part: "size", edges };
     }
     return null;
   }
 
   function hitWire(pt: Vec, tolerance = 0.6): { seg: Segment; leg: number } | null {
+    if (bench !== "draft") return null;
     let best: { seg: Segment; leg: number; dist: number } | null = null;
     for (const seg of page.segments) {
       const { dist, leg } = distanceToRoute(pt, routeOf(page, seg));
@@ -145,6 +197,7 @@
    * an edge or a corner (resize that side). Edges are named n/s/e/w.
    */
   function hitSection(pt: Vec): { id: string; part: "move" | "size"; edges: string } | null {
+    if (bench !== "annotate") return null;
     const near = 0.6;
     for (let i = page.sections.length - 1; i >= 0; i--) {
       const sec = page.sections[i]!;
@@ -165,6 +218,7 @@
 
   /** A coil's contact table under the pointer: drag it to move it, click a row to go to that contact. */
   function hitTable(pt: Vec): { coil: Element; at: Vec; row: number } | null {
+    if (bench !== "draft") return null;
     for (let i = page.elements.length - 1; i >= 0; i--) {
       const el = page.elements[i]!;
       if (!isMaster(el)) continue;
@@ -305,6 +359,22 @@
       gesture = { kind: "table", coil: table.coil.id, start: pt, at: table.at, delta: [0, 0], row: table.row };
       return;
     }
+    // The corner handle of a selected picture, box or label plate sizes it.
+    const sized = resizable();
+    if (sized && Math.abs(pt[0] - sized.corner[0]) < 0.9 && Math.abs(pt[1] - sized.corner[1]) < 0.9) {
+      gesture = { kind: "elsize", id: sized.el.id, start: pt, size: sized.size, delta: [0, 0], keepShape: sized.el.symbol === "image" };
+      return;
+    }
+    const cloudHit = hitCloud(pt);
+    if (cloudHit) {
+      const c = clouds.find((x) => x.id === cloudHit.id)!;
+      editor.selection = [c.id];
+      gesture =
+        cloudHit.part === "size"
+          ? { kind: "cloudsize", id: c.id, start: pt, rect: [...c.rect], delta: [0, 0], edges: cloudHit.edges }
+          : { kind: "cloudmove", id: c.id, start: pt, rect: [...c.rect], delta: [0, 0] };
+      return;
+    }
     const hit = hitElement(pt);
     const wireHit = hit ? null : hitWire(pt);
     const secHit = hit || wireHit ? null : hitSection(pt);
@@ -317,7 +387,7 @@
           : { kind: "secmove", id: sec.id, start: pt, rect: [...sec.rect], delta: [0, 0] };
       return;
     }
-    if (!hit && !wireHit && page.boundaryY !== null && Math.abs(pt[1] - page.boundaryY) < 0.6) {
+    if (bench === "draft" && !hit && !wireHit && page.boundaryY !== null && Math.abs(pt[1] - page.boundaryY) < 0.6) {
       gesture = { kind: "boundary", y: page.boundaryY };
       return;
     }
@@ -359,8 +429,13 @@
       g.cur = pointer;
     } else if (g.kind === "secnew") {
       g.cur = snapVec(pointer);
-    } else if (g.kind === "secmove" || g.kind === "secsize") {
+    } else if (g.kind === "secmove" || g.kind === "secsize" || g.kind === "cloudmove" || g.kind === "cloudsize") {
       g.delta = snapVec([pointer[0] - g.start[0], pointer[1] - g.start[1]]);
+    } else if (g.kind === "elsize") {
+      let d = snapVec([pointer[0] - g.start[0], pointer[1] - g.start[1]]);
+      // A picture keeps its shape (hold Shift to stretch it).
+      if (g.keepShape && !e.shiftKey) d = [d[0], Math.round(((g.size[0] + d[0]) * g.size[1]) / g.size[0]) - g.size[1]];
+      g.delta = d;
     } else if (g.kind === "table") {
       // Half-unit steps: the table is text, it doesn't need to sit on the grid.
       g.delta = [Math.round((pointer[0] - g.start[0]) * 2) / 2, Math.round((pointer[1] - g.start[1]) * 2) / 2];
@@ -397,6 +472,13 @@
     } else if ((g.kind === "secmove" || g.kind === "secsize") && (g.delta[0] || g.delta[1])) {
       const rect = sectionPreview(g);
       editor.apply((p) => updateSection(p, editor.pageId, g.id, { rect }));
+    } else if (g.kind === "elsize" && (g.delta[0] || g.delta[1])) {
+      const w = Math.max(2, g.size[0] + g.delta[0]);
+      const h = Math.max(2, g.size[1] + g.delta[1]);
+      editor.apply((p) => updateElement(p, editor.pageId, g.id, { params: { w, h } }));
+    } else if ((g.kind === "cloudmove" || g.kind === "cloudsize") && (g.delta[0] || g.delta[1])) {
+      const rect = sectionPreview({ ...g, kind: g.kind === "cloudsize" ? "secsize" : "secmove" });
+      editor.apply((p) => updateCloud(p, g.id, { rect }));
     } else if (g.kind === "table") {
       if (g.delta[0] || g.delta[1]) {
         const at: Vec = [g.at[0] + g.delta[0], g.at[1] + g.delta[1]];
@@ -416,14 +498,19 @@
       if (r.w < 0.2 && r.h < 0.2) return;
       const hitEls = page.elements
         .filter((el) => {
-          if (el.symbol === "junction") return false;
+          if (el.symbol === "junction" || benchOf(el) !== bench) return false;
           const gm = geoms.get(el.id);
           return gm && rectsIntersect(r, offsetRect(gm.bbox, el.pos));
         })
         .map((el) => el.id);
       // Wires are boxed only when they lie wholly inside.
-      const hitSegs = page.segments.filter((s) => routeOf(page, s).every((p) => pointInRect(p, r))).map((s) => s.id);
-      const hits = [...hitEls, ...hitSegs];
+      const hitSegs = bench === "draft" ? page.segments.filter((s) => routeOf(page, s).every((p) => pointInRect(p, r))).map((s) => s.id) : [];
+      const inside = (q: Rect4) => q[0] >= r.x && q[1] >= r.y && q[0] + q[2] <= r.x + r.w && q[1] + q[3] <= r.y + r.h;
+      const hitBoxes =
+        bench === "annotate"
+          ? [...page.sections.filter((x) => inside(x.rect)).map((x) => x.id), ...clouds.filter((c) => inside(c.rect)).map((c) => c.id)]
+          : [];
+      const hits = [...hitEls, ...hitSegs, ...hitBoxes];
       editor.selection = g.add ? [...new Set([...editor.selection, ...hits])] : hits;
     }
   }
@@ -453,8 +540,43 @@
     return [x, y, w, h];
   }
 
+  /** Pictures dropped on the sheet go where they're dropped (Annotate workbench). */
+  async function onDrop(e: DragEvent) {
+    if (sim) return;
+    const files = [...(e.dataTransfer?.files ?? [])].filter((f) => f.type.startsWith("image/"));
+    if (!files.length) return;
+    e.preventDefault();
+    const at = clampToArea(snapVec(toUnits(e)));
+    await placePictures(files, at);
+  }
+
+  /** Put pictures on the sheet, top-left at `at`, and switch to Annotate where they're edited. */
+  export async function placePictures(files: Blob[], at?: Vec): Promise<void> {
+    const where = at ?? clampToArea(snapVec(pointer ?? [AREA_UNITS.w / 2 - 20, AREA_UNITS.h / 2 - 10]));
+    const ids: string[] = [];
+    for (const [i, f] of files.entries()) {
+      let img;
+      try {
+        img = await readImage(f);
+      } catch (err) {
+        editor.flash((err as Error).message);
+        continue;
+      }
+      editor.apply((p) => {
+        const asset = addAsset(p, img);
+        ids.push(addImage(p, editor.pageId, asset, [where[0] + i * 4, where[1] + i * 4]).id);
+      });
+    }
+    if (ids.length) {
+      editor.mode = "annotate";
+      editor.tool = "select";
+      editor.selection = ids;
+      editor.flash(ids.length === 1 ? "Picture added. Drag its corner to size it." : `${ids.length} pictures added.`);
+    }
+  }
+
   function onDblClick(e: MouseEvent) {
-    if (sim || editor.tool !== "select") return;
+    if (editor.tool !== "select") return;
     const hit = hitElement(toUnits(e));
     if (!hit) return;
     const target = linkedTarget(editor.project, hit);
@@ -502,8 +624,10 @@
   /** Resize cursors over section edges, a move cursor over labels and contact tables. */
   const hoverCursor = $derived.by(() => {
     if (sim || editor.tool !== "select" || !pointer || gesture) return "";
+    const sz = resizable();
+    if (sz && Math.abs(pointer[0] - sz.corner[0]) < 0.9 && Math.abs(pointer[1] - sz.corner[1]) < 0.9) return "nwse";
     if (hitTable(pointer)) return "move";
-    const s = hitSection(pointer);
+    const s = hitCloud(pointer) ?? hitSection(pointer);
     if (!s) return "";
     if (s.part === "move") return "move";
     const e = s.edges;
@@ -516,6 +640,11 @@
     const g = gesture as Gesture;
     if (g?.kind !== "secmove" && g?.kind !== "secsize") return null;
     return new Map([[g.id, sectionPreview(g)]]);
+  });
+  const cloudPreview = $derived.by(() => {
+    const g = gesture as Gesture;
+    if (g?.kind !== "cloudmove" && g?.kind !== "cloudsize") return null;
+    return sectionPreview({ ...g, kind: g.kind === "cloudsize" ? "secsize" : "secmove" });
   });
   const boundaryPreview = $derived.by(() => {
     const g = gesture as Gesture;
@@ -609,6 +738,10 @@
   onpointermove={onPointerMove}
   onpointerup={onPointerUp}
   ondblclick={onDblClick}
+  ondragover={(e) => {
+    if (!sim && e.dataTransfer?.types.includes("Files")) e.preventDefault();
+  }}
+  ondrop={(e) => void onDrop(e)}
   onpointerleave={() => (pointer = null)}
   oncontextmenu={(e) => e.preventDefault()}
   role="application"
@@ -686,6 +819,15 @@
           {/each}
         {/if}
       {/each}
+      {#each clouds as c (c.id)}
+        {#if selected.has(c.id)}
+          {@const r = c.rect}
+          <rect class="sel" x={r[0] - 0.8} y={r[1] - 0.8} width={r[2] + 1.6} height={r[3] + 1.6} />
+          {#each [[0, 0], [1, 0], [0, 1], [1, 1]] as [fx, fy] (`${fx}${fy}`)}
+            <rect class="handle" x={r[0] + fx * r[2] - 0.5} y={r[1] + fy * r[3] - 0.5} width="1" height="1" />
+          {/each}
+        {/if}
+      {/each}
       {#each page.segments as seg (seg.id)}
         {#if selected.has(seg.id)}
           {@const pts = previewRoutes?.get(seg.id) ?? routeOf(page, seg)}
@@ -704,6 +846,19 @@
           height={g.bbox.h + 2.4}
           rx="1"
         />
+      {/if}
+      {#if !gesture || gesture.kind === "elsize"}
+        {@const sz = resizable()}
+        {#if sz}
+          {@const g = gesture?.kind === "elsize" ? gesture : null}
+          {@const w = Math.max(2, sz.size[0] + (g?.delta[0] ?? 0))}
+          {@const h = Math.max(2, sz.size[1] + (g?.delta[1] ?? 0))}
+          {#if g}<rect class="band" x={sz.el.pos[0]} y={sz.el.pos[1]} width={w} height={h} />{/if}
+          <rect class="handle corner" x={sz.el.pos[0] + w - 0.6} y={sz.el.pos[1] + h - 0.6} width="1.2" height="1.2" />
+        {/if}
+      {/if}
+      {#if cloudPreview}
+        <path class="cloud-ghost" d={cloudPath(cloudPreview)} />
       {/if}
       {#if tablePreview}
         <rect class="band" x={tablePreview.x} y={tablePreview.y} width={tablePreview.w} height={tablePreview.h} />
@@ -773,6 +928,12 @@
   }
   .canvas.nesw {
     cursor: nesw-resize;
+  }
+  .cloud-ghost {
+    fill: none;
+    stroke: #1e6ee6;
+    stroke-width: 0.25;
+    stroke-dasharray: 0.8 0.5;
   }
   .jumped {
     fill: rgba(255, 170, 0, 0.12);

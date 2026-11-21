@@ -7,11 +7,12 @@
 
   let filter = $state("");
 
-  const all = listSymbols().filter((s) => s.palette);
+  /** Each workbench shows only its own parts: electrics in Draft, text and boxes in Annotate. */
+  const all = $derived(listSymbols().filter((s) => s.palette && (s.bench ?? "draft") === (editor.mode === "annotate" ? "annotate" : "draft")));
   /** Shown by name first: the name says what a part is; the small picture is a reminder. */
   const groups = $derived.by(() => {
     const q = filter.trim().toLowerCase();
-    const out = new Map<string, typeof all>();
+    const out = new Map<string, ReturnType<typeof listSymbols>>();
     for (const s of all) {
       if (q && !`${s.name} ${s.group} ${s.id}`.toLowerCase().includes(q)) continue;
       out.set(s.group, [...(out.get(s.group) ?? []), s]);

@@ -75,6 +75,8 @@ export interface ParamDef {
   fixed?: string;
   /** An example of the format to follow, shown greyed in an empty box. */
   placeholder?: string;
+  /** Kept on the element but not shown for editing. */
+  hidden?: boolean;
 }
 
 export interface SymbolDef {
@@ -89,6 +91,12 @@ export interface SymbolDef {
   kind(el: Element): SymbolKind | null;
   /** Terminal groups that are the same potential (e.g. both sides of a terminal). */
   bridged?(el: Element): string[][];
+  /**
+   * The workbench it belongs to. Drafting (the default) is the electrical
+   * drawing; annotations (text, boxes, label plates, pictures) are added and
+   * edited in the Annotate workbench.
+   */
+  bench?: "draft" | "annotate";
   draw(el: Element): { prims: Prim[]; terminals: TerminalDef[]; body: Rect };
 }
 
@@ -1107,6 +1115,7 @@ const SYMBOLS: SymbolDef[] = [
   },
   {
     id: "text",
+    bench: "annotate",
     name: "Text",
     group: "Drawing",
     palette: true,
@@ -1151,6 +1160,7 @@ const SYMBOLS: SymbolDef[] = [
   },
   {
     id: "box",
+    bench: "annotate",
     name: "Box",
     group: "Drawing",
     palette: true,
@@ -1175,6 +1185,7 @@ const SYMBOLS: SymbolDef[] = [
   },
   {
     id: "plate",
+    bench: "annotate",
     name: "Label plate",
     group: "Drawing",
     palette: true,
@@ -1210,6 +1221,26 @@ const SYMBOLS: SymbolDef[] = [
         terminals: [],
         body: { x: 0, y: 0, w, h },
       };
+    },
+  },
+  {
+    id: "image",
+    bench: "annotate",
+    name: "Picture",
+    group: "Drawing",
+    // Pasted (Ctrl+V) or dropped onto the sheet; not placed from the palette.
+    palette: false,
+    params: [
+      { key: "asset", label: "Picture", type: "text", default: "", hidden: true },
+      { key: "w", label: "Width (units)", type: "number", min: 2, max: 200, default: 30 },
+      { key: "h", label: "Height (units)", type: "number", min: 2, max: 120, default: 20 },
+    ],
+    kind: () => null,
+    draw(el) {
+      // The picture itself is drawn from the project's assets; this is its frame.
+      const w = num(el, "w", 30, 2, 200);
+      const h = num(el, "h", 20, 2, 120);
+      return { prims: [], terminals: [], body: { x: 0, y: 0, w, h } };
     },
   },
   {
@@ -1334,6 +1365,11 @@ export function paramApplies(def: ParamDef, el: Element): boolean {
 }
 
 const BY_ID = new Map(SYMBOLS.map((s) => [s.id, s]));
+
+/** Which workbench an element is edited in. */
+export function benchOf(el: Element): "draft" | "annotate" {
+  return getSymbol(el.symbol)?.bench ?? "draft";
+}
 
 export function listSymbols(): SymbolDef[] {
   return SYMBOLS;

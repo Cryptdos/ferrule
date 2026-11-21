@@ -1,5 +1,16 @@
 <script lang="ts">
-  import { deleteElements, deleteSections, deleteSegments, duplicateElements, moveElements, rotateElements } from "../../core/ops";
+  import {
+    deleteClouds,
+    deleteElements,
+    deleteSections,
+    deleteSegments,
+    duplicateElements,
+    moveElements,
+    rotateElements,
+  } from "../../core/ops";
+  import { benchOf } from "../../core/symbols";
+  import { api } from "../api";
+  import FileBrowser from "./FileBrowser.svelte";
   import { isTyping } from "../typing";
   import type { Editor } from "../editor.svelte";
   import Canvas from "./Canvas.svelte";
@@ -18,7 +29,20 @@
   import SimPanel from "./SimPanel.svelte";
   import { Simulator } from "../sim.svelte";
 
-  let { editor, onclose }: { editor: Editor; onclose: () => void } = $props();
+  let { editor, onclose, onopen }: { editor: Editor; onclose: () => void; onopen?: (id: string) => void } = $props();
+  let savingAs = $state(false);
+
+  async function saveAs(path: string) {
+    savingAs = false;
+    await editor.saveNow();
+    try {
+      const { id } = await api.saveAs(editor.project.id, path);
+      editor.flash(`Saved a copy as ${path}. Now editing the copy.`);
+      onopen?.(id);
+    } catch (e) {
+      editor.flash((e as Error).message);
+    }
+  }
 
   let canvas: Canvas | undefined = $state();
   let showProject = $state(false);
@@ -26,11 +50,15 @@
   let tableView = $state(false);
   let sim: Simulator | null = $state(null);
 
-  function setMode(mode: "draft" | "simulate") {
+  function setMode(mode: "draft" | "annotate" | "ga" | "simulate") {
     if (mode === editor.mode) return;
     sim?.stop();
     sim = null;
     editor.mode = mode;
+    // Each workbench has its own things to pick: start with nothing picked.
+    editor.tool = "select";
+    editor.placeSymbol = null;
+    editor.selection = [];
     if (mode === "simulate") {
       tableView = false;
       editor.tool = "select";
@@ -91,8 +119,20 @@
 
 
   function onKey(e: KeyboardEvent) {
-    if (isTyping(e.target) || showProject || dialog || tableView || editor.mode === "simulate") return;
+    if (isTyping(e.target) || showProject || dialog || tableView || savingAs) return;
     const ctrl = e.ctrlKey || e.metaKey;
+    // Simulating: only moving about (sheets, fit); nothing is edited.
+    if (editor.mode === "simulate") {
+      if (e.key === "PageDown" || e.key === "PageUp") {
+        e.preventDefault();
+        const pages = editor.project.pages;
+        const i = editor.pageIndex + (e.key === "PageDown" ? 1 : -1);
+        if (pages[i]) editor.setPage(pages[i].id);
+      } else if (e.key === "f" || e.key === "F") {
+        canvas?.fit();
+      }
+      return;
+    }
     const ids = editor.selectedElements.map((el) => el.id);
     const segIds = editor.selectedSegments.map((s) => s.id);
     const secIds = editor.selectedSections.map((s) => s.id);
@@ -109,9 +149,11 @@
       void editor.saveNow();
     } else if (ctrl && e.key.toLowerCase() === "a") {
       e.preventDefault();
+      // Everything this workbench edits.
+      const bench = editor.mode === "annotate" ? "annotate" : "draft";
       editor.selection = [
-        ...editor.page.elements.filter((el) => el.symbol !== "junction").map((el) => el.id),
-        ...editor.page.segments.map((s) => s.id),
+        ...editor.page.elements.filter((el) => el.symbol !== "junction" && benchOf(el) === bench).map((el) => el.id),
+        ...(bench === "draft" ? editor.page.segments.map((s) => s.id) : editor.page.sections.map((s) => s.id)),
       ];
     } else if (ctrl && e.key.toLowerCase() === "d") {
       e.preventDefault();
@@ -122,9 +164,11 @@
       });
       editor.selection = copies;
     } else if (e.key === "Delete" || e.key === "Backspace") {
-      if (!ids.length && !segIds.length && !secIds.length) return;
+      const cloudIds = editor.selectedClouds.map((c) => c.id);
+      if (!ids.length && !segIds.length && !secIds.length && !cloudIds.length) return;
       e.preventDefault();
       editor.apply((p) => {
+        deleteClouds(p, cloudIds);
         deleteSections(p, pageId, secIds);
         deleteSegments(p, pageId, segIds);
         deleteElements(p, pageId, ids);
@@ -138,10 +182,10 @@
       editor.tool = "select";
       editor.placeSymbol = null;
       editor.selection = [];
-    } else if (e.key === "w" || e.key === "W") {
+    } else if ((e.key === "w" || e.key === "W") && editor.mode === "draft") {
       editor.tool = "wire";
       editor.placeSymbol = null;
-    } else if (e.key === "b" || e.key === "B") {
+    } else if ((e.key === "b" || e.key === "B") && editor.mode === "annotate") {
       editor.tool = "section";
       editor.placeSymbol = null;
     } else if (e.key === "s" || e.key === "S") {
@@ -166,6 +210,14 @@
 
 <svelte:window
   onkeydown={onKey}
+  onpaste={(e) => {
+    // Ctrl+V with a picture on the clipboard puts it on the sheet (Annotate).
+    if (editor.mode === "simulate" || editor.mode === "ga" || isTyping(e.target) || showProject || dialog) return;
+    const files = [...(e.clipboardData?.files ?? [])].filter((f) => f.type.startsWith("image/"));
+    if (!files.length) return;
+    e.preventDefault();
+    void canvas?.placePictures(files);
+  }}
   onbeforeunload={(e) => {
     if (editor.hasUnsaved) {
       void editor.saveNow();
@@ -179,52 +231,74 @@
     <button class="link" onclick={onclose} title="Back to projects">◂ Projects</button>
     <strong class="title">{editor.project.project.title}</strong>
     <div class="workbench" role="group" aria-label="Workbench">
-      <button class:active={editor.mode === "draft"} onclick={() => setMode("draft")}>Draft</button>
+      <button class:active={editor.mode === "draft"} onclick={() => setMode("draft")} title="The electrical drawing: parts, wires, rails, plant">Draft</button>
+      <button class:active={editor.mode === "annotate"} onclick={() => setMode("annotate")} title="Text, boxes, label plates, sections, revision clouds and pictures">Annotate</button>
       <button class:active={editor.mode === "simulate"} onclick={() => setMode("simulate")} title="Try the logic as drawn">Simulate</button>
     </div>
     {#if editor.mode === "simulate"}
-      <span class="simnote">Simulating: click switches and buttons on the drawing. Editing is off.</span>
+      <span class="simnote">Simulating: click switches and buttons on the drawing; double-click to follow a link. Editing is off.</span>
       <button onclick={() => canvas?.fit()} title="Fit sheet (F)">Fit</button>
       <button class:active={!!editor.splitPageId} onclick={toggleSplit}>Split</button>
     {:else}
-    <div class="tools">
-      <button class:active={editor.tool === "select"} onclick={() => ((editor.tool = "select"), (editor.placeSymbol = null))}>
-        Select
-      </button>
-      <button class:active={editor.tool === "wire"} onclick={() => ((editor.tool = "wire"), (editor.placeSymbol = null))} title="Draw wires (W)">
-        Wire
-      </button>
-      <button class:active={editor.tool === "section"} onclick={() => ((editor.tool = "section"), (editor.placeSymbol = null))} title="Draw a section box (B)">
-        Section
-      </button>
-      <button class:active={editor.tool === "cloud"} onclick={() => ((editor.tool = "cloud"), (editor.placeSymbol = null))} title="Cloud a change for the latest revision">
-        Cloud
-      </button>
-      <span class="sep"></span>
-      <button disabled={!editor.canUndo} onclick={() => editor.undo()} title="Undo (Ctrl+Z)">Undo</button>
-      <button disabled={!editor.canRedo} onclick={() => editor.redo()} title="Redo (Ctrl+Y)">Redo</button>
-      <span class="sep"></span>
-      <button onclick={() => canvas?.fit()} title="Fit sheet (F)">Fit</button>
-      <button class:active={!!editor.splitPageId} onclick={toggleSplit} title="Show another sheet alongside">Split</button>
-      <button class:active={tableView} onclick={() => (tableView = !tableView)} title="Every element in the project as a table">Table</button>
-      <span class="sep"></span>
-      <button onclick={doRenumber} title="Recalculate tags, terminal and wire numbers (locked ones are kept)">Renumber</button>
-      <button onclick={() => (dialog = "templates")} title="Save and stamp sheet and section templates">Templates…</button>
-      <button onclick={() => (dialog = "plant")} title="Field equipment: define plant and place views">Plant…</button>
-      <button onclick={() => (dialog = "checks")} title="Check the drawing for problems">Check</button>
-      <button onclick={() => (dialog = "schedules")} title="Terminal and cable schedules">Schedules</button>
-      <button onclick={() => (showProject = true)} title="Project details and revisions (title block)">Project…</button>
+      <div class="tools">
+        <button class:active={editor.tool === "select"} onclick={() => ((editor.tool = "select"), (editor.placeSymbol = null))}>
+          Select
+        </button>
+        {#if editor.mode === "draft"}
+          <button class:active={editor.tool === "wire"} onclick={() => ((editor.tool = "wire"), (editor.placeSymbol = null))} title="Draw wires (W)">
+            Wire
+          </button>
+        {:else if editor.mode === "annotate"}
+          <button class:active={editor.tool === "section"} onclick={() => ((editor.tool = "section"), (editor.placeSymbol = null))} title="Draw a section box (B)">
+            Section
+          </button>
+          <button class:active={editor.tool === "cloud"} onclick={() => ((editor.tool = "cloud"), (editor.placeSymbol = null))} title="Cloud a change for the latest revision">
+            Cloud
+          </button>
+          <label class="button" title="Add a picture (or paste one with Ctrl+V, or drop one on the sheet)">
+            Picture…
+            <input
+              type="file"
+              accept="image/*"
+              hidden
+              onchange={(e) => {
+                const files = [...(e.currentTarget.files ?? [])];
+                e.currentTarget.value = "";
+                if (files.length) void canvas?.placePictures(files);
+              }}
+            />
+          </label>
+        {/if}
+        <span class="sep"></span>
+        <button disabled={!editor.canUndo} onclick={() => editor.undo()} title="Undo (Ctrl+Z)">Undo</button>
+        <button disabled={!editor.canRedo} onclick={() => editor.redo()} title="Redo (Ctrl+Y)">Redo</button>
+        <span class="sep"></span>
+        <button onclick={() => canvas?.fit()} title="Fit sheet (F)">Fit</button>
+        <button class:active={!!editor.splitPageId} onclick={toggleSplit} title="Show another sheet alongside">Split</button>
+        {#if editor.mode === "draft"}
+          <button class:active={tableView} onclick={() => (tableView = !tableView)} title="Every element in the project as a table">Table</button>
+          <span class="sep"></span>
+          <button onclick={doRenumber} title="See what Renumber would change to tags, terminal and wire numbers, then apply">Renumber</button>
+          <button onclick={() => (dialog = "templates")} title="Save and stamp sheet and section templates">Templates…</button>
+          <button onclick={() => (dialog = "plant")} title="Field equipment: define plant and place views">Plant…</button>
+          <button onclick={() => (dialog = "checks")} title="Check the drawing for problems">Check</button>
+          <button onclick={() => (dialog = "schedules")} title="Terminal and cable schedules">Schedules</button>
+        {/if}
+      </div>
+    {/if}
+    <div class="file">
+      <button onclick={() => (showProject = true)} title="Project details, logo and revisions (title block)">Project…</button>
+      <button onclick={() => (savingAs = true)} title="Save a copy of this project to a file anywhere">Save as…</button>
       <button onclick={exportPdf} disabled={exporting} title="Download every sheet as an A4 PDF">
         {exporting ? "Exporting…" : "Export PDF"}
       </button>
       <button onclick={print} title="Open the print view and print from the browser">Print</button>
     </div>
-    {/if}
     <span class="status" class:error={editor.saveState === "error"}>{saveText}</span>
   </header>
   <aside class="left">
     <PageList {editor} />
-    {#if editor.mode === "draft"}<Palette {editor} />{/if}
+    {#if editor.mode === "draft" || editor.mode === "annotate"}<Palette {editor} />{/if}
   </aside>
   <main class:split={!!editor.splitPageId && !tableView}>
     {#if tableView}
@@ -246,6 +320,14 @@
     {/if}
   </aside>
 </div>
+{#if savingAs}
+  <FileBrowser
+    mode="save"
+    initialName={editor.project.project.title}
+    onpick={(path) => void saveAs(path)}
+    onclose={() => (savingAs = false)}
+  />
+{/if}
 {#if dialog === "plant"}
   <PlantDialog {editor} onclose={() => (dialog = null)} />
 {:else if dialog === "renumber"}
@@ -274,10 +356,17 @@
     grid-area: head;
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
     padding: 0 10px;
+    overflow-x: auto;
+    white-space: nowrap;
     border-bottom: 1px solid #cfd4d8;
     background: #f4f5f6;
+  }
+  header button,
+  header .button {
+    white-space: nowrap;
+    flex: none;
   }
   .title {
     font-size: 14px;
@@ -308,6 +397,19 @@
     align-items: center;
     gap: 4px;
   }
+  .file {
+    display: flex;
+    gap: 4px;
+    margin-left: auto;
+  }
+  label.button {
+    border: 1px solid #c8ccd2;
+    border-radius: 4px;
+    padding: 3px 8px;
+    background: #fff;
+    cursor: pointer;
+    font-size: 13px;
+  }
   .sep {
     width: 1px;
     height: 20px;
@@ -315,7 +417,6 @@
     margin: 0 4px;
   }
   .status {
-    margin-left: auto;
     font-size: 12px;
     color: #667;
   }

@@ -47,6 +47,7 @@ export function parseProject(input: unknown): Project {
           : {},
     },
     titleBlock: strOr(input.titleBlock, "default-a4"),
+    assets: {},
     plant: parsePlant(input.plant),
     pages: [],
     conductors: [],
@@ -86,6 +87,8 @@ export function parseProject(input: unknown): Project {
       ...(typeof r.b === "string" ? { b: r.b } : {}),
       ...(typeof r.note === "string" ? { note: r.note } : {}),
     }));
+  project.assets = parseAssets(input.assets);
+  if (typeof input.logo === "string" && project.assets[input.logo]) project.logo = input.logo;
   project.conductors = parseConductors(input.conductors);
   const lamps = new Set(project.pages.flatMap((pg) => pg.elements.filter((e) => e.symbol === "lamp").map((e) => e.id)));
   for (const c of project.conductors) c.terminals = c.terminals.map((t) => upgradeRef(t, lamps));
@@ -111,6 +114,22 @@ export function parseTemplate(t: Record<string, unknown>, i = 0): Project["templ
         ? (t.size as [number, number])
         : [200, 112],
   };
+}
+
+/** Images: data URLs of the kinds a browser draws, nothing else. */
+function parseAssets(v: unknown): Project["assets"] {
+  const out: Project["assets"] = {};
+  if (!isObj(v)) return out;
+  for (const [id, a] of Object.entries(v)) {
+    if (!isObj(a) || typeof a.data !== "string" || !/^data:image\/(png|jpeg|svg\+xml|webp|gif);base64,/.test(a.data)) continue;
+    out[id] = {
+      data: a.data,
+      w: typeof a.w === "number" && a.w > 0 ? a.w : 100,
+      h: typeof a.h === "number" && a.h > 0 ? a.h : 100,
+      ...(typeof a.name === "string" ? { name: a.name } : {}),
+    };
+  }
+  return out;
 }
 
 export function parsePlant(v: unknown): Project["plant"] {

@@ -34,7 +34,7 @@ describe("project API", () => {
     expect(put.status).toBe(200);
     const loaded = await (await app.request("/api/projects/fan-panel")).json();
     expect(loaded.project.client).toBe("ACME");
-    expect(await readdir(dir)).toContain("fan-panel.ferrule.json.bak");
+    expect(await readdir(dir)).toContain("fan-panel.ferrule.bak");
   });
 
   test("rejects bad ids, bad data and mismatched ids", async () => {
@@ -120,5 +120,39 @@ describe("examples", () => {
     const p = await (await a.request(`/api/projects/${id}`)).json();
     expect(p.pages).toHaveLength(12);
     expect((await a.request("/api/examples/nope", { method: "POST" })).status).toBe(404);
+  });
+});
+
+describe("project files anywhere", () => {
+  test("save as, open, list, duplicate, delete, browse", async () => {
+    const elsewhere = await mkdtemp(join(tmpdir(), "ferrule-elsewhere-"));
+    try {
+      const created = await (await app.request("/api/projects", json({ title: "Kitchen Panel" }))).json();
+      // Save As puts a copy somewhere else and gives it its own id.
+      const saved = await (await app.request(`/api/projects/${created.id}/save-as`, json({ path: join(elsewhere, "Kitchen") }))).json();
+      expect(saved.id).toMatch(/^kitchen-[0-9a-f]{6}$/);
+      expect(await readdir(elsewhere)).toContain("Kitchen.ferrule");
+      // A second Save As to the same name is refused unless asked to overwrite.
+      expect((await app.request(`/api/projects/${created.id}/save-as`, json({ path: join(elsewhere, "Kitchen.ferrule") }))).status).toBe(409);
+      // It's on the list, from elsewhere, and opens again by its path to the same id.
+      const list = await (await app.request("/api/projects")).json();
+      expect(list.find((p: { id: string }) => p.id === saved.id).where).toBe("elsewhere");
+      const opened = await (await app.request("/api/projects/open", json({ path: join(elsewhere, "Kitchen.ferrule") }))).json();
+      expect(opened.id).toBe(saved.id);
+      const loaded = await (await app.request(`/api/projects/${saved.id}`)).json();
+      expect(loaded.id).toBe(saved.id);
+      // The folder browser lists it.
+      const listing = await (await app.request(`/api/browse?path=${encodeURIComponent(elsewhere)}`)).json();
+      expect(listing.files.map((f: { name: string }) => f.name)).toEqual(["Kitchen.ferrule"]);
+      // Duplicate, then delete: the file moves to Deleted, not destroyed.
+      const dup = await (await app.request(`/api/projects/${created.id}/duplicate`, { method: "POST" })).json();
+      expect((await app.request(`/api/projects/${dup.id}?file=1`, { method: "DELETE" })).status).toBe(200);
+      expect((await readdir(join(dir, "Deleted"))).length).toBe(1);
+      // Removing one from elsewhere from the list leaves its file alone.
+      expect((await app.request(`/api/projects/${saved.id}`, { method: "DELETE" })).status).toBe(200);
+      expect(await readdir(elsewhere)).toContain("Kitchen.ferrule");
+    } finally {
+      await rm(elsewhere, { recursive: true, force: true });
+    }
   });
 });

@@ -56,7 +56,7 @@
 {#if printData}
   <PrintView project={printData} {autoprint} {solo} />
 {:else if editor}
-  <EditorView {editor} onclose={() => void open(null)} />
+  <EditorView {editor} onclose={() => void open(null)} onopen={(id) => void open(id)} />
 {:else}
   {#if error}<p class="error">{error}</p>{/if}
   <Picker onopen={(id) => void open(id)} />
