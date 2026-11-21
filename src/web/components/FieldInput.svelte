@@ -1,5 +1,6 @@
 <script lang="ts">
   import { resolveFields } from "../../core/fields";
+  import { plantLabel } from "../../core/ops";
   import type { Editor } from "../editor.svelte";
 
   /** A text input for labels, with a picker that inserts plant fields like {plant:p1.tag}. */
@@ -46,8 +47,8 @@
       <option value={"{sheets}"}>Sheet count</option>
       <option value={"{rev}"}>Latest revision</option>
       {#each editor.project.plant as p (p.id)}
-        <option value={`{plant:${p.id}.tag}`}>{p.tag} tag</option>
-        <option value={`{plant:${p.id}.description}`}>{p.tag} description</option>
+        <option value={`{plant:${p.id}.tag}`}>{plantLabel(p)} tag</option>
+        <option value={`{plant:${p.id}.description}`}>{plantLabel(p)} description</option>
       {/each}
     </select>
 </div>

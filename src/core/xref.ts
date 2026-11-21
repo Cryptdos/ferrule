@@ -38,8 +38,12 @@ export function locate(project: Project, id: string): Located | null {
 }
 
 /** Sheet-column address of a point, e.g. "10-16". */
-export function address(page: Page, pos: Vec): string {
-  return `${page.number}-${columnOf(pos[0])}`;
+/**
+ * Where something is: sheet-column, e.g. 8-34. Seen from the same sheet
+ * just the column, e.g. 34, as on a manufacturer's drawing.
+ */
+export function address(page: Page, pos: Vec, from?: Page | null): string {
+  return from && from.id === page.id ? `${columnOf(pos[0])}` : `${page.number}-${columnOf(pos[0])}`;
 }
 
 export function masterOf(project: Project, el: Element): Located | null {
@@ -122,8 +126,9 @@ export function contactTable(project: Project, el: Element): [string, string, st
 
 /** The same rows, each with the contact it describes. */
 export function contactRows(project: Project, el: Element): { row: [string, string, string]; id: string }[] {
+  const here = locate(project, el.id)?.page;
   return slavesOf(project, el).flatMap((s) => {
-    const where = address(s.page, s.el.pos);
+    const where = address(s.page, s.el.pos, here);
     const rows: { row: [string, string, string]; id: string }[] = [
       { row: [contactType(s.el), contactMarks(s.el), where], id: s.el.id },
     ];
@@ -153,14 +158,23 @@ export function linkedTarget(project: Project, el: Element): string | null {
 
 /** The cross-reference shown under an element's tag. */
 export function xrefText(project: Project, el: Element, masterTag: string): string {
+  const here = locate(project, el.id)?.page;
   if (el.symbol === "offpage") {
     const p = partnerOf(project, el);
-    if (p) return address(p.page, p.el.pos);
+    if (p) return address(p.page, p.el.pos, here);
     return typeof el.params.ref === "string" ? el.params.ref : "";
+  }
+  if (el.symbol === "rail") {
+    // The other sheets with a rail of the same name: it's the same conductor.
+    const name = String(el.params.name ?? "");
+    const sheets = project.pages
+      .filter((pg) => pg.id !== here?.id && pg.elements.some((e) => e.symbol === "rail" && String(e.params.name ?? "") === name))
+      .map((pg) => `/${pg.number}`);
+    return name ? sheets.join(" ") : "";
   }
   const m = masterOf(project, el);
   if (m) {
-    const where = address(m.page, m.el.pos);
+    const where = address(m.page, m.el.pos, here);
     // With position-based tags the coil's tag already says where it is.
     return masterTag.endsWith(where) ? "" : `/${where}`;
   }

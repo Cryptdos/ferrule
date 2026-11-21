@@ -18,10 +18,10 @@ import {
   type TerminalRef,
   newId,
 } from "./model";
-import { defaultParams, getSymbol, requireSymbol, terminalPoint } from "./symbols";
+import { defaultParams, getSymbol, plantTerminalName, requireSymbol, terminalPoint } from "./symbols";
 import { isOrthogonal, routeOf, simplifyRoute } from "./wires";
 import { isMaster, isSlave, locate } from "./xref";
-import { colourCode } from "./wirecolours";
+import { colourCode, lampColour } from "./wirecolours";
 
 export class OpError extends Error {}
 
@@ -47,7 +47,7 @@ export interface AddElementOptions {
 
 /** Lamp colours written the usual way whatever the case they came in ("GN" → "Gn"). */
 function normaliseParams(symbol: string, params: Record<string, ParamValue>): Record<string, ParamValue> {
-  if (symbol === "lamp" && typeof params.colour === "string") params.colour = colourCode(params.colour);
+  if (symbol === "lamp" && typeof params.colour === "string") params.colour = lampColour(params.colour);
   return params;
 }
 
@@ -121,6 +121,13 @@ export function updateElement(project: Project, pageId: string, id: string, patc
   if (patch.zone !== undefined) el.zone = patch.zone;
   if (patch.rot !== undefined) el.rot = patch.rot;
   if (patch.params) el.params = normaliseParams(el.symbol, { ...el.params, ...patch.params });
+  // A linked arrow's partner is always the other way round: one source, one destination.
+  if (el.symbol === "offpage" && patch.params && "source" in patch.params) {
+    for (const other of el.links) {
+      const o = project.pages.flatMap((p) => p.elements).find((e) => e.id === other);
+      if (o) o.params.source = el.params.source === false;
+    }
+  }
 }
 
 /** Copy elements to a new position (Ctrl+D / paste). Returns the new ids. */
@@ -207,6 +214,28 @@ export function resetRoute(project: Project, pageId: string, ids: string[]): voi
     const seg = getSegment(page, id);
     seg.route = "auto";
     seg.points = [];
+  }
+}
+
+/**
+ * Field or panel wire. `field`: true/false to fix it, null to go back to
+ * deciding by the panel boundary. `showNumber`: print the number on a field wire.
+ */
+export function setWireKind(
+  project: Project,
+  pageId: string,
+  ids: string[],
+  opts: { field?: boolean | null; showNumber?: boolean },
+): void {
+  const page = getPage(project, pageId);
+  for (const id of ids) {
+    const seg = getSegment(page, id);
+    if (opts.field === null) delete seg.field;
+    else if (opts.field !== undefined) seg.field = opts.field;
+    if (opts.showNumber !== undefined) {
+      if (opts.showNumber) seg.showNumber = true;
+      else delete seg.showNumber;
+    }
   }
 }
 
@@ -456,9 +485,9 @@ export function linkOffpage(project: Project, aId: string, bId: string | null): 
     unlinkAll(project, b.el, () => false);
     a.el.links.push(b.el.id);
     b.el.links.push(a.el.id);
-    // One end goes, the other comes: if both point the same way, turn the other one round.
-    const dir = (e: Element) => (e.params.direction === "in" ? "in" : "out");
-    if (dir(a.el) === dir(b.el)) b.el.params.direction = dir(a.el) === "out" ? "in" : "out";
+    // One source, one destination: if both are the same, the other one changes.
+    const src = (e: Element) => e.params.source !== false;
+    if (src(a.el) === src(b.el)) b.el.params.source = !src(a.el);
   }
   refreshConductors(project);
 }
@@ -505,21 +534,33 @@ const cleanTerminals = (list: string[]) => [...new Set(list.map((t) => t.trim())
  * Runs are separated by "|"; a run may start with a group name and a colon.
  */
 export function parseTerminalSpec(spec: string): { terminals: string[]; groups: PlantGroup[] } {
+  const runs = spec.split("|").map((run) => {
+    const i = run.indexOf(":");
+    return {
+      name: i >= 0 ? run.slice(0, i).trim() : "",
+      terms: cleanTerminals((i >= 0 ? run.slice(i + 1) : run).split(/[,\s]+/)),
+    };
+  });
+  // A name used in more than one group (C, NO, NC on two relays) is told apart by its group: R2.C.
+  const count = new Map<string, number>();
+  for (const r of runs) for (const t of r.terms) count.set(t, (count.get(t) ?? 0) + 1);
   const terminals: string[] = [];
   const groups: PlantGroup[] = [];
-  for (const run of spec.split("|")) {
-    const i = run.indexOf(":");
-    const name = i >= 0 ? run.slice(0, i).trim() : "";
-    const terms = cleanTerminals((i >= 0 ? run.slice(i + 1) : run).split(/[,\s]+/)).filter((t) => !terminals.includes(t));
-    terminals.push(...terms);
-    if (name && terms.length) {
-      const g = groups.find((x) => x.name === name);
-      if (g) g.terminals.push(...terms);
-      else groups.push({ name, terminals: terms });
+  for (const r of runs) {
+    const ids = r.terms
+      .map((t) => ((count.get(t) ?? 0) > 1 && r.name ? `${r.name}.${t}` : t))
+      .filter((id) => !terminals.includes(id));
+    terminals.push(...ids);
+    if (r.name && ids.length) {
+      const g = groups.find((x) => x.name === r.name);
+      if (g) g.terminals.push(...ids);
+      else groups.push({ name: r.name, terminals: ids });
     }
   }
   return { terminals, groups };
 }
+
+export { plantTerminalName };
 
 /** The other way: a plant item's terminals and groups as one line. */
 export function formatTerminalSpec(item: Pick<PlantItem, "terminals" | "groups">): string {
@@ -528,19 +569,35 @@ export function formatTerminalSpec(item: Pick<PlantItem, "terminals" | "groups">
   const runs: { name: string; terms: string[] }[] = [];
   for (const t of item.terminals) {
     const name = groupOf.get(t) ?? "";
+    const shown = plantTerminalName(t, name);
     const last = runs[runs.length - 1];
-    if (last && last.name === name) last.terms.push(t);
-    else runs.push({ name, terms: [t] });
+    if (last && last.name === name) last.terms.push(shown);
+    else runs.push({ name, terms: [shown] });
   }
   return runs.map((r) => (r.name ? `${r.name}: ${r.terms.join(" ")}` : r.terms.join(" "))).join(" | ");
 }
 
-/** Groups that only mention terminals the item has, and not empty. */
+/** Groups that only mention terminals the item has, and not empty. Anything else a group carries is kept. */
 function cleanGroups(groups: PlantGroup[], terminals: string[]): PlantGroup[] {
   const have = new Set(terminals);
   return groups
-    .map((g) => ({ name: g.name.trim(), terminals: cleanTerminals(g.terminals).filter((t) => have.has(t)) }))
+    .map((g) => ({ ...g, name: g.name.trim(), terminals: cleanTerminals(g.terminals).filter((t) => have.has(t)) }))
     .filter((g) => g.name && g.terminals.length);
+}
+
+/** The letters a tag starts with: SF-01 → SF, U3-13 → U. */
+export function prefixOf(tag: string): string {
+  return /^[A-Za-z]+/.exec(tag.trim())?.[0]?.toUpperCase() ?? "";
+}
+
+/** A plant tag from its prefix and address: U3-13, or SEF-3-13 when the prefix is more than one letter. */
+export function plantTag(prefix: string, address: string): string {
+  return prefix.length > 1 ? `${prefix}-${address}` : `${prefix}${address}`;
+}
+
+/** A plant item's tag as shown: its tag, or its prefix and "?" until Renumber gives it one. */
+export function plantLabel(item: PlantItem): string {
+  return item.tag || `${item.prefix || "U"}?`;
 }
 
 export function addPlant(
@@ -548,16 +605,19 @@ export function addPlant(
   tag: string,
   description = "",
   terminals: string[] = [],
-  more: { groups?: PlantGroup[]; info?: string } = {},
+  more: { groups?: PlantGroup[]; info?: string; prefix?: string; powerByOthers?: boolean } = {},
 ): PlantItem {
   const t = tag.trim();
-  if (!t) throw new OpError("A plant item needs a tag");
-  if (project.plant.some((p) => p.tag === t)) throw new OpError(`There's already a plant item ${t}`);
+  const prefix = (more.prefix?.trim() || prefixOf(t) || "U").toUpperCase();
+  if (t && project.plant.some((p) => p.tag === t)) throw new OpError(`There's already a plant item ${t}`);
   const terms = cleanTerminals(terminals);
-  const item: PlantItem = { id: newId("p"), tag: t, description: description.trim(), terminals: terms };
+  const item: PlantItem = { id: newId("p"), tag: t, prefix, description: description.trim(), terminals: terms };
+  // A tag typed in is kept; otherwise Renumber gives it one from where its first view is.
+  if (t && more.prefix === undefined) item.locked = true;
   const groups = cleanGroups(more.groups ?? [], terms);
   if (groups.length) item.groups = groups;
   if (more.info?.trim()) item.info = more.info.trim();
+  if (more.powerByOthers) item.powerByOthers = true;
   project.plant.push(item);
   return item;
 }
@@ -565,17 +625,43 @@ export function addPlant(
 export function updatePlant(
   project: Project,
   id: string,
-  patch: { tag?: string; description?: string; terminals?: string[]; groups?: PlantGroup[]; info?: string },
+  patch: {
+    tag?: string;
+    prefix?: string;
+    description?: string;
+    terminals?: string[];
+    groups?: PlantGroup[];
+    info?: string;
+    powerByOthers?: boolean;
+  },
 ): void {
   const item = getPlant(project, id);
   if (patch.tag !== undefined) {
     const t = patch.tag.trim();
-    if (!t) throw new OpError("A plant item needs a tag");
-    if (project.plant.some((p) => p.id !== id && p.tag === t)) throw new OpError(`There's already a plant item ${t}`);
+    if (t && project.plant.some((p) => p.id !== id && p.tag === t)) throw new OpError(`There's already a plant item ${t}`);
+    // Typing a tag locks it; clearing it hands it back to Renumber.
     item.tag = t;
+    if (t) item.locked = true;
+    else delete item.locked;
+  }
+  if (patch.prefix !== undefined) item.prefix = patch.prefix.trim().toUpperCase() || "U";
+  if (patch.powerByOthers !== undefined) {
+    if (patch.powerByOthers) item.powerByOthers = true;
+    else delete item.powerByOthers;
   }
   if (patch.description !== undefined) item.description = patch.description.trim();
-  if (patch.terminals !== undefined) item.terminals = cleanTerminals(patch.terminals);
+  if (patch.terminals !== undefined) {
+    const before = item.terminals;
+    item.terminals = cleanTerminals(patch.terminals);
+    // Views that showed every terminal go on showing every terminal.
+    for (const page of project.pages) {
+      for (const el of page.elements) {
+        if (el.symbol !== "plant-view" || el.params.plant !== id) continue;
+        const shown = String(el.params.show ?? "").split(",").filter(Boolean);
+        if (before.every((t) => shown.includes(t))) el.params.show = item.terminals.join(",");
+      }
+    }
+  }
   if (patch.info !== undefined) {
     if (patch.info.trim()) item.info = patch.info.trim();
     else delete item.info;
@@ -629,6 +715,7 @@ export function syncPlantViews(project: Project): void {
       el.params.pdesc = item?.description ?? "";
       el.params.pinfo = item?.info ?? "";
       el.params.pgroups = (item?.groups ?? []).map((g) => `${g.name}=${g.terminals.join(",")}`).join(";");
+      el.params.pbo = item?.powerByOthers === true;
       const keep = new Set(show);
       page.segments = page.segments.filter(
         (s) => !((s.from[0] === el.id && !keep.has(s.from[1])) || (s.to[0] === el.id && !keep.has(s.to[1]))),

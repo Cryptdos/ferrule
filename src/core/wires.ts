@@ -194,6 +194,13 @@ export function wireLabelSpot(points: Vec[], minLength = 3): { at: Vec; vertical
   return { at: vertical ? [mid[0] - 0.35, mid[1]] : [mid[0], mid[1] - 0.35], vertical };
 }
 
+/** Is this a field wire (out to plant)? Set by hand, or because an end is outside the panel boundary. */
+export function isFieldWire(page: Page, seg: Segment): boolean {
+  if (seg.field !== undefined) return seg.field;
+  const ext = (id: string) => page.elements.find((e) => e.id === id)?.zone === "external";
+  return ext(seg.from[0]) || ext(seg.to[0]);
+}
+
 export interface WireText {
   text: string;
   at: Vec;

@@ -4,7 +4,7 @@
  */
 import { FORMAT, FORMAT_VERSION, type Project, emptyInfo } from "./model";
 import { getSymbol } from "./symbols";
-import { colourCode } from "./wirecolours";
+import { colourCode, lampColour } from "./wirecolours";
 
 export class ProjectFormatError extends Error {}
 
@@ -120,6 +120,10 @@ export function parsePlant(v: unknown): Project["plant"] {
     .map((pl) => ({
       id: pl.id as string,
       tag: strOr(pl.tag),
+      // Plant tags became prefix + position (format 2): the prefix comes from an older typed tag.
+      prefix: strOr(pl.prefix) || /^[A-Za-z]+/.exec(strOr(pl.tag))?.[0]?.toUpperCase() || "U",
+      ...(pl.locked === true ? { locked: true } : {}),
+      ...(pl.powerByOthers === true ? { powerByOthers: true } : {}),
       description: strOr(pl.description),
       terminals: arr(pl.terminals).filter((t): t is string => typeof t === "string"),
       ...(Array.isArray(pl.groups)
@@ -138,7 +142,7 @@ export function parsePlant(v: unknown): Project["plant"] {
 // Older files
 
 /** Lamp colours were single letters before the IEC 60757 two-letter codes. */
-const OLD_LAMP_COLOURS: Record<string, string> = { A: "Am", G: "Gn", R: "Rd", W: "Wh", B: "Bu", Y: "Ye" };
+const OLD_LAMP_COLOURS: Record<string, string> = { A: "Ye", G: "Gn", R: "Rd", W: "Wh", B: "Bu", Y: "Ye" };
 /** Lamp terminals were L and N before V+ and V- (they're often 24 V DC). */
 const OLD_LAMP_TERMINALS: Record<string, string> = { L: "V+", N: "V-" };
 
@@ -184,6 +188,8 @@ function parsePage(pg: Record<string, unknown>, i: number): Project["pages"][num
         to: s.to as [string, string],
         route: s.route === "manual" ? ("manual" as const) : ("auto" as const),
         points: arr(s.points).filter(isVec),
+        ...(typeof s.field === "boolean" ? { field: s.field } : {}),
+        ...(s.showNumber === true ? { showNumber: true } : {}),
       };
     });
   const sections = arr(pg.sections)
@@ -198,8 +204,13 @@ function parsePage(pg: Record<string, unknown>, i: number): Project["pages"][num
     .map((sc) => ({ id: sc.id as string, label: strOr(sc.label), rect: sc.rect as [number, number, number, number] }));
   const lamps = new Set(elements.filter((e) => e.symbol === "lamp").map((e) => e.id));
   for (const e of elements) {
+    // Link arrows had a direction (out/in) before the Source tick.
+    if (e.symbol === "offpage" && typeof e.params.direction === "string") {
+      e.params.source = e.params.direction !== "in";
+      delete e.params.direction;
+    }
     if (e.symbol === "lamp" && typeof e.params.colour === "string") {
-      e.params.colour = OLD_LAMP_COLOURS[e.params.colour] ?? colourCode(e.params.colour);
+      e.params.colour = OLD_LAMP_COLOURS[e.params.colour] ?? lampColour(e.params.colour);
     }
   }
   for (const s of segments) {

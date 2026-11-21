@@ -3,7 +3,7 @@
   import { AREA_MM, AREA_UNITS, SHEET_MM, UNIT_MM } from "../../core/geometry";
   import type { Page, Project } from "../../core/model";
   import type { Vec } from "../../core/geometry";
-  import { connectionDots, routeOf, wireTexts } from "../../core/wires";
+  import { connectionDots, isFieldWire, routeOf, wireTexts } from "../../core/wires";
   import { resolveFields } from "../../core/fields";
   import { cloudsOn } from "../../core/ops";
   import { cloudPath } from "../../core/titleblock";
@@ -46,11 +46,8 @@
   const clouds = $derived(cloudsOn(project, page.id));
   const boundaryY = $derived(boundary !== undefined && boundary !== null ? boundary : page.boundaryY);
 
-  /** Field cables (a wire with an end out in the field) are drawn dashed. */
-  const field = $derived.by(() => {
-    const ext = new Set(page.elements.filter((e) => e.zone === "external").map((e) => e.id));
-    return new Set(page.segments.filter((s) => ext.has(s.from[0]) || ext.has(s.to[0])).map((s) => s.id));
-  });
+  /** Field wires (out to plant) are drawn dashed and don't print their number unless asked to. */
+  const field = $derived(new Set(page.segments.filter((s) => isFieldWire(page, s)).map((s) => s.id)));
 
   /** Conductors on a named rail: the rail's name says what they are, so no number. */
   const railConds = $derived.by(() => {
@@ -92,7 +89,7 @@
       {@const c = condById.get(seg.conductor)}
       {#if c}
         {#each wireTexts(pts, {
-          number: railConds.has(c.id) ? "" : c.number,
+          number: railConds.has(c.id) || (field.has(seg.id) && !seg.showNumber) ? "" : c.number,
           colour: c.colour,
           func: c.function,
           labelFrom: terminalEnd(seg.from),
@@ -167,10 +164,11 @@
     font-size: 1.5px;
     fill: #000;
   }
+  /* Panel boundary: light and evenly dashed, under everything; terminals on it sit over it. */
   .boundary {
-    stroke: #000;
-    stroke-width: 0.22;
-    stroke-dasharray: 3 0.8 0.6 0.8;
+    stroke: #444;
+    stroke-width: 0.14;
+    stroke-dasharray: 1.2 1.2;
   }
   .wires circle {
     fill: #000;

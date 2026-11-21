@@ -86,7 +86,11 @@ export class Editor {
   }
 
   /** Run a model operation as one undoable step. Returns false if it was refused. */
-  apply(fn: (p: Project) => void): boolean {
+  /**
+   * Run a model operation as one undoable step. Steps with the same `merge`
+   * key in a row (a number box being scrolled) make one undo step together.
+   */
+  apply(fn: (p: Project) => void, opts: { merge?: string } = {}): boolean {
     const before = JSON.stringify($state.snapshot(this.project));
     try {
       fn(this.project);
@@ -102,7 +106,9 @@ export class Editor {
       }
       throw e;
     }
-    this.undoStack.push(before);
+    const merging = !!opts.merge && opts.merge === this.lastMerge && this.undoStack.length > 0;
+    if (!merging) this.undoStack.push(before);
+    this.lastMerge = opts.merge ?? null;
     if (this.undoStack.length > HISTORY_LIMIT) this.undoStack.shift();
     this.redoStack = [];
     this.syncHistoryFlags();
@@ -110,7 +116,10 @@ export class Editor {
     return true;
   }
 
+  private lastMerge: string | null = null;
+
   undo(): void {
+    this.lastMerge = null;
     const prev = this.undoStack.pop();
     if (!prev) return;
     this.redoStack.push(JSON.stringify($state.snapshot(this.project)));

@@ -14,7 +14,8 @@ export function resolveFields(text: string, project: Pick<Project, "plant"> & Pa
   if (!text.includes("{")) return text;
   let out = text.replace(FIELD, (whole, ref: string, field: "tag" | "description") => {
     const p = project.plant.find((x) => x.id === ref) ?? project.plant.find((x) => x.tag === ref);
-    return p ? p[field] : whole;
+    // A plant not yet numbered shows its prefix and "?", like any other part.
+    return p ? (field === "tag" ? p.tag || `${p.prefix || "U"}?` : p[field]) : whole;
   });
   if (project.project) {
     const info = project.project as unknown as Record<string, string>;

@@ -52,6 +52,13 @@ export interface Segment {
   route: "auto" | "manual";
   /** Polyline in grid units, first and last points on the terminals. */
   points: Vec[];
+  /**
+   * A field wire (out to plant) rather than panel wiring. Unset: decided by
+   * whether it has an end outside the panel boundary.
+   */
+  field?: boolean;
+  /** Print the wire number on this field wire too (field wires don't, by default). */
+  showNumber?: boolean;
 }
 
 export interface Conductor {
@@ -91,9 +98,23 @@ export interface Page {
 /** A piece of field equipment, defined once with all its terminals (DESIGN.md §6). */
 export interface PlantItem {
   id: string;
+  /**
+   * Prefix + sheet-column of its first view, like every other tag
+   * (SEF-3-13, U3-13), set by Renumber unless locked. Empty until then.
+   */
   tag: string;
+  /** Letters its tag starts with, e.g. SEF for a safety extract fan. */
+  prefix?: string;
+  /** Keep the tag as typed when renumbering. */
+  locked?: boolean;
   description: string;
+  /**
+   * Terminal ids. Usually just the name (L, 1, NO); where two groups use the
+   * same name (R1: C NO NC | R2: C NO NC) the id is group.name (R2.C).
+   */
   terminals: string[];
+  /** Its power supply isn't on these drawings: a break on the left, marked POWER BY OTHERS. */
+  powerByOthers?: boolean;
   /** Named groups of terminals, e.g. ENABLE: 1 2. Shown inside the box under their terminals. */
   groups?: PlantGroup[];
   /** More information shown under the box (model, rating, supply…). May have several lines. */

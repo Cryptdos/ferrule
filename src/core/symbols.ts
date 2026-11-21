@@ -29,7 +29,7 @@ export type Anchor = "start" | "middle" | "end";
 export type Prim =
   | { t: "line"; pts: Vec[]; w?: number; dash?: boolean }
   | { t: "poly"; pts: Vec[]; fill: boolean }
-  | { t: "circle"; c: Vec; r: number; fill?: boolean }
+  | { t: "circle"; c: Vec; r: number; fill?: boolean; /** Paper-white inside, to sit over a line. */ bg?: boolean }
   | { t: "arc"; from: Vec; to: Vec; r: number; sweep: 0 | 1 }
   | { t: "ellipse"; c: Vec; rx: number; ry: number; dash?: boolean }
   | {
@@ -73,6 +73,8 @@ export interface ParamDef {
   when?: (el: Element) => boolean;
   /** What it reads as when it doesn't apply. */
   fixed?: string;
+  /** An example of the format to follow, shown greyed in an empty box. */
+  placeholder?: string;
 }
 
 export interface SymbolDef {
@@ -105,6 +107,11 @@ const TEXT_SIZES: Record<string, number> = { small: 1.8, normal: 2.53, large: 3.
 const line = (...pts: Vec[]): Prim => ({ t: "line", pts });
 const dashed = (...pts: Vec[]): Prim => ({ t: "line", pts, dash: true });
 const heavy = (w: number, ...pts: Vec[]): Prim => ({ t: "line", pts, w });
+/** A prim moved by (dx, dy). Lines and polys only. */
+function shift(p: Prim, dx: number, dy: number): Prim {
+  if (p.t === "line" || p.t === "poly") return { ...p, pts: p.pts.map(([x, y]) => [x + dx, y + dy] as Vec) };
+  return p;
+}
 const rect = (x: number, y: number, w: number, h: number, fill = false): Prim => ({
   t: "poly",
   pts: [
@@ -212,6 +219,9 @@ const familyParam: ParamDef = {
     { value: "timer", label: "Timer (K)" },
   ],
   default: "relay",
+  // Once linked to a coil, the contact takes the coil's tag: this is for one standing alone.
+  when: (el) => el.links.length === 0,
+  fixed: "Follows its coil",
 };
 const familyKind = (el: Element): SymbolKind => {
   const f = str(el, "family", "relay");
@@ -255,11 +265,10 @@ export function timerFunction(el: Element): TimerFunction {
   return TIMER_FUNCTIONS.find((f) => f.value === v) ?? TIMER_FUNCTIONS[0]!;
 }
 
-/** Indicator colours: IEC 60757 two-letter codes, first letter capital (amber added). */
+/** Indicator colours: IEC 60757 two-letter codes, first letter capital. */
 export const LAMP_COLOURS = [
   { code: "Rd", name: "red" },
   { code: "Ye", name: "yellow" },
-  { code: "Am", name: "amber" },
   { code: "Gn", name: "green" },
   { code: "Bu", name: "blue" },
   { code: "Wh", name: "white" },
@@ -582,7 +591,7 @@ const SYMBOLS: SymbolDef[] = [
     palette: true,
     params: [
       { key: "poles", label: "Poles", type: "number", min: 1, max: 4, default: 1 },
-      { key: "rating", label: "Rating", type: "text", default: "" },
+      { key: "rating", label: "Rating", type: "text", default: "", placeholder: "e.g. 2A" },
     ],
     kind: () => "fuse",
     draw(el) {
@@ -650,8 +659,8 @@ const SYMBOLS: SymbolDef[] = [
         options: TIMER_FUNCTIONS.map((f) => ({ value: f.value, label: f.label })),
         default: "on",
       },
-      { key: "time", label: "Time", type: "text", default: "" },
-      { key: "code", label: "Maker's function code", type: "text", default: "" },
+      { key: "time", label: "Time", type: "text", default: "", placeholder: "e.g. 5s, 1.5s, 2min" },
+      { key: "code", label: "Maker's function code", type: "text", default: "", placeholder: "e.g. A (Selec 600XU)" },
     ],
     kind: () => "timer",
     draw(el) {
@@ -728,7 +737,7 @@ const SYMBOLS: SymbolDef[] = [
     name: "Terminal",
     group: "Connection",
     palette: true,
-    params: [{ key: "strip", label: "Terminal strip", type: "text", default: "X1" }],
+    params: [{ key: "strip", label: "Terminal strip", type: "text", default: "X1", placeholder: "e.g. X1" }],
     kind: () => "terminal",
     bridged: () => [["1", "2"]],
     draw(el) {
@@ -736,10 +745,11 @@ const SYMBOLS: SymbolDef[] = [
         prims: [
           line([0, -1], [0, -0.45]),
           line([0, 0.45], [0, 1]),
-          circle(0, 0, 0.45),
-          // Terminal numbers read up the page, so a row of terminals doesn't collide.
-          { t: "text", at: [-0.25, -0.75], text: "{tag}", size: TERM, anchor: "start", role: "tag", vertical: true },
-          ...(el.label ? [text(0.8, 0.4, "{label}", TERM, "start", "label")] : []),
+          // White inside: a terminal on the panel boundary sits over the line.
+          { t: "circle", c: [0, 0], r: 0.45, bg: true },
+          // The terminal's number sits beside it, across the wire, so it doesn't read as a wire number.
+          text(0.6, -0.15, "{tag}", 0.85, "start", "tag"),
+          ...(el.label ? [text(0.65, 1.0, "{label}", TERM, "start", "label")] : []),
         ],
         terminals: vterms("1", "2", 1),
         body: { x: -0.45, y: -0.45, w: 0.9, h: 0.9 },
@@ -754,24 +764,28 @@ const SYMBOLS: SymbolDef[] = [
     params: [],
     kind: () => "socket",
     draw(el) {
+      // L and N 3 units apart, straight down from a two-pole MCB; the earth
+      // comes out of the side, to go to an earth symbol.
+      const cx = 1.5;
+      const r = 2.6;
       return {
         prims: [
-          line([-2, -4], [-2, -1]),
           line([0, -4], [0, -1]),
-          line([2, -4], [2, -1]),
-          line([-2.4, -1], [2.4, -1]),
-          { t: "arc", from: [-2.4, -1], to: [2.4, -1], r: 2.4, sweep: 0 },
-          term(-1.55, -2.6, "L"),
-          term(0.45, -2.6, "E"),
-          term(2.45, -2.6, "N"),
-          ...tagAndLabel(-3, el),
+          line([3, -4], [3, -1]),
+          line([cx - r, -1], [cx + r, -1]),
+          { t: "arc", from: [cx - r, -1], to: [cx + r, -1], r, sweep: 0 },
+          line([cx + r, -1], [cx + r, -2], [6, -2]),
+          term(-0.45, -2.6, "L", "end"),
+          term(0.45, -2.6, "N"),
+          term(5.6, -2.4, "E", "end"),
+          ...tagAndLabel(-1.4, el),
         ],
         terminals: [
-          { name: "L", at: [-2, -4], dir: "up" },
-          { name: "E", at: [0, -4], dir: "up" },
-          { name: "N", at: [2, -4], dir: "up" },
+          { name: "L", at: [0, -4], dir: "up" },
+          { name: "N", at: [3, -4], dir: "up" },
+          { name: "E", at: [6, -2], dir: "right" },
         ],
-        body: { x: -2.4, y: -1, w: 4.8, h: 2.4 },
+        body: { x: cx - r, y: -1, w: 2 * r, h: r },
       };
     },
   },
@@ -782,7 +796,7 @@ const SYMBOLS: SymbolDef[] = [
     palette: true,
     params: [
       { key: "screen", label: "Earthed screen", type: "bool", default: false },
-      { key: "rating", label: "Rating", type: "text", default: "" },
+      { key: "rating", label: "Rating", type: "text", default: "", placeholder: "e.g. 230/24V 100VA" },
     ],
     kind: () => "transformer",
     draw(el) {
@@ -824,7 +838,7 @@ const SYMBOLS: SymbolDef[] = [
     name: "Motor (3-phase)",
     group: "Loads",
     palette: true,
-    params: [{ key: "rating", label: "Rating", type: "text", default: "" }],
+    params: [{ key: "rating", label: "Rating", type: "text", default: "", placeholder: "e.g. 1.5kW 3.4A FLC" }],
     kind: () => "motor",
     draw(el) {
       // U V W 3 units apart, in line with the poles of the contactor above.
@@ -897,8 +911,11 @@ const SYMBOLS: SymbolDef[] = [
       return {
         prims: [
           heavy(RAIL_W, [0, 0], [len, 0]),
-          text(-0.8, 0.5, name, TAG, "end", "note"),
-          text(len + 0.8, 0.5, name, TAG, "start", "note"),
+          // Names sit just above the rail at each end, clear of the line.
+          text(-0.6, -0.45, name, TAG, "end", "note"),
+          text(len + 0.6, -0.45, name, TAG, "start", "note"),
+          // Other sheets the same rail is on (a rail of the same name is the same conductor).
+          text(len + 0.6, 1.5, "{xref}", TERM, "start", "xref"),
         ],
         terminals: railTerminals(el),
         body: { x: 0, y: -0.15, w: len, h: 0.3 },
@@ -910,43 +927,69 @@ const SYMBOLS: SymbolDef[] = [
     name: "Earth",
     group: "Connection",
     palette: true,
-    params: [],
+    params: [
+      {
+        key: "type",
+        label: "Type",
+        type: "select",
+        default: "earth",
+        options: [
+          { value: "earth", label: "Earth, general (IEC 60417-5017)" },
+          { value: "protective", label: "Protective earth, PE (5019)" },
+          { value: "functional", label: "Functional / clean earth, FE (5018)" },
+          { value: "chassis", label: "Frame or chassis (5020)" },
+          { value: "equipotential", label: "Equipotential bonding (5021)" },
+        ],
+      },
+    ],
     kind: () => null,
-    draw() {
-      return {
-        prims: [line([0, -2], [0, 0]), line([-1.2, 0], [1.2, 0]), line([-0.8, 0.5], [0.8, 0.5]), line([-0.4, 1], [0.4, 1])],
-        terminals: [{ name: "E", at: [0, -2], dir: "up" }],
-        body: { x: -1.2, y: 0, w: 2.4, h: 1 },
-      };
+    draw(el) {
+      const type = str(el, "type", "earth");
+      // The three bars of the general earth, under a stem from the terminal.
+      const bars: Prim[] = [line([-1.2, 0], [1.2, 0]), line([-0.8, 0.5], [0.8, 0.5]), line([-0.4, 1], [0.4, 1])];
+      let prims: Prim[] = [line([0, -2], [0, 0]), ...bars];
+      let body: Rect = { x: -1.2, y: 0, w: 2.4, h: 1 };
+      if (type === "protective") {
+        // In a circle.
+        prims = [line([0, -2], [0, -1.3]), line([0, -1.3], [0, -0.4]), ...bars.map((b) => shift(b, 0, -0.4)), circle(0, 0.1, 1.5)];
+        body = { x: -1.5, y: -1.4, w: 3, h: 3 };
+      } else if (type === "functional") {
+        // In a cup: an arc under the bars.
+        prims = [line([0, -2], [0, -0.3]), ...bars.map((b) => shift(b, 0, -0.3)), { t: "arc", from: [-1.5, -0.3], to: [1.5, -0.3], r: 1.5, sweep: 0 }];
+        body = { x: -1.5, y: -0.3, w: 3, h: 1.5 };
+      } else if (type === "chassis") {
+        // A bar with hatching under it.
+        prims = [line([0, -2], [0, 0]), line([-1.2, 0], [1.2, 0])];
+        for (const x of [-1.2, -0.2, 0.8]) prims.push(line([x + 0.4, 0], [x - 0.2, 0.9]));
+        body = { x: -1.4, y: 0, w: 2.6, h: 0.9 };
+      } else if (type === "equipotential") {
+        // A triangle pointing down.
+        prims = [line([0, -2], [0, 0]), { t: "poly", pts: [[-1.2, 0], [1.2, 0], [0, 1.5]], fill: false }];
+        body = { x: -1.2, y: 0, w: 2.4, h: 1.5 };
+      }
+      return { prims, terminals: [{ name: "E", at: [0, -2], dir: "up" }], body };
     },
   },
   {
     id: "offpage",
-    name: "Off-page arrow",
-    group: "Drawing",
+    name: "Link arrow",
+    group: "Connection",
     palette: true,
     params: [
-      {
-        key: "direction",
-        label: "Direction",
-        type: "select",
-        default: "out",
-        options: [
-          { value: "out", label: "Going to (points away)" },
-          { value: "in", label: "Coming from (points in)" },
-        ],
-      },
-      { key: "ref", label: "Reference (if not linked)", type: "text", default: "" },
+      { key: "source", label: "Source (where the conductor comes from)", type: "bool", default: true },
+      { key: "ref", label: "Reference (if not linked)", type: "text", default: "", placeholder: "e.g. 8-34" },
     ],
     kind: () => null,
     draw(el) {
-      const incoming = str(el, "direction", "out") === "in";
-      // Going: an open arrow pointing away from the wire. Coming: a filled
-      // arrow pointing back into it. Different in shape and in weight, so
-      // they can't be mistaken for each other even in a poor print.
-      const head: Prim = incoming
-        ? { t: "poly", pts: [[-0.8, 1.3], [0.8, 1.3], [0, 0]], fill: true }
-        : { t: "poly", pts: [[-0.8, 0], [0.8, 0], [0, 1.3]], fill: false };
+      const source = el.params.source !== false;
+      // A slim isosceles triangle. The source points away along the wire
+      // (it goes on elsewhere); the destination points back into its wire
+      // (it comes from elsewhere) and is filled, so the two never get mixed up.
+      const w = 0.6;
+      const h = 1.8;
+      const head: Prim = source
+        ? { t: "poly", pts: [[-w, 0], [w, 0], [0, h]], fill: false }
+        : { t: "poly", pts: [[-w, h], [w, h], [0, 0]], fill: true };
       return {
         prims: [
           line([0, -2], [0, 0]),
@@ -954,16 +997,16 @@ const SYMBOLS: SymbolDef[] = [
           // Whichever way the arrow points, the reference reads on its right and the label on its left.
           ...(el.rot === 180
             ? [
-                text(-1.2, -1, "{xref}", LABEL, "end", "xref"),
-                ...(el.label ? [text(1.2, -1, "{label}", LABEL, "start", "label")] : []),
+                text(-1, -1, "{xref}", LABEL, "end", "xref"),
+                ...(el.label ? [text(1, -1, "{label}", LABEL, "start", "label")] : []),
               ]
             : [
-                text(1.2, 1, "{xref}", LABEL, "start", "xref"),
-                ...(el.label ? [text(-1.2, 1, "{label}", LABEL, "end", "label")] : []),
+                text(1, 1.2, "{xref}", LABEL, "start", "xref"),
+                ...(el.label ? [text(-1, 1.2, "{label}", LABEL, "end", "label")] : []),
               ]),
         ],
         terminals: [{ name: "1", at: [0, -2], dir: "up" }],
-        body: { x: -0.8, y: 0, w: 1.6, h: 1.3 },
+        body: { x: -w, y: 0, w: 2 * w, h },
       };
     },
   },
@@ -1023,31 +1066,42 @@ const SYMBOLS: SymbolDef[] = [
     draw(el) {
       const lay = plantViewLayout(el);
       const { left, right, h } = lay;
-      const prims: Prim[] = [line([right, 0], [left, 0], [left, h], [right, h])];
-      if (lay.partial) {
-        // Break line: there's more to this plant on another sheet.
-        const zig: Vec[] = [[right, 0]];
-        for (let i = 0, y = 0.3; y < h; i++, y += 0.6) zig.push([right + (i % 2 ? 0.4 : -0.4), y]);
-        zig.push([right, h]);
-        prims.push(line(...zig));
-      } else {
-        prims.push(line([right, 0], [right, h]));
+      const pbo = bool(el, "pbo", false);
+      const zig = (x: number): Vec[] => {
+        const pts: Vec[] = [[x, 0]];
+        for (let i = 0, y = 0.4; y < h; i++, y += 0.8) pts.push([x + (i % 2 ? 0.4 : -0.4), y]);
+        pts.push([x, h]);
+        return pts;
+      };
+      const prims: Prim[] = [line([left, 0], [right, 0]), line([left, h], [right, h])];
+      // A break on a side means "more of this plant isn't shown here": on the
+      // right, other terminals on another sheet; on the left, its power, by others.
+      prims.push(pbo ? line(...zig(left)) : line([left, 0], [left, h]));
+      prims.push(lay.partial ? line(...zig(right)) : line([right, 0], [right, h]));
+      if (pbo) {
+        prims.push(
+          text(left - 0.9, h / 2 - 0.2, "POWER BY", LABEL, "end", "note"),
+          text(left - 0.9, h / 2 + 1.2, "OTHERS", LABEL, "end", "note"),
+        );
       }
-      for (const t of lay.terms) prims.push(line([t.x, -1], [t.x, 0]), text(t.x, 1.4, t.name, TERM, "middle", "term"));
-      // Group names inside the box, in bold, under a bar spanning their terminals.
-      for (const g of lay.groups) {
-        if (g.x1 > g.x0) prims.push({ t: "line", pts: [[g.x0 - 0.6, 1.9], [g.x1 + 0.6, 1.9]], w: 0.1 });
-        prims.push({ ...(text((g.x0 + g.x1) / 2, 3.1, g.name, LABEL, "middle", "note") as Extract<Prim, { t: "text" }>), bold: true });
+      // Terminal boxes along the top inside edge; adjacent ones share a wall.
+      for (const t of lay.terms) {
+        prims.push(rect(t.x - 1.5, 0, 3, PLANT.termH), text(t.x, PLANT.termH - 0.35, t.name, TERM, "middle", "term"));
       }
-      // Tag, description and further information under the box, left aligned.
-      let y = h + 1.7;
-      prims.push(text(left, y, "{tag}", TAG, "start", "tag"));
-      for (const l of [str(el, "pdesc", ""), ...str(el, "pinfo", "").split("\n")].filter(Boolean)) {
-        y += 1.35;
-        prims.push(text(left, y, l, LABEL, "start", "note"));
+      for (const g of lay.groups) prims.push(text((g.x0 + g.x1) / 2, PLANT.termH + 1.7, g.name, PLANT.group, "middle", "note"));
+      // Tag, description and information under the box: centred under a box
+      // wider than they are, otherwise left-aligned from its left edge.
+      const lines: [string, number, TextRole][] = [["{tag}", TAG, "tag"]];
+      for (const l of [str(el, "pdesc", ""), ...str(el, "pinfo", "").split("\n")].filter(Boolean)) lines.push([l, LABEL, "note"]);
+      if (el.label) lines.push(["{label}", LABEL, "label"]);
+      const widest = Math.max(...lines.map(([t, size]) => (t === "{tag}" ? 8 : t.length) * size * 0.55));
+      const centred = widest < right - left;
+      let y = h + 1.8;
+      for (const [t, size, role] of lines) {
+        prims.push(text(centred ? (left + right) / 2 : left, y, t, size, centred ? "middle" : "start", role));
+        y += size === TAG ? 1.6 : 1.4;
       }
-      if (el.label) prims.push(text(left, y + 1.35, "{label}", LABEL, "start", "label"));
-      const terminals: TerminalDef[] = lay.terms.map((t) => ({ name: t.name, at: [t.x, -1], dir: "up" as Dir }));
+      const terminals: TerminalDef[] = lay.terms.map((t) => ({ name: t.id, at: [t.x, 0], dir: "up" as Dir }));
       return { prims, terminals, body: { x: left, y: 0, w: right - left, h } };
     },
   },
@@ -1210,13 +1264,29 @@ export function parsePlantGroups(s: string): { name: string; terminals: string[]
     .filter((g): g is { name: string; terminals: string[] } => !!g && !!g.name);
 }
 
+/** A plant terminal's name as printed: its id without any group qualifier (R2.C → C). */
+export function plantTerminalName(id: string, group?: string): string {
+  return group && id.startsWith(`${group}.`) ? id.slice(group.length + 1) : id;
+}
+
+/** Plant view sizes, grid units. */
+export const PLANT = {
+  /** Every plant box is this tall, so they line up. */
+  h: 6,
+  /** Terminal boxes along the top inside edge. */
+  termH: 1.6,
+  /** Group names, in capitals, a touch larger than other labels. */
+  group: 1.25,
+};
+
 /**
- * Where a plant view's terminals go: 3 units apart, a gap between groups,
- * and room for each group's name under its terminals. The box is as wide
- * as the terminals need and no wider.
+ * Where a plant view's terminals go, as on a maker's drawing: a row of
+ * small boxes 3 units apart along the inside top edge, each group's name
+ * under its boxes, a gap between groups. The box is as wide as its
+ * terminals need.
  */
 export function plantViewLayout(el: Element): {
-  terms: { name: string; x: number }[];
+  terms: { id: string; name: string; x: number }[];
   groups: { name: string; x0: number; x1: number }[];
   left: number;
   right: number;
@@ -1236,30 +1306,26 @@ export function plantViewLayout(el: Element): {
     if (last && last.name === name) last.terms.push(t);
     else runs.push({ name, terms: [t] });
   }
-  const textW = (name: string) => (name ? name.length * LABEL * 0.62 + 0.8 : 0);
-  const terms: { name: string; x: number }[] = [];
+  const textW = (name: string) => (name ? name.length * PLANT.group * 0.62 : 0);
+  const terms: { id: string; name: string; x: number }[] = [];
   const groups: { name: string; x0: number; x1: number }[] = [];
-  let x = 0; // earliest the next run's first terminal may sit
-  let prevRight = -Infinity; // right edge of whatever the previous run drew
+  let prevRight = -Infinity; // right edge of whatever the previous run drew (boxes or name)
   for (const [i, r] of runs.entries()) {
     const span = (r.terms.length - 1) * 3;
-    const half = Math.max(span, textW(r.name)) / 2;
-    if (i > 0) x += 1; // a little more room between groups than between terminals
-    // Centre of this run, far enough right that its name clears the last one's.
-    let centre = Math.max(x + span / 2, prevRight + 0.6 + half);
-    let x0 = Math.ceil(centre - span / 2);
-    if (i === 0) x0 = 0;
-    centre = x0 + span / 2;
-    r.terms.forEach((t, j) => terms.push({ name: t, x: x0 + j * 3 }));
-    if (r.name) groups.push({ name: r.name, x0, x1: x0 + span });
-    prevRight = Math.max(x0 + span, centre + (r.name ? textW(r.name) / 2 : 0));
-    x = x0 + span + 3;
+    const half = Math.max(span + 3, textW(r.name)) / 2;
+    // Centre far enough right to clear the last run by a box width.
+    let x0 = 0;
+    if (i > 0) x0 = Math.ceil(prevRight + 3 + half - span / 2);
+    const centre = x0 + span / 2;
+    r.terms.forEach((t, j) => terms.push({ id: t, name: plantTerminalName(t, r.name), x: x0 + j * 3 }));
+    if (r.name) groups.push({ name: r.name.toUpperCase(), x0, x1: x0 + span });
+    prevRight = centre + half;
   }
   const lastX = terms.length ? terms[terms.length - 1]!.x : 0;
   const nameEdge = (g: { name: string; x0: number; x1: number }, side: -1 | 1) => (g.x0 + g.x1) / 2 + (side * textW(g.name)) / 2;
-  const left = Math.min(-1.5, ...groups.map((g) => nameEdge(g, -1) - 0.2));
-  const right = Math.max(lastX + 1.5, left + 4, ...groups.map((g) => nameEdge(g, 1) + 0.2));
-  return { terms, groups, left, right, h: groups.length ? 4 : 2.4, partial: shown.length < all.length };
+  const left = Math.min(-3, ...groups.map((g) => nameEdge(g, -1) - 1));
+  const right = Math.max(lastX + 3, left + 6, ...groups.map((g) => nameEdge(g, 1) + 1));
+  return { terms, groups, left, right, h: PLANT.h, partial: shown.length < all.length };
 }
 
 /** Does a parameter apply to this element as it's set now? */

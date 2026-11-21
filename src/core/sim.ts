@@ -195,7 +195,7 @@ export function compile(project: Project): Circuit {
             for (let i = 1; i < shown.length; i++) link(el, shown[0]!, shown[i]!, (s) => (s.inputs[el.id] ?? 0) === 1);
             const item = project.plant.find((p) => p.id === el.params.plant);
             names.set(el.id, item?.tag ?? "plant");
-            inputs.push({ el: el.id, kind: "toggle", label: item ? `${item.tag} contact (field)` : "Field contact", initial: 0 });
+            inputs.push({ el: el.id, kind: "toggle", label: item ? `${item.tag || item.prefix || "Plant"} contact (field)` : "Field contact", initial: 0 });
           }
           break;
         }

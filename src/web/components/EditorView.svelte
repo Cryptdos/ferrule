@@ -1,6 +1,5 @@
 <script lang="ts">
   import { deleteElements, deleteSections, deleteSegments, duplicateElements, moveElements, rotateElements } from "../../core/ops";
-  import { renumber } from "../../core/renumber";
   import { isTyping } from "../typing";
   import type { Editor } from "../editor.svelte";
   import Canvas from "./Canvas.svelte";
@@ -10,6 +9,7 @@
   import ProjectDialog from "./ProjectDialog.svelte";
   import PlantDialog from "./PlantDialog.svelte";
   import ChecksDialog from "./ChecksDialog.svelte";
+  import RenumberDialog from "./RenumberDialog.svelte";
   import SchedulesDialog from "./SchedulesDialog.svelte";
   import ElementList from "./ElementList.svelte";
   import TableView from "./TableView.svelte";
@@ -22,7 +22,7 @@
 
   let canvas: Canvas | undefined = $state();
   let showProject = $state(false);
-  let dialog: "plant" | "checks" | "schedules" | "templates" | null = $state(null);
+  let dialog: "plant" | "checks" | "schedules" | "templates" | "renumber" | null = $state(null);
   let tableView = $state(false);
   let sim: Simulator | null = $state(null);
 
@@ -76,10 +76,8 @@
   }
 
   function doRenumber() {
-    let r = { tags: 0, terminals: 0, wires: 0 };
-    if (editor.apply((p) => (r = renumber(p)))) {
-      editor.flash(`Renumbered ${r.tags} tags, ${r.terminals} terminals, ${r.wires} wires. Undo puts them back.`);
-    }
+    // Show what would change first; nothing changes until it's applied.
+    dialog = "renumber";
   }
 
   async function print() {
@@ -250,6 +248,8 @@
 </div>
 {#if dialog === "plant"}
   <PlantDialog {editor} onclose={() => (dialog = null)} />
+{:else if dialog === "renumber"}
+  <RenumberDialog {editor} onclose={() => (dialog = null)} />
 {:else if dialog === "checks"}
   <ChecksDialog {editor} onclose={() => (dialog = null)} />
 {:else if dialog === "templates"}

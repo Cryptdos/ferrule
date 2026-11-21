@@ -23,12 +23,14 @@ import type { Element, Page, Project } from "./model";
 import { assignAddresses, collisionSuffix, type Placed } from "./numbering";
 import { requireSymbol, terminalPoint } from "./symbols";
 import { tagPrefix } from "./tags";
+import { plantTag } from "./ops";
 import { isMaster, masterOf, slavesOf } from "./xref";
 
 export interface RenumberResult {
   tags: number;
   terminals: number;
   wires: number;
+  plant: number;
 }
 
 const isLocked = (el: Element) => el.params.locked === true;
@@ -82,7 +84,7 @@ function assign(
 
 export function renumber(project: Project): RenumberResult {
   const scheme = project.numbering.scheme;
-  const result: RenumberResult = { tags: 0, terminals: 0, wires: 0 };
+  const result: RenumberResult = { tags: 0, terminals: 0, wires: 0, plant: 0 };
 
   // --- Component tags and terminals --------------------------------------
   const tagItems: Item[] = [];
@@ -121,6 +123,32 @@ export function renumber(project: Project): RenumberResult {
   for (const [id, tag] of assign(termItems, scheme, 1, takenTerms, (it, n) => `${it.group}:${n}`)) {
     byId.get(id)!.tag = tag.slice(tag.indexOf(":") + 1);
     result.terminals++;
+  }
+
+  // --- Plant: prefix + where its first view is -------------------------------
+  const plantItems: Item[] = [];
+  for (const item of project.plant) {
+    if (item.locked && item.tag) {
+      takenTags.add(item.tag);
+      continue;
+    }
+    let first: Item | null = null;
+    for (const page of project.pages) {
+      for (const el of page.elements) {
+        if (el.symbol !== "plant-view" || el.params.plant !== item.id) continue;
+        const it: Item = { id: item.id, page: page.number, column: columnOf(el.pos[0]), y: el.pos[1], x: el.pos[0], group: item.prefix || "U" };
+        if (!first || order(it, first) < 0) first = it;
+      }
+    }
+    if (first) plantItems.push(first);
+  }
+  for (const [id, address] of assign(plantItems, scheme, 1, new Set(), (_it, n) => n)) {
+    const item = project.plant.find((p) => p.id === id)!;
+    let tag = plantTag(item.prefix || "U", address);
+    for (let k = 1; takenTags.has(tag); k++) tag = plantTag(item.prefix || "U", `${address}${collisionSuffix(k)}`);
+    takenTags.add(tag);
+    item.tag = tag;
+    result.plant++;
   }
 
   // --- Contact pole numbers ------------------------------------------------
@@ -177,4 +205,54 @@ export function renumber(project: Project): RenumberResult {
     }
   }
   return result;
+}
+
+export interface RenumberChange {
+  kind: "Tag" | "Terminal" | "Plant" | "Wire" | "Pole";
+  /** Sheet-column of the thing, or its sheet for a wire. */
+  where: string;
+  from: string;
+  to: string;
+}
+
+/**
+ * What Renumber would change, without changing anything: run it on a copy
+ * and compare. Only real changes are listed.
+ */
+export function renumberPreview(project: Project): { changes: RenumberChange[]; result: Project } {
+  const copy: Project = JSON.parse(JSON.stringify(project));
+  renumber(copy);
+  const changes: RenumberChange[] = [];
+  const before = new Map<string, Element>();
+  for (const page of project.pages) for (const el of page.elements) before.set(el.id, el);
+  for (const page of copy.pages) {
+    for (const el of page.elements) {
+      const old = before.get(el.id);
+      if (!old) continue;
+      const where = `${page.number}-${columnOf(el.pos[0])}`;
+      if ((old.tag ?? "") !== (el.tag ?? "")) {
+        changes.push({ kind: el.symbol === "terminal" ? "Terminal" : "Tag", where, from: old.tag || "–", to: el.tag || "–" });
+      }
+      if (old.params.pole !== el.params.pole && el.params.pole !== undefined) {
+        changes.push({ kind: "Pole", where, from: String(old.params.pole ?? "–"), to: String(el.params.pole) });
+      }
+    }
+  }
+  const oldPlant = new Map(project.plant.map((p) => [p.id, p]));
+  for (const item of copy.plant) {
+    const old = oldPlant.get(item.id);
+    if (old && old.tag !== item.tag) changes.push({ kind: "Plant", where: item.description || "", from: old.tag || "–", to: item.tag });
+  }
+  const oldCond = new Map(project.conductors.map((c) => [c.id, c]));
+  const sheetOf = new Map<string, number>();
+  for (const page of copy.pages) for (const el of page.elements) sheetOf.set(el.id, page.number);
+  for (const c of copy.conductors) {
+    const old = oldCond.get(c.id);
+    if ((old?.number ?? "") === c.number) continue;
+    const sheets = [...new Set(c.terminals.map(([id]) => sheetOf.get(id)).filter((n): n is number => n !== undefined))].sort((a, b) => a - b);
+    changes.push({ kind: "Wire", where: sheets.length ? `sheet ${sheets.join(", ")}` : "", from: old?.number || "–", to: c.number || "–" });
+  }
+  const rank = { Plant: 0, Tag: 1, Pole: 2, Terminal: 3, Wire: 4 };
+  changes.sort((a, b) => rank[a.kind] - rank[b.kind] || a.where.localeCompare(b.where, undefined, { numeric: true }));
+  return { changes, result: copy };
 }

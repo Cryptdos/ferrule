@@ -179,7 +179,7 @@ describe("off-page arrows", () => {
     const a = add("offpage", 10, 10);
     const b = add("offpage", 50, 10);
     linkOffpage(p, a.id, b.id);
-    expect(b.params.direction).toBe("in");
+    expect(b.params.source).toBe(false);
     expect(linkedTarget(p, a)).toBe(b.id);
     expect(linkedTarget(p, b)).toBe(a.id);
     // Coming and going are drawn differently.
@@ -227,7 +227,29 @@ describe("plant terminal groups", () => {
     const texts = g.prims.filter((x) => x.t === "text").map((x) => (x.t === "text" ? x.text : ""));
     expect(texts).toContain("MODEL X");
     expect(texts).toContain("7.5kW");
-    expect(g.prims.some((x) => x.t === "text" && x.bold && x.text === "ENABLE")).toBe(true);
+    expect(g.prims.some((x) => x.t === "text" && x.text === "ENABLE")).toBe(true);
+    // Every plant box is the same height.
+    expect(g.body.h).toBe(6);
+  });
+
+  test("the same terminal names in two groups are told apart: R1: C NO NC | R2: C NO NC", () => {
+    const spec = parseTerminalSpec("R1: C NO NC | R2: C NO NC");
+    expect(spec.terminals).toEqual(["R1.C", "R1.NO", "R1.NC", "R2.C", "R2.NO", "R2.NC"]);
+    expect(formatTerminalSpec(spec)).toBe("R1: C NO NC | R2: C NO NC");
+    const { p, pg } = sheet();
+    const item = addPlant(p, "", "DPS", spec.terminals, { groups: spec.groups, prefix: "DPS" });
+    const v = placePlantView(p, pg, item.id, [20, 90]);
+    const lay = plantViewLayout(v);
+    expect(lay.terms.map((t) => t.name)).toEqual(["C", "NO", "NC", "C", "NO", "NC"]);
+    expect(lay.terms.map((t) => t.id)).toContain("R2.NC");
+  });
+
+  test("a plant whose power is by others gets a break on its left", () => {
+    const { p, pg } = sheet();
+    const item = addPlant(p, "", "LIFT 2", ["1", "2"], { prefix: "LIFT", powerByOthers: true });
+    const v = placePlantView(p, pg, item.id, [20, 90]);
+    const texts = localGeometry(v, "").prims.filter((x) => x.t === "text").map((x) => (x.t === "text" ? x.text : ""));
+    expect(texts).toContain("POWER BY");
   });
 });
 

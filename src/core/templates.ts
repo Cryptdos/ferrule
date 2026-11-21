@@ -20,7 +20,7 @@ import {
   type Template,
   newId,
 } from "./model";
-import { OpError, addPage, addPlant, getPage, syncPlantViews, updateZones } from "./ops";
+import { OpError, addPage, addPlant, getPage, prefixOf, syncPlantViews, updateZones } from "./ops";
 
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v));
 
@@ -145,7 +145,15 @@ export function stampTemplate(project: Project, templateId: string, opts: StampO
       target = project.plant.find((p) => p.id === m.plant);
       if (!target) throw new OpError(`No plant item "${m.plant}"`);
     } else if (m && "newTag" in m) {
-      target = addPlant(project, m.newTag, m.description ?? item.description, item.terminals, { groups: item.groups, info: item.info });
+      // Letters only (SF): a prefix, and Renumber gives the tag. A full tag (SF-02) is kept as typed.
+      const typed = /\d/.test(m.newTag) ? m.newTag : "";
+      target = addPlant(project, typed, m.description ?? item.description, item.terminals, {
+        groups: item.groups,
+        info: item.info,
+        prefix: prefixOf(m.newTag) || item.prefix || "U",
+        powerByOthers: item.powerByOthers,
+      });
+      if (typed) target.locked = true;
     } else {
       target = project.plant.find((p) => p.id === item.id) ?? project.plant.find((p) => p.tag === item.tag);
       if (!target) {

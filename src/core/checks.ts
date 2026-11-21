@@ -73,12 +73,12 @@ export function checkProject(project: Project): Finding[] {
       }
       if (el.symbol === "offpage") {
         const other = partnerOf(project, el);
-        const dir = (e: typeof el) => (e.params.direction === "in" ? "in" : "out");
+        const src = (e: typeof el) => e.params.source !== false;
         // Report each mismatched pair once, from the first-numbered end.
-        if (other && dir(el) === dir(other.el) && el.id < other.el.id) {
+        if (other && src(el) === src(other.el) && el.id < other.el.id) {
           out.push({
             level: "warning",
-            message: `Sheet ${page.number}: paired off-page arrows both point ${dir(el) === "in" ? "in (coming)" : "away (going)"}; one should go and the other come`,
+            message: `Sheet ${page.number}: linked arrows are both ${src(el) ? "sources" : "destinations"}; one should be the source`,
             pageId: page.id,
             ids: [el.id],
           });

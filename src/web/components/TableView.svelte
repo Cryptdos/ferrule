@@ -4,7 +4,7 @@
   import { listSymbols, requireSymbol } from "../../core/symbols";
   import { displayTag } from "../../core/tags";
   import { masterOf } from "../../core/xref";
-  import { replaceInElements, setTagLocks, updateElementAnywhere } from "../../core/ops";
+  import { plantLabel, replaceInElements, setTagLocks, updateElementAnywhere } from "../../core/ops";
   import type { Editor } from "../editor.svelte";
 
   /** Every element in the project as a row (DESIGN.md §11). */
@@ -89,7 +89,7 @@
     {#if editor.project.plant.length}
       <select bind:value={plant}>
         <option value="">All plant</option>
-        {#each editor.project.plant as p (p.id)}<option value={p.id}>{p.tag}</option>{/each}
+        {#each editor.project.plant as p (p.id)}<option value={p.id}>{plantLabel(p)}</option>{/each}
       </select>
     {/if}
     <input bind:value={text} placeholder="Search tag, type or label" />

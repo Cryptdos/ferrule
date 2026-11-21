@@ -1,5 +1,7 @@
 <script lang="ts">
+  import { resolveFields } from "../../core/fields";
   import { columnOf } from "../../core/geometry";
+  import { isFieldWire } from "../../core/wires";
   import {
     deleteElements,
     deleteSegments,
@@ -14,11 +16,13 @@
     renamePage,
     resetRoute,
     reverseSegment,
+    setWireKind,
     rotateElements,
     setConductorNumber,
     setConductorInfo,
     updateElement,
     type ElementPatch,
+    plantLabel,
   } from "../../core/ops";
   import { address, contactMarks, contactType, isMaster, isSlave, masterOf, partnerOf, slavesOf } from "../../core/xref";
   import { paramApplies, requireSymbol } from "../../core/symbols";
@@ -49,21 +53,28 @@
     const id = one.id;
     editor.apply((proj) => updateElement(proj, editor.pageId, id, p));
   }
-  function setParam(key: string, value: ParamValue) {
-    patch({ params: { [key]: value } });
+  function setParam(key: string, value: ParamValue, merge?: string) {
+    if (!one) return;
+    const id = one.id;
+    const pageId = editor.pageId;
+    editor.apply((p) => updateElement(p, pageId, id, { params: { [key]: value } }), merge ? { merge } : {});
   }
 
   /** Every coil in the project, for the contact link dropdown. */
   const coils = $derived(
     editor.project.pages.flatMap((pg) =>
-      pg.elements.filter(isMaster).map((el) => ({ el, label: `${displayTag(el, editor.project)}  (sheet ${pg.number}, col ${columnOf(el.pos[0])})${el.label ? " " + el.label : ""}` })),
+      pg.elements.filter(isMaster).map((el) => ({
+        el,
+        // Labels with fields ({plant:…}) read as they print.
+        label: `${displayTag(el, editor.project)}  (sheet ${pg.number}, col ${columnOf(el.pos[0])})${el.label ? " " + resolveFields(el.label, editor.project) : ""}`,
+      })),
     ),
   );
   const arrows = $derived(
     editor.project.pages.flatMap((pg) =>
       pg.elements
         .filter((e) => e.symbol === "offpage" && e.id !== one?.id)
-        .map((el) => ({ el, label: `${address(pg, el.pos)}${el.label ? " " + el.label : ""}` })),
+        .map((el) => ({ el, label: `${address(pg, el.pos)}${el.label ? " " + resolveFields(el.label, editor.project) : ""}` })),
     ),
   );
 </script>
@@ -184,13 +195,15 @@
               min={p.min}
               max={p.max}
               value={Number(v)}
-              onchange={(e) => {
-                const n = Number(e.currentTarget.value);
-                if (Number.isFinite(n)) setParam(p.key, Math.min(p.max ?? n, Math.max(p.min ?? n, Math.round(n))));
+              oninput={(e) => {
+                // Live while scrolling or typing; one undo step for the lot.
+                const raw = e.currentTarget.value;
+                const n = Number(raw);
+                if (raw !== "" && Number.isFinite(n)) setParam(p.key, Math.min(p.max ?? n, Math.max(p.min ?? n, Math.round(n))), `${one.id}:${p.key}`);
               }}
             />
           {:else}
-            <input value={String(v)} onchange={(e) => setParam(p.key, e.currentTarget.value)} />
+            <input value={String(v)} placeholder={p.placeholder} onchange={(e) => setParam(p.key, e.currentTarget.value)} />
           {/if}
         </label>
       {/if}
@@ -225,7 +238,7 @@
     {#if one.symbol === "plant-view"}
       {@const item = editor.project.plant.find((x) => x.id === one.params.plant)}
       {@const shown = new Set(String(one.params.show ?? "").split(",").filter(Boolean))}
-      <div class="sub">{item ? `${item.tag} ${item.description}` : "Plant item missing"}</div>
+      <div class="sub">{item ? `${plantLabel(item)} ${item.description}` : "Plant item missing"}</div>
       {#if item}
         <div class="sub">Terminals shown on this sheet</div>
         <div class="ticks">
@@ -347,6 +360,36 @@
       <datalist id="ferrule-wire-functions">
         {#each WIRE_FUNCTIONS as f (f)}<option value={f}></option>{/each}
       </datalist>
+      {@const isField = isFieldWire(page, seg)}
+      <label>
+        Kind
+        <select
+          value={seg.field === undefined ? "auto" : seg.field ? "field" : "panel"}
+          onchange={(e) => {
+            const v = e.currentTarget.value;
+            const id = seg.id;
+            editor.apply((p) => setWireKind(p, editor.pageId, [id], { field: v === "auto" ? null : v === "field" }));
+          }}
+        >
+          <option value="auto">Automatic: {isField && seg.field === undefined ? "field" : "panel"} (by the panel boundary)</option>
+          <option value="panel">Panel wiring</option>
+          <option value="field">Field wire (dashed, out to plant)</option>
+        </select>
+      </label>
+      {#if isField}
+        <label class="check">
+          <input
+            type="checkbox"
+            checked={seg.showNumber === true}
+            onchange={(e) => {
+              const v = e.currentTarget.checked;
+              const id = seg.id;
+              editor.apply((p) => setWireKind(p, editor.pageId, [id], { showNumber: v }));
+            }}
+          />
+          Print the wire number on this field wire
+        </label>
+      {/if}
       {#if cond.colour}
         <div class="row">
           Colour and number print at the {describe(seg.from)} end.
@@ -480,8 +523,16 @@
   }
   .pair {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 6px;
+  }
+  /* Nothing in the panel may be wider than the panel. */
+  .props :global(input:not([type="checkbox"])),
+  .props :global(select),
+  .props :global(textarea) {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
   }
   label.check {
     flex-direction: row;

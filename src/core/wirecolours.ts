@@ -32,4 +32,10 @@ export function colourCode(s: string): string {
   return pairs.map((p) => p[0]!.toUpperCase() + p[1]).join("");
 }
 
+/** A lamp colour as we write it. Amber isn't an IEC colour: yellow is used for it. */
+export function lampColour(s: string): string {
+  const c = colourCode(s);
+  return c === "Am" ? "Ye" : c;
+}
+
 export const WIRE_FUNCTIONS = ["0V", "24V", "24V AC", "24V DC", "230V", "L", "N", "L1", "L2", "L3", "PE", "0-10V", "SIG", "COM", "FE"];

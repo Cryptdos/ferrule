@@ -90,7 +90,7 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
   const bus = (name: string, x: number, y: number, length: number, label = "") =>
     add("busbar", x, y, { label, params: { name, length } });
   const arrowOut = (x: number, y: number, label = "") => add("offpage", x, y, { label });
-  const arrowIn = (x: number, y: number, label = "") => add("offpage", x, y, { rot: 180, label, params: { direction: "in" } });
+  const arrowIn = (x: number, y: number, label = "") => add("offpage", x, y, { rot: 180, label, params: { source: false } });
   const text = (x: number, y: number, s: string, size = "normal", align = "start") =>
     add("text", x, y, { label: s, params: { size, align } });
   const box = (x: number, y: number, bw: number, bh: number, label = "", dashed = false) =>
@@ -128,7 +128,7 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
   const busN = bus("N", 14, 48, 170);
   [busL1, busL2, busL3, busN].forEach((b, i) => w([qMain, String(2 * i + 2)], tap(b, 30 + 3 * i)));
   const fPower = add("fuse", 150, 62, { params: { rating: "4A" } });
-  const hPower = add("lamp", 150, 76, { label: "POWER ON", params: { colour: "Am" } });
+  const hPower = add("lamp", 150, 76, { label: "POWER ON", params: { colour: "Ye" } });
   w(tap(busL1, 150), [fPower, "1"]);
   w([fPower, "2"], [hPower, "V+"]);
   w([hPower, "V-"], tap(busN, 156));
@@ -205,11 +205,14 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
   const sL1 = rail("L1", 4, 6, 50);
   const sN = rail("N", 4, 9, 50);
   const cmcb = add("isolator", 14, 18, { label: "6A TYPE D", params: { function: "breaker", poles: 2, operator: "none" } });
-  const socket = add("socket", 17, 34, { label: "13A SOCKET (LAPTOP)" });
+  const socket = add("socket", 14, 34, { label: "13A SOCKET (LAPTOP)" });
   w(tap(sL1, 14), [cmcb, "1"]);
   w(tap(sN, 17), [cmcb, "3"]);
   w([cmcb, "2"], [socket, "L"]);
   w([cmcb, "4"], [socket, "N"]);
+  // The socket's earth goes out of its side to a protective earth.
+  const pe = add("earth", 24, 34, { params: { type: "protective" } });
+  w([socket, "E"], [pe, "E"]);
   const pmcb = add("isolator", 34, 18, { label: "6A TYPE D", params: { function: "breaker", poles: 2, operator: "none" } });
   const tx = add("transformer", 34, 32, { label: "TX1", params: { rating: "240/24V 300VA", screen: true } });
   w(tap(sL1, 34), [pmcb, "1"]);
