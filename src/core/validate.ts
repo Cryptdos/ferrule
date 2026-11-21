@@ -86,6 +86,8 @@ export function parseProject(input: unknown): Project {
       ...(typeof r.note === "string" ? { note: r.note } : {}),
     }));
   project.conductors = parseConductors(input.conductors);
+  const lamps = new Set(project.pages.flatMap((pg) => pg.elements.filter((e) => e.symbol === "lamp").map((e) => e.id)));
+  for (const c of project.conductors) c.terminals = c.terminals.map((t) => upgradeRef(t, lamps));
   return project;
 }
 
@@ -119,7 +121,28 @@ export function parsePlant(v: unknown): Project["plant"] {
       tag: strOr(pl.tag),
       description: strOr(pl.description),
       terminals: arr(pl.terminals).filter((t): t is string => typeof t === "string"),
+      ...(Array.isArray(pl.groups)
+        ? {
+            groups: arr(pl.groups)
+              .filter(isObj)
+              .map((g) => ({ name: strOr(g.name), terminals: arr(g.terminals).filter((t): t is string => typeof t === "string") }))
+              .filter((g) => g.name && g.terminals.length),
+          }
+        : {}),
+      ...(typeof pl.info === "string" && pl.info ? { info: pl.info } : {}),
     }));
+}
+
+// ---------------------------------------------------------------------------
+// Older files
+
+/** Lamp colours were single letters before the IEC 60757 two-letter codes. */
+const OLD_LAMP_COLOURS: Record<string, string> = { A: "AM", G: "GN", R: "RD", W: "WH", B: "BU", Y: "YE" };
+/** Lamp terminals were L and N before V+ and V- (they're often 24 V DC). */
+const OLD_LAMP_TERMINALS: Record<string, string> = { L: "V+", N: "V-" };
+
+function upgradeRef(ref: [string, string], lamps: Set<string>): [string, string] {
+  return lamps.has(ref[0]) && OLD_LAMP_TERMINALS[ref[1]] ? [ref[0], OLD_LAMP_TERMINALS[ref[1]]!] : ref;
 }
 
 function parsePage(pg: Record<string, unknown>, i: number): Project["pages"][number] {
@@ -172,6 +195,16 @@ function parsePage(pg: Record<string, unknown>, i: number): Project["pages"][num
         sc.rect.every((n) => typeof n === "number"),
     )
     .map((sc) => ({ id: sc.id as string, label: strOr(sc.label), rect: sc.rect as [number, number, number, number] }));
+  const lamps = new Set(elements.filter((e) => e.symbol === "lamp").map((e) => e.id));
+  for (const e of elements) {
+    if (e.symbol === "lamp" && typeof e.params.colour === "string" && OLD_LAMP_COLOURS[e.params.colour]) {
+      e.params.colour = OLD_LAMP_COLOURS[e.params.colour]!;
+    }
+  }
+  for (const s of segments) {
+    s.from = upgradeRef(s.from, lamps);
+    s.to = upgradeRef(s.to, lamps);
+  }
   const boundaryY = typeof pg.boundaryY === "number" && Number.isFinite(pg.boundaryY) ? pg.boundaryY : null;
   return { id: pg.id as string, number: i + 1, title: strOr(pg.title), boundaryY, sections, elements, segments };
 }
@@ -184,6 +217,8 @@ function parseConductors(v: unknown): Project["conductors"] {
       id: c.id as string,
       number: strOr(c.number),
       ...(c.locked === true ? { locked: true } : {}),
+      ...(typeof c.colour === "string" && c.colour ? { colour: c.colour } : {}),
+      ...(typeof c.function === "string" && c.function ? { function: c.function } : {}),
       terminals: arr(c.terminals).filter(
         (t): t is [string, string] => Array.isArray(t) && t.length === 2 && t.every((x) => typeof x === "string"),
       ),

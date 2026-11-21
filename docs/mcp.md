@@ -40,8 +40,9 @@ An open editor tab follows changes Claude makes: it reloads the project and says
 | `add_page`, `update_page`, `delete_page` | Sheets, titles, order, panel boundary |
 | `add_element`, `update_element`, `move_element`, `delete_element` | Symbols, text, boxes, plates (and deleting wires or sections by id) |
 | `connect`, `disconnect` | Wires: terminal to terminal, or tee into a wire |
+| `label_wire` | A wire's number, core colour (IEC 60757, e.g. BU) and function (e.g. 0V), printed along it |
 | `link` | Contact → coil, or pair off-page arrows |
-| `add_plant`, `place_plant_view` | Field equipment and its views |
+| `add_plant`, `place_plant_view` | Field equipment (terminals, named terminal groups, information lines) and its views |
 | `add_section` | Labelled section boxes |
 | `save_template`, `apply_template` | Templates and stamping for other plant |
 | `renumber`, `check`, `schedules` | Tags and wire numbers, rule checks, terminal/cable schedules |
@@ -49,7 +50,7 @@ An open editor tab follows changes Claude makes: it reloads the project and says
 | `check_logic` | Search for any sequence that breaks a rule (e.g. two contactors on together), or shorts the supply |
 | `export_pdf` | Saves the A4 PDF into an `exports` folder beside `projects` |
 
-Coordinates are grid units: x 0–200 across (2 per column), y 0–112 down. Sheets are referred to by number, elements and wires by id.
+Coordinates are grid units: x 0–200 across (2 per column), y 0–120 down. Sheets are referred to by number, elements and wires by id.
 
 ## Security
 

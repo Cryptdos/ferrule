@@ -11,6 +11,7 @@ import {
   type Page,
   type ParamValue,
   type PlantItem,
+  type PlantGroup,
   type Project,
   type Section,
   type Segment,
@@ -441,6 +442,9 @@ export function linkOffpage(project: Project, aId: string, bId: string | null): 
     unlinkAll(project, b.el, () => false);
     a.el.links.push(b.el.id);
     b.el.links.push(a.el.id);
+    // One end goes, the other comes: if both point the same way, turn the other one round.
+    const dir = (e: Element) => (e.params.direction === "in" ? "in" : "out");
+    if (dir(a.el) === dir(b.el)) b.el.params.direction = dir(a.el) === "out" ? "in" : "out";
   }
   refreshConductors(project);
 }
@@ -452,6 +456,19 @@ export function setConductorNumber(project: Project, conductorId: string, number
   c.number = number.trim();
   if (locked && c.number) c.locked = true;
   else delete c.locked;
+}
+
+/** Core colour and what a conductor carries, shown after its number. Empty strings clear them. */
+export function setConductorInfo(project: Project, conductorId: string, info: { colour?: string; function?: string }): void {
+  const c = project.conductors.find((x) => x.id === conductorId);
+  if (!c) throw new OpError(`No conductor "${conductorId}"`);
+  for (const k of ["colour", "function"] as const) {
+    const v = info[k];
+    if (v === undefined) continue;
+    const t = v.trim();
+    if (t) c[k] = k === "colour" ? t.toUpperCase() : t;
+    else delete c[k];
+  }
 }
 
 export function setNumberingScheme(project: Project, scheme: Project["numbering"]["scheme"]): void {
@@ -469,11 +486,64 @@ export function getPlant(project: Project, id: string): PlantItem {
 
 const cleanTerminals = (list: string[]) => [...new Set(list.map((t) => t.trim()).filter(Boolean))];
 
-export function addPlant(project: Project, tag: string, description = "", terminals: string[] = []): PlantItem {
+/**
+ * Terminals written with their groups: "L N E | ENABLE: 1 2 | 0-10V: 3 4".
+ * Runs are separated by "|"; a run may start with a group name and a colon.
+ */
+export function parseTerminalSpec(spec: string): { terminals: string[]; groups: PlantGroup[] } {
+  const terminals: string[] = [];
+  const groups: PlantGroup[] = [];
+  for (const run of spec.split("|")) {
+    const i = run.indexOf(":");
+    const name = i >= 0 ? run.slice(0, i).trim() : "";
+    const terms = cleanTerminals((i >= 0 ? run.slice(i + 1) : run).split(/[,\s]+/)).filter((t) => !terminals.includes(t));
+    terminals.push(...terms);
+    if (name && terms.length) {
+      const g = groups.find((x) => x.name === name);
+      if (g) g.terminals.push(...terms);
+      else groups.push({ name, terminals: terms });
+    }
+  }
+  return { terminals, groups };
+}
+
+/** The other way: a plant item's terminals and groups as one line. */
+export function formatTerminalSpec(item: Pick<PlantItem, "terminals" | "groups">): string {
+  const groupOf = new Map<string, string>();
+  for (const g of item.groups ?? []) for (const t of g.terminals) groupOf.set(t, g.name);
+  const runs: { name: string; terms: string[] }[] = [];
+  for (const t of item.terminals) {
+    const name = groupOf.get(t) ?? "";
+    const last = runs[runs.length - 1];
+    if (last && last.name === name) last.terms.push(t);
+    else runs.push({ name, terms: [t] });
+  }
+  return runs.map((r) => (r.name ? `${r.name}: ${r.terms.join(" ")}` : r.terms.join(" "))).join(" | ");
+}
+
+/** Groups that only mention terminals the item has, and not empty. */
+function cleanGroups(groups: PlantGroup[], terminals: string[]): PlantGroup[] {
+  const have = new Set(terminals);
+  return groups
+    .map((g) => ({ name: g.name.trim(), terminals: cleanTerminals(g.terminals).filter((t) => have.has(t)) }))
+    .filter((g) => g.name && g.terminals.length);
+}
+
+export function addPlant(
+  project: Project,
+  tag: string,
+  description = "",
+  terminals: string[] = [],
+  more: { groups?: PlantGroup[]; info?: string } = {},
+): PlantItem {
   const t = tag.trim();
   if (!t) throw new OpError("A plant item needs a tag");
   if (project.plant.some((p) => p.tag === t)) throw new OpError(`There's already a plant item ${t}`);
-  const item: PlantItem = { id: newId("p"), tag: t, description: description.trim(), terminals: cleanTerminals(terminals) };
+  const terms = cleanTerminals(terminals);
+  const item: PlantItem = { id: newId("p"), tag: t, description: description.trim(), terminals: terms };
+  const groups = cleanGroups(more.groups ?? [], terms);
+  if (groups.length) item.groups = groups;
+  if (more.info?.trim()) item.info = more.info.trim();
   project.plant.push(item);
   return item;
 }
@@ -481,7 +551,7 @@ export function addPlant(project: Project, tag: string, description = "", termin
 export function updatePlant(
   project: Project,
   id: string,
-  patch: { tag?: string; description?: string; terminals?: string[] },
+  patch: { tag?: string; description?: string; terminals?: string[]; groups?: PlantGroup[]; info?: string },
 ): void {
   const item = getPlant(project, id);
   if (patch.tag !== undefined) {
@@ -492,6 +562,13 @@ export function updatePlant(
   }
   if (patch.description !== undefined) item.description = patch.description.trim();
   if (patch.terminals !== undefined) item.terminals = cleanTerminals(patch.terminals);
+  if (patch.info !== undefined) {
+    if (patch.info.trim()) item.info = patch.info.trim();
+    else delete item.info;
+  }
+  const groups = cleanGroups(patch.groups ?? item.groups ?? [], item.terminals);
+  if (groups.length) item.groups = groups;
+  else delete item.groups;
   syncPlantViews(project);
 }
 
@@ -536,6 +613,8 @@ export function syncPlantViews(project: Project): void {
       el.params.terms = terms.join(",");
       el.params.show = show.join(",");
       el.params.pdesc = item?.description ?? "";
+      el.params.pinfo = item?.info ?? "";
+      el.params.pgroups = (item?.groups ?? []).map((g) => `${g.name}=${g.terminals.join(",")}`).join(";");
       const keep = new Set(show);
       page.segments = page.segments.filter(
         (s) => !((s.from[0] === el.id && !keep.has(s.from[1])) || (s.to[0] === el.id && !keep.has(s.to[1]))),

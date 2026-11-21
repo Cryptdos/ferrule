@@ -7,9 +7,9 @@
  * coil shows a table of its contacts and where they are. Off-page arrows
  * link in pairs and show where the other one is.
  */
-import { columnOf, type Vec } from "./geometry";
+import { columnOf, type Rect, type Vec } from "./geometry";
 import type { Element, Page, Project } from "./model";
-import type { Prim } from "./symbols";
+import { isolatorAux, type Prim } from "./symbols";
 
 export const MASTER_SYMBOLS = new Set(["coil", "timer-coil"]);
 const SLAVE_SYMBOLS = new Set(["contact-no", "contact-nc", "contact-co", "timer-contact"]);
@@ -115,9 +115,40 @@ export function contactMarks(el: Element): string {
   }
 }
 
-/** Rows of a coil's contact table: type, marks, where. */
+/** Rows of a coil's contact table: type, marks, where. A contactor's auxiliary contacts get a row each. */
 export function contactTable(project: Project, el: Element): [string, string, string][] {
-  return slavesOf(project, el).map((s) => [contactType(s.el), contactMarks(s.el), address(s.page, s.el.pos)]);
+  return contactRows(project, el).map((r) => r.row);
+}
+
+/** The same rows, each with the contact it describes. */
+export function contactRows(project: Project, el: Element): { row: [string, string, string]; id: string }[] {
+  return slavesOf(project, el).flatMap((s) => {
+    const where = address(s.page, s.el.pos);
+    const rows: { row: [string, string, string]; id: string }[] = [
+      { row: [contactType(s.el), contactMarks(s.el), where], id: s.el.id },
+    ];
+    if (s.el.symbol === "isolator") {
+      for (const a of isolatorAux(s.el)) rows.push({ row: [a.nc ? "NC" : "NO", `${a.a}-${a.b}`, where], id: s.el.id });
+    }
+    return rows;
+  });
+}
+
+/** Which row of a contact table a point (relative to the table's corner) is on, or -1. */
+export function contactTableRowAt(rows: number, local: Vec): number {
+  if (local[0] < 0 || local[0] > TABLE_W || local[1] < 0) return -1;
+  const i = Math.floor((local[1] - 0.15) / TABLE_ROW);
+  return i >= 0 && i < rows ? i : local[1] < 0.4 ? 0 : -1;
+}
+
+/** Where a double-click on an element takes you: coil ↔ contact, arrow ↔ arrow. */
+export function linkedTarget(project: Project, el: Element): string | null {
+  const m = masterOf(project, el);
+  if (m) return m.el.id;
+  const p = partnerOf(project, el);
+  if (p) return p.el.id;
+  const first = slavesOf(project, el)[0];
+  return first ? first.el.id : null;
 }
 
 /** The cross-reference shown under an element's tag. */
@@ -136,24 +167,46 @@ export function xrefText(project: Project, el: Element, masterTag: string): stri
   return "";
 }
 
+// Contact table layout, in grid units.
+const TABLE_ROW = 1.1;
+const TABLE_TEXT = 0.85;
+const TABLE_W = 7.4;
+/** Where the marks column ends and the address column starts. */
+const TABLE_SEP = 4.4;
+
 /**
- * The contact table drawn under a coil, in the coil's local coordinates:
- * one row per contact, below everything else the coil draws.
+ * Where a coil's contact table sits, relative to the coil, or wherever it
+ * has been dragged to (params xrefDx/xrefDy). By default it's to the right
+ * of the coil's wire, ending just above the coil: clear of the coil's own
+ * wires and of a coil on the next rung at the same height, and narrow
+ * enough to sit between rungs 5 columns apart.
  */
-export function contactTablePrims(rows: [string, string, string][], below: number): Prim[] {
+export function contactTableAt(el: Element, body: Rect, rows: number): Vec {
+  const dx = typeof el.params.xrefDx === "number" ? el.params.xrefDx : Math.max(1.9, body.x + body.w + 0.3);
+  const dy = typeof el.params.xrefDy === "number" ? el.params.xrefDy : body.y - 0.2 - contactTableRect(rows, [0, 0]).h;
+  return [dx, dy];
+}
+
+/** The table's outline, relative to the coil, for picking it up. */
+export function contactTableRect(rows: number, at: Vec): Rect {
+  return { x: at[0], y: at[1], w: TABLE_W, h: rows * TABLE_ROW + 0.4 };
+}
+
+/** The contact table drawn beside a coil, one row per contact, in the coil's coordinates. */
+export function contactTablePrims(rows: [string, string, string][], at: Vec): Prim[] {
   if (!rows.length) return [];
-  const rowH = 1.35;
-  const top = below + 0.9;
+  const [x0, top] = at;
+  const sep = x0 + TABLE_SEP;
   const out: Prim[] = [
-    { t: "line", pts: [[-4.4, top], [3.6, top]], w: 0.12 },
-    { t: "line", pts: [[0.6, top], [0.6, top + rows.length * rowH + 0.3]], w: 0.12 },
+    { t: "line", pts: [[x0, top], [x0 + TABLE_W, top]], w: 0.1 },
+    { t: "line", pts: [[sep, top], [sep, top + rows.length * TABLE_ROW + 0.3]], w: 0.1 },
   ];
   rows.forEach(([type, marks, where], i) => {
-    const y = top + (i + 1) * rowH - 0.2;
+    const y = top + (i + 1) * TABLE_ROW - 0.15;
     out.push(
-      { t: "text", at: [-4.3, y], text: type, size: 1.0, anchor: "start", role: "xref" },
-      { t: "text", at: [0.4, y], text: marks, size: 1.0, anchor: "end", role: "xref" },
-      { t: "text", at: [0.9, y], text: where, size: 1.0, anchor: "start", role: "xref" },
+      { t: "text", at: [x0 + 0.1, y], text: type, size: TABLE_TEXT, anchor: "start", role: "xref" },
+      { t: "text", at: [sep - 0.2, y], text: marks, size: TABLE_TEXT, anchor: "end", role: "xref" },
+      { t: "text", at: [sep + 0.25, y], text: where, size: TABLE_TEXT, anchor: "start", role: "xref" },
     );
   });
   return out;

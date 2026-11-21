@@ -71,6 +71,19 @@ export function checkProject(project: Project): Finding[] {
       if (el.symbol === "offpage" && !partnerOf(project, el)) {
         out.push({ level: "warning", message: `Sheet ${page.number}: off-page arrow isn't paired with another`, pageId: page.id, ids: [el.id] });
       }
+      if (el.symbol === "offpage") {
+        const other = partnerOf(project, el);
+        const dir = (e: typeof el) => (e.params.direction === "in" ? "in" : "out");
+        // Report each mismatched pair once, from the first-numbered end.
+        if (other && dir(el) === dir(other.el) && el.id < other.el.id) {
+          out.push({
+            level: "warning",
+            message: `Sheet ${page.number}: paired off-page arrows both point ${dir(el) === "in" ? "in (coming)" : "away (going)"}; one should go and the other come`,
+            pageId: page.id,
+            ids: [el.id],
+          });
+        }
+      }
 
       const names = terminalNames(el);
       if (!NO_TERMINAL_CHECK.has(el.symbol) && names.length) {

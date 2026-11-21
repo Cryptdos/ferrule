@@ -52,12 +52,14 @@
     return new Set(page.segments.filter((s) => ext.has(s.from[0]) || ext.has(s.to[0])).map((s) => s.id));
   });
 
-  /** Wire numbers, by conductor. Wires on rails aren't labelled: the rail is. */
+  /** Wire labels, by conductor. Wires on rails aren't labelled: the rail is. */
   const numbers = $derived.by(() => {
     const railIds = new Set(page.elements.filter((e) => e.symbol === "rail" || e.symbol === "busbar").map((e) => e.id));
     const out = new Map<string, string>();
     for (const c of project.conductors) {
-      if (c.number && !c.terminals.some(([id]) => railIds.has(id))) out.set(c.id, c.number);
+      // Number, then core colour and what it carries: "1-66 BU 0V".
+      const text = [c.number, c.colour, c.function].filter(Boolean).join(" ");
+      if (text && !c.terminals.some(([id]) => railIds.has(id))) out.set(c.id, text);
     }
     return out;
   });
@@ -160,8 +162,8 @@
   }
   .boundary {
     stroke: #000;
-    stroke-width: 0.45;
-    stroke-dasharray: 2 0.8;
+    stroke-width: 0.22;
+    stroke-dasharray: 3 0.8 0.6 0.8;
   }
   .wires circle {
     fill: #000;

@@ -11,6 +11,7 @@
  * No motors, analogue or power flow. Fuses and breakers always conduct.
  */
 import type { Element, LogicRule, Project } from "./model";
+import { isolatorAux } from "./symbols";
 import { masterOf } from "./xref";
 import { displayTag } from "./tags";
 
@@ -34,7 +35,13 @@ interface Load {
   kind: Kind;
   a: string;
   b: string;
+  /** A lamp's test terminal: lights it too, against the same return. */
+  test?: string;
 }
+
+/** Timer functions the simulator knows (symbols.ts TIMER_FUNCTIONS). */
+export type TimerMode = "on" | "off" | "on-off" | "interval" | "flash-on" | "flash-off";
+const TIMER_MODES: TimerMode[] = ["on", "off", "on-off", "interval", "flash-on", "flash-off"];
 
 export interface Input {
   el: string;
@@ -52,7 +59,7 @@ export interface Circuit {
   ret: Set<string>;
   inputs: Input[];
   /** Timer settings by element id: delay in seconds and mode. */
-  timers: Map<string, { delay: number; mode: "on" | "off" }>;
+  timers: Map<string, { delay: number; mode: TimerMode }>;
   names: Map<string, string>;
 }
 
@@ -96,7 +103,7 @@ export function compile(project: Project): Circuit {
   const links: Link[] = [];
   const loads: Load[] = [];
   const inputs: Input[] = [];
-  const timers = new Map<string, { delay: number; mode: "on" | "off" }>();
+  const timers = new Map<string, { delay: number; mode: TimerMode }>();
   const names = new Map<string, string>();
   const supply = new Set<string>();
   const ret = new Set<string>();
@@ -168,12 +175,11 @@ export function compile(project: Project): Circuit {
           break;
         case "isolator": {
           const poles = typeof el.params.poles === "number" ? el.params.poles : 3;
-          const aux = typeof el.params.aux === "number" ? el.params.aux : 0;
           const coilDriven = el.params.function === "contactor" && !!master;
           // Isolators and breakers start closed (on); toggling opens them.
           const closed = coilDriven ? operated : (s: SimState) => (s.inputs[el.id] ?? 1) === 1;
           for (let i = 0; i < poles; i++) link(el, String(2 * i + 1), String(2 * i + 2), closed);
-          for (let i = 0; i < aux; i++) link(el, `${i + 1}3`, `${i + 1}4`, closed);
+          for (const a of isolatorAux(el)) link(el, a.a, a.b, a.nc ? (s) => !closed(s) : closed);
           if (!coilDriven) inputs.push({ el: el.id, kind: "toggle", label: el.label || "Isolator / breaker", initial: 1 });
           break;
         }
@@ -198,10 +204,19 @@ export function compile(project: Project): Circuit {
           break;
         case "timer-coil":
           loads.push({ el: el.id, kind: "timer", a: n(el, "A1"), b: n(el, "A2") });
-          timers.set(el.id, { delay: parseDelay(el.params.time), mode: el.params.mode === "off" ? "off" : "on" });
+          timers.set(el.id, {
+            delay: parseDelay(el.params.time),
+            mode: TIMER_MODES.includes(el.params.mode as TimerMode) ? (el.params.mode as TimerMode) : "on",
+          });
           break;
         case "lamp":
-          loads.push({ el: el.id, kind: "lamp", a: n(el, "L"), b: n(el, "N") });
+          loads.push({
+            el: el.id,
+            kind: "lamp",
+            a: n(el, "V+"),
+            b: n(el, "V-"),
+            ...(el.params.testPin === true ? { test: n(el, "T") } : {}),
+          });
           break;
       }
     }
@@ -241,11 +256,12 @@ function pass(c: Circuit, s: SimState) {
   for (const l of c.links) if (l.closed(s)) uf.union(l.a, l.b);
   const fs = uf.find(S);
   const fr = uf.find(R);
-  const on = (l: Load) => {
-    const a = uf.find(l.a);
-    const b = uf.find(l.b);
+  const across = (x: string, y: string) => {
+    const a = uf.find(x);
+    const b = uf.find(y);
     return (a === fs && b === fr) || (a === fr && b === fs);
   };
+  const on = (l: Load) => across(l.a, l.b) || (!!l.test && across(l.test, l.b));
   return { uf, fs, short: fs === fr && c.supply.size > 0 && c.ret.size > 0, on };
 }
 
@@ -266,26 +282,10 @@ export function settle(c: Circuit, s: SimState): SimState {
     }
     // Timers.
     for (const [id, t] of c.timers) {
-      const e = !!next.energised[id];
-      let done = !!next.timed[id];
-      if (t.mode === "on") {
-        if (e) {
-          if (next.since[id] === undefined) next.since[id] = next.t;
-          done = next.t - next.since[id]! >= t.delay;
-        } else {
-          delete next.since[id];
-          done = false;
-        }
-      } else {
-        if (e) {
-          delete next.since[id];
-          done = true;
-        } else if (done) {
-          if (next.since[id] === undefined) next.since[id] = next.t;
-          done = next.t - next.since[id]! < t.delay;
-          if (!done) delete next.since[id];
-        }
-      }
+      const r = stepTimer(t.mode, t.delay, !!next.energised[id], !!next.timed[id], next.since[id], next.t);
+      const done = r.done;
+      if (r.since === undefined) delete next.since[id];
+      else next.since[id] = r.since;
       if (done !== !!next.timed[id]) {
         next.timed[id] = done;
         changed = true;
@@ -306,6 +306,71 @@ export function settle(c: Circuit, s: SimState): SimState {
   }
   next.unstable = true;
   return next;
+}
+
+// ---------------------------------------------------------------------------
+// Timers
+
+const EPS = 1e-9;
+
+/**
+ * One timer at time t. `since` is when its current timing phase started
+ * (undefined when it isn't timing). Returns whether its contacts are
+ * operated and the new `since`.
+ */
+export function stepTimer(
+  mode: TimerMode,
+  delay: number,
+  energised: boolean,
+  done: boolean,
+  since: number | undefined,
+  t: number,
+): { done: boolean; since: number | undefined } {
+  const el = (from: number) => t - from + EPS;
+  switch (mode) {
+    case "on":
+      if (!energised) return { done: false, since: undefined };
+      since ??= t;
+      return { done: el(since) >= delay, since };
+    case "off":
+      if (energised) return { done: true, since: undefined };
+      if (!done) return { done: false, since: undefined };
+      since ??= t;
+      return el(since) < delay ? { done: true, since } : { done: false, since: undefined };
+    case "on-off":
+      if (energised) {
+        if (done) return { done: true, since: undefined };
+        since ??= t;
+        return el(since) >= delay ? { done: true, since: undefined } : { done: false, since };
+      }
+      if (!done) return { done: false, since: undefined };
+      since ??= t;
+      return el(since) < delay ? { done: true, since } : { done: false, since: undefined };
+    case "interval":
+      // On as soon as it's energised, off again after the time (or when de-energised).
+      if (!energised) return { done: false, since: undefined };
+      since ??= t;
+      return { done: el(since) < delay, since };
+    case "flash-on":
+    case "flash-off": {
+      if (!energised) return { done: false, since: undefined };
+      since ??= t;
+      if (delay <= 0) return { done: mode === "flash-on", since };
+      const phase = Math.floor(el(since) / delay) % 2 === 0;
+      return { done: mode === "flash-on" ? phase : !phase, since };
+    }
+  }
+}
+
+/** When a timer will next change, or null if it won't by itself. */
+export function timerEvent(mode: TimerMode, delay: number, since: number | undefined, t: number): number | null {
+  if (since === undefined) return null;
+  if (mode === "flash-on" || mode === "flash-off") {
+    if (delay <= 0) return null;
+    return since + (Math.floor((t - since + EPS) / delay) + 1) * delay;
+  }
+  // Already past (an on-delay that has timed out stays timed out).
+  return since + delay > t + EPS ? since + delay : null;
 }
 
 /** Flip a switch, selector, isolator or field contact; or hold/release a push button. */
@@ -331,11 +396,11 @@ export function press(c: Circuit, s: SimState, el: string): SimState {
 export function advance(c: Circuit, s: SimState, seconds: number): SimState {
   let cur = settle(c, s);
   const end = cur.t + seconds;
-  for (let guard = 0; guard < 1000; guard++) {
+  for (let guard = 0; guard < 5000; guard++) {
     let nextEvent = end;
     for (const [id, t] of c.timers) {
-      const since = cur.since[id];
-      if (since !== undefined) nextEvent = Math.min(nextEvent, Math.max(cur.t, since + t.delay));
+      const at = timerEvent(t.mode, t.delay, cur.since[id], cur.t);
+      if (at !== null) nextEvent = Math.min(nextEvent, Math.max(cur.t, at));
     }
     cur = settle(c, { ...cur, t: nextEvent });
     if (nextEvent >= end) break;
@@ -347,9 +412,9 @@ export function advance(c: Circuit, s: SimState, seconds: number): SimState {
 export function nextTimer(c: Circuit, s: SimState): number | null {
   let best: number | null = null;
   for (const [id, t] of c.timers) {
-    const since = s.since[id];
-    if (since === undefined) continue;
-    const left = Math.max(0, since + t.delay - s.t);
+    const at = timerEvent(t.mode, t.delay, s.since[id], s.t);
+    if (at === null) continue;
+    const left = Math.max(0, at - s.t);
     best = best === null ? left : Math.min(best, left);
   }
   return best;

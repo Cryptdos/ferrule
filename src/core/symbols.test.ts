@@ -33,7 +33,7 @@ describe("symbol library", () => {
     expect(names("coil")).toEqual(["A1", "A2"]);
     expect(names("contact-no")).toEqual(["13", "14"]);
     expect(names("contact-nc")).toEqual(["21", "22"]);
-    expect(names("lamp")).toEqual(["L", "N"]);
+    expect(names("lamp")).toEqual(["V+", "V-"]);
     expect(names("isolator", { poles: 3, aux: 1 })).toEqual(["1", "2", "3", "4", "5", "6", "13", "14"]);
   });
 

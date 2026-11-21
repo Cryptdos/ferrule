@@ -15,7 +15,7 @@ export const COLUMNS = 100;
 export const UNITS_PER_COLUMN = 2;
 
 /** Drawing area size in grid units. */
-export const AREA_UNITS = { w: COLUMNS * UNITS_PER_COLUMN, h: 112 } as const;
+export const AREA_UNITS = { w: COLUMNS * UNITS_PER_COLUMN, h: 120 } as const;
 
 /** Drawing area (the frame) on the sheet, in millimetres. */
 export const AREA_MM = { x: 10, y: 8, w: 277 } as const;
@@ -34,7 +34,7 @@ export const TITLE_BLOCK_MM = {
   x: AREA_MM.x,
   y: AREA_MM.y + AREA_H_MM + COLUMN_STRIP_MM,
   w: AREA_MM.w,
-  h: 32,
+  h: 21,
 } as const;
 
 /** Unlabelled tick marks down the left and right edges. */

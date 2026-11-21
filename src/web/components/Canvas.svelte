@@ -1,6 +1,7 @@
 <script lang="ts">
   import {
     AREA_MM,
+    AREA_UNITS,
     SHEET_MM,
     UNIT_MM,
     type Vec,
@@ -18,6 +19,7 @@
     placePlantView,
     setBoundary,
     setManualRoute,
+    updateElement,
     updateSection,
     wire,
     type WireEnd,
@@ -32,6 +34,7 @@
   import { getAvoid } from "../avoid";
   import { isTyping } from "../typing";
   import type { Simulator } from "../sim.svelte";
+  import { contactRows, contactTableAt, contactTableRect, contactTableRowAt, isMaster, linkedTarget } from "../../core/xref";
   import Sheet from "./Sheet.svelte";
   import ElementView from "./ElementView.svelte";
 
@@ -51,7 +54,8 @@
     | { kind: "band"; start: Vec; cur: Vec; add: boolean }
     | { kind: "secnew"; start: Vec; cur: Vec; cloud?: boolean }
     | { kind: "secmove"; id: string; start: Vec; rect: Rect4; delta: Vec }
-    | { kind: "secsize"; id: string; start: Vec; rect: Rect4; delta: Vec }
+    | { kind: "secsize"; id: string; start: Vec; rect: Rect4; delta: Vec; edges: string }
+    | { kind: "table"; coil: string; start: Vec; at: Vec; delta: Vec; row: number }
     | { kind: "boundary"; y: number }
     | null;
   type Rect4 = [number, number, number, number];
@@ -136,16 +140,41 @@
     return best;
   }
 
-  /** A section's resize handle (bottom-right corner) or its border/label. */
-  function hitSection(pt: Vec): { id: string; part: "move" | "size" } | null {
+  /**
+   * What part of a section box is under the pointer: its label (move it),
+   * an edge or a corner (resize that side). Edges are named n/s/e/w.
+   */
+  function hitSection(pt: Vec): { id: string; part: "move" | "size"; edges: string } | null {
+    const near = 0.6;
     for (let i = page.sections.length - 1; i >= 0; i--) {
       const sec = page.sections[i]!;
       const [x, y, w, h] = sec.rect;
-      if (Math.hypot(pt[0] - (x + w), pt[1] - (y + h)) < 1) return { id: sec.id, part: "size" };
-      const nearV = (Math.abs(pt[0] - x) < 0.6 || Math.abs(pt[0] - (x + w)) < 0.6) && pt[1] > y - 0.6 && pt[1] < y + h + 0.6;
-      const nearH = (Math.abs(pt[1] - y) < 0.6 || Math.abs(pt[1] - (y + h)) < 0.6) && pt[0] > x - 0.6 && pt[0] < x + w + 0.6;
-      const onLabel = pt[0] > x && pt[0] < x + 20 && pt[1] > y && pt[1] < y + 2.6;
-      if (nearV || nearH || onLabel) return { id: sec.id, part: "move" };
+      const inX = pt[0] > x - near && pt[0] < x + w + near;
+      const inY = pt[1] > y - near && pt[1] < y + h + near;
+      const onLabel = pt[0] > x && pt[0] < x + Math.min(w, 24) && pt[1] > y + near && pt[1] < y + 2.6;
+      if (onLabel) return { id: sec.id, part: "move", edges: "" };
+      let edges = "";
+      if (inX && Math.abs(pt[1] - y) < near) edges += "n";
+      if (inX && Math.abs(pt[1] - (y + h)) < near) edges += "s";
+      if (inY && Math.abs(pt[0] - x) < near) edges += "w";
+      if (inY && Math.abs(pt[0] - (x + w)) < near) edges += "e";
+      if (edges) return { id: sec.id, part: "size", edges };
+    }
+    return null;
+  }
+
+  /** A coil's contact table under the pointer: drag it to move it, click a row to go to that contact. */
+  function hitTable(pt: Vec): { coil: Element; at: Vec; row: number } | null {
+    for (let i = page.elements.length - 1; i >= 0; i--) {
+      const el = page.elements[i]!;
+      if (!isMaster(el)) continue;
+      const g = geoms.get(el.id);
+      const rows = contactRows(editor.project, el).length;
+      if (!g || !rows) continue;
+      const at = contactTableAt(el, g.body, rows);
+      const r = contactTableRect(rows, at);
+      const local: Vec = [pt[0] - el.pos[0], pt[1] - el.pos[1]];
+      if (pointInRect(local, r, 0.2)) return { coil: el, at, row: contactTableRowAt(rows, [local[0] - at[0], local[1] - at[1]]) };
     }
     return null;
   }
@@ -270,14 +299,22 @@
       return;
     }
 
-    // Select tool.
+    // Select tool. A coil's contact table sits outside the coil, so check it first.
+    const table = hitTable(pt);
+    if (table) {
+      gesture = { kind: "table", coil: table.coil.id, start: pt, at: table.at, delta: [0, 0], row: table.row };
+      return;
+    }
     const hit = hitElement(pt);
     const wireHit = hit ? null : hitWire(pt);
     const secHit = hit || wireHit ? null : hitSection(pt);
     if (secHit) {
       const sec = page.sections.find((x) => x.id === secHit.id)!;
       editor.selection = [sec.id];
-      gesture = { kind: secHit.part === "size" ? "secsize" : "secmove", id: sec.id, start: pt, rect: [...sec.rect], delta: [0, 0] };
+      gesture =
+        secHit.part === "size"
+          ? { kind: "secsize", id: sec.id, start: pt, rect: [...sec.rect], delta: [0, 0], edges: secHit.edges }
+          : { kind: "secmove", id: sec.id, start: pt, rect: [...sec.rect], delta: [0, 0] };
       return;
     }
     if (!hit && !wireHit && page.boundaryY !== null && Math.abs(pt[1] - page.boundaryY) < 0.6) {
@@ -324,8 +361,11 @@
       g.cur = snapVec(pointer);
     } else if (g.kind === "secmove" || g.kind === "secsize") {
       g.delta = snapVec([pointer[0] - g.start[0], pointer[1] - g.start[1]]);
+    } else if (g.kind === "table") {
+      // Half-unit steps: the table is text, it doesn't need to sit on the grid.
+      g.delta = [Math.round((pointer[0] - g.start[0]) * 2) / 2, Math.round((pointer[1] - g.start[1]) * 2) / 2];
     } else if (g.kind === "boundary") {
-      g.y = Math.round(Math.max(0, Math.min(112, pointer[1])));
+      g.y = Math.round(Math.max(0, Math.min(AREA_UNITS.h, pointer[1])));
     }
   }
 
@@ -357,6 +397,17 @@
     } else if ((g.kind === "secmove" || g.kind === "secsize") && (g.delta[0] || g.delta[1])) {
       const rect = sectionPreview(g);
       editor.apply((p) => updateSection(p, editor.pageId, g.id, { rect }));
+    } else if (g.kind === "table") {
+      if (g.delta[0] || g.delta[1]) {
+        const at: Vec = [g.at[0] + g.delta[0], g.at[1] + g.delta[1]];
+        editor.apply((p) => updateElement(p, editor.pageId, g.coil, { params: { xrefDx: at[0], xrefDy: at[1] } }));
+      } else {
+        // A click on a row goes to that contact.
+        const coil = page.elements.find((e) => e.id === g.coil);
+        const row = coil && g.row >= 0 ? contactRows(editor.project, coil)[g.row] : undefined;
+        if (row) editor.goTo(row.id);
+        else editor.selection = [g.coil];
+      }
     } else if (g.kind === "boundary" && g.y !== page.boundaryY) {
       const y = g.y;
       editor.apply((p) => setBoundary(p, editor.pageId, y));
@@ -381,10 +432,85 @@
     return { x: Math.min(a[0], b[0]), y: Math.min(a[1], b[1]), w: Math.abs(a[0] - b[0]), h: Math.abs(a[1] - b[1]) };
   }
 
-  function sectionPreview(g: { kind: string; rect: Rect4; delta: Vec }): Rect4 {
-    const [x, y, w, h] = g.rect;
-    return g.kind === "secsize" ? [x, y, Math.max(4, w + g.delta[0]), Math.max(4, h + g.delta[1])] : [x + g.delta[0], y + g.delta[1], w, h];
+  function sectionPreview(g: { kind: string; rect: Rect4; delta: Vec; edges?: string }): Rect4 {
+    let [x, y, w, h] = g.rect;
+    const [dx, dy] = g.delta;
+    if (g.kind !== "secsize") return [x + dx, y + dy, w, h];
+    const e = g.edges ?? "se";
+    // Each dragged edge moves; the opposite edge stays put. Never smaller than 4 units.
+    if (e.includes("w")) {
+      const nx = Math.min(x + dx, x + w - 4);
+      w += x - nx;
+      x = nx;
+    }
+    if (e.includes("e")) w = Math.max(4, w + dx);
+    if (e.includes("n")) {
+      const ny = Math.min(y + dy, y + h - 4);
+      h += y - ny;
+      y = ny;
+    }
+    if (e.includes("s")) h = Math.max(4, h + dy);
+    return [x, y, w, h];
   }
+
+  function onDblClick(e: MouseEvent) {
+    if (sim || editor.tool !== "select") return;
+    const hit = hitElement(toUnits(e));
+    if (!hit) return;
+    const target = linkedTarget(editor.project, hit);
+    if (target) editor.goTo(target);
+  }
+
+  // Bring an element we've jumped to into view, at the current zoom.
+  $effect(() => {
+    void editor.focusRequest;
+    const id = editor.highlight;
+    if (!id || !svg) return;
+    const el = page.elements.find((x) => x.id === id);
+    if (!el) return;
+    const cx = AREA_MM.x + el.pos[0] * UNIT_MM;
+    const cy = AREA_MM.y + el.pos[1] * UNIT_MM;
+    const v = $state.snapshot(view);
+    const h = v.w * (box.h / Math.max(1, box.w));
+    const margin = v.w * 0.1;
+    if (cx < v.x + margin || cx > v.x + v.w - margin || cy < v.y + margin || cy > v.y + h - margin) {
+      view = { ...v, x: cx - v.w / 2, y: cy - h / 2 };
+    }
+  });
+
+  // The highlight lasts until the selection moves on.
+  $effect(() => {
+    if (editor.highlight && !editor.selection.includes(editor.highlight)) editor.highlight = null;
+  });
+
+  const highlighted = $derived.by(() => {
+    const id = editor.highlight;
+    const el = id ? page.elements.find((x) => x.id === id) : null;
+    const g = el ? geoms.get(el.id) : null;
+    return el && g ? { el, g } : null;
+  });
+
+  const tablePreview = $derived.by(() => {
+    const g = gesture as Gesture;
+    if (g?.kind !== "table" || (!g.delta[0] && !g.delta[1])) return null;
+    const coil = page.elements.find((e) => e.id === g.coil);
+    if (!coil) return null;
+    const r = contactTableRect(contactRows(editor.project, coil).length, [g.at[0] + g.delta[0], g.at[1] + g.delta[1]]);
+    return { x: coil.pos[0] + r.x, y: coil.pos[1] + r.y, w: r.w, h: r.h };
+  });
+
+  /** Resize cursors over section edges, a move cursor over labels and contact tables. */
+  const hoverCursor = $derived.by(() => {
+    if (sim || editor.tool !== "select" || !pointer || gesture) return "";
+    if (hitTable(pointer)) return "move";
+    const s = hitSection(pointer);
+    if (!s) return "";
+    if (s.part === "move") return "move";
+    const e = s.edges;
+    if ((e.includes("n") && e.includes("w")) || (e.includes("s") && e.includes("e"))) return "nwse";
+    if ((e.includes("n") && e.includes("e")) || (e.includes("s") && e.includes("w"))) return "nesw";
+    return e === "n" || e === "s" ? "ns" : "ew";
+  });
 
   const sectionRects = $derived.by(() => {
     const g = gesture as Gesture;
@@ -450,7 +576,7 @@
 
   const simLive = $derived(sim ? new Set(sim.state.live) : null);
   function lampColour(c: unknown): string {
-    return { A: "#ffb52e", G: "#3cc85a", R: "#ff4a4a", W: "#e8e8e8", B: "#4a8cff", Y: "#ffe04a" }[String(c)] ?? "#ffe04a";
+    return { AM: "#ffb52e", GN: "#3cc85a", RD: "#ff4a4a", WH: "#e8e8e8", CL: "#f4f4f4", BU: "#4a8cff", YE: "#ffe04a" }[String(c)] ?? "#ffe04a";
   }
 
   const cursorClass = $derived(
@@ -458,7 +584,7 @@
       ? "grab"
       : editor.tool !== "select"
         ? "crosshair"
-        : "default",
+        : hoverCursor || "default",
   );
 </script>
 
@@ -482,6 +608,7 @@
   onpointerdown={onPointerDown}
   onpointermove={onPointerMove}
   onpointerup={onPointerUp}
+  ondblclick={onDblClick}
   onpointerleave={() => (pointer = null)}
   oncontextmenu={(e) => e.preventDefault()}
   role="application"
@@ -554,7 +681,9 @@
         {#if selected.has(sec.id)}
           {@const r = sectionRects?.get(sec.id) ?? sec.rect}
           <rect class="sel" x={r[0] - 0.3} y={r[1] - 0.3} width={r[2] + 0.6} height={r[3] + 0.6} />
-          <rect class="handle" x={r[0] + r[2] - 0.6} y={r[1] + r[3] - 0.6} width="1.2" height="1.2" />
+          {#each [[0, 0], [1, 0], [0, 1], [1, 1]] as [fx, fy] (`${fx}${fy}`)}
+            <rect class="handle" x={r[0] + fx * r[2] - 0.5} y={r[1] + fy * r[3] - 0.5} width="1" height="1" />
+          {/each}
         {/if}
       {/each}
       {#each page.segments as seg (seg.id)}
@@ -565,6 +694,20 @@
       {/each}
     {/snippet}
     {#snippet over()}
+      {#if highlighted}
+        {@const { el, g } = highlighted}
+        <rect
+          class="jumped"
+          x={el.pos[0] + g.bbox.x - 1.2}
+          y={el.pos[1] + g.bbox.y - 1.2}
+          width={g.bbox.w + 2.4}
+          height={g.bbox.h + 2.4}
+          rx="1"
+        />
+      {/if}
+      {#if tablePreview}
+        <rect class="band" x={tablePreview.x} y={tablePreview.y} width={tablePreview.w} height={tablePreview.h} />
+      {/if}
       {#if ghost}
         <g class="ghost"><ElementView el={ghost} project={editor.project} /></g>
       {/if}
@@ -615,6 +758,34 @@
   }
   .canvas.grab {
     cursor: grab;
+  }
+  .canvas.move {
+    cursor: move;
+  }
+  .canvas.ns {
+    cursor: ns-resize;
+  }
+  .canvas.ew {
+    cursor: ew-resize;
+  }
+  .canvas.nwse {
+    cursor: nwse-resize;
+  }
+  .canvas.nesw {
+    cursor: nesw-resize;
+  }
+  .jumped {
+    fill: rgba(255, 170, 0, 0.12);
+    stroke: #f08c00;
+    stroke-width: 0.35;
+    pointer-events: none;
+    animation: jumped 0.9s ease-in-out 4;
+  }
+  @keyframes jumped {
+    50% {
+      stroke-width: 0.9;
+      fill: rgba(255, 170, 0, 0.35);
+    }
   }
   .desk {
     fill: #d8dcdf;

@@ -15,11 +15,13 @@
     resetRoute,
     rotateElements,
     setConductorNumber,
+    setConductorInfo,
     updateElement,
     type ElementPatch,
   } from "../../core/ops";
   import { address, contactMarks, contactType, isMaster, isSlave, masterOf, partnerOf, slavesOf } from "../../core/xref";
-  import { requireSymbol } from "../../core/symbols";
+  import { paramApplies, requireSymbol } from "../../core/symbols";
+  import { WIRE_COLOURS, WIRE_FUNCTIONS } from "../../core/wirecolours";
   import { displayTag, tagPrefix } from "../../core/tags";
   import type { ParamValue } from "../../core/model";
   import type { Editor } from "../editor.svelte";
@@ -110,6 +112,8 @@
       <div class="sub">Contacts ({slaves.length})</div>
       {#if slaves.length === 0}
         <p class="hint">None yet. Select a contact and pick this coil under “Driven by coil”.</p>
+      {:else}
+        <p class="hint">Drag the contact table on the drawing to move it; click a row, or double-click a contact, to jump.</p>
       {/if}
       {#each slaves as s (s.el.id)}
         <button class="link-btn" onclick={() => editor.goTo(s.el.id)}>
@@ -152,7 +156,14 @@
     {/if}
     {#each def.params as p (p.key)}
       {@const v = one.params[p.key] ?? p.default}
-      {#if p.type === "bool"}
+      {#if !paramApplies(p, one)}
+        <label class="off" title="Doesn't apply to this {def.name.toLowerCase()} as it's set">
+          {p.label}
+          <select disabled>
+            <option>{p.options?.find((o) => o.value === p.fixed)?.label ?? p.fixed ?? "–"}</option>
+          </select>
+        </label>
+      {:else if p.type === "bool"}
         <label class="check">
           <input type="checkbox" checked={v === true} onchange={(e) => setParam(p.key, e.currentTarget.checked)} />
           {p.label}
@@ -183,6 +194,33 @@
         </label>
       {/if}
     {/each}
+    {#if one.symbol === "isolator"}
+      <p class="hint">
+        {#if one.params.function === "contactor"}
+          Worked by its coil: pick the coil under “Driven by coil”. The handle doesn't apply.
+        {:else if one.params.function === "breaker"}
+          A breaker trips and resets by hand on its own toggle, so no operator is drawn.
+        {:else}
+          Worked by hand. For poles that a coil works, set the function to contactor main contacts.
+        {/if}
+      </p>
+    {/if}
+    {#if isMaster(one) && (typeof one.params.xrefDx === "number" || typeof one.params.xrefDy === "number")}
+      <div class="buttons">
+        <button
+          onclick={() => {
+            const id = one.id;
+            editor.apply((p) => {
+              const el = p.pages.flatMap((pg) => pg.elements).find((e) => e.id === id);
+              if (el) {
+                delete el.params.xrefDx;
+                delete el.params.xrefDy;
+              }
+            });
+          }}>Put the contact table back beside the coil</button
+        >
+      </div>
+    {/if}
     {#if one.symbol === "plant-view"}
       {@const item = editor.project.plant.find((x) => x.id === one.params.plant)}
       {@const shown = new Set(String(one.params.show ?? "").split(",").filter(Boolean))}
@@ -229,7 +267,7 @@
       />
     </label>
     <div class="pos">Columns {columnOf(sec.rect[0])}–{columnOf(sec.rect[0] + sec.rect[2] - 1)}</div>
-    <p class="hint">Drag the border to move it, the corner square to resize.</p>
+    <p class="hint">Drag the label to move it. Drag an edge or a corner to resize just that side.</p>
     <div class="buttons">
       <button
         class="danger"
@@ -271,7 +309,44 @@
         />
         Lock number (Renumber keeps it)
       </label>
-      <div class="row">Conductor joins {cond.terminals.length} terminals</div>
+      <div class="pair">
+        <label>
+          Core colour
+          <select
+            value={cond.colour ?? ""}
+            onchange={(e) => {
+              const v = e.currentTarget.value;
+              const id = cond.id;
+              editor.apply((p) => setConductorInfo(p, id, { colour: v }));
+            }}
+          >
+            <option value="">–</option>
+            {#each WIRE_COLOURS as c (c.code)}
+              <option value={c.code}>{c.code} {c.name}</option>
+            {/each}
+            {#if cond.colour && !WIRE_COLOURS.some((c) => c.code === cond.colour)}
+              <option value={cond.colour}>{cond.colour}</option>
+            {/if}
+          </select>
+        </label>
+        <label>
+          Function
+          <input
+            value={cond.function ?? ""}
+            placeholder="e.g. 0V, 24V AC"
+            list="ferrule-wire-functions"
+            onchange={(e) => {
+              const v = e.currentTarget.value;
+              const id = cond.id;
+              editor.apply((p) => setConductorInfo(p, id, { function: v }));
+            }}
+          />
+        </label>
+      </div>
+      <datalist id="ferrule-wire-functions">
+        {#each WIRE_FUNCTIONS as f (f)}<option value={f}></option>{/each}
+      </datalist>
+      <div class="row">Conductor joins {cond.terminals.length} terminals. Number, colour and function print along the wire.</div>
     {/if}
     <div class="row">Route: {seg.route === "manual" ? "adjusted by hand" : "automatic"}</div>
     <p class="hint">Drag a leg of the wire to move it. The ends stay on their terminals.</p>
@@ -389,6 +464,14 @@
     gap: 2px;
     font-size: 12px;
     color: #445;
+  }
+  label.off {
+    color: #99a;
+  }
+  .pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
   }
   label.check {
     flex-direction: row;

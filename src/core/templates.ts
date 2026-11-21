@@ -9,7 +9,7 @@
  */
 import { refreshConductors } from "./conductors";
 import { fieldPlantRefs, remapFields } from "./fields";
-import { type Vec, pointInRect } from "./geometry";
+import { AREA_UNITS, type Vec, pointInRect } from "./geometry";
 import {
   type Element,
   type Page,
@@ -71,7 +71,7 @@ function capture(
 /** Save a whole sheet as a template. */
 export function saveSheetTemplate(project: Project, pageId: string, name: string): Template {
   const page = getPage(project, pageId);
-  const t = capture(project, name, "sheet", page, page.elements, page.sections, [0, 0], [200, 112]);
+  const t = capture(project, name, "sheet", page, page.elements, page.sections, [0, 0], [AREA_UNITS.w, AREA_UNITS.h]);
   project.templates.push(t);
   return t;
 }
@@ -145,7 +145,7 @@ export function stampTemplate(project: Project, templateId: string, opts: StampO
       target = project.plant.find((p) => p.id === m.plant);
       if (!target) throw new OpError(`No plant item "${m.plant}"`);
     } else if (m && "newTag" in m) {
-      target = addPlant(project, m.newTag, m.description ?? item.description, item.terminals);
+      target = addPlant(project, m.newTag, m.description ?? item.description, item.terminals, { groups: item.groups, info: item.info });
     } else {
       target = project.plant.find((p) => p.id === item.id) ?? project.plant.find((p) => p.tag === item.tag);
       if (!target) {

@@ -3,7 +3,7 @@
   import type { Element } from "../../core/model";
   import Prims from "./Prims.svelte";
 
-  let { symbol }: { symbol: string } = $props();
+  let { symbol, size: px = 30 }: { symbol: string; size?: number } = $props();
 
   const geom = $derived.by(() => {
     const params = defaultParams(symbol);
@@ -19,6 +19,6 @@
   const cy = $derived(geom.bbox.y + geom.bbox.h / 2);
 </script>
 
-<svg viewBox="{cx - size / 2} {cy - size / 2} {size} {size}" width="30" height="30" aria-hidden="true">
+<svg viewBox="{cx - size / 2} {cy - size / 2} {size} {size}" width={px} height={px} aria-hidden="true">
   <Prims prims={geom.prims} />
 </svg>

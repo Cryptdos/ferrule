@@ -17,15 +17,15 @@
   <rect class="outer" x="0" y="0" width={tb.w} height={tb.h} />
   <rect x={tb.logo.x} y={tb.logo.y} width={tb.logo.w} height={tb.logo.h} />
   {#each tb.cells as c (c.label)}
-    {@const size = c.big ? 3.4 : 2.6}
+    {@const size = c.big ? 3.0 : 2.4}
     <rect x={c.x} y={c.y} width={c.w} height={c.h} />
-    <text class="label" x={c.x + 1} y={c.y + 2.2}>{c.label}</text>
+    <text class="label" x={c.x + 0.8} y={c.y + 1.8}>{c.label}</text>
     {#if c.value}
       <text
         class="value"
         class:big={c.big}
         x={c.x + 1.5}
-        y={c.y + c.h - 1.6}
+        y={c.y + c.h - 1.2}
         font-size={size}
         textLength={fit(c.value, size, c.w - 3)}
         lengthAdjust="spacingAndGlyphs">{c.value}</text
@@ -39,9 +39,9 @@
   {#each tb.revisions.cols as col, i (col.label)}
     {@const x = tb.revisions.x + tb.revisions.cols.slice(0, i).reduce((s, c) => s + c.w, 0)}
     <line x1={x} y1="0" x2={x} y2={tb.h} />
-    <text class="label" x={x + 1} y={tb.revisions.rowH - 1.8}>{col.label}</text>
+    <text class="label" x={x + 0.8} y={tb.revisions.rowH - 1.3}>{col.label}</text>
     {#each tb.revisions.rows as row, r (r)}
-      <text class="rev" x={x + 1} y={tb.revisions.rowH * (r + 2) - 1.8 + (REVISION_ROWS - tb.revisions.rows.length) * tb.revisions.rowH}
+      <text class="rev" x={x + 1} y={tb.revisions.rowH * (r + 2) - 1.1 + (REVISION_ROWS - tb.revisions.rows.length) * tb.revisions.rowH}
         >{row[i]}</text
       >
     {/each}
@@ -63,9 +63,9 @@
     fill: #000;
   }
   .label {
-    font-size: 1.8px;
+    font-size: 1.5px;
   }
   .rev {
-    font-size: 2.4px;
+    font-size: 2.2px;
   }
 </style>

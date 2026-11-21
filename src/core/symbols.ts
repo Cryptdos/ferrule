@@ -31,7 +31,18 @@ export type Prim =
   | { t: "poly"; pts: Vec[]; fill: boolean }
   | { t: "circle"; c: Vec; r: number; fill?: boolean }
   | { t: "arc"; from: Vec; to: Vec; r: number; sweep: 0 | 1 }
-  | { t: "text"; at: Vec; text: string; size: number; anchor: Anchor; role: TextRole; vertical?: boolean };
+  | { t: "ellipse"; c: Vec; rx: number; ry: number; dash?: boolean }
+  | {
+      t: "text";
+      at: Vec;
+      text: string;
+      size: number;
+      anchor: Anchor;
+      role: TextRole;
+      vertical?: boolean;
+      /** Drawn with an outline as well as fill, which reads as bold in the one-weight font. */
+      bold?: boolean;
+    };
 
 export type TextRole = "tag" | "label" | "term" | "note" | "xref";
 
@@ -58,6 +69,10 @@ export interface ParamDef {
   min?: number;
   max?: number;
   default: ParamValue;
+  /** Only applies when this returns true (otherwise shown greyed out). */
+  when?: (el: Element) => boolean;
+  /** What it reads as when it doesn't apply. */
+  fixed?: string;
 }
 
 export interface SymbolDef {
@@ -81,9 +96,9 @@ export interface SymbolDef {
 const W = 0.18; // normal line weight (≈ 0.25 mm)
 const RAIL_W = 0.3;
 const BAR_W = 0.6;
-const TAG = 1.6; // tag text size
-const LABEL = 1.25;
-const TERM = 1.05;
+const TAG = 1.4; // tag text size (≈ 1.9 mm)
+const LABEL = 1.1; // ≈ 1.5 mm
+const TERM = 0.95; // ≈ 1.3 mm
 /** Text sizes for drawing text, in grid units (2.5, 3.5, 5 and 7 mm on paper). */
 const TEXT_SIZES: Record<string, number> = { small: 1.8, normal: 2.53, large: 3.61, title: 5.05 };
 
@@ -131,8 +146,8 @@ function bool(el: Element, key: string, fallback: boolean): boolean {
  * the label under that. An empty cross-reference closes up.
  */
 function tagAndLabel(x: number, el: Element): Prim[] {
-  const out: Prim[] = [text(x, 0.55, "{tag}", TAG, "end", "tag"), text(x, 1.95, "{xref}", TERM, "end", "xref")];
-  if (el.label) out.push(text(x, 3.35, "{label}", LABEL, "end", "label"));
+  const out: Prim[] = [text(x, 0.5, "{tag}", TAG, "end", "tag"), text(x, 1.75, "{xref}", TERM, "end", "xref")];
+  if (el.label) out.push(text(x, 3.0, "{label}", LABEL, "end", "label"));
   return out;
 }
 
@@ -202,6 +217,54 @@ const familyKind = (el: Element): SymbolKind => {
   const f = str(el, "family", "relay");
   return f === "contactor" ? "contactor" : f === "timer" ? "timer" : "relay";
 };
+
+/** What a timer does. `wave` is a small sketch of its output for the coil's function box. */
+export interface TimerFunction {
+  value: string;
+  label: string;
+  short: string;
+  wave?: Vec[];
+}
+
+export const TIMER_FUNCTIONS: TimerFunction[] = [
+  { value: "on", label: "On-delay", short: "On-delay" },
+  { value: "off", label: "Off-delay", short: "Off-delay" },
+  { value: "on-off", label: "On- and off-delay", short: "On/off-delay" },
+  {
+    value: "interval",
+    label: "Interval (on for the time when energised)",
+    short: "Interval",
+    wave: [[0, 0.8], [0.25, 0.8], [0.25, -0.8], [0.75, -0.8], [0.75, 0.8], [1, 0.8]],
+  },
+  {
+    value: "flash-on",
+    label: "Cyclic / flasher, ON first",
+    short: "Cyclic ON",
+    wave: [[0, 0.8], [0, -0.8], [0.33, -0.8], [0.33, 0.8], [0.67, 0.8], [0.67, -0.8], [1, -0.8]],
+  },
+  {
+    value: "flash-off",
+    label: "Cyclic / flasher, OFF first",
+    short: "Cyclic OFF",
+    wave: [[0, 0.8], [0.33, 0.8], [0.33, -0.8], [0.67, -0.8], [0.67, 0.8], [1, 0.8]],
+  },
+];
+
+export function timerFunction(el: Element): TimerFunction {
+  const v = str(el, "mode", "on");
+  return TIMER_FUNCTIONS.find((f) => f.value === v) ?? TIMER_FUNCTIONS[0]!;
+}
+
+/** Indicator colours, as the two-letter codes of IEC 60757. */
+export const LAMP_COLOURS = [
+  { code: "RD", name: "red" },
+  { code: "YE", name: "yellow" },
+  { code: "AM", name: "amber" },
+  { code: "GN", name: "green" },
+  { code: "BU", name: "blue" },
+  { code: "WH", name: "white" },
+  { code: "CL", name: "clear" },
+];
 
 // ---------------------------------------------------------------------------
 // The library
@@ -438,7 +501,7 @@ const SYMBOLS: SymbolDef[] = [
   },
   {
     id: "isolator",
-    name: "Isolator / multi-pole switch",
+    name: "Isolator / MCB / contactor",
     group: "Protection",
     palette: true,
     params: [
@@ -448,18 +511,27 @@ const SYMBOLS: SymbolDef[] = [
         type: "select",
         default: "isolator",
         options: [
-          { value: "isolator", label: "Isolator / switch-disconnector (Q)" },
-          { value: "contactor", label: "Contactor main contacts (Q)" },
+          { value: "isolator", label: "Isolator / switch-disconnector (Q), hand operated" },
+          { value: "contactor", label: "Contactor main contacts (Q), coil operated" },
           { value: "breaker", label: "Circuit breaker / MCB (F)" },
         ],
       },
       { key: "poles", label: "Main poles", type: "number", min: 1, max: 4, default: 3 },
-      { key: "aux", label: "Auxiliary poles (NO)", type: "number", min: 0, max: 3, default: 0 },
-      { key: "operator", label: "Operator", type: "select", default: "turn", options: [
-        { value: "turn", label: "Rotary handle" },
-        { value: "push", label: "Push" },
-        { value: "none", label: "None" },
-      ] },
+      { key: "aux", label: "Auxiliary poles NO", type: "number", min: 0, max: 3, default: 0 },
+      { key: "auxNc", label: "Auxiliary poles NC", type: "number", min: 0, max: 3, default: 0 },
+      {
+        key: "operator",
+        label: "Operator",
+        type: "select",
+        default: "turn",
+        options: [
+          { value: "turn", label: "Rotary handle" },
+          { value: "push", label: "Push" },
+          { value: "none", label: "None" },
+        ],
+        when: (el) => str(el, "function", "isolator") === "isolator",
+        fixed: "none",
+      },
     ],
     kind: (el) => {
       const f = str(el, "function", "isolator");
@@ -468,33 +540,39 @@ const SYMBOLS: SymbolDef[] = [
     draw(el) {
       const fn = str(el, "function", "isolator");
       const poles = num(el, "poles", 3, 1, 4);
-      const aux = num(el, "aux", 0, 0, 3);
       const gap = 3;
       const prims: Prim[] = [];
       const terminals: TerminalDef[] = [];
-      const total = poles + aux;
-      for (let i = 0; i < total; i++) {
-        const x = i * gap + (i >= poles ? 1 : 0);
-        const isAux = i >= poles;
-        const a = isAux ? `${i - poles + 1}3` : `${2 * i + 1}`;
-        const b = isAux ? `${i - poles + 1}4` : `${2 * i + 2}`;
+      for (let i = 0; i < poles; i++) {
+        const x = i * gap;
+        const a = `${2 * i + 1}`;
+        const b = `${2 * i + 2}`;
         prims.push(...noContact(x));
-        if (!isAux && fn === "isolator") prims.push(line([x - 0.5, -1.5], [x + 0.5, -1.5]));
+        if (fn === "isolator") prims.push(line([x - 0.5, -1.5], [x + 0.5, -1.5]));
         // IEC contactor function: a small arc at the fixed contact.
-        if (!isAux && fn === "contactor") prims.push({ t: "arc", from: [x, -1.5], to: [x, -0.5], r: 0.5, sweep: 1 });
+        if (fn === "contactor") prims.push({ t: "arc", from: [x, -1.5], to: [x, -0.5], r: 0.5, sweep: 1 });
         // Circuit breaker function: a cross at the fixed contact.
-        if (!isAux && fn === "breaker") prims.push(line([x - 0.4, -1.9], [x + 0.4, -1.1]), line([x - 0.4, -1.1], [x + 0.4, -1.9]));
+        if (fn === "breaker") prims.push(line([x - 0.4, -1.9], [x + 0.4, -1.1]), line([x - 0.4, -1.1], [x + 0.4, -1.9]));
         prims.push(term(x + 0.45, -2.2, a), term(x + 0.45, 2.9, b));
         terminals.push({ name: a, at: [x, -3], dir: "up" }, { name: b, at: [x, 3], dir: "down" });
       }
-      const lastX = (total - 1) * gap + (aux > 0 ? 1 : 0);
-      const op = fn === "contactor" ? "none" : str(el, "operator", "turn");
+      let lastX = (poles - 1) * gap;
+      let lastMid = lastX + NO_MID[0];
+      for (const [i, p] of isolatorAux(el).entries()) {
+        const x = (poles + i) * gap + 1;
+        prims.push(...(p.nc ? ncContact(x) : noContact(x)), term(x + 0.45, -2.2, p.a), term(x + 0.45, 2.9, p.b));
+        terminals.push({ name: p.a, at: [x, -3], dir: "up" }, { name: p.b, at: [x, 3], dir: "down" });
+        lastX = x;
+        lastMid = x + (p.nc ? NC_MID[0] : NO_MID[0]);
+      }
+      // Only a switch-disconnector has a handle of its own; a contactor is worked by its coil.
+      const op = fn === "isolator" ? str(el, "operator", "turn") : "none";
       const hx = -2.4;
-      prims.push(dashed([op === "none" ? NO_MID[0] : hx, 0], [lastX + NO_MID[0], 0]));
+      prims.push(dashed([op === "none" ? NO_MID[0] : hx, 0], [lastMid, 0]));
       if (op === "turn") prims.push(...turnHead(hx));
       if (op === "push") prims.push(...pushHead(hx));
-      prims.push(...tagAndLabel(-3.2, el));
-      return { prims, terminals, body: { x: -2.9, y: -1.7, w: lastX + 3, h: 3.2 } };
+      prims.push(...tagAndLabel(op === "none" ? -1.6 : -3.2, el));
+      return { prims, terminals, body: { x: op === "none" ? -1.3 : -2.9, y: -1.9, w: lastX + (op === "none" ? 2.7 : 4.3), h: 3.4 } };
     },
   },
   {
@@ -567,37 +645,40 @@ const SYMBOLS: SymbolDef[] = [
     params: [
       {
         key: "mode",
-        label: "Delay",
+        label: "Function",
         type: "select",
-        options: [
-          { value: "on", label: "Delay on" },
-          { value: "off", label: "Delay off" },
-        ],
+        options: TIMER_FUNCTIONS.map((f) => ({ value: f.value, label: f.label })),
         default: "on",
       },
       { key: "time", label: "Time", type: "text", default: "" },
+      { key: "code", label: "Maker's function code", type: "text", default: "" },
     ],
     kind: () => "timer",
     draw(el) {
-      const on = str(el, "mode", "on") === "on";
+      const mode = timerFunction(el);
       const time = str(el, "time", "");
-      const mark: Prim[] = on
-        ? [rect(-2.8, -1.1, 1.2, 2.2), line([-2.8, -1.1], [-1.6, 1.1]), line([-2.8, 1.1], [-1.6, -1.1])]
-        : [rect(-2.8, -1.1, 1.2, 2.2, true)];
-      return {
-        prims: [
-          line([0, -3], [0, -1.1]),
-          line([0, 1.1], [0, 3]),
-          rect(-1.6, -1.1, 3.2, 2.2),
-          ...mark,
-          term(0.45, -1.6, "A1"),
-          term(0.45, 2.9, "A2"),
-          ...(time ? [text(1.9, 0.45, time, LABEL, "start", "note")] : []),
-          ...tagAndLabel(-3.3, el),
-        ],
-        terminals: vterms("A1", "A2"),
-        body: { x: -2.8, y: -1.1, w: 4.4, h: 2.2 },
-      };
+      const code = str(el, "code", "");
+      // Function mark in a box on the left of the coil (IEC 60617 for the two delays).
+      const bx = -2.8;
+      const mark: Prim[] = [rect(bx, -1.1, 1.2, 2.2, mode.value === "off")];
+      if (mode.value === "on") mark.push(line([bx, -1.1], [bx + 1.2, 1.1]), line([bx, 1.1], [bx + 1.2, -1.1]));
+      if (mode.value === "on-off") mark.push(line([bx, -1.1], [bx + 1.2, 1.1]), { t: "poly", pts: [[bx, 1.1], [bx + 1.2, 1.1], [bx + 1.2, -1.1]], fill: true });
+      if (mode.wave) mark.push(line(...mode.wave.map(([x, y]) => [bx + 0.15 + x * 0.9, y * 0.7] as Vec)));
+      // What it does, under the tag: the function (with the maker's code) and the time.
+      const fn = [mode.short, time, code ? `(${code})` : ""].filter(Boolean).join(" ");
+      const tx = -3.3;
+      const prims: Prim[] = [
+        line([0, -3], [0, -1.1]),
+        line([0, 1.1], [0, 3]),
+        rect(-1.6, -1.1, 3.2, 2.2),
+        ...mark,
+        term(0.45, -1.6, "A1"),
+        term(0.45, 2.9, "A2"),
+        text(tx, 0.5, "{tag}", TAG, "end", "tag"),
+        text(tx, 1.75, fn, LABEL, "end", "note"),
+      ];
+      if (el.label) prims.push(text(tx, 3.0, "{label}", LABEL, "end", "label"));
+      return { prims, terminals: vterms("A1", "A2"), body: { x: -2.8, y: -1.1, w: 4.4, h: 2.2 } };
     },
   },
   {
@@ -610,38 +691,36 @@ const SYMBOLS: SymbolDef[] = [
         key: "colour",
         label: "Colour",
         type: "select",
-        options: [
-          { value: "", label: "None" },
-          { value: "A", label: "A amber" },
-          { value: "G", label: "G green" },
-          { value: "R", label: "R red" },
-          { value: "W", label: "W white" },
-          { value: "B", label: "B blue" },
-          { value: "Y", label: "Y yellow" },
-        ],
+        options: [{ value: "", label: "None" }, ...LAMP_COLOURS.map((c) => ({ value: c.code, label: `${c.code} ${c.name}` }))],
         default: "",
       },
+      { key: "testPin", label: "Lamp test terminal (T)", type: "bool", default: false },
     ],
     kind: () => "lamp",
     draw(el) {
       const r = 1.3;
       const d = r * Math.SQRT1_2;
       const colour = str(el, "colour", "");
-      return {
-        prims: [
-          line([0, -3], [0, -r]),
-          line([0, r], [0, 3]),
-          circle(0, 0, r),
-          line([-d, -d], [d, d]),
-          line([-d, d], [d, -d]),
-          term(0.45, -2.2, "L"),
-          term(0.45, 2.9, "N"),
-          ...(colour ? [text(1.8, 0.5, colour, LABEL, "start", "note")] : []),
-          ...tagAndLabel(-1.8, el),
-        ],
-        terminals: vterms("L", "N"),
-        body: { x: -r, y: -r, w: 2 * r, h: 2 * r },
-      };
+      const test = bool(el, "testPin", false);
+      const prims: Prim[] = [
+        line([0, -3], [0, -r]),
+        line([0, r], [0, 3]),
+        circle(0, 0, r),
+        line([-d, -d], [d, d]),
+        line([-d, d], [d, -d]),
+        term(0.45, -2.2, "V+"),
+        term(0.45, 2.9, "V-"),
+        ...(colour ? [text(1.8, 0.45, colour, LABEL, "start", "note")] : []),
+      ];
+      const terminals = vterms("V+", "V-");
+      if (test) {
+        // Test terminal beside the supply, on the same side, so both wire from above.
+        // Enters the bulb from the side, clear of the cross.
+        prims.push(line([-2, -3], [-2, -1.4], [-r * 0.87, -r * 0.5]), term(-2.45, -2.2, "T", "end"));
+        terminals.unshift({ name: "T", at: [-2, -3], dir: "up" });
+      }
+      prims.push(...tagAndLabel(test ? -2.4 : -1.8, el));
+      return { prims, terminals, body: { x: test ? -2 : -r, y: -r, w: test ? 2 + r : 2 * r, h: 2 * r } };
     },
   },
   {
@@ -707,34 +786,36 @@ const SYMBOLS: SymbolDef[] = [
     ],
     kind: () => "transformer",
     draw(el) {
+      // Windings 3 units apart, the same as switch poles, so it wires straight from an isolator or MCB.
       const r = 2.2;
       const cy = 1.4;
-      const edge = cy + Math.sqrt(r * r - 0.36); // circle edge at x = ±0.6
+      const cx = 1.5;
+      const edge = cy + Math.sqrt(r * r - 0.36); // circle edge at x = cx ± 0.6
       const rating = str(el, "rating", "");
       const prims: Prim[] = [
-        circle(0, -cy, r),
-        circle(0, cy, r),
-        line([-2, -6], [-2, -5], [-0.6, -edge]),
-        line([2, -6], [2, -5], [0.6, -edge]),
-        line([-2, 6], [-2, 5], [-0.6, edge]),
-        line([2, 6], [2, 5], [0.6, edge]),
-        term(-2.45, -5.2, "P1", "end"),
-        term(2.45, -5.2, "P2"),
-        term(-2.45, 5.9, "S1", "end"),
-        term(2.45, 5.9, "S2"),
-        ...tagAndLabel(-3.2, el),
+        circle(cx, -cy, r),
+        circle(cx, cy, r),
+        line([0, -6], [0, -5], [cx - 0.6, -edge]),
+        line([3, -6], [3, -5], [cx + 0.6, -edge]),
+        line([0, 6], [0, 5], [cx - 0.6, edge]),
+        line([3, 6], [3, 5], [cx + 0.6, edge]),
+        term(-0.45, -5.2, "P1", "end"),
+        term(3.45, -5.2, "P2"),
+        term(-0.45, 5.9, "S1", "end"),
+        term(3.45, 5.9, "S2"),
+        ...tagAndLabel(-1.2, el),
       ];
-      if (bool(el, "screen", false)) prims.push(dashed([-3, 0], [3, 0]), line([3, 0], [3.6, 0]));
-      if (rating) prims.push(text(3, 2.6, rating, LABEL, "start", "note"));
+      if (bool(el, "screen", false)) prims.push(dashed([cx - 3, 0], [cx + 3, 0]), line([cx + 3, 0], [cx + 3.6, 0]));
+      if (rating) prims.push(text(cx + 3, 2.6, rating, LABEL, "start", "note"));
       return {
         prims,
         terminals: [
-          { name: "P1", at: [-2, -6], dir: "up" },
-          { name: "P2", at: [2, -6], dir: "up" },
-          { name: "S1", at: [-2, 6], dir: "down" },
-          { name: "S2", at: [2, 6], dir: "down" },
+          { name: "P1", at: [0, -6], dir: "up" },
+          { name: "P2", at: [3, -6], dir: "up" },
+          { name: "S1", at: [0, 6], dir: "down" },
+          { name: "S2", at: [3, 6], dir: "down" },
         ],
-        body: { x: -r, y: -cy - r, w: 2 * r, h: 2 * (cy + r) },
+        body: { x: cx - r, y: -cy - r, w: 2 * r, h: 2 * (cy + r) },
       };
     },
   },
@@ -746,27 +827,28 @@ const SYMBOLS: SymbolDef[] = [
     params: [{ key: "rating", label: "Rating", type: "text", default: "" }],
     kind: () => "motor",
     draw(el) {
-      const r = 3;
-      const e = Math.sqrt(r * r - 4);
+      // U V W 3 units apart, in line with the poles of the contactor above.
+      const r = 3.6;
+      const e = Math.sqrt(r * r - 9);
       const rating = str(el, "rating", "");
       return {
         prims: [
           circle(0, 0, r),
-          line([-2, -6], [-2, -e]),
+          line([-3, -6], [-3, -e]),
           line([0, -6], [0, -r]),
-          line([2, -6], [2, -e]),
+          line([3, -6], [3, -e]),
           text(0, 0.3, "M", 2.2, "middle", "note"),
           text(0, 2, "3~", 1.3, "middle", "note"),
-          term(-2.45, -4.4, "U", "end"),
+          term(-3.45, -4.4, "U", "end"),
           term(0.45, -4.4, "V"),
-          term(2.45, -4.4, "W"),
-          ...(rating ? [text(3.5, 2.5, rating, LABEL, "start", "note")] : []),
-          ...tagAndLabel(-3.6, el),
+          term(3.45, -4.4, "W"),
+          ...(rating ? [text(4.1, 2.5, rating, LABEL, "start", "note")] : []),
+          ...tagAndLabel(-4.2, el),
         ],
         terminals: [
-          { name: "U", at: [-2, -6], dir: "up" },
+          { name: "U", at: [-3, -6], dir: "up" },
           { name: "V", at: [0, -6], dir: "up" },
-          { name: "W", at: [2, -6], dir: "up" },
+          { name: "W", at: [3, -6], dir: "up" },
         ],
         body: { x: -r, y: -r, w: 2 * r, h: 2 * r },
       };
@@ -843,13 +925,32 @@ const SYMBOLS: SymbolDef[] = [
     name: "Off-page arrow",
     group: "Drawing",
     palette: true,
-    params: [{ key: "ref", label: "Reference (if not linked)", type: "text", default: "" }],
+    params: [
+      {
+        key: "direction",
+        label: "Direction",
+        type: "select",
+        default: "out",
+        options: [
+          { value: "out", label: "Going to (points away)" },
+          { value: "in", label: "Coming from (points in)" },
+        ],
+      },
+      { key: "ref", label: "Reference (if not linked)", type: "text", default: "" },
+    ],
     kind: () => null,
     draw(el) {
+      const incoming = str(el, "direction", "out") === "in";
+      // Going: an open arrow pointing away from the wire. Coming: a filled
+      // arrow pointing back into it. Different in shape and in weight, so
+      // they can't be mistaken for each other even in a poor print.
+      const head: Prim = incoming
+        ? { t: "poly", pts: [[-0.8, 1.3], [0.8, 1.3], [0, 0]], fill: true }
+        : { t: "poly", pts: [[-0.8, 0], [0.8, 0], [0, 1.3]], fill: false };
       return {
         prims: [
           line([0, -2], [0, 0]),
-          { t: "poly", pts: [[-0.8, 0], [0.8, 0], [0, 1.3]], fill: false },
+          head,
           // Whichever way the arrow points, the reference reads on its right and the label on its left.
           ...(el.rot === 180
             ? [
@@ -867,6 +968,51 @@ const SYMBOLS: SymbolDef[] = [
     },
   },
   {
+    id: "screen",
+    name: "Cable screen",
+    group: "Connection",
+    palette: true,
+    params: [
+      { key: "span", label: "Width across the cores (units)", type: "number", min: 1, max: 60, default: 3 },
+      {
+        key: "drain",
+        label: "Drain wire (E)",
+        type: "select",
+        default: "right",
+        options: [
+          { value: "right", label: "Drain on the right" },
+          { value: "left", label: "Drain on the left" },
+          { value: "none", label: "No drain (not terminated here)" },
+        ],
+      },
+      { key: "dashed", label: "Dashed", type: "bool", default: false },
+    ],
+    kind: () => "cable",
+    draw(el) {
+      // An ellipse drawn across the cores of a screened cable, the screen
+      // (drain) taken off one end to earth. Origin on the first core.
+      const span = num(el, "span", 3, 1, 60);
+      const drain = str(el, "drain", "right");
+      const rx = span / 2 + 0.9;
+      const cx = span / 2;
+      const prims: Prim[] = [{ t: "ellipse", c: [cx, 0], rx, ry: 0.7, dash: bool(el, "dashed", false) }];
+      const terminals: TerminalDef[] = [];
+      if (drain !== "none") {
+        const side = drain === "left" ? -1 : 1;
+        const ex = side === 1 ? cx + rx : cx - rx;
+        const tx = side === 1 ? Math.ceil(ex + 0.6) : Math.floor(ex - 0.6);
+        prims.push(line([ex, 0], [tx, 0], [tx, 2]));
+        terminals.push({ name: "E", at: [tx, 2], dir: "down" });
+      }
+      const lx = drain === "left" ? cx + rx + 0.5 : cx - rx - 0.5;
+      const anchor: Anchor = drain === "left" ? "start" : "end";
+      prims.push(text(lx, -0.4, "{tag}", TAG, anchor, "tag"));
+      if (el.label) prims.push(text(lx, 0.95, "{label}", LABEL, anchor, "label"));
+      // No body: the wires pass through the screen.
+      return { prims, terminals, body: { x: cx, y: 0, w: 0, h: 0 } };
+    },
+  },
+  {
     id: "plant-view",
     name: "Plant view",
     group: "Drawing",
@@ -875,31 +1021,33 @@ const SYMBOLS: SymbolDef[] = [
     params: [],
     kind: () => null,
     draw(el) {
-      const all = str(el, "terms", "").split(",").filter(Boolean);
-      const showSet = new Set(str(el, "show", "").split(",").filter(Boolean));
-      const shown = all.filter((t) => showSet.has(t));
-      const desc = str(el, "pdesc", "");
-      const n = Math.max(1, shown.length);
-      const right = Math.max((n - 1) * 3 + 2, Math.ceil(desc.length * LABEL * 0.5) + 0, 6) ;
-      const left = -2;
-      const h = 6;
+      const lay = plantViewLayout(el);
+      const { left, right, h } = lay;
       const prims: Prim[] = [line([right, 0], [left, 0], [left, h], [right, h])];
-      if (shown.length < all.length) {
+      if (lay.partial) {
         // Break line: there's more to this plant on another sheet.
         const zig: Vec[] = [[right, 0]];
-        for (let y = 0.75; y < h; y += 1.5) zig.push([right + (Math.round(y / 1.5) % 2 ? 0.6 : -0.6), y]);
+        for (let i = 0, y = 0.3; y < h; i++, y += 0.6) zig.push([right + (i % 2 ? 0.4 : -0.4), y]);
         zig.push([right, h]);
         prims.push(line(...zig));
       } else {
         prims.push(line([right, 0], [right, h]));
       }
-      const terminals: TerminalDef[] = shown.map((t, i) => ({ name: t, at: [i * 3, -1], dir: "up" as Dir }));
-      shown.forEach((t, i) => {
-        prims.push(line([i * 3, -1], [i * 3, 0]), text(i * 3, 1.5, t, TERM, "middle", "term"));
-      });
-      prims.push(text(left + 0.5, 3.7, "{tag}", TAG, "start", "tag"));
-      if (desc) prims.push(text(left + 0.5, 5.3, desc, LABEL, "start", "note"));
-      if (el.label) prims.push(text(left, h + 1.6, "{label}", LABEL, "start", "label"));
+      for (const t of lay.terms) prims.push(line([t.x, -1], [t.x, 0]), text(t.x, 1.4, t.name, TERM, "middle", "term"));
+      // Group names inside the box, in bold, under a bar spanning their terminals.
+      for (const g of lay.groups) {
+        if (g.x1 > g.x0) prims.push({ t: "line", pts: [[g.x0 - 0.6, 1.9], [g.x1 + 0.6, 1.9]], w: 0.1 });
+        prims.push({ ...(text((g.x0 + g.x1) / 2, 3.1, g.name, LABEL, "middle", "note") as Extract<Prim, { t: "text" }>), bold: true });
+      }
+      // Tag, description and further information under the box, left aligned.
+      let y = h + 1.7;
+      prims.push(text(left, y, "{tag}", TAG, "start", "tag"));
+      for (const l of [str(el, "pdesc", ""), ...str(el, "pinfo", "").split("\n")].filter(Boolean)) {
+        y += 1.35;
+        prims.push(text(left, y, l, LABEL, "start", "note"));
+      }
+      if (el.label) prims.push(text(left, y + 1.35, "{label}", LABEL, "start", "label"));
+      const terminals: TerminalDef[] = lay.terms.map((t) => ({ name: t.name, at: [t.x, -1], dir: "up" as Dir }));
       return { prims, terminals, body: { x: left, y: 0, w: right - left, h } };
     },
   },
@@ -954,14 +1102,14 @@ const SYMBOLS: SymbolDef[] = [
     palette: true,
     params: [
       { key: "w", label: "Width (units)", type: "number", min: 2, max: 200, default: 30 },
-      { key: "h", label: "Height (units)", type: "number", min: 2, max: 112, default: 20 },
+      { key: "h", label: "Height (units)", type: "number", min: 2, max: 120, default: 20 },
       { key: "dashed", label: "Dashed", type: "bool", default: false },
       { key: "heavy", label: "Heavy line", type: "bool", default: false },
     ],
     kind: () => null,
     draw(el) {
       const w = num(el, "w", 30, 2, 200);
-      const h = num(el, "h", 20, 2, 112);
+      const h = num(el, "h", 20, 2, 120);
       const pts: Vec[] = [[0, 0], [w, 0], [w, h], [0, h], [0, 0]];
       const prim: Prim = { t: "line", pts, dash: bool(el, "dashed", false), w: bool(el, "heavy", false) ? 0.35 : W };
       return {
@@ -1035,6 +1183,90 @@ function railTerminals(el: Element): TerminalDef[] {
   return out;
 }
 
+/**
+ * Auxiliary contacts of an isolator or contactor, after the main poles.
+ * Numbered in sequence with the usual function digits: NO x3/x4, NC x1/x2
+ * (e.g. 13/14, 23/24, 31/32).
+ */
+export function isolatorAux(el: Element): { a: string; b: string; nc: boolean }[] {
+  const no = num(el, "aux", 0, 0, 3);
+  const nc = num(el, "auxNc", 0, 0, 3);
+  const out: { a: string; b: string; nc: boolean }[] = [];
+  for (let i = 0; i < no + nc; i++) {
+    const isNc = i >= no;
+    out.push({ a: `${i + 1}${isNc ? 1 : 3}`, b: `${i + 1}${isNc ? 2 : 4}`, nc: isNc });
+  }
+  return out;
+}
+
+/** Terminal groups of a plant view's params: "ENABLE=1,2;0-10V=3,4". */
+export function parsePlantGroups(s: string): { name: string; terminals: string[] }[] {
+  return s
+    .split(";")
+    .map((g) => {
+      const i = g.indexOf("=");
+      return i < 0 ? null : { name: g.slice(0, i).trim(), terminals: g.slice(i + 1).split(",").filter(Boolean) };
+    })
+    .filter((g): g is { name: string; terminals: string[] } => !!g && !!g.name);
+}
+
+/**
+ * Where a plant view's terminals go: 3 units apart, a gap between groups,
+ * and room for each group's name under its terminals. The box is as wide
+ * as the terminals need and no wider.
+ */
+export function plantViewLayout(el: Element): {
+  terms: { name: string; x: number }[];
+  groups: { name: string; x0: number; x1: number }[];
+  left: number;
+  right: number;
+  h: number;
+  partial: boolean;
+} {
+  const all = str(el, "terms", "").split(",").filter(Boolean);
+  const showSet = new Set(str(el, "show", "").split(",").filter(Boolean));
+  const shown = all.filter((t) => showSet.has(t));
+  const groupOf = new Map<string, string>();
+  for (const g of parsePlantGroups(str(el, "pgroups", ""))) for (const t of g.terminals) groupOf.set(t, g.name);
+  // Runs of shown terminals in the same group.
+  const runs: { name: string; terms: string[] }[] = [];
+  for (const t of shown) {
+    const name = groupOf.get(t) ?? "";
+    const last = runs[runs.length - 1];
+    if (last && last.name === name) last.terms.push(t);
+    else runs.push({ name, terms: [t] });
+  }
+  const textW = (name: string) => (name ? name.length * LABEL * 0.62 + 0.8 : 0);
+  const terms: { name: string; x: number }[] = [];
+  const groups: { name: string; x0: number; x1: number }[] = [];
+  let x = 0; // earliest the next run's first terminal may sit
+  let prevRight = -Infinity; // right edge of whatever the previous run drew
+  for (const [i, r] of runs.entries()) {
+    const span = (r.terms.length - 1) * 3;
+    const half = Math.max(span, textW(r.name)) / 2;
+    if (i > 0) x += 1; // a little more room between groups than between terminals
+    // Centre of this run, far enough right that its name clears the last one's.
+    let centre = Math.max(x + span / 2, prevRight + 0.6 + half);
+    let x0 = Math.ceil(centre - span / 2);
+    if (i === 0) x0 = 0;
+    centre = x0 + span / 2;
+    r.terms.forEach((t, j) => terms.push({ name: t, x: x0 + j * 3 }));
+    if (r.name) groups.push({ name: r.name, x0, x1: x0 + span });
+    prevRight = Math.max(x0 + span, centre + (r.name ? textW(r.name) / 2 : 0));
+    x = x0 + span + 3;
+  }
+  const lastX = terms.length ? terms[terms.length - 1]!.x : 0;
+  const nameEdge = (g: { name: string; x0: number; x1: number }, side: -1 | 1) => (g.x0 + g.x1) / 2 + (side * textW(g.name)) / 2;
+  const left = Math.min(-1.5, ...groups.map((g) => nameEdge(g, -1) - 0.2));
+  const right = Math.max(lastX + 1.5, left + 4, ...groups.map((g) => nameEdge(g, 1) + 0.2));
+  return { terms, groups, left, right, h: groups.length ? 4 : 2.4, partial: shown.length < all.length };
+}
+
+/** Does a parameter apply to this element as it's set now? */
+export function paramApplies(def: ParamDef, el: Element): boolean {
+  return !def.when || def.when(el);
+}
+
 const BY_ID = new Map(SYMBOLS.map((s) => [s.id, s]));
 
 export function listSymbols(): SymbolDef[] {
@@ -1069,6 +1301,8 @@ function rotatePrim(p: Prim, rot: Rotation): Prim {
       return { ...p, pts: p.pts.map((v) => rotate(v, rot)) };
     case "circle":
       return { ...p, c: rotate(p.c, rot) };
+    case "ellipse":
+      return rot === 90 || rot === 270 ? { ...p, c: rotate(p.c, rot), rx: p.ry, ry: p.rx } : { ...p, c: rotate(p.c, rot) };
     case "arc":
       return { ...p, from: rotate(p.from, rot), to: rotate(p.to, rot) };
     case "text": {
@@ -1103,6 +1337,8 @@ function primBounds(p: Prim): Rect | null {
       return fromPts(p.pts);
     case "circle":
       return { x: p.c[0] - p.r, y: p.c[1] - p.r, w: 2 * p.r, h: 2 * p.r };
+    case "ellipse":
+      return { x: p.c[0] - p.rx, y: p.c[1] - p.ry, w: 2 * p.rx, h: 2 * p.ry };
     case "arc": {
       const r = fromPts([p.from, p.to]);
       return { x: r.x - p.r / 2, y: r.y - p.r / 2, w: r.w + p.r, h: r.h + p.r };
@@ -1136,7 +1372,7 @@ export function localGeometry(el: Element, texts: string | GeometryText): Geomet
     const y0 = xrefPrim.at[1];
     raw = raw
       .filter((p) => p !== xrefPrim)
-      .map((p) => (p.t === "text" && p.role === "label" && p.at[1] > y0 ? { ...p, at: [p.at[0], p.at[1] - 1.4] as Vec } : p));
+      .map((p) => (p.t === "text" && p.role === "label" && p.at[1] > y0 ? { ...p, at: [p.at[0], p.at[1] - 1.25] as Vec } : p));
   }
   const labelLines = (t.label ?? el.label).split("\n");
   const fill = (s: string) => {

@@ -121,7 +121,8 @@ Decisions:
 - **A4 landscape** is the primary target. Technicians on site work from these prints, and A3 is cumbersome in the field. A3 can come later as an option.
 - **100 columns** across the drawing area. Column numbers are printed below the drawing frame every 10 columns (10, 20 … 90), with tick marks on the frame every 5 columns.
 - **No rows.** The left and right edges of the frame carry evenly spaced, unlabelled tick marks, so you can judge where you are vertically on a printout.
-- The panel boundary is a dashed line across the lower part of the drawing area, with terminals sitting on it.
+- The panel boundary is a thin dash-dot line across the lower part of the drawing area, with terminals sitting on it.
+- The drawing area is 200 × 120 grid units; the title block is kept to three 7 mm rows so the drawing gets the room.
 
 ### Title block (v1)
 
@@ -148,12 +149,12 @@ Draft list:
 4. Push button, NO
 5. Push button, NC
 6. Selector / keyswitch (2 and 3 position)
-7. Multi-pole switch / isolator (with auxiliary poles)
+7. Multi-pole switch: isolator (hand operated), contactor main contacts (coil operated) or circuit breaker, with NO and NC auxiliary poles numbered 13/14, 21/22…
 8. Fuse
 9. Relay / contactor coil
-10. Timer coil (delay on, delay off)
+10. Timer coil: on-delay, off-delay, on- and off-delay, interval, cyclic ON-first and OFF-first, with the maker's function code (e.g. Selec 600XU "C") printed beside it
 11. Timer contact
-12. Lamp (with colour letter)
+12. Indicator lamp: V+ / V- terminals (they're often 24 V DC), optional lamp-test terminal T beside V+, two-letter IEC 60757 colour code (RD, YE, AM, GN, BU, WH, CL)
 13. Terminal
 14. Socket outlet
 15. Transformer
@@ -161,7 +162,10 @@ Draft list:
 17. Distribution block / busbar
 18. Earth
 19. Plant view (box with break line, see §6)
-20. Off-page / continuation arrow
+20. Off-page / continuation arrow: open arrow pointing away for "going to", filled arrow pointing in for "coming from". Pairing two arrows makes one of each.
+21. Cable screen: an ellipse across the cores with the drain taken to a terminal
+
+Multi-terminal symbols keep the switch pole pitch (3 units) between terminals, so a transformer or motor wires straight down from the MCB or contactor above it.
 
 Symbols are defined in code or simple SVG + terminal positions, not in a symbol editor.
 
@@ -174,6 +178,7 @@ Each time it's placed on a page you place a **view** of it:
 - Each terminal has a checkbox. Only the ticked terminals are shown.
 - If any terminals are hidden, a squiggly break line is drawn automatically to show there's more.
 - Typical use: 230 V power terminals on one page, digital controls on another, network on a third.
+- The box is as wide as its shown terminals need. Terminals can be grouped by function (written `L N E | ENABLE: 1 2 | 0-10V: 3 4`); each group's name is printed in bold inside the box under its terminals. The tag, description and any information lines (model, rating) are printed left-aligned under the box.
 
 Checks:
 
@@ -302,6 +307,7 @@ Reference drawings from other companies are proprietary. They are never committe
 | Simulation | Conductors are nodes; contacts, buttons, selectors, isolators and field plant views are switched links; coils and lamps are loads between a CCT… rail and the 0V rail. Settle until stable; on/off-delay timers on a simulation clock. Plant views act as volt-free field contacts |
 | Logic rules | Breadth-first search over operator actions (operate, press, wait for timers) for the shortest sequence that breaks a rule; also reports shorts and chatter. Only inputs that can influence the rule's coils are searched; isolators and breakers stay closed unless asked |
 | Wires to rails | Rail taps slide to sit directly above/below the other end, so rung wires stay straight when symbols move |
+| Review 1 (2026-11-21) | Palette lists parts by name with a small icon and a search box. Coil contact tables sit to the right of the coil and can be dragged; double-click jumps contact ↔ coil and arrow ↔ arrow, and the part you land on is ringed until you select something else. Section boxes resize from any edge. Text boxes commit when you click away. Wires carry a core colour and function after their number. Smaller symbol text (tag ≈ 1.9 mm). Format version 2: lamp terminals L/N become V+/V-, colour letters become IEC codes, on load |
 
 ## 16. Open questions
 

@@ -110,6 +110,7 @@ function describeElement(p: Project, page: Page, el: Element) {
 
 function describePage(p: Project, page: Page) {
   const wireNo = new Map(p.conductors.map((c) => [c.id, c.number]));
+  const cond = new Map(p.conductors.map((c) => [c.id, c]));
   const name = (ref: [string, string]) => {
     const el = page.elements.find((e) => e.id === ref[0]);
     return el ? `${displayTag(el, p) || el.symbol}:${ref[1]}` : ref.join(":");
@@ -127,6 +128,8 @@ function describePage(p: Project, page: Page) {
       to: s.to,
       between: `${name(s.from)} → ${name(s.to)}`,
       number: wireNo.get(s.conductor) || undefined,
+      colour: cond.get(s.conductor)?.colour,
+      function: cond.get(s.conductor)?.function,
       route: s.route === "manual" ? "manual" : undefined,
     })),
   };
@@ -170,7 +173,7 @@ const project = { type: "string", description: "Project id (see list_projects)" 
 const sheet = { type: "integer", description: "Sheet number, 1-based" };
 const xy = {
   x: { type: "number", description: "Grid units across, 0–200 (2 units per column; column = floor(x/2)+1)" },
-  y: { type: "number", description: "Grid units down, 0–112" },
+  y: { type: "number", description: "Grid units down, 0–120" },
 };
 const obj = (properties: Record<string, unknown>, required: string[] = []) => ({
   type: "object",
@@ -499,17 +502,32 @@ export const TOOLS: Tool[] = [
         tag: { type: "string" },
         description: { type: "string" },
         terminals: { type: "array", items: { type: "string" } },
+        groups: {
+          type: "array",
+          description: "Named groups of its terminals, shown in bold inside the box, e.g. [{name: 'ENABLE', terminals: ['1','2']}]",
+          items: { type: "object" },
+        },
+        info: { type: "string", description: "More lines under the box: model, rating, supply…" },
       },
       ["project"],
     ),
     run: async (a, ctx) =>
       edit(ctx, str(a, "project"), (p) => {
+        const groups = Array.isArray(a.groups)
+          ? a.groups.map((g) => {
+              const o = (g ?? {}) as Record<string, unknown>;
+              return { name: String(o.name ?? ""), terminals: Array.isArray(o.terminals) ? o.terminals.map(String) : [] };
+            })
+          : undefined;
+        const info = typeof a.info === "string" ? a.info : undefined;
         if (typeof a.plant === "string") {
           const item = plantByRef(p, a.plant);
           op.updatePlant(p, item.id, {
             tag: typeof a.tag === "string" ? a.tag : undefined,
             description: typeof a.description === "string" ? a.description : undefined,
             terminals: Array.isArray(a.terminals) ? a.terminals.map(String) : undefined,
+            groups,
+            info,
           });
           return item;
         }
@@ -518,7 +536,35 @@ export const TOOLS: Tool[] = [
           str(a, "tag"),
           str(a, "description", false),
           Array.isArray(a.terminals) ? a.terminals.map(String) : [],
+          { groups, info },
         );
+      }),
+  },
+  {
+    name: "label_wire",
+    description:
+      "Set what's printed along a wire's conductor: its number (locked so Renumber keeps it), core colour (IEC 60757 code, e.g. BU, BN, GNYE) and function (e.g. 0V, 24V AC). Empty strings clear.",
+    inputSchema: obj(
+      {
+        project,
+        wire: { type: "string", description: "Wire (segment) id from get_page" },
+        number: { type: "string" },
+        colour: { type: "string" },
+        function: { type: "string" },
+      },
+      ["project", "wire"],
+    ),
+    run: async (a, ctx) =>
+      edit(ctx, str(a, "project"), (p) => {
+        const seg = p.pages.flatMap((pg) => pg.segments).find((x) => x.id === a.wire);
+        if (!seg) throw new ArgError(`No wire "${String(a.wire)}"`);
+        if (typeof a.number === "string") op.setConductorNumber(p, seg.conductor, a.number, true);
+        op.setConductorInfo(p, seg.conductor, {
+          colour: typeof a.colour === "string" ? a.colour : undefined,
+          function: typeof a.function === "string" ? a.function : undefined,
+        });
+        const c = p.conductors.find((x) => x.id === seg.conductor)!;
+        return { conductor: c.id, number: c.number, colour: c.colour, function: c.function };
       }),
   },
   {

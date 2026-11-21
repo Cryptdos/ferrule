@@ -117,12 +117,12 @@ describe("cross-references", () => {
     const inn = addElement(p, pg2, "offpage", [20, 20], { rot: 180 });
     const h = addElement(p, pg2, "lamp", [20, 40]);
     connect(p, pg, [s1.id, "14"], [out.id, "1"]);
-    connect(p, pg2, [inn.id, "1"], [h.id, "L"]);
+    connect(p, pg2, [inn.id, "1"], [h.id, "V+"]);
     linkOffpage(p, out.id, inn.id);
     renumber(p);
     expect(elementTexts(out, p).xref).toBe("2-11");
     expect(elementTexts(inn, p).xref).toBe("1-26");
     const num = (id: string, t: string) => p.conductors.find((c) => c.terminals.some(([e, n]) => e === id && n === t))!.number;
-    expect(num(h.id, "L")).toBe(num(s1.id, "14"));
+    expect(num(h.id, "V+")).toBe(num(s1.id, "14"));
   });
 });

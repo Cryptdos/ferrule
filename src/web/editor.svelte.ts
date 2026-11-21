@@ -34,6 +34,10 @@ export class Editor {
   placeParams: Record<string, string | number | boolean> = $state({});
   saveState: SaveState = $state("saved");
   message: string = $state("");
+  /** An element just jumped to (goTo): ringed until the selection moves on. */
+  highlight: string | null = $state(null);
+  /** Bumped by goTo so the canvas scrolls the highlighted element into view. */
+  focusRequest = $state(0);
 
   private undoStack: string[] = [];
   private redoStack: string[] = [];
@@ -165,6 +169,9 @@ export class Editor {
     this.selection = [id];
     this.tool = "select";
     this.placeSymbol = null;
+    // Show where we've landed: the canvas brings it into view and rings it until it's unselected.
+    this.highlight = id;
+    this.focusRequest++;
   }
 
   flash(msg: string): void {

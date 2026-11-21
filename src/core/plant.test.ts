@@ -122,7 +122,7 @@ describe("sections and schedules", () => {
   test("sections stay on the page and keep a minimum size", () => {
     const { p, pg } = fan();
     const s = addSection(p, pg, "MAIN", [190, 100, 30, 30]);
-    expect(s.rect).toEqual([170, 82, 30, 30]);
+    expect(s.rect).toEqual([170, 90, 30, 30]);
     updateSection(p, pg, s.id, { rect: [10, 10, 1, 1] });
     expect(s.rect).toEqual([10, 10, 4, 4]);
   });

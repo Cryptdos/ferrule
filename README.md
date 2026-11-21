@@ -60,7 +60,7 @@ Wire routing uses [libavoid-js](https://github.com/Aksem/libavoid-js) (LGPL-2.1-
 
 To see what a finished set looks like, choose *add the LSP-01 example* on the project picker.
 
-- Pick a symbol on the left and click on the sheet to place it. `Esc` goes back to selecting.
+- Pick a part on the left (type in *Find a part…* to narrow the list) and click on the sheet to place it. `Esc` goes back to selecting.
 - Drag to move (snaps to the grid), drag on empty paper to box-select, `Shift`/`Ctrl`+click to add to the selection.
 - `R` rotate, `Del` delete, `Ctrl+D` duplicate, arrow keys nudge, `Ctrl+Z`/`Ctrl+Y` undo/redo, `F` fit.
 - Scroll to zoom, middle-drag or `Space`+drag to pan.
@@ -69,10 +69,12 @@ To see what a finished set looks like, choose *add the LSP-01 example* on the pr
 - Saving is automatic.
 - **Sheets** (top left): `+` adds a sheet after the current one, `⧉` duplicates it, arrows reorder, `✕` deletes. `PgUp`/`PgDn` switch sheets. With nothing selected, the right panel edits the sheet title.
 - **Numbering:** tags show as `K?`, `S?`… until you press **Renumber**. Position scheme (default): tags and wire numbers are the sheet-column where they are, e.g. `K3-16`, wire `3-22`; the highest in a column keeps the plain number and the rest get A, B, C. Wires on a named rail take its name (CCT, 0V). Sequential (K1, K2…, wire 100, 101…) can be chosen under Project…. Lock a tag or wire number to keep it.
-- **Links:** select a contact and pick its coil under *Driven by coil*: it takes the coil's tag and pole number (13/14, 23/24, 31/32…), and the coil gets a contact table showing where each contact is. Off-page arrows pair up under *Continues at*: each shows where the other is, and the wire keeps its number across sheets.
-- **Plant…:** define field equipment once (tag, description, all its terminals) and *Place view* on any sheet. Tick the terminals a sheet shows; hidden ones give the box a break line. Labels can include `{plant:…}` fields (the *+ field* picker) so they always match the plant's tag.
-- **Panel boundary:** tick it in the sheet panel (nothing selected), then drag the dashed line. Everything below is field equipment, and wires to it are drawn as dashed field cables. A wire crossing it without a terminal is flagged by **Check**.
-- **Section** tool (`B`): drag out a dashed section box; select its border to label, move or resize it.
+- **Links:** select a contact and pick its coil under *Driven by coil*: it takes the coil's tag and pole number (13/14, 23/24, 31/32…), and the coil gets a contact table to its right showing where each contact is (drag the table to move it; click a row to jump to that contact). **Double-click** a contact to jump to its coil, a coil to its first contact, or an off-page arrow to its partner; where you land is ringed until you select something else. Off-page arrows pair up under *Continues at*: each shows where the other is, one is drawn going (open arrow) and the other coming (filled arrow), and the wire keeps its number across sheets.
+- **Wires:** select a wire to set its number, core colour (IEC codes: BU, BN, GNYE…) and function (0V, 24V…); all three print along it.
+- **Lamps** have V+ and V- terminals and an optional lamp-test terminal T; colours are two-letter codes (RD, GN, AM…). **Timer coils** take a function (on-delay, off-delay, interval, cyclic…) and the maker's code for it; the simulator runs each one.
+- **Plant…:** define field equipment once (tag, description, all its terminals, any information lines such as model and rating) and *Place view* on any sheet. Group terminals by function as `L N E | ENABLE: 1 2 | 0-10V: 3 4`: the group names print in bold inside the box, the tag and details under it. Tick the terminals a sheet shows; hidden ones give the box a break line. Labels can include `{plant:…}` fields (the *+ field* picker) so they always match the plant's tag.
+- **Panel boundary:** tick it in the sheet panel (nothing selected), then drag the dash-dot line. Everything below is field equipment, and wires to it are drawn as dashed field cables. A wire crossing it without a terminal is flagged by **Check**.
+- **Section** tool (`B`): drag out a dashed section box. Drag its label to move it, any edge or corner to resize that side.
 - **Check** lists problems (boundary crossings, loose contacts, coils without contacts, unpaired off-page arrows, duplicate tags, plant terminals shown nowhere or twice) with a *Show* button. **Schedules** gives terminal and field cable schedules, downloadable as CSV.
 - **Right sidebar:** everything on the sheet, in column order and synced with the canvas selection (click a row to select; filter box at the top), with the selection's properties below.
 - **Split** shows another sheet alongside. *Go to* buttons (coil ↔ contacts, off-page pairs) then keep the sheet you came from in view; click the other half to work on it.

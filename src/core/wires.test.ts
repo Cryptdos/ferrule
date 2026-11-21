@@ -45,10 +45,10 @@ describe("wiring", () => {
     const { p, pg } = setup();
     const k = addElement(p, pg, "coil", [10, 20]);
     const h = addElement(p, pg, "lamp", [20, 20]);
-    expect(() => connect(p, pg, [k.id, "X9"], [h.id, "L"])).toThrow();
+    expect(() => connect(p, pg, [k.id, "X9"], [h.id, "V+"])).toThrow();
     expect(() => connect(p, pg, [k.id, "A1"], [k.id, "A2"])).toThrow();
-    connect(p, pg, [k.id, "A1"], [h.id, "L"]);
-    expect(() => connect(p, pg, [h.id, "L"], [k.id, "A1"])).toThrow(/already/);
+    connect(p, pg, [k.id, "A1"], [h.id, "V+"]);
+    expect(() => connect(p, pg, [h.id, "V+"], [k.id, "A1"])).toThrow(/already/);
   });
 
   test("a straight rung routes straight", () => {
@@ -92,7 +92,7 @@ describe("wiring", () => {
     const { p, pg, page } = setup();
     const a = addElement(p, pg, "coil", [10, 20]);
     const b = addElement(p, pg, "lamp", [30, 40]);
-    const w = connect(p, pg, [a.id, "A2"], [b.id, "L"]);
+    const w = connect(p, pg, [a.id, "A2"], [b.id, "V+"]);
     routePage(avoid, page);
     const manual: Vec[] = [[10, 23], [10, 30], [30, 30], [30, 37]];
     setManualRoute(p, pg, w.id, manual);
@@ -110,7 +110,7 @@ describe("wiring", () => {
     const { p, pg, page } = setup();
     const a = addElement(p, pg, "coil", [10, 20]);
     const b = addElement(p, pg, "lamp", [30, 40]);
-    const w = connect(p, pg, [a.id, "A2"], [b.id, "L"]);
+    const w = connect(p, pg, [a.id, "A2"], [b.id, "V+"]);
     routePage(avoid, page);
     expect(() => setManualRoute(p, pg, w.id, [[10, 23], [30, 37]])).toThrow();
     expect(() => setManualRoute(p, pg, w.id, [[11, 23], [11, 30], [30, 30], [30, 37]])).toThrow();
@@ -123,9 +123,9 @@ describe("tees and conductors", () => {
     const a = addElement(p, pg, "lamp", [10, 20]);
     const b = addElement(p, pg, "lamp", [10, 60]);
     const c = addElement(p, pg, "lamp", [30, 40]);
-    const w = connect(p, pg, [a.id, "N"], [b.id, "L"]);
+    const w = connect(p, pg, [a.id, "V-"], [b.id, "V+"]);
     routePage(avoid, page);
-    wire(p, pg, { wire: w.id, at: [10, 40] }, { terminal: [c.id, "L"] });
+    wire(p, pg, { wire: w.id, at: [10, 40] }, { terminal: [c.id, "V+"] });
     routePage(avoid, page);
     const j = page.elements.find((e) => e.symbol === "junction")!;
     expect(j.pos).toEqual([10, 40]);
@@ -140,9 +140,9 @@ describe("tees and conductors", () => {
     const a = addElement(p, pg, "lamp", [10, 20]);
     const b = addElement(p, pg, "lamp", [10, 60]);
     const c = addElement(p, pg, "lamp", [30, 40]);
-    const w = connect(p, pg, [a.id, "N"], [b.id, "L"]);
+    const w = connect(p, pg, [a.id, "V-"], [b.id, "V+"]);
     routePage(avoid, page);
-    const t = wire(p, pg, { wire: w.id, at: [10, 40] }, { terminal: [c.id, "L"] });
+    const t = wire(p, pg, { wire: w.id, at: [10, 40] }, { terminal: [c.id, "V+"] });
     deleteSegments(p, pg, [t.id]);
     expect(page.elements.some((e) => e.symbol === "junction")).toBe(false);
     expect(page.segments).toHaveLength(1);
@@ -157,8 +157,8 @@ describe("tees and conductors", () => {
     const h = addElement(p, pg, "lamp", [40, 25]);
     connect(p, pg, [rail.id, "20"], [x1.id, "1"]);
     connect(p, pg, [x1.id, "2"], [s.id, "13"]);
-    connect(p, pg, [rail.id, "40"], [h.id, "L"]);
-    const w = connect(p, pg, [s.id, "14"], [h.id, "N"]);
+    connect(p, pg, [rail.id, "40"], [h.id, "V+"]);
+    const w = connect(p, pg, [s.id, "14"], [h.id, "V-"]);
     // Rail, terminal X1 and the contact's 13 are one potential; 14 → lamp N is another.
     expect(p.conductors).toHaveLength(2);
     const before = p.conductors.find((c) => c.id === w.conductor)!;
@@ -172,7 +172,7 @@ describe("tees and conductors", () => {
     const { p, pg, page } = setup();
     const rail = addElement(p, pg, "rail", [0, 10], { params: { length: 100 } });
     const h = addElement(p, pg, "lamp", [20, 20]);
-    connect(p, pg, [rail.id, "20"], [h.id, "L"]);
+    connect(p, pg, [rail.id, "20"], [h.id, "V+"]);
     routePage(avoid, page);
     expect(connectionDots(page)).toEqual([[20, 10]]);
   });
@@ -183,7 +183,7 @@ describe("rail taps", () => {
     const { p, pg, page } = setup();
     const rail = addElement(p, pg, "rail", [0, 70], { params: { length: 100 } });
     const h = addElement(p, pg, "lamp", [40, 60]);
-    const w = connect(p, pg, [h.id, "N"], [rail.id, "40"]);
+    const w = connect(p, pg, [h.id, "V-"], [rail.id, "40"]);
     routePage(avoid, page);
     moveElements(p, pg, [h.id], [10, 0]);
     routePage(avoid, page);

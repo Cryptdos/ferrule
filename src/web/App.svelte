@@ -43,7 +43,15 @@
   if (!printData) void open(currentId());
 </script>
 
-<svelte:window onpopstate={() => void open(currentId())} />
+<svelte:window
+  onpopstate={() => void open(currentId())}
+  onpointerdowncapture={(e) => {
+    // Clicking away from a text box commits what was typed (its change event)
+    // before the click can change the selection and take the box away.
+    const a = document.activeElement;
+    if ((a instanceof HTMLInputElement || a instanceof HTMLTextAreaElement) && e.target !== a) a.blur();
+  }}
+/>
 
 {#if printData}
   <PrintView project={printData} {autoprint} {solo} />

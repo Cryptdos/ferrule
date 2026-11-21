@@ -43,7 +43,7 @@ describe("element operations", () => {
     const { p, pg } = setup();
     const a = addElement(p, pg, "coil", [10, 10]);
     const b = addElement(p, pg, "lamp", [20, 10]);
-    p.pages[0]!.segments.push({ id: "w", conductor: "", from: [a.id, "A1"], to: [b.id, "L"], route: "auto", points: [] });
+    p.pages[0]!.segments.push({ id: "w", conductor: "", from: [a.id, "A1"], to: [b.id, "V+"], route: "auto", points: [] });
     deleteElements(p, pg, [a.id]);
     expect(p.pages[0]!.elements.map((e) => e.id)).toEqual([b.id]);
     expect(p.pages[0]!.segments).toHaveLength(0);

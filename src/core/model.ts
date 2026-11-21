@@ -5,7 +5,7 @@
 import type { Rotation, Vec } from "./geometry";
 
 export const FORMAT = "ferrule";
-export const FORMAT_VERSION = 1;
+export const FORMAT_VERSION = 2;
 
 export type ParamValue = string | number | boolean;
 
@@ -60,6 +60,10 @@ export interface Conductor {
   number: string;
   /** Keep this number when renumbering. */
   locked?: boolean;
+  /** Core colour, as an IEC 60757 code (e.g. "BU", "GNYE"). */
+  colour?: string;
+  /** What it carries, e.g. "0V", "24V AC", "L1". */
+  function?: string;
   terminals: TerminalRef[];
 }
 
@@ -89,6 +93,15 @@ export interface PlantItem {
   id: string;
   tag: string;
   description: string;
+  terminals: string[];
+  /** Named groups of terminals, e.g. ENABLE: 1 2. Shown inside the box under their terminals. */
+  groups?: PlantGroup[];
+  /** More information shown under the box (model, rating, supply…). May have several lines. */
+  info?: string;
+}
+
+export interface PlantGroup {
+  name: string;
   terminals: string[];
 }
 

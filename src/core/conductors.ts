@@ -113,6 +113,8 @@ export function refreshConductors(project: Project): void {
       id: best?.id ?? newId("c"),
       number: best?.number ?? "",
       ...(best?.locked ? { locked: true } : {}),
+      ...(best?.colour ? { colour: best.colour } : {}),
+      ...(best?.function ? { function: best.function } : {}),
       terminals: group.map(unkey),
     };
     used.add(conductor.id);
