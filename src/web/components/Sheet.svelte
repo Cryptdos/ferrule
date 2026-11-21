@@ -3,7 +3,7 @@
   import { AREA_MM, AREA_UNITS, SHEET_MM, UNIT_MM } from "../../core/geometry";
   import type { Page, Project } from "../../core/model";
   import type { Vec } from "../../core/geometry";
-  import { BLOCK_HALF, blockLabels, connectionDots, isFieldWire, routeOf, wireTexts } from "../../core/wires";
+  import { BLOCK_HALF, BLOCK_INSET, blockLabels, connectionDots, isFieldWire, routeOf, wireTexts } from "../../core/wires";
   import { resolveFields } from "../../core/fields";
   import { cloudsOn } from "../../core/ops";
   import { cloudPath } from "../../core/titleblock";
@@ -88,9 +88,9 @@
   {/each}
   {#if boundaryY !== null}
     <!-- Panel boundary: the terminal block, full width; its terminals are cells in it. -->
-    <rect class="block" x="0" y={boundaryY - BLOCK_HALF} width={AREA_UNITS.w} height={BLOCK_HALF * 2} />
+    <rect class="block" x={BLOCK_INSET} y={boundaryY - BLOCK_HALF} width={AREA_UNITS.w - BLOCK_INSET * 2} height={BLOCK_HALF * 2} />
     {#each blockLabels(page) as l (l.x)}
-      <text class="strip" x={l.x} y={boundaryY + 0.37} text-anchor={l.anchor}>{l.text}</text>
+      <text class="strip" x={l.x} y={boundaryY + 0.42} text-anchor={l.anchor}>{l.text}</text>
     {/each}
   {/if}
   {@render under?.()}
@@ -185,7 +185,7 @@
   }
   .strip {
     font-family: var(--drawing-font);
-    font-size: 1px;
+    font-size: 1.15px;
     fill: #000;
   }
   .wires circle {

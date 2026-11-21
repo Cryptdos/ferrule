@@ -3,6 +3,7 @@
  * polylines in grid units whose first and last points sit on terminals.
  * These helpers are pure so the UI, the router and tests share them.
  */
+import { BLOCK_INSET } from "./blocks";
 import type { Vec } from "./geometry";
 import type { Element, Page, Segment, TerminalRef } from "./model";
 import { terminalDir, terminalPoint } from "./symbols";
@@ -279,8 +280,7 @@ export function wireTexts(
   return out;
 }
 
-/** Half the height of the terminal block along a panel boundary (grid units). */
-export const BLOCK_HALF = 1;
+export { BLOCK_HALF, BLOCK_INSET } from "./blocks";
 
 /**
  * The strip names along a boundary's terminal block: one at the left end and
@@ -296,7 +296,7 @@ export function blockLabels(page: Page): { x: number; text: string; anchor: "sta
   for (const t of terms) {
     const strip = String(t.params.strip ?? "X1").trim() || "X1";
     if (strip === last) continue;
-    out.push(out.length === 0 ? { x: 0.5, text: strip, anchor: "start" } : { x: t.pos[0] - 0.8, text: strip, anchor: "end" });
+    out.push(out.length === 0 ? { x: BLOCK_INSET + 0.6, text: strip, anchor: "start" } : { x: t.pos[0] - 0.8, text: strip, anchor: "end" });
     last = strip;
   }
   return out;

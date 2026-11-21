@@ -8,7 +8,8 @@
  * Default orientation is vertical, current flowing top to bottom, as in a
  * ladder rung between the CCT and 0V rails.
  */
-import { textWidth } from "./textwidth";
+import { CAP_HEIGHT, textWidth } from "./textwidth";
+import { BLOCK_HALF } from "./blocks";
 import { legendTable, notesLayout, revisionTable, type LegendEntry } from "./annotations";
 import {
   type Dir,
@@ -175,6 +176,9 @@ function poleMarks(el: Element, base: [string, string]): [string, string] {
   if (!pole) return base;
   return [`${pole}${base[0].slice(-1)}`, `${pole}${base[1].slice(-1)}`];
 }
+
+/** A block cell's number: 1.05 units (≈1.5 mm, clear of the cell walls), smaller only if it won't fit up the cell. */
+const termSize = (tag: string, half: number) => Math.min(1.05, (half * 2 - 0.4) / Math.max(0.1, textWidth(tag, 1)));
 
 const vterms = (a: string, b: string, half = 3): TerminalDef[] => [
   { name: a, at: [0, -half], dir: "up" },
@@ -764,6 +768,7 @@ const SYMBOLS: SymbolDef[] = [
           { value: "plain", label: "Terminal" },
           { value: "fuse", label: "Fused terminal" },
           { value: "disconnect", label: "Disconnect (knife) terminal" },
+          { value: "fuse-disconnect", label: "Switched fuse terminal (fuse disconnect)" },
         ],
       },
       {
@@ -783,45 +788,56 @@ const SYMBOLS: SymbolDef[] = [
       const onBlock = el.params.onBlock === true;
       const fn = str(el, "function", "plain");
       const prims: Prim[] = [];
+      // In the block the cell is 3 units tall (room for a readable number);
+      // on its own the terminal is a small circle with leads to ±1.
+      const half = onBlock ? BLOCK_HALF : 1;
       // A fused or disconnect terminal: the fuse or knife in the lead on the
       // panel side, right on top of the terminal, so it can't be missed.
-      const top = fn === "fuse" || fn === "disconnect" ? -3 : -1;
+      const top = fn === "plain" ? -half : -half - 2;
+      const y0 = -half; // where the terminal itself starts
       if (fn === "fuse") {
         // IEC fuse: a rectangle with the conductor through it.
-        prims.push(line([0, -3], [0, -1]), line([-0.32, -2.75], [0.32, -2.75], [0.32, -1.2], [-0.32, -1.2], [-0.32, -2.75]));
-      } else if (fn === "disconnect") {
-        // Knife link, drawn open: the blade hinged at the bottom.
-        prims.push(
-          line([0, -3], [0, -2.6]),
-          line([-0.3, -2.6], [0.3, -2.6]),
-          line([0, -1.25], [0, -1]),
-          line([0, -1.25], [-0.45, -2.5]),
-          { t: "circle", c: [0, -1.25], r: 0.12, fill: true },
-        );
+        prims.push(line([0, top], [0, y0]), line([-0.32, y0 - 1.75], [0.32, y0 - 1.75], [0.32, y0 - 0.2], [-0.32, y0 - 0.2], [-0.32, y0 - 1.75]));
+      } else if (fn === "disconnect" || fn === "fuse-disconnect") {
+        // Knife link drawn open, hinged at the bottom; a switched fuse carries the fuse on the blade.
+        const pivot: Vec = [0, y0 - 0.25];
+        const tip: Vec = [-0.5, y0 - 1.6];
+        prims.push(line([0, top], [0, y0 - 1.6]), line([-0.3, y0 - 1.6], [0.3, y0 - 1.6]), line(pivot, [0, y0]), line(pivot, tip), { t: "circle", c: pivot, r: 0.12, fill: true });
+        if (fn === "fuse-disconnect") {
+          const dx = tip[0] - pivot[0];
+          const dy = tip[1] - pivot[1];
+          const len = Math.hypot(dx, dy);
+          const u: Vec = [dx / len, dy / len];
+          const n: Vec = [-u[1] * 0.22, u[0] * 0.22];
+          const a: Vec = [pivot[0] + u[0] * 0.3, pivot[1] + u[1] * 0.3];
+          const b: Vec = [pivot[0] + u[0] * (len - 0.15), pivot[1] + u[1] * (len - 0.15)];
+          prims.push(line([a[0] + n[0], a[1] + n[1]], [b[0] + n[0], b[1] + n[1]], [b[0] - n[0], b[1] - n[1]], [a[0] - n[0], a[1] - n[1]], [a[0] + n[0], a[1] + n[1]]));
+        }
       }
       if (onBlock) {
         // A cell of the boundary's terminal block, its number written up the cell.
         prims.push(
-          line([-0.5, -1], [0.5, -1], [0.5, 1], [-0.5, 1], [-0.5, -1]),
-          // As big as fits up the cell (a long number like 3-13A gets a little smaller).
+          line([-0.5, -half], [0.5, -half], [0.5, half], [-0.5, half], [-0.5, -half]),
+          // As big as reads well, smaller only if it won't fit up the cell (3-13A).
           {
             t: "text",
-            at: [0.28, 0],
+            // Centred across the cell: the capitals sit either side of the middle.
+            at: [termSize(t?.tag ?? el.tag ?? "", half) * CAP_HEIGHT * 0.5, 0],
             text: "{tag}",
-            size: Math.min(0.8, 1.75 / Math.max(0.1, textWidth(t?.tag ?? el.tag ?? "", 1))),
+            size: termSize(t?.tag ?? el.tag ?? "", half),
             anchor: "middle",
             role: "tag",
             vertical: true,
           },
-          ...(el.label ? [text(0.65, 2.0, "{label}", TERM, "start", "label")] : []),
+          ...(el.label ? [text(0.65, half + 1, "{label}", TERM, "start", "label")] : []),
         );
         return {
           prims,
           terminals: [
             { name: "1", at: [0, top], dir: "up" },
-            { name: "2", at: [0, 1], dir: "down" },
+            { name: "2", at: [0, half], dir: "down" },
           ],
-          body: { x: -0.5, y: -1, w: 1, h: 2 },
+          body: { x: -0.5, y: -half, w: 1, h: half * 2 },
         };
       }
       const strip = el.params.showStrip === true ? String(el.params.strip ?? "").trim() : "";

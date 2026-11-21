@@ -179,7 +179,7 @@ export function stripSize(project: Project, refs: string[]): { w: number; h: num
   let h = 0;
   for (const id of refs) {
     const fn = byId.get(id)?.params.function;
-    const t = (fn === "fuse" ? sizes.fuseTerminal : fn === "disconnect" ? sizes.disconnectTerminal : sizes.terminal)!;
+    const t = (fn === "fuse" || fn === "fuse-disconnect" ? sizes.fuseTerminal : fn === "disconnect" ? sizes.disconnectTerminal : sizes.terminal)!;
     w += t.w;
     h = Math.max(h, t.h);
   }

@@ -836,10 +836,10 @@ export function setBoundary(project: Project, pageId: string, y: number | null):
   updateZones(page);
 }
 
-/** A terminal dropped within a unit of the boundary goes into its terminal block. */
+/** A terminal dropped on or next to the boundary's terminal block goes into it. */
 function snapToBlock(page: Page, el: Element): void {
   if (page.boundaryY === null || el.symbol !== "terminal" || (el.rot !== 0 && el.rot !== 180)) return;
-  if (Math.abs(el.pos[1] - page.boundaryY) <= 1) el.pos = [el.pos[0], page.boundaryY];
+  if (Math.abs(el.pos[1] - page.boundaryY) <= 1.5) el.pos = [el.pos[0], page.boundaryY];
 }
 
 /** Elements below the boundary are field equipment; on or above it, panel internals. */

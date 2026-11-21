@@ -187,7 +187,7 @@ describe("terminal block on the panel boundary", () => {
     expect(t.pos[1]).toBe(80); // dropped near it: snapped in
     expect(t.params.onBlock).toBe(true);
     const g = localGeometry(t, elementTexts(t, p));
-    expect(g.body).toEqual({ x: -0.5, y: -1, w: 1, h: 2 });
+    expect(g.body).toEqual({ x: -0.5, y: -1.5, w: 1, h: 3 });
     setBoundary(p, pg, 90);
     expect(t.pos[1]).toBe(90);
     moveElements(p, pg, [t.id], [0, -10]);
@@ -214,12 +214,17 @@ describe("terminal block on the panel boundary", () => {
     const k = addElement(p, pg, "coil", [20, 60]);
     const t = addElement(p, pg, "terminal", [20, 80]);
     connect(p, pg, [k.id, "A2"], [t.id, "1"]);
-    expect(terminalPoint(t, "1")).toEqual([20, 79]);
+    expect(terminalPoint(t, "1")).toEqual([20, 78.5]);
     updateElement(p, pg, t.id, { params: { function: "fuse" } });
-    expect(terminalPoint(t, "1")).toEqual([20, 77]);
+    expect(terminalPoint(t, "1")).toEqual([20, 76.5]);
     expect(routesStale(p.pages[0]!)).toBe(true); // the editor and the print view route it again
     const lines = localGeometry(t, elementTexts(t, p)).prims.filter((x) => x.t === "line");
     expect(lines.length).toBeGreaterThan(2);
+    // A switched fuse: the knife with the fuse on its blade.
+    updateElement(p, pg, t.id, { params: { function: "fuse-disconnect" } });
+    const sw = localGeometry(t, elementTexts(t, p)).prims.filter((x) => x.t === "line");
+    expect(sw.length).toBeGreaterThan(lines.length);
+    expect(terminalPoint(t, "1")).toEqual([20, 76.5]);
   });
 
   test("older files: terminals already on a boundary go into the block when loaded", () => {
