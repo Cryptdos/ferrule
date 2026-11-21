@@ -92,7 +92,7 @@ It was built from this sanitised description alone. The original drawings stayed
 | 2. Every tag, wire number, terminal number and cross-reference generated | Yes. Nothing is typed; renumbering again changes nothing (tested). |
 | 3. Section titles, motor labels, door labels from plant tags | Yes. Every plant name on every sheet is a `{plant:…}` field (tested: no literal plant tags in any label, title or section). |
 | 4. Sheets 3–6 from one template, 8–9 from one | Yes ("Fan starter section", "Fans duty/standby controls"). Cross-sheet links (CCT/0V feeds, enable loops, run signals, the fire alarm relay's contacts) are made after stamping. |
-| 5. Simulator runs the logic | Milestone 10. |
+| 5. Simulator runs the logic and exposes faults | Yes (milestone 10). Duty/standby, airflow proving, the 10 s fail timer and the fans-fail latch run as drawn across sheets 3–9 (tested). The search proves SF-01 and SF-02 are never enabled together. It also exposes a fault: see below. |
 | 6. Clean A4 PDF, title block from project data | Yes, including revision B with a cloud on sheet 8. |
 
 `check` reports nothing: no errors and no warnings.
@@ -102,7 +102,11 @@ It was built from this sanitised description alone. The original drawings stayed
 - **Keyswitches (sheets 8–9).** Enable path drawn as: CCT → (AUTO/TEST keyswitch in TEST, *or* fire alarm relay FR energised) → fans-fail relay NC → duty selector (changeover: position 1 → fan 1 enable relay, position 2 → fan 2).
 - **Fire alarm relay.** FR is taken to be energised when the fire alarm is active (its contact lights FIRE ALARM ACTIVATED), so in AUTO the fans run on alarm.
 - **Enable and run signals** between controls and starter sheets are drawn as paired off-page arrows rather than terminal pairs, because both ends are inside the panel.
-- **Tripped lamps** are lit by each fan's fail timer contact, as the description reads. Once the fans-fail latch drops the enable relays, the timers reset and the lamps go out, so this looks like one of the original's suspected bugs. The simulator in milestone 10 should show it.
+- **Tripped lamps** are lit by each fan's fail timer contact, as the description reads.
+
+### Fault found by the simulator
+
+With the fire alarm active and the duty fan's airflow not proven, the fail timer runs out after 10 s and the fans-fail relay latches, as intended. But the latch also drops the enable relays, which resets the fail timer, and the TRIPPED lamp is driven by that timer's contact. **So the TRIPPED lamp lights for an instant and goes straight out: the operator never sees which fan failed.** The standby fan isn't started either, because the latch opens the common enable path. If the original works like the description, this is a real bug. A per-fan trip latch would fix it, driving its own TRIPPED lamp and changing over to the standby fan.
 - **Lamp test.** The LAMP TEST button feeds an LT rail on sheet 7; per-lamp test links aren't drawn yet.
 - **Volt-free fire alarm monitoring** contacts (running relay NO per fan) are on sheets 8–9, to separate fire-alarm interface plant FA-SF / FA-EF.
 - **General arrangement (sheet 10)** shows the section widths given (1000 / 4×400 / 1000 mm) and door items. No heights were given, so it's not to scale.

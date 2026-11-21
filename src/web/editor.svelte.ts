@@ -24,6 +24,8 @@ export class Editor {
   /** Selected element ids on the current page. */
   selection: string[] = $state([]);
   tool: Tool = $state("select");
+  /** Workbench (DESIGN.md §9): drafting, or simulating the logic as drawn. */
+  mode: "draft" | "simulate" = $state("draft");
   placeSymbol: string | null = $state(null);
   /** A section template waiting to be stamped where you click. */
   stamp: { templateId: string; plant: import("../core/templates").PlantMapping; size: [number, number]; name: string } | null =

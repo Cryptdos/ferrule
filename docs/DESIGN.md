@@ -299,6 +299,8 @@ Reference drawings from other companies are proprietary. They are never committe
 | Grid unit | 1 unit = 1.385 mm on A4 (2 units per column); symbols and terminals snap to whole units |
 | MCP transport | Streamable HTTP at /mcp (JSON replies, no SSE stream needed) plus `--mcp` stdio, which relays to a running Ferrule or starts one, so editor and Claude share one server |
 | Concurrent edits | Project files carry a version (file mtime). Saves send If-Match and are refused if someone else saved since; open editors get change events (file watch → SSE) and reload |
+| Simulation | Conductors are nodes; contacts, buttons, selectors, isolators and field plant views are switched links; coils and lamps are loads between a CCT… rail and the 0V rail. Settle until stable; on/off-delay timers on a simulation clock. Plant views act as volt-free field contacts |
+| Logic rules | Breadth-first search over operator actions (operate, press, wait for timers) for the shortest sequence that breaks a rule; also reports shorts and chatter. Only inputs that can influence the rule's coils are searched; isolators and breakers stay closed unless asked |
 | Wires to rails | Rail taps slide to sit directly above/below the other end, so rung wires stay straight when symbols move |
 
 ## 16. Open questions

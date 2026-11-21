@@ -16,7 +16,8 @@ import { cableSchedule, terminalSchedule } from "../core/schedules";
 import { listSymbols, localGeometry } from "../core/symbols";
 import { displayTag, elementTexts } from "../core/tags";
 import { saveSectionTemplate, saveSheetTemplate, stampTemplate, type PlantMapping } from "../core/templates";
-import { contactTable, masterOf, partnerOf } from "../core/xref";
+import { contactTable, isMaster, masterOf, partnerOf } from "../core/xref";
+import { advance, compile, describeAction, initialState, press, search, toggle, type Action, type SimState } from "../core/sim";
 import type { Library, Storage } from "./storage";
 
 export interface ToolContext {
@@ -645,6 +646,87 @@ export const TOOLS: Tool[] = [
     run: async (a, ctx) => {
       const p = await ctx.storage.load(str(a, "project"));
       return a.kind === "cables" ? cableSchedule(p) : terminalSchedule(p);
+    },
+  },
+  {
+    name: "simulate",
+    description:
+      "Run the relay logic as drawn (DESIGN.md §9). Start with everything off (isolators and breakers on), apply actions in order — {toggle: id} for switches, selectors, isolators and field plant contacts (a plant view acts as a volt-free contact), {press: id} for push buttons, {wait: seconds} for timers — and report which coils are energised and which lamps are lit after each step. Supply is any rail named CCT…, return the 0V rail.",
+    inputSchema: obj(
+      {
+        project,
+        actions: { type: "array", items: { type: "object" }, description: "e.g. [{\"toggle\": \"e_x\"}, {\"wait\": 10}, {\"press\": \"e_y\"}]" },
+      },
+      ["project"],
+    ),
+    run: async (a, ctx) => {
+      const p = await ctx.storage.load(str(a, "project"));
+      const c = compile(p);
+      const tagOf = new Map<string, string>();
+      for (const pg of p.pages) for (const el of pg.elements) tagOf.set(el.id, `${displayTag(el, p)}${el.label ? " " + resolveFields(el.label, p) : ""}`.trim());
+      const report = (s: SimState) => ({
+        t: Math.round(s.t * 10) / 10,
+        energised: Object.entries(s.energised).filter(([, v]) => v).map(([k]) => tagOf.get(k) ?? k),
+        lit: Object.entries(s.lamps).filter(([, v]) => v).map(([k]) => tagOf.get(k) ?? k),
+        ...(s.short ? { short: true } : {}),
+        ...(s.unstable ? { unstable: true } : {}),
+      });
+      let s = initialState(c);
+      const steps: object[] = [{ step: "start", ...report(s) }];
+      for (const raw of Array.isArray(a.actions) ? (a.actions as Record<string, unknown>[]) : []) {
+        let act: Action;
+        if (typeof raw.toggle === "string") act = { do: "toggle", el: raw.toggle };
+        else if (typeof raw.press === "string") act = { do: "press", el: raw.press };
+        else if (typeof raw.wait === "number") act = { do: "wait", seconds: raw.wait };
+        else throw new ArgError("Each action is {toggle: id}, {press: id} or {wait: seconds}");
+        if (act.do !== "wait" && !c.inputs.some((i) => i.el === act.el)) throw new ArgError(`${act.el} isn't something you can operate`);
+        s = act.do === "wait" ? advance(c, s, act.seconds) : act.do === "press" ? press(c, s, act.el) : toggle(c, s, act.el);
+        steps.push({ step: describeAction(c, act), ...report(s) });
+      }
+      return { inputs: c.inputs.map((i) => ({ id: i.el, kind: i.kind, name: tagOf.get(i.el), label: i.label })), steps };
+    },
+  },
+  {
+    name: "check_logic",
+    description:
+      "Search every sequence of operations (and waiting for timers) for one that breaks a rule, e.g. two contactors that must never both be on (an ATS paralleling supplies). Uses the project's saved rules plus any given here; also reports shorts and relays that chatter.",
+    inputSchema: obj(
+      {
+        project,
+        neverBoth: { type: "array", items: { type: "array", items: { type: "string" } }, description: "Pairs of coil/lamp ids" },
+        never: { type: "array", items: { type: "string" } },
+        limit: { type: "integer", description: "States to explore (default 20000)" },
+        includeIsolators: { type: "boolean", description: "Also try opening isolators and breakers (default false)" },
+      },
+      ["project"],
+    ),
+    run: async (a, ctx) => {
+      const p = await ctx.storage.load(str(a, "project"));
+      const c = compile(p);
+      const rules = [...p.rules];
+      for (const [x, y] of (a.neverBoth as string[][]) ?? []) rules.push({ id: `nb${rules.length}`, kind: "never-both", a: x!, b: y });
+      for (const x of (a.never as string[]) ?? []) rules.push({ id: `n${rules.length}`, kind: "never", a: x });
+      const tagOf = (id: string) => {
+        for (const pg of p.pages) {
+          const el = pg.elements.find((e) => e.id === id);
+          if (el) return displayTag(el, p) || el.symbol;
+        }
+        return id;
+      };
+      const r = search(c, initialState(c), rules, {
+        limit: typeof a.limit === "number" ? a.limit : 20000,
+        includeIsolators: a.includeIsolators === true,
+      });
+      return {
+        explored: r.states,
+        complete: !r.truncated,
+        broken: r.violations.map((v) => ({
+          rule: v.rule.kind === "never" ? `never ${tagOf(v.rule.a)}` : `never both ${tagOf(v.rule.a)} and ${tagOf(v.rule.b!)}`,
+          after: v.path.map((x) => describeAction(c, x)),
+        })),
+        faults: r.faults.map((f) => ({ fault: f.kind, after: f.path.map((x) => describeAction(c, x)) })),
+        coils: p.pages.flatMap((pg) => pg.elements.filter((e) => isMaster(e)).map((e) => ({ id: e.id, tag: displayTag(e, p) }))),
+      };
     },
   },
   {

@@ -62,6 +62,7 @@ export function parseProject(input: unknown): Project {
           .map((c) => ({ id: typeof c.id === "string" ? c.id : `cl_${Math.random().toString(36).slice(2, 9)}`, pageId: c.pageId as string, rect: c.rect as [number, number, number, number] })),
       })),
     templates: [],
+    rules: [],
   };
 
   arr(input.pages).forEach((pg, i) => {
@@ -74,6 +75,16 @@ export function parseProject(input: unknown): Project {
     .filter((t) => typeof t.id === "string")
     .map((t, i) => parseTemplate(t, i));
 
+  project.rules = arr(input.rules)
+    .filter(isObj)
+    .filter((r) => typeof r.id === "string" && typeof r.a === "string")
+    .map((r) => ({
+      id: r.id as string,
+      kind: r.kind === "never" ? ("never" as const) : ("never-both" as const),
+      a: r.a as string,
+      ...(typeof r.b === "string" ? { b: r.b } : {}),
+      ...(typeof r.note === "string" ? { note: r.note } : {}),
+    }));
   project.conductors = parseConductors(input.conductors);
   return project;
 }

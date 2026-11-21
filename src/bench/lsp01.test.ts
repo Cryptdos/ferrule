@@ -84,3 +84,88 @@ describe("LSP-01 benchmark", () => {
     expect(p.revisions[1]!.clouds).toHaveLength(1);
   });
 });
+
+describe("LSP-01 simulation (criterion 5)", async () => {
+  const { compile, initialState, toggle, press, advance, search } = await import("../core/sim");
+  const find = (sheet: number, label: string) => {
+    const el = p.pages[sheet - 1]!.elements.find((e) => resolveFields(e.label, p) === label);
+    if (!el) throw new Error(`No "${label}" on sheet ${sheet}`);
+    return el;
+  };
+  const plantView = (tag: string) => {
+    const item = p.plant.find((x) => x.tag === tag)!;
+    for (const pg of p.pages) {
+      const el = pg.elements.find((e) => e.symbol === "plant-view" && e.params.plant === item.id);
+      if (el) return el;
+    }
+    throw new Error(tag);
+  };
+  const c = compile(p);
+  const fa = plantView("FA");
+  const fr = find(7, "FIRE ALARM RELAY");
+  const healthy = find(7, "CONTROL CIRCUIT HEALTHY");
+  const en1 = find(8, "SF-01 ENABLE");
+  const en2 = find(8, "SF-02 ENABLE");
+  const k1 = find(3, "SF-01 CONTACTOR");
+  const k2 = find(4, "SF-02 CONTACTOR");
+  const rr2 = find(8, "SF-02 RUNNING");
+  const run2 = find(4, "SF-02 RUNNING");
+  const ff = find(8, "FANS FAIL");
+  const trip2 = find(8, "SF-02 TRIPPED");
+  const duty = find(8, "DUTY SELECTOR");
+  const reset = find(8, "FANS TRIP RESET");
+
+  test("healthy at rest: control circuit lamp on, no fans", () => {
+    const s = initialState(c);
+    expect(s.lamps[healthy.id]).toBe(true);
+    expect(s.energised[fr.id]).toBeFalsy();
+    expect(s.energised[k1.id] || s.energised[k2.id]).toBeFalsy();
+  });
+
+  test("fire alarm starts the duty fan through its starter sheet, and the running relay comes back", () => {
+    let s = toggle(c, initialState(c), fa.id);
+    expect(s.energised[fr.id]).toBe(true);
+    // Duty selector in position 1 (11–12): SF-02 is duty as drawn.
+    expect(s.energised[en2.id]).toBe(true);
+    expect(s.energised[en1.id]).toBe(false);
+    expect(s.energised[k2.id]).toBe(true);
+    expect(s.lamps[run2.id]).toBe(true);
+    expect(s.energised[rr2.id]).toBe(true);
+    // Turn the duty selector: SF-01 takes over.
+    s = toggle(c, s, duty.id);
+    expect(s.energised[k1.id]).toBe(true);
+    expect(s.energised[k2.id]).toBe(false);
+  });
+
+  test("proven airflow stops the fail timer; unproven trips the fans after 10 s", () => {
+    let s = toggle(c, initialState(c), fa.id);
+    const proven = toggle(c, s, plantView("DPS-SF-02").id);
+    expect(advance(c, proven, 30).energised[ff.id]).toBe(false);
+    s = advance(c, s, 9);
+    expect(s.energised[ff.id]).toBe(false);
+    expect(s.lamps[trip2.id]).toBe(false);
+    s = advance(c, s, 1);
+    // Fans-fail latches and drops the enables…
+    expect(s.energised[ff.id]).toBe(true);
+    expect(s.energised[en2.id]).toBe(false);
+    expect(s.energised[k2.id]).toBe(false);
+    // …which resets the timer, so the TRIPPED lamp goes straight out again:
+    // the operator never sees which fan failed. One of the original's suspected bugs.
+    expect(s.lamps[trip2.id]).toBe(false);
+    // The latch holds until FANS TRIP RESET.
+    s = advance(c, s, 60);
+    expect(s.energised[ff.id]).toBe(true);
+    s = press(c, s, reset.id);
+    // Reset with the alarm still on: the duty fan restarts (and will trip again unproven).
+    expect(s.energised[ff.id]).toBe(false);
+    expect(s.energised[k2.id]).toBe(true);
+  });
+
+  test("rule search: the two supply fans are never enabled together", () => {
+    const r = search(c, initialState(c), [{ id: "duty", kind: "never-both", a: k1.id, b: k2.id }]);
+    // Every sequence tried (only the inputs that can affect these contactors are searched).
+    expect(r.truncated).toBe(false);
+    expect(r.violations).toEqual([]);
+    expect(r.faults).toEqual([]);
+  });
+});

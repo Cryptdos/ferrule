@@ -45,6 +45,8 @@ An open editor tab follows changes Claude makes: it reloads the project and says
 | `add_section` | Labelled section boxes |
 | `save_template`, `apply_template` | Templates and stamping for other plant |
 | `renumber`, `check`, `schedules` | Tags and wire numbers, rule checks, terminal/cable schedules |
+| `simulate` | Run the relay logic through a sequence of actions; reports coils energised and lamps lit after each |
+| `check_logic` | Search for any sequence that breaks a rule (e.g. two contactors on together), or shorts the supply |
 | `export_pdf` | Saves the A4 PDF into an `exports` folder beside `projects` |
 
 Coordinates are grid units: x 0–200 across (2 per column), y 0–112 down. Sheets are referred to by number, elements and wires by id.

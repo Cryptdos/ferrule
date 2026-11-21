@@ -146,6 +146,17 @@ export interface Project {
   conductors: Conductor[];
   revisions: Revision[];
   templates: Template[];
+  /** Logic rules the simulator checks, e.g. two contactors never on together (DESIGN.md §10). */
+  rules: LogicRule[];
+}
+
+export interface LogicRule {
+  id: string;
+  /** "never-both": a and b are never energised/lit together. "never": a never is. */
+  kind: "never-both" | "never";
+  a: string;
+  b?: string;
+  note?: string;
 }
 
 export function emptyInfo(title = "Untitled project"): ProjectInfo {
@@ -190,5 +201,6 @@ export function newProject(id: string, title = "Untitled project"): Project {
     conductors: [],
     revisions: [{ rev: "A", date: "", drawnBy: "", description: "First issue", clouds: [] }],
     templates: [],
+    rules: [],
   };
 }

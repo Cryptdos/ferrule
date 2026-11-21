@@ -666,3 +666,19 @@ export function cloudsOn(project: Project, pageId: string): { id: string; rect: 
   const rev = project.revisions[project.revisions.length - 1];
   return rev ? rev.clouds.filter((c) => c.pageId === pageId).map((c) => ({ id: c.id, rect: c.rect, rev: rev.rev })) : [];
 }
+
+// ---------------------------------------------------------------------------
+// Logic rules (simulation)
+
+export function addRule(project: Project, kind: "never-both" | "never", a: string, b?: string, note = ""): string {
+  const exists = (id: string) => project.pages.some((pg) => pg.elements.some((e) => e.id === id));
+  if (!exists(a) || (kind === "never-both" && (!b || !exists(b)))) throw new OpError("Pick the coils or lamps the rule is about");
+  if (kind === "never-both" && a === b) throw new OpError("Pick two different items");
+  const id = newId("r");
+  project.rules.push({ id, kind, a, ...(kind === "never-both" ? { b } : {}), ...(note ? { note } : {}) });
+  return id;
+}
+
+export function deleteRule(project: Project, id: string): void {
+  project.rules = project.rules.filter((r) => r.id !== id);
+}

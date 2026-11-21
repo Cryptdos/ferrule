@@ -19,6 +19,7 @@
     routes,
     sectionRects = null,
     boundary,
+    live = null,
     under,
     over,
   }: {
@@ -33,6 +34,8 @@
     sectionRects?: Map<string, [number, number, number, number]> | null;
     /** Temporary boundary height while dragging. */
     boundary?: number | null;
+    /** Simulation: conductors connected to the supply. */
+    live?: Set<string> | null;
     /** Extra drawing in grid units, under the elements (selection boxes). */
     under?: Snippet;
     /** Extra drawing in grid units, over the elements (ghosts, handles). */
@@ -83,7 +86,7 @@
   <g class="wires">
     {#each page.segments as seg (seg.id)}
       {@const pts = routes?.get(seg.id) ?? routeOf(page, seg)}
-      <polyline class:field={field.has(seg.id)} points={pts.map((p) => p.join(",")).join(" ")} />
+      <polyline class:field={field.has(seg.id)} class:live={!!live?.has(seg.conductor)} points={pts.map((p) => p.join(",")).join(" ")} />
       {@const num = numbers.get(seg.conductor)}
       {@const spot = num ? wireLabelSpot(pts) : null}
       {#if num && spot}
@@ -125,6 +128,10 @@
     stroke-width: 0.18;
     stroke-linejoin: miter;
     stroke-linecap: square;
+  }
+  .wires polyline.live {
+    stroke: #d42020;
+    stroke-width: 0.35;
   }
   .wires polyline.field {
     stroke-dasharray: 0.9 0.5;

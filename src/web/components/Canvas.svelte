@@ -31,10 +31,11 @@
   import type { Editor } from "../editor.svelte";
   import { getAvoid } from "../avoid";
   import { isTyping } from "../typing";
+  import type { Simulator } from "../sim.svelte";
   import Sheet from "./Sheet.svelte";
   import ElementView from "./ElementView.svelte";
 
-  let { editor }: { editor: Editor } = $props();
+  let { editor, sim = null }: { editor: Editor; sim?: Simulator | null } = $props();
 
   let svg: SVGSVGElement | undefined = $state();
   let box = $state({ w: 1200, h: 800 });
@@ -200,6 +201,14 @@
     }
     if (e.button !== 0) return;
     const pt = toUnits(e);
+
+    if (sim) {
+      // Simulate: clicking an input operates it; nothing is edited.
+      const hit = hitElement(pt);
+      if (hit && sim.isInput(hit.id)) sim.operate(hit.id);
+      else gesture = { kind: "pan", client: [e.clientX, e.clientY], start: { x: view.x, y: view.y } };
+      return;
+    }
 
     if (editor.tool === "place" && editor.placeSymbol) {
       const symbol = editor.placeSymbol;
@@ -439,6 +448,11 @@
     return g?.kind === "band" ? g : null;
   });
 
+  const simLive = $derived(sim ? new Set(sim.state.live) : null);
+  function lampColour(c: unknown): string {
+    return { A: "#ffb52e", G: "#3cc85a", R: "#ff4a4a", W: "#e8e8e8", B: "#4a8cff", Y: "#ffe04a" }[String(c)] ?? "#ffe04a";
+  }
+
   const cursorClass = $derived(
     gesture?.kind === "pan" || spaceDown
       ? "grab"
@@ -482,8 +496,45 @@
     </pattern>
   </defs>
   <rect class="desk" x={view.x - 1000} y={view.y - 1000} width={view.w + 2000} height={viewH + 2000} />
-  <Sheet project={editor.project} {page} grid {offset} routes={previewRoutes} {sectionRects} boundary={boundaryPreview}>
+  <Sheet
+    project={editor.project}
+    {page}
+    grid={!sim}
+    {offset}
+    routes={previewRoutes}
+    {sectionRects}
+    boundary={boundaryPreview}
+    live={simLive}
+  >
     {#snippet under()}
+      {#if sim}
+        {#each page.elements as el (el.id)}
+          {@const g = geoms.get(el.id)}
+          {#if g}
+            {@const lit = !!sim.state.energised[el.id] || !!sim.state.lamps[el.id]}
+            {#if lit}
+              <rect
+                class="sim-on"
+                style:fill={el.symbol === "lamp" ? lampColour(el.params.colour) : undefined}
+                x={el.pos[0] + g.body.x - 0.5}
+                y={el.pos[1] + g.body.y - 0.5}
+                width={g.body.w + 1}
+                height={g.body.h + 1}
+              />
+            {/if}
+            {#if sim.isInput(el.id)}
+              <rect
+                class="sim-input"
+                class:active={sim.value(el.id) === 1}
+                x={el.pos[0] + g.bbox.x - 0.4}
+                y={el.pos[1] + g.bbox.y - 0.4}
+                width={g.bbox.w + 0.8}
+                height={g.bbox.h + 0.8}
+              />
+            {/if}
+          {/if}
+        {/each}
+      {/if}
       {#each page.elements as el (el.id)}
         {#if selected.has(el.id)}
           {@const g = geoms.get(el.id)}
@@ -585,6 +636,21 @@
     stroke: #1a8f3a;
     stroke-width: 0.15;
     stroke-dasharray: 0.8 0.4;
+  }
+  .sim-on {
+    fill: rgba(60, 200, 90, 0.55);
+    stroke: none;
+  }
+  .sim-input {
+    fill: none;
+    stroke: #e67e1e;
+    stroke-width: 0.15;
+    stroke-dasharray: 0.5 0.3;
+    cursor: pointer;
+  }
+  .sim-input.active {
+    fill: rgba(230, 126, 30, 0.12);
+    stroke-dasharray: none;
   }
   .handle {
     fill: #fff;

@@ -15,6 +15,8 @@
   import TableView from "./TableView.svelte";
   import SplitPane from "./SplitPane.svelte";
   import TemplatesDialog from "./TemplatesDialog.svelte";
+  import SimPanel from "./SimPanel.svelte";
+  import { Simulator } from "../sim.svelte";
 
   let { editor, onclose }: { editor: Editor; onclose: () => void } = $props();
 
@@ -22,6 +24,22 @@
   let showProject = $state(false);
   let dialog: "plant" | "checks" | "schedules" | "templates" | null = $state(null);
   let tableView = $state(false);
+  let sim: Simulator | null = $state(null);
+
+  function setMode(mode: "draft" | "simulate") {
+    if (mode === editor.mode) return;
+    sim?.stop();
+    sim = null;
+    editor.mode = mode;
+    if (mode === "simulate") {
+      tableView = false;
+      editor.tool = "select";
+      editor.placeSymbol = null;
+      editor.selection = [];
+      sim = new Simulator($state.snapshot(editor.project) as typeof editor.project);
+    }
+  }
+  $effect(() => () => sim?.stop());
 
   function toggleSplit() {
     if (editor.splitPageId) {
@@ -75,7 +93,7 @@
 
 
   function onKey(e: KeyboardEvent) {
-    if (isTyping(e.target) || showProject || dialog || tableView) return;
+    if (isTyping(e.target) || showProject || dialog || tableView || editor.mode === "simulate") return;
     const ctrl = e.ctrlKey || e.metaKey;
     const ids = editor.selectedElements.map((el) => el.id);
     const segIds = editor.selectedSegments.map((s) => s.id);
@@ -162,6 +180,15 @@
   <header>
     <button class="link" onclick={onclose} title="Back to projects">◂ Projects</button>
     <strong class="title">{editor.project.project.title}</strong>
+    <div class="workbench" role="group" aria-label="Workbench">
+      <button class:active={editor.mode === "draft"} onclick={() => setMode("draft")}>Draft</button>
+      <button class:active={editor.mode === "simulate"} onclick={() => setMode("simulate")} title="Try the logic as drawn">Simulate</button>
+    </div>
+    {#if editor.mode === "simulate"}
+      <span class="simnote">Simulating: click switches and buttons on the drawing. Editing is off.</span>
+      <button onclick={() => canvas?.fit()} title="Fit sheet (F)">Fit</button>
+      <button class:active={!!editor.splitPageId} onclick={toggleSplit}>Split</button>
+    {:else}
     <div class="tools">
       <button class:active={editor.tool === "select"} onclick={() => ((editor.tool = "select"), (editor.placeSymbol = null))}>
         Select
@@ -194,17 +221,18 @@
       </button>
       <button onclick={print} title="Open the print view and print from the browser">Print</button>
     </div>
+    {/if}
     <span class="status" class:error={editor.saveState === "error"}>{saveText}</span>
   </header>
   <aside class="left">
     <PageList {editor} />
-    <Palette {editor} />
+    {#if editor.mode === "draft"}<Palette {editor} />{/if}
   </aside>
   <main class:split={!!editor.splitPageId && !tableView}>
     {#if tableView}
       <TableView {editor} onclose={() => (tableView = false)} />
     {:else}
-      <div class="pane"><Canvas bind:this={canvas} {editor} /></div>
+      <div class="pane"><Canvas bind:this={canvas} {editor} {sim} /></div>
       {#if editor.splitPageId}
         <div class="pane"><SplitPane {editor} /></div>
       {/if}
@@ -212,8 +240,12 @@
     {#if editor.message}<div class="toast">{editor.message}</div>{/if}
   </main>
   <aside class="right">
-    <ElementList {editor} />
-    <div class="props-scroll"><Props {editor} /></div>
+    {#if sim}
+      <div class="props-scroll"><SimPanel {editor} {sim} /></div>
+    {:else}
+      <ElementList {editor} />
+      <div class="props-scroll"><Props {editor} /></div>
+    {/if}
   </aside>
 </div>
 {#if dialog === "plant"}
@@ -253,6 +285,23 @@
     overflow: hidden;
     text-overflow: ellipsis;
     max-width: 260px;
+  }
+  .workbench {
+    display: flex;
+  }
+  .workbench button {
+    border-radius: 0;
+  }
+  .workbench button:first-child {
+    border-radius: 4px 0 0 4px;
+  }
+  .workbench button:last-child {
+    border-radius: 0 4px 4px 0;
+    margin-left: -1px;
+  }
+  .simnote {
+    font-size: 12px;
+    color: #a55a00;
   }
   .tools {
     display: flex;

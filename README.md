@@ -6,7 +6,7 @@ A lightweight, browser-based tool for drafting control panel schematics: symbols
 - [Benchmark: LSP-01 life safety panel](docs/benchmark-lsp01.md)
 - [MCP server: letting Claude draft drawings](docs/mcp.md)
 
-Status: milestones 1–9 (skeleton, wires, pages + title block + PDF, numbering + cross-references, plant + boundary + sections, element list + table view, templates + revisions, MCP server, LSP-01 benchmark).
+Status: milestones 1–10 built (skeleton, wires, pages + title block + PDF, numbering + cross-references, plant + boundary + sections, element list + table view, templates + revisions, MCP server, LSP-01 benchmark, simulation workbench).
 
 ## Running it
 
@@ -80,5 +80,6 @@ To see what a finished set looks like, choose *add the LSP-01 example* on the pr
 - **Templates…:** save the current sheet, or a selected section box and what's in it, as a template. *Stamp…* makes a copy for other plant (pick existing plant or type a new tag) with fresh tags; sheets go in as a new sheet, sections where you click. *To library* saves a copy in the `library` folder beside `projects` for use in other projects.
 - **Cloud:** drag round a change to cloud it for the latest revision (add revisions under Project…). Only the latest revision's clouds are drawn. Remove them from the sheet panel.
 - **Text**, **Box** and **Label plate** (Drawing group) for cover sheets, general arrangements and door labels. Text can hold fields: `{project:title}`, `{project:drawingNo}`, `{sheets}`, `{rev}` and plant fields.
+- **Simulate** (top left, beside Draft): the same sheets, live. Click switches, push buttons, selectors, isolators and field plant (e.g. a DPS or fire alarm contact) to operate them; coils pull in, contacts follow, lamps light, live wires show red and timers run on the clock. The panel lists every input, coil and lamp. Under *Rules*, add "never both on" rules (e.g. two contactors of an ATS) and **Check logic**: Ferrule tries every sequence of operations and reports the shortest one that breaks a rule, shorts the supply or makes relays chatter, with *Replay*. Supply is any rail named CCT…, return the 0V rail.
 - **Project…** sets the title block fields (project, panel, job no., drawing ref., drawn/checked) and the revision table.
 - **Export PDF** downloads every sheet as one A4 landscape PDF. **Print** opens the same sheets in a browser tab and prints them, if PDF export isn't available.

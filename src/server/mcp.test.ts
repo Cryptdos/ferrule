@@ -133,3 +133,31 @@ describe("MCP over HTTP", () => {
     expect(put.status).toBe(409);
   });
 });
+
+describe("MCP simulation", () => {
+  test("simulate and check_logic", async () => {
+    const project = (await call("create_project", { title: "Sim Panel" })).data.id;
+    const add = async (symbol: string, x: number, y: number, params = {}) =>
+      (await call("add_element", { project, sheet: 1, symbol, x, y, params })).data;
+    const cct = await add("rail", 0, 10, { name: "CCT", length: 190 });
+    const ov = await add("rail", 0, 80, { name: "0V", length: 190 });
+    const s1 = await add("selector", 20, 30);
+    const s2 = await add("selector", 60, 30);
+    const q1 = await add("coil", 20, 70, { type: "contactor" });
+    const q2 = await add("coil", 60, 70, { type: "contactor" });
+    const c = (f: [string, string], t: [string, string]) =>
+      call("connect", { project, sheet: 1, from: { element: f[0], terminal: f[1] }, to: { element: t[0], terminal: t[1] } });
+    await c([cct.id, "20"], [s1.id, "13"]);
+    await c([s1.id, "14"], [q1.id, "A1"]);
+    await c([q1.id, "A2"], [ov.id, "20"]);
+    await c([cct.id, "60"], [s2.id, "13"]);
+    await c([s2.id, "14"], [q2.id, "A1"]);
+    await c([q2.id, "A2"], [ov.id, "60"]);
+    await call("renumber", { project });
+    const run = (await call("simulate", { project, actions: [{ toggle: s1.id }] })).data;
+    expect(run.steps[1].energised).toEqual(["Q1-11"]);
+    const check = (await call("check_logic", { project, neverBoth: [[q1.id, q2.id]] })).data;
+    expect(check.complete).toBe(true);
+    expect(check.broken[0].after).toHaveLength(2);
+  });
+});
