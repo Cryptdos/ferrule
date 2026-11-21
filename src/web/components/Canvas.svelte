@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import {
     AREA_MM,
     AREA_UNITS,
@@ -408,6 +409,11 @@
     if (sim) {
       // Simulate: clicking an input operates it; nothing is edited. A push
       // button is held for as long as the mouse is down (Shift+click latches it).
+      // Nothing is selected here, so any click ends a jump's ring.
+      if (editor.highlight) {
+        editor.highlight = null;
+        editor.selection = [];
+      }
       const hit = hitElement(pt);
       const input = hit ? simInputAt(hit, pt) : null;
       if (input && sim.isPress(input) && !e.shiftKey) {
@@ -783,21 +789,26 @@
     if (target) editor.goTo(target);
   }
 
-  // Bring an element we've jumped to into view, at the current zoom.
+  // Bring an element we've jumped to into view, at the current zoom. Only a
+  // new jump (focusRequest) or the sheet appearing runs this: reading the view
+  // here would pull you back to the element every time you zoom or pan.
   $effect(() => {
     void editor.focusRequest;
-    const id = editor.highlight;
-    if (!id || !svg) return;
-    const el = page.elements.find((x) => x.id === id);
-    if (!el) return;
-    const cx = AREA_MM.x + el.pos[0] * UNIT_MM;
-    const cy = AREA_MM.y + el.pos[1] * UNIT_MM;
-    const v = $state.snapshot(view);
-    const h = v.w * (box.h / Math.max(1, box.w));
-    const margin = v.w * 0.1;
-    if (cx < v.x + margin || cx > v.x + v.w - margin || cy < v.y + margin || cy > v.y + h - margin) {
-      view = { ...v, x: cx - v.w / 2, y: cy - h / 2 };
-    }
+    void page.id;
+    untrack(() => {
+      const id = editor.highlight;
+      if (!id || !svg) return;
+      const el = page.elements.find((x) => x.id === id);
+      if (!el) return;
+      const cx = AREA_MM.x + el.pos[0] * UNIT_MM;
+      const cy = AREA_MM.y + el.pos[1] * UNIT_MM;
+      const v = $state.snapshot(view);
+      const h = v.w * (box.h / Math.max(1, box.w));
+      const margin = v.w * 0.1;
+      if (cx < v.x + margin || cx > v.x + v.w - margin || cy < v.y + margin || cy > v.y + h - margin) {
+        view = { ...v, x: cx - v.w / 2, y: cy - h / 2 };
+      }
+    });
   });
 
   // The highlight lasts until the selection moves on.
