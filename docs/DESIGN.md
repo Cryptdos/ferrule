@@ -121,7 +121,8 @@ Decisions:
 - **A4 landscape** is the primary target. Technicians on site work from these prints, and A3 is cumbersome in the field. A3 can come later as an option.
 - **100 columns** across the drawing area. Column numbers are printed below the drawing frame every 10 columns (10, 20 … 90), with tick marks on the frame every 5 columns.
 - **No rows.** The left and right edges of the frame carry evenly spaced, unlabelled tick marks, so you can judge where you are vertically on a printout.
-- The panel boundary is a dashed line across the lower part of the drawing area, with terminals sitting on it.
+- The panel boundary is a thin dash-dot line across the lower part of the drawing area, with terminals sitting on it.
+- The drawing area is 200 × 120 grid units; the title block is kept to three 7 mm rows so the drawing gets the room.
 
 ### Title block (v1)
 
@@ -148,12 +149,12 @@ Draft list:
 4. Push button, NO
 5. Push button, NC
 6. Selector / keyswitch (2 and 3 position)
-7. Multi-pole switch / isolator (with auxiliary poles)
+7. Multi-pole switch: isolator (hand operated), contactor main contacts (coil operated) or circuit breaker, with NO and NC auxiliary poles numbered 13/14, 21/22…
 8. Fuse
 9. Relay / contactor coil
-10. Timer coil (delay on, delay off)
+10. Timer coil: on-delay, off-delay, on- and off-delay, interval, cyclic ON-first and OFF-first, with the maker's function code (e.g. Selec 600XU "C") printed beside it
 11. Timer contact
-12. Lamp (with colour letter)
+12. Indicator lamp: V+ / V- terminals (they're often 24 V DC), optional lamp-test terminal T beside V+, two-letter IEC 60757 colour code written Rd, Ye, Am, Gn, Bu, Wh, Cl
 13. Terminal
 14. Socket outlet
 15. Transformer
@@ -161,7 +162,10 @@ Draft list:
 17. Distribution block / busbar
 18. Earth
 19. Plant view (box with break line, see §6)
-20. Off-page / continuation arrow
+20. Off-page / continuation arrow: open arrow pointing away for "going to", filled arrow pointing in for "coming from". Pairing two arrows makes one of each.
+21. Cable screen: an ellipse across the cores with the drain taken to a terminal
+
+Multi-terminal symbols keep the switch pole pitch (3 units) between terminals, so a transformer or motor wires straight down from the MCB or contactor above it.
 
 Symbols are defined in code or simple SVG + terminal positions, not in a symbol editor.
 
@@ -174,6 +178,7 @@ Each time it's placed on a page you place a **view** of it:
 - Each terminal has a checkbox. Only the ticked terminals are shown.
 - If any terminals are hidden, a squiggly break line is drawn automatically to show there's more.
 - Typical use: 230 V power terminals on one page, digital controls on another, network on a third.
+- The box is as wide as its shown terminals need. Terminals can be grouped by function (written `L N E | ENABLE: 1 2 | 0-10V: 3 4`); each group's name is printed in bold inside the box under its terminals. The tag, description and any information lines (model, rating) are printed left-aligned under the box.
 
 Checks:
 
@@ -293,6 +298,19 @@ Reference drawings from other companies are proprietary. They are never committe
 | Designation default | IEC 81346-2:2019, single-letter prefixes |
 | Collisions | Topmost keeps plain address; then A, B, C… down the column |
 | CI | GitHub Actions: install, type-check, test on every push and PR |
+| Routing results | Routed in the browser (libavoid wasm) and stored in the project as points, so printing, PDF and MCP draw stored routes and don't need the router |
+| PDF engine | Headless Edge/Chrome `--print-to-pdf` of the print view, not Playwright: Edge is on every Windows PC, so the portable .exe needs nothing installed. Browser *Print* as fallback |
+| Font | osifont (ISO 3098 lettering), LGPL-3 + font exception variant, bundled. The only font on drawings, screen and PDF; single weight, no bold |
+| Grid unit | 1 unit = 1.385 mm on A4 (2 units per column); symbols and terminals snap to whole units |
+| MCP transport | Streamable HTTP at /mcp (JSON replies, no SSE stream needed) plus `--mcp` stdio, which relays to a running Ferrule or starts one, so editor and Claude share one server |
+| Concurrent edits | Project files carry a version (file mtime). Saves send If-Match and are refused if someone else saved since; open editors get change events (file watch → SSE) and reload |
+| Simulation | Conductors are nodes; contacts, buttons, selectors, isolators and field plant views are switched links; coils and lamps are loads between a CCT… rail and the 0V rail. Settle until stable; on/off-delay timers on a simulation clock. Plant views act as volt-free field contacts |
+| Logic rules | Breadth-first search over operator actions (operate, press, wait for timers) for the shortest sequence that breaks a rule; also reports shorts and chatter. Only inputs that can influence the rule's coils are searched; isolators and breakers stay closed unless asked |
+| Wires to rails | Rail taps slide to sit directly above/below the other end, so rung wires stay straight when symbols move |
+| Review 1 (2026-11-21) | Palette lists parts by name with a small icon and a search box. Coil contact tables sit to the right of the coil and can be dragged; double-click jumps contact ↔ coil and arrow ↔ arrow, and the part you land on is ringed until you select something else. Section boxes resize from any edge. Text boxes commit when you click away. Wires carry a core colour (printed at the source end, the number just after it) and a function (printed at each terminal end). Colour codes are written with a capital first letter: Bu, Rd, GnYe. Smaller symbol text (tag ≈ 1.9 mm). Format version 2: lamp terminals L/N become V+/V-, colour letters become IEC codes, on load |
+| Review 2 (2026-11-21) | **Workbenches** are strict: Draft (electro-mechanical only), Annotate (text, boxes, plates, pictures, sections, clouds), GA, Simulate; each shows and selects only its own things. **Files:** one `.ferrule` JSON file anywhere, pictures embedded as data URLs (≤2400 px), recent list for files outside `projects`; delete moves to `projects/Deleted`. **Plant tags** follow the position scheme: prefix + sheet-column of the first view (`SEF-3-13`, default `U`); layout as the LIFT 2 example (terminal boxes along the top, group names in capitals over them), optional *power by others* break; duplicate terminal names allowed in different groups. **Link arrows**: one source, partner is the destination; 1-to-1 only (a 1-to-many fan-out is better drawn as a rail with the same name). **Rails/busbars with the same name** are one conductor across sheets. **Field wires** dashed, numbers hidden by default; a wire keeps its number through a terminal. **Renumber** previews a table of changes before applying. **Timers** use IEC 61131-3 names (TON, TOF, TP; flashers have no IEC name). Amber lamps migrate to yellow. **Simulation**: Incoming supply part (3ph+N/3ph/1ph+N/DC) with separate phases, transformers supply their secondary when energised, legacy CCT/0V rails if no supply part; plant groups are inputs (C/NO/NC move together) or outputs and may follow a coil with delay/invert; symbols draw their operated state. **GA**: separate sheets at a true scale (1:5…1:20 to fit A4), items stored in mm, devices linked to schematic parts by id (each part on one GA at most), generic sizes per kind editable per project. **Routing**: 1-unit stub out of every terminal, tag and note text are obstacles, rail taps slide only when the far end faces the rail |
+| Review 3 (2026-11-21) | **Layout:** two-row top bar (file and workbenches, then the workbench's tools); common actions are icons. The drawing fills the window, with floating see-through panels: the browser (sheets folding open to their items, then parts), a draggable properties box that remembers its place (shown only when something is picked), and a sheet overview with a draggable view outline. Fit centres the sheet in the part the browser doesn't cover. **Spare sheets**: annotations only, enforced in the model (adding a drafting part to one is refused). **Annotations** (notes, revision list, legend) are drawn from data: `draw(el, t)` gets project-derived content through `GeometryText`, so canvas, print and PDF draw them alike. Text is measured with osifont's own advance widths (generated table) for wrapping and fitting. Annotations are never routing obstacles. **GA labels**: centred, along the longer side, shrunk to fit down to 0.75 units (≈1 mm), then knocked out of the lines instead. **Device table**: shared library at `library/devices/devices.json` with each device's files in its own folder; projects copy the entries they use (`devices`), GA items reference one (`device`) and keep hand-set sizes; `useDeviceLibrary: false` per project |
+| Panel boundary as a terminal block (2026-11-21) | Replaces the dashed line, after the Cromptons style: a block 3 units tall (≈4.2 mm) centred on the boundary, inset 2 units from each side. Upright terminals exactly on it are drawn as cells (`params.onBlock`, kept up to date by `updateZones` and on load) with connection points at ±1.5. The number goes up the cell at 1.05 units (≈1.5 mm), centred, shrunk only if it won't fit (3-13A). Strip names sit in the block at the left end and where the strip changes, so cells carry just the sheet-column number; schedules write `X1:3-13`. Moving the boundary moves its terminals; terminals dropped within 1 unit snap in. Terminals get a type: plain, fused (IEC fuse above the cell), disconnect (open knife above it) or switched fuse (knife with the fuse on the blade), moving the panel-side connection 2 units further up; wires whose ends no longer meet are re-routed when the project is opened, edited or printed (`routesStale`). GA strips size each terminal by its type |
 
 ## 16. Open questions
 

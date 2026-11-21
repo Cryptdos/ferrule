@@ -1,0 +1,62 @@
+/* osifont (ISO 3098 lettering), LGPL-3 with font exception: see fonts/README.md.
+   The one font used on drawings, on screen and in the PDF. */
+@font-face {
+  font-family: "osifont";
+  src: url("./fonts/osifont-lgpl3fe.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: block;
+}
+:root {
+  --drawing-font: "osifont", Arial, sans-serif;
+}
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  height: 100%;
+  font-family: system-ui, "Segoe UI", Arial, sans-serif;
+  font-size: 14px;
+  color: #1c1f24;
+  background: #fff;
+}
+button {
+  font: inherit;
+  font-size: 13px;
+  padding: 4px 10px;
+  border: 1px solid #b9c0c6;
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+}
+button:hover:not(:disabled) {
+  border-color: #778;
+}
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+button.active {
+  background: #e8f0fd;
+  border-color: #1e6ee6;
+}
+button.danger {
+  color: #a00;
+}
+button.link {
+  border: none;
+  background: none;
+  padding: 4px 6px;
+  color: #1e5cc0;
+}
+input,
+select {
+  font: inherit;
+  font-size: 13px;
+  padding: 4px 6px;
+  border: 1px solid #b9c0c6;
+  border-radius: 4px;
+  background: #fff;
+}
