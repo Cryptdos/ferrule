@@ -21,6 +21,17 @@
   }
   void refresh();
 
+  async function example() {
+    try {
+      const res = await fetch("/api/examples/lsp-01", { method: "POST" });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error ?? res.statusText);
+      onopen(body.id);
+    } catch (err) {
+      error = (err as Error).message;
+    }
+  }
+
   async function create(e: SubmitEvent) {
     e.preventDefault();
     try {
@@ -38,6 +49,10 @@
     <input bind:value={title} placeholder="New project title" />
     <button type="submit">Create project</button>
   </form>
+  <p class="example">
+    Or <button class="link" onclick={example}>add the LSP-01 example</button>: a 12-sheet life safety panel drawn
+    entirely with Ferrule's own tools.
+  </p>
   {#if error}<p class="error">{error}</p>{/if}
   {#if loading}
     <p>Loading…</p>
@@ -93,6 +108,11 @@
   .open span {
     font-size: 12px;
     color: #667;
+  }
+  .example {
+    font-size: 13px;
+    color: #556;
+    margin: -8px 0 18px;
   }
   .error {
     color: #b00;

@@ -18,6 +18,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { McpServer, serveStdio } from "./mcp";
 import { loadServerAvoid } from "./avoid";
 import { slugify } from "./storage";
+import { buildLsp01 } from "../bench/lsp01";
 
 export const VERSION = "0.1.0";
 
@@ -123,7 +124,8 @@ export async function start(opts: StartOptions = {}): Promise<void> {
     },
     VERSION,
   );
-  const app = createApp({ storage, library, assets, version: VERSION, pdf, selfUrl, mcp });
+  const examples = { "lsp-01": async () => buildLsp01(await loadServerAvoid()).project };
+  const app = createApp({ storage, library, assets, version: VERSION, pdf, selfUrl, mcp, examples });
   for (let port = args.port; port < args.port + 20 && !server; port++) {
     try {
       server = Bun.serve({ port, hostname: args.host, fetch: app.fetch, idleTimeout: 120 });

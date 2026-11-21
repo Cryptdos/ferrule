@@ -109,3 +109,16 @@ describe("template library", () => {
     expect((await a.request("/api/library/nope")).status).toBe(404);
   });
 });
+
+describe("examples", () => {
+  test("adds a copy of an example project", async () => {
+    const { buildLsp01 } = await import("../bench/lsp01");
+    const a = createApp({ storage: new Storage(dir), examples: { "lsp-01": async () => buildLsp01(null).project } });
+    const res = await a.request("/api/examples/lsp-01", { method: "POST" });
+    expect(res.status).toBe(201);
+    const { id } = await res.json();
+    const p = await (await a.request(`/api/projects/${id}`)).json();
+    expect(p.pages).toHaveLength(12);
+    expect((await a.request("/api/examples/nope", { method: "POST" })).status).toBe(404);
+  });
+});

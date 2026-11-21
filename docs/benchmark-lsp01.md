@@ -79,3 +79,30 @@ Each fan has a local isolator in the field.
 4. Sheets 3–6 come from one section template, and sheets 8–9 from one controls template.
 5. The simulator runs the duty/standby, airflow-proving, timer trip and fans-fail latch logic as drawn, and exposes any faults in it. Finding real bugs in the original counts as a pass for the simulator, not a failure of the drawing test.
 6. The set exports to a clean A4 PDF with the title block filled from project data.
+
+## Status (milestone 9)
+
+The set is rebuilt in [`src/bench/lsp01.ts`](../src/bench/lsp01.ts), using only Ferrule's core operations (the same ones behind the editor and the MCP tools). Open it in Ferrule from the project picker (*add the LSP-01 example*), or write it to a file with `bun scripts/build-lsp01.ts projects/lsp-01.ferrule.json`.
+
+It was built from this sanitised description alone. The original drawings stayed out of the session, so layout matches the description rather than the original sheets.
+
+| Criterion | Result |
+|---|---|
+| 1. All 12 sheets, same layout and readability | 12 sheets in the original order, A4. Readability judged on the exported PDF. Needs a side-by-side look against the original. |
+| 2. Every tag, wire number, terminal number and cross-reference generated | Yes. Nothing is typed; renumbering again changes nothing (tested). |
+| 3. Section titles, motor labels, door labels from plant tags | Yes. Every plant name on every sheet is a `{plant:…}` field (tested: no literal plant tags in any label, title or section). |
+| 4. Sheets 3–6 from one template, 8–9 from one | Yes ("Fan starter section", "Fans duty/standby controls"). Cross-sheet links (CCT/0V feeds, enable loops, run signals, the fire alarm relay's contacts) are made after stamping. |
+| 5. Simulator runs the logic | Milestone 10. |
+| 6. Clean A4 PDF, title block from project data | Yes, including revision B with a cloud on sheet 8. |
+
+`check` reports nothing: no errors and no warnings.
+
+### Assumptions to confirm against the original
+
+- **Keyswitches (sheets 8–9).** Enable path drawn as: CCT → (AUTO/TEST keyswitch in TEST, *or* fire alarm relay FR energised) → fans-fail relay NC → duty selector (changeover: position 1 → fan 1 enable relay, position 2 → fan 2).
+- **Fire alarm relay.** FR is taken to be energised when the fire alarm is active (its contact lights FIRE ALARM ACTIVATED), so in AUTO the fans run on alarm.
+- **Enable and run signals** between controls and starter sheets are drawn as paired off-page arrows rather than terminal pairs, because both ends are inside the panel.
+- **Tripped lamps** are lit by each fan's fail timer contact, as the description reads. Once the fans-fail latch drops the enable relays, the timers reset and the lamps go out, so this looks like one of the original's suspected bugs. The simulator in milestone 10 should show it.
+- **Lamp test.** The LAMP TEST button feeds an LT rail on sheet 7; per-lamp test links aren't drawn yet.
+- **Volt-free fire alarm monitoring** contacts (running relay NO per fan) are on sheets 8–9, to separate fire-alarm interface plant FA-SF / FA-EF.
+- **General arrangement (sheet 10)** shows the section widths given (1000 / 4×400 / 1000 mm) and door items. No heights were given, so it's not to scale.

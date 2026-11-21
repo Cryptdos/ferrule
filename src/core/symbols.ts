@@ -379,6 +379,16 @@ const SYMBOLS: SymbolDef[] = [
         ],
         default: "2",
       },
+      {
+        key: "contact",
+        label: "Contact",
+        type: "select",
+        options: [
+          { value: "no", label: "NO (13/14)" },
+          { value: "co", label: "Changeover (11/12/14)" },
+        ],
+        default: "no",
+      },
       { key: "key", label: "Key operated", type: "bool", default: false },
       { key: "legend", label: "Position legend", type: "text", default: "" },
     ],
@@ -387,6 +397,31 @@ const SYMBOLS: SymbolDef[] = [
       const key = bool(el, "key", false);
       const three = str(el, "positions", "2") === "3";
       const legend = str(el, "legend", "") || (three ? "I 0 II" : "0  I");
+      if (str(el, "contact", "no") === "co") {
+        // Changeover: common 11 at the bottom, 12 (left) and 14 (right) at the top.
+        const hx = -3.4;
+        return {
+          prims: [
+            line([0, -3], [0, -1.5]),
+            line([-2, -3], [-2, -1.5], [-0.9, -1.5]),
+            line([0, 1.5], [0, 3]),
+            line([0, 1.5], [-1.1, -1.7]),
+            dashed([-0.55, -0.1], [hx, -0.1]),
+            ...(key ? keyHead(hx) : turnHead(hx)).map((p) => (p.t === "line" ? { ...p, pts: p.pts.map(([x, y]) => [x, y - 0.1] as Vec) } : p)),
+            text(hx, -1.5, legend, TERM, "middle", "note"),
+            term(0.45, -2.2, "14"),
+            term(-2.45, -2.2, "12", "end"),
+            term(0.45, 2.9, "11"),
+            ...tagAndLabel(-4.6, el),
+          ],
+          terminals: [
+            { name: "12", at: [-2, -3], dir: "up" },
+            { name: "14", at: [0, -3], dir: "up" },
+            { name: "11", at: [0, 3], dir: "down" },
+          ],
+          body: { x: -3.9, y: -1.8, w: 4, h: 3.3 },
+        };
+      }
       return {
         prims: [
           ...noContact(),
@@ -464,25 +499,31 @@ const SYMBOLS: SymbolDef[] = [
   },
   {
     id: "fuse",
-    name: "Fuse",
+    name: "Fuse / fuse carrier",
     group: "Protection",
     palette: true,
-    params: [{ key: "rating", label: "Rating", type: "text", default: "" }],
+    params: [
+      { key: "poles", label: "Poles", type: "number", min: 1, max: 4, default: 1 },
+      { key: "rating", label: "Rating", type: "text", default: "" },
+    ],
     kind: () => "fuse",
     draw(el) {
       const rating = str(el, "rating", "");
-      return {
-        prims: [
-          line([0, -3], [0, 3]),
-          rect(-0.6, -1.6, 1.2, 3.2),
-          term(0.45, -2.2, "1"),
-          term(0.45, 2.9, "2"),
-          ...(rating ? [text(1, 0.45, rating, LABEL, "start", "note")] : []),
-          ...tagAndLabel(-1.2, el),
-        ],
-        terminals: vterms("1", "2"),
-        body: { x: -0.6, y: -1.6, w: 1.2, h: 3.2 },
-      };
+      const poles = num(el, "poles", 1, 1, 4);
+      const prims: Prim[] = [];
+      const terminals: TerminalDef[] = [];
+      for (let i = 0; i < poles; i++) {
+        const x = i * 3;
+        // One pole keeps the plain 1/2 marking; a carrier is 1/2, 3/4, 5/6…
+        const a = String(2 * i + 1);
+        const b = String(2 * i + 2);
+        prims.push(line([x, -3], [x, 3]), rect(x - 0.6, -1.6, 1.2, 3.2), term(x + 0.45, -2.2, a), term(x + 0.45, 2.9, b));
+        terminals.push({ name: a, at: [x, -3], dir: "up" }, { name: b, at: [x, 3], dir: "down" });
+      }
+      if (poles > 1) prims.push(dashed([0.6, 0], [(poles - 1) * 3 - 0.6, 0]));
+      if (rating) prims.push(text((poles - 1) * 3 + 1, 0.45, rating, LABEL, "start", "note"));
+      prims.push(...tagAndLabel(-1.2, el));
+      return { prims, terminals, body: { x: -0.6, y: -1.6, w: (poles - 1) * 3 + 1.2, h: 3.2 } };
     },
   },
   {
@@ -809,8 +850,16 @@ const SYMBOLS: SymbolDef[] = [
         prims: [
           line([0, -2], [0, 0]),
           { t: "poly", pts: [[-0.8, 0], [0.8, 0], [0, 1.3]], fill: false },
-          text(1.2, 1, "{xref}", LABEL, "start", "xref"),
-          ...(el.label ? [text(-1.2, 1, "{label}", LABEL, "end", "label")] : []),
+          // Whichever way the arrow points, the reference reads on its right and the label on its left.
+          ...(el.rot === 180
+            ? [
+                text(-1.2, -1, "{xref}", LABEL, "end", "xref"),
+                ...(el.label ? [text(1.2, -1, "{label}", LABEL, "start", "label")] : []),
+              ]
+            : [
+                text(1.2, 1, "{xref}", LABEL, "start", "xref"),
+                ...(el.label ? [text(-1.2, 1, "{label}", LABEL, "end", "label")] : []),
+              ]),
         ],
         terminals: [{ name: "1", at: [0, -2], dir: "up" }],
         body: { x: -0.8, y: 0, w: 1.6, h: 1.3 },

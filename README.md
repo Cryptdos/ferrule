@@ -6,7 +6,7 @@ A lightweight, browser-based tool for drafting control panel schematics: symbols
 - [Benchmark: LSP-01 life safety panel](docs/benchmark-lsp01.md)
 - [MCP server: letting Claude draft drawings](docs/mcp.md)
 
-Status: milestones 1–8 (skeleton, wires, pages + title block + PDF, numbering + cross-references, plant + boundary + sections, element list + table view, templates + revisions, MCP server).
+Status: milestones 1–9 (skeleton, wires, pages + title block + PDF, numbering + cross-references, plant + boundary + sections, element list + table view, templates + revisions, MCP server, LSP-01 benchmark).
 
 ## Running it
 
@@ -57,6 +57,8 @@ Drawings use [osifont](https://github.com/hikikomori82/osifont) (ISO 3098 letter
 Wire routing uses [libavoid-js](https://github.com/Aksem/libavoid-js) (LGPL-2.1-or-later), loaded as a separate WebAssembly file.
 
 ## Using the editor
+
+To see what a finished set looks like, choose *add the LSP-01 example* on the project picker.
 
 - Pick a symbol on the left and click on the sheet to place it. `Esc` goes back to selecting.
 - Drag to move (snaps to the grid), drag on empty paper to box-select, `Shift`/`Ctrl`+click to add to the selection.

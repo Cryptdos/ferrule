@@ -14,6 +14,8 @@ export interface AppOptions {
   /** Where the PDF renderer can reach this server, e.g. http://127.0.0.1:4810 */
   selfUrl?: () => string;
   mcp?: McpServer;
+  /** Example projects that can be added to the projects folder, by name. */
+  examples?: Record<string, () => Promise<import("../core/model").Project>>;
 }
 
 /** Only pages served from this machine may call /mcp from a browser (DNS-rebinding guard). */
@@ -32,7 +34,7 @@ function fileName(s: string): string {
   return s.replace(/[^A-Za-z0-9._ -]+/g, "-").trim() || "drawing";
 }
 
-export function createApp({ storage, library, assets, version = "dev", pdf, selfUrl, mcp }: AppOptions): Hono {
+export function createApp({ storage, library, assets, version = "dev", pdf, selfUrl, mcp, examples }: AppOptions): Hono {
   const app = new Hono();
 
   app.onError((err, c) => {
@@ -111,6 +113,20 @@ export function createApp({ storage, library, assets, version = "dev", pdf, self
       },
     });
   });
+
+  if (examples) {
+    app.get("/api/examples", (c) => c.json(Object.keys(examples)));
+    // Adds a fresh copy of an example to the projects folder.
+    app.post("/api/examples/:name", async (c) => {
+      const make = examples[c.req.param("name")];
+      if (!make) return c.json({ error: "No such example" }, 404);
+      const project = await make();
+      const created = await storage.create(project.project.title);
+      project.id = created.id;
+      await storage.save(created.id, project);
+      return c.json({ id: created.id }, 201);
+    });
+  }
 
   if (library) {
     app.get("/api/library", async (c) => c.json(await library.list()));

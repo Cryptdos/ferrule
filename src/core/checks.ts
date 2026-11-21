@@ -72,12 +72,13 @@ export function checkProject(project: Project): Finding[] {
         out.push({ level: "warning", message: `Sheet ${page.number}: off-page arrow isn't paired with another`, pageId: page.id, ids: [el.id] });
       }
 
-      if (!NO_TERMINAL_CHECK.has(el.symbol)) {
-        const names = terminalNames(el);
+      const names = terminalNames(el);
+      if (!NO_TERMINAL_CHECK.has(el.symbol) && names.length) {
         const w = wired.get(el.id) ?? new Set<string>();
         if (w.size === 0) {
           out.push({ level: "warning", message: `Sheet ${page.number}: ${tag || el.symbol} isn't connected`, pageId: page.id, ids: [el.id] });
-        } else if (el.symbol !== "contact-co" && names.some((n) => !w.has(n))) {
+        } else if (el.symbol !== "contact-co" && el.symbol !== "terminal" && names.some((n) => !w.has(n))) {
+          // (A terminal wired on one side only is normal: the other side is a cable by others.)
           const open = names.filter((n) => !w.has(n));
           out.push({
             level: "warning",
