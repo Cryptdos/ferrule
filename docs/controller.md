@@ -53,14 +53,21 @@ The pin **number** is what's wired, so it's always there. The id and group are s
 - **Shared commons** (`⊥`, `C1`) are one pin used by several points, drawn once.
 - **Universal IO (UIO, UI)** is set per point to one of the forms above, as on the real kit.
 - **Supply out points are sources.** Each picks a distribution from the project's list (design-v0.2 §2), e.g. `L (EPS)` or `24V DC aux`, and in simulation energises it. It's live when the device is on: clicked on and off like an output, or following the device's own supply in (a PSU is on when its input is). This replaces drawing a stand-in *Incoming supply* next to plant that provides power, as was needed for the inverter on ATS-1.
-- **PSUs and DC UPSs with a battery** are vital panel kit and must simulate properly, since many panels run DC internals with a local battery backup. A typical DIN-rail DC UPS has:
-  - **Supply in** (L, N, PE) from the mains;
-  - **Supply out** (+V, -V), a source on its DC distribution;
-  - **Battery** (BAT+, BAT-): a battery point that's charged from the output while the mains is on, and **becomes the source** when the mains is lost;
-  - **Status relays**, each a contact point (C/NO/NC): *AC fail*, *DC OK*, *Battery low*, *Charger fail*;
-  - sometimes signal pins (remote inhibit, a force or battery-start input) and a comms port, drawn as pins only.
+- **PSUs, DC UPSs and batteries are plant**, built from ordinary points: no special part, no special type. They need nothing new beyond one thing, *follows* using the same plain conditions as expectations (up to two, joined with **and** / **or**), so one condition language serves both. For example, a DC UPS with a separate battery:
 
-  In simulation the output is live while the mains input is live, **or** while the battery is connected and not flat. *AC fail* follows the mains input (on when it's lost). *DC OK* follows the output. *Battery low* and *Charger fail* are clicked, as faults to test with, and a **battery flat** toggle lets you test what the panel does when the backup runs out. These are ordinary points with *follows*, so no special part is needed: a **generic PSU / DC UPS** module type is added to the shipped types (with or without battery and relays) to make it quick to set up.
+  | Plant | Point | Form | Behaviour |
+  |---|---|---|---|
+  | DC UPS | Mains (L, N, PE) | Supply in | |
+  | | Battery (BAT+, BAT-) | Powered input | |
+  | | Output (+V, -V) | Supply out, `24V DC` | Follows: **Mains on or Battery on** |
+  | | AC fail | Contact C/NO/NC | Follows: **Mains off** |
+  | | DC OK | Contact | Follows: **Output on** |
+  | | Battery low, Charger fail | Contact | Clicked (faults to test with) |
+  | Battery | +, - | Supply out, `24V DC` | Clicked: on = charged, off = flat |
+
+  The battery is wired to the UPS's BAT terminals like any other circuit, so a fuse in BAT+ simulates naturally: blow it and the UPS loses its backup. Charging and discharging aren't modelled; a battery is charged or flat, by click. The battery and the UPS output share their distribution, so feeding the same DC bus from both is not a short.
+
+  **Ethos check:** everything here is points, forms, *follows* and wiring that plant already uses. A PSU is the same with no battery points; a controller's 24 V auxiliary output is just a supply out point. If a device ever needs more than this to simulate, the answer is to wire it from simpler plant, not to add options.
 - **Inputs and sources.** A dry input needs no source: the controller senses its own loop. A powered input needs one, usually the controller's own 24 V auxiliary output (a supply out point) or a PSU, wired round through the field contact like any other circuit.
 
 ## 4. Building devices
@@ -78,7 +85,7 @@ A controller is a device of kind **controller**:
 
 | Type | Channels | Notes |
 |---|---|---|
-| Power supply | — | Supply in, supply out; optionally battery, status relays (AC fail, DC OK, battery low, charger fail): covers PSUs and DC UPSs |
+| Power supply | — | Supply in, supply out (a controller's own power module; stand-alone PSUs and UPSs are plant) |
 | Host | — | The controller's base: supply, comms ports, often some IO |
 | DI-*n* | *n* dry or powered inputs | |
 | DO-*n* | *n* contacts or powered outputs | |
@@ -161,7 +168,7 @@ All that linking has to be easy (also design-v0.2 §6):
 ### Outputs: click them
 
 - **Controller DOs:** click to toggle. The contact closes or opens (or the powered output goes live), and the circuit reacts.
-- **Plant outputs** (a DPS, a fault relay): click to toggle, or **follow** another thing with an optional delay ("proven 5 s after SF-01 runs"). Following is the only automatic behaviour.
+- **Plant outputs** (a DPS, a fault relay, a UPS output): click to toggle, or **follow** up to two conditions joined with and/or, with an optional delay ("proven 5 s after SF-01 runs", "on when Mains on or Battery on"). The conditions are written exactly like expectations. Following is the only automatic behaviour.
 - Analogue outputs aren't simulated.
 
 ### Expectations: one way to check the whole drawing
