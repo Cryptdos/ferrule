@@ -209,20 +209,7 @@ Designed in full in [controller.md](controller.md). In short: plant and controll
 ## 9. Simulation
 
 - **Sources (73, 74).** The incoming supply energises its distribution. A transformer supplies its secondary only while its primary is energised (it's an isolated circuit, so it must remain a source), and the polarity follows the primary: whichever primary side is live, the matching secondary side (P1→S1, P2→S2) is live. With distributions (§2) the ATS-1 changeover simulates correctly: W1-18 is live only through Q1-23.
-- **Colour by source (follow-up of 22/11/26).** While simulating, a live conductor is drawn in its **distribution's colour**, thicker than an unpowered one, so you can see what's live and where it came from. Neutrals and 0 V returns are coloured too, so the current's path reads both ways. The colours come from the distribution list (§2); defaults:
-
-  | Distribution | Colour |
-  |---|---|
-  | L1 / L (single phase) | Brown |
-  | L2 | Black |
-  | L3 | Grey |
-  | N | Blue |
-  | PE | Green-yellow |
-  | 24 V AC | Orange |
-  | 24 V DC (+) | Red |
-  | 0 V control | White, drawn with a dark edge so it shows on the sheet |
-
-  A conductor fed from two different distributions is a **short**: it flashes and raises a warning. Live with no known distribution (e.g. a stand-in source) stays red, as today. Print and PDF stay black.
+- **Live wires in their own colour (follow-up of 22/11/26).** While simulating, a live wire is drawn **in the core colour it's drafted with** (Bn, Bu, Og, Rd…), thicker than an unpowered one. Busbars likewise use their own colour (§2). What you see live is exactly what's drawn, nothing new to set up, and neutrals and 0 V returns light up in their own colours too, so the current's path reads both ways. White (0 V) is drawn with a dark edge so it shows on the sheet. A live wire with no colour set stays red, as today. A conductor fed from two different distributions is a **short**: it flashes and raises a warning. Print and PDF stay black.
 - **Plant that supplies power (follow-up of 22/11/26).** An inverter's EPS output, a PSU or a controller's 24 V auxiliary output are **supply out** points on the device, each with a distribution, and act as sources ([controller.md](controller.md) §3). No more stand-in incoming supplies.
 - **Break at a fuse (49).** Click a fuse or MCB while simulating to blow or trip it; click again to replace or reset. It's drawn open and marked.
 - **Plant and controller IO (53, and follow-up of 22/11/26).** Plant simulation is replaced by the IO point model ([controller.md](controller.md) §6): outputs clicked or following, inputs green or red against what's expected. A point you've changed is marked on the drawing and listed at the top of the simulation panel until reset.
