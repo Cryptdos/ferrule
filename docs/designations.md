@@ -37,7 +37,7 @@ Class names are summarised, not quoted. See the standard for the definitions.
 | W | Guiding | Leads from one place to another |
 | X | Interfacing | Interfaces one object to another |
 
-- **Never used:** A, I and O.
+- **Never used:** A, I and O. (Ferrule uses A for controllers as a project decision: see the mapping below.)
 - **Reserved:** D, J, L, V, Y and Z are reserved for future standardisation. Ferrule must not offer them.
 
 ### Ferrule symbol mapping
@@ -63,6 +63,7 @@ This is our application of the class definitions to the v1 symbol set (DESIGN.md
 | Earth terminal | X | Interfacing (terminals). Not listed explicitly |
 | Distribution block / busbar | W | Guiding (leads energy from one place to another) |
 | Cable | W | Guiding |
+| Controller (BMS outstation, PLC) and its modules | **A** | **Project decision, not IEC:** the standard would class a controller as K (information processing), but A reads naturally for an outstation on these drawings. A is otherwise unused by IEC 81346-2, so there's no clash. Overridable per project |
 | Differential pressure switch | B (BP) | Sensing; BP is pressure sensing, listed in the preview |
 | Temperature sensor/switch | B (BT) | Sensing; BT is temperature sensing, listed in the preview |
 
