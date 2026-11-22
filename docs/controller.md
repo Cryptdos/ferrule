@@ -83,7 +83,9 @@ A controller is a device of kind **controller**:
 
   After generating, the table can be edited by hand for oddities (the DXR2's `V+`, a shared `⊥`).
 - **From datasheets.** Real models (a Trend IQ5-IO/16UIO, a DXR2.E18) are entered once from the datasheet with the generator and table, then saved in the device library with their GA size and datasheet. Ferrule ships no makers' data.
-- **Point references** are `tag:module.point`, e.g. `A2-23:3.DI2`, so channels numbered per module (Trend) and per controller (Siemens) both work. A controller with one module drops the module: `A2-23:DI2`.
+- **Every module has its own tag**, by where its view is drawn, like any other part: a DI module drawn at sheet 3, column 23 is `A3-23`. The tag tells you straight away which sheet to turn to.
+- **Point references** are `module tag:point`, e.g. `A3-23:DI2`. That works whether the maker numbers channels per module (Trend) or per controller (Siemens), and matches how it's said on site: "this controller, DI2", with the tag saying where it is.
+- **The controller as a whole** is its modules together. It has a description (e.g. *AHU-1 outstation*) and is identified by its host module's tag; the modules list it in their title row (*part of A2-5, AHU-1 outstation*). The GA places its modules together.
 
 ## 5. On the drawing
 
@@ -101,7 +103,7 @@ A controller view sits **at the top of the sheet**, with its **terminals along t
 └───o───o────o──────o───o────o──────o───o────o─────────────────────────┘
 ```
 
-- **Title row:** controller tag, module number and type, maker and model when known.
+- **Title row:** the module's tag, its type, maker and model when known, and the controller it belongs to (`A3-23 · DI-8 · part of A2-5, AHU-1 outstation`).
 - **Group heading** (e.g. *Analogue outputs*, *Universal IO*), then per channel: group, pin ids, pin numbers, terminals.
 - **Point labels** (what each one does on this job) under the terminals, along the wire: `TPEF/09/01 E/FAN SPEED CONTROL`.
 - **One view per module** is the usual case. A module too wide for the sheet **continues** on the next with a break mark, as in the Trend example.
@@ -140,7 +142,7 @@ Each input (a controller DI, or a UI used as one; or a plant input) can have an 
 
 **Expectations are one plain sentence**, chosen from lists:
 
-> `A2-23:3.DI2` should be **on** when **K3-12** is **energised**
+> `A3-23:DI2` should be **on** when **K3-12** is **energised**
 
 - *Things*: a coil (energised), a contact (closed), a plant point or DO (on), a lamp (lit).
 - Two conditions can be joined with **and** or **or**. Nothing more: no maths, no timers.
@@ -157,10 +159,10 @@ Each input (a controller DI, or a UI used as one; or a plant input) can have an 
 
 An **IO schedule** (the job's points list) exported as CSV with the terminal and cable schedules:
 
-| Controller | Module | Point | Form | Pins | Label | Wired to | Sheet |
-|---|---|---|---|---|---|---|---|
-| A2-23 | 3: DI-8 | DI2 | Dry input | 3, C1 | SF-01 running | SF-01:Running | 9-41 |
-| A2-23 | 4: DO-8 | DO1 | Contact | 11, 12 | SF-01 enable | via 9-41 → 3-34 | 3-34 |
+| Controller | Module | Point | Form | Pins | Label | Wired to |
+|---|---|---|---|---|---|---|
+| A2-5 AHU-1 outstation | A3-23 (DI-8) | DI2 | Dry input | 3, C1 | SF-01 running | SF-01:Running (9-41) |
+| A2-5 AHU-1 outstation | A4-10 (DO-8) | DO1 | Contact | 11, 12 | SF-01 enable | via link 4-12 → 3-34 |
 
 Plant points have a schedule of their own: device, point, pins, what they're wired to.
 
@@ -184,7 +186,7 @@ RS485 and other comms are **pins and groups only**: drawn on the module and plan
 
 ## 11. Still to decide
 
-1. **Module numbering in references:** `A2-23:3.DI2` (module number, then point) as proposed, or would you write it differently on site?
+1. ~~Module numbering in references~~ **Decided:** each module is tagged by where it's drawn; points are `A3-23:DI2`.
 2. **Expectations for plant inputs** (e.g. "SF-01's run input should be on when K3-34 is energised"): useful as well, or controllers only?
 3. **Module view width:** one module per view, continuing onto the next sheet when wide. Or would you sometimes want a whole controller's modules side by side across one sheet?
 4. **Channel state dots** on the drawing during simulation (like the Trend LEDs), or colour the terminals only?
