@@ -182,6 +182,7 @@ Result: 31 parts become 26, and each is the only way to draw its thing.
 - **New tools (16):** arrow, highlight (a translucent marker band), numbered call-out circles (auto-numbered 1, 2, 3… per sheet), polygon.
 - **Door items (11).** Lamps, pushbuttons, rotary handles and meters on a door are drawn by the **GA door view** from the schematic parts themselves (lamp lens in its colour, handle with its positions), rather than as Annotate shapes. That way the door GA can't drift from the schematic. The placeholder boxes go.
 - Text gains Notes' formatting (§3).
+- **Controller map** table, with controllers: modules in rail order with tag, bus address, maker, model and where each is drawn ([controller.md](controller.md) §5).
 
 ---
 

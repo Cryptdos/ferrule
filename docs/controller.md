@@ -111,6 +111,27 @@ A controller view sits **at the top of the sheet**, with its **terminals along t
 - **Views show chosen channels**, like plant views. A module can be split across as many views and sheets as it needs to keep sheets well spaced: a DO-8 with all its terminals might take two sheets, DO1–4 on one and DO5–8 on the next. A split view shows a break mark at its cut edge, as in the Trend example. The module's tag comes from its first view.
 - In simulation each channel's terminal boxes are coloured by its state (§6).
 
+### Controller map (Annotate)
+
+A **Controller map** table, from Annotate's *Tables* next to the revision list and symbol legend, draws a controller's modules in rail order, one box per module, after the Lloret drawings:
+
+```
+┌────────────────┐┌────────────────┐┌────────────────┐┌ ─ ─ ─ ─ ─ ─ ─ ┐
+│ A3-23       ③  ││ A4-10       ④  ││ A5-2        ⑤  │    SPARE   ⑥
+│ SCHNEIDER      ││ SCHNEIDER      ││ SCHNEIDER      │    I/O
+│ SXWDI16XX10001 ││ SXWDO12X10001  ││ SXWUI16XX10001 │
+│ DI-16          ││ DO-12          ││ UIO-16         │
+│ 3-23, 4-10     ││ 4-10           ││ 5-2            │
+└────────────────┘└────────────────┘└────────────────┘└ ─ ─ ─ ─ ─ ─ ─ ┘
+```
+
+- Each box: the module's tag, its **address** in a circle (its position on the controller's bus, from rail order unless set by hand to match the DIP switches), maker, model and type, and **where it's drawn**: every view's sheet-column, so a split module lists both parts.
+- **Spare slots** are part of the controller's module list and drawn dashed (*Spare I/O*), as on the Lloret sheet.
+- It fills itself from the controller and keeps up to date, like the legend. Wraps onto more rows to fit its width.
+- Usually placed on the controller's first sheet, or a spare sheet of its own.
+
+This answers "where's that module?" at a glance, so day-to-day work can go by terminals while the tags stay consistent for anyone who wants them.
+
 ### All connections go to the module
 
 Every point's wiring is drawn **at the module**, outputs included. A DO that enables a fan starter is wired from the module's DO pins out through a **link arrow** to the starter circuit, and switched there. On site you check a controller by looking at its modules, so every one of its connections should be on that sheet. It's the same reason plant shows all its cores. (This replaces the first draft's "contacts linked to the output".)
@@ -208,12 +229,13 @@ RS485 and other comms are **pins and groups only**: drawn on the module and plan
 | Expectations | One system: "should be … when …" for inputs (controller and plant), "never …" for anything; replaces "never both on" rules |
 | Module views | Split across views and sheets as needed, like plant |
 | State display | Colour the terminal boxes |
+| Finding modules | A Controller map table (Annotate): modules in rail order with tag, bus address, maker, model, type, where each is drawn, and spare slots |
 | Comms | Pins and groups only; network drawings later |
 
 ## 12. Phases
 
 1. **IO points for plant and expectations:** pins table and quick entry, forms, click and follow, expectations (should be / never) with green/red, the simulation panel. Replaces plant groups and the "never both on" rules.
 2. **Link workflow** (§5): useful everywhere, and needed before controllers multiply the arrows.
-3. **Controllers:** generic module types, the generator, library models, module views at the top of the sheet, references, the IO schedule, GA placement, checks, Check logic for red inputs.
+3. **Controllers:** generic module types, the generator, library models, module views at the top of the sheet, references, the controller map, the IO schedule, GA placement, checks, Check logic for red inputs.
 4. **MCP tools** for all of the above.
 5. **Later:** network drawings for comms.
