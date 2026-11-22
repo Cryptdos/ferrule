@@ -46,11 +46,29 @@ The pin **number** is what's wired, so it's always there. The id and group are s
 | Dry input | In | Input + common | DI sensing a volt-free contact |
 | Powered input | In | Input + common | 24 V DI, a starter's 230 V run input |
 | Analogue | In or out | Signal + common | AI, AO, UI used for 0–10 V, 4–20 mA, NTC. Drawn and scheduled, **not simulated** |
-| Supply | — | L/N/E, +V/-V, 24 V AC | Power to the device |
+| Supply in | In | L/N/E, +V/-V, 24 V AC | Power to the device |
+| Supply out | Out | L/N, +V/-V, 24 V AC | Power **from** the device: an inverter's EPS output, a PSU's 24 V, a controller's 24 V auxiliary output for powering DIs and field devices |
 | Comms | — | A, B, screen; or a port | RS485, BACnet MS/TP, Modbus, KNX |
 
 - **Shared commons** (`⊥`, `C1`) are one pin used by several points, drawn once.
 - **Universal IO (UIO, UI)** is set per point to one of the forms above, as on the real kit.
+- **Supply out points are sources.** Each picks a distribution from the project's list (design-v0.2 §2), e.g. `L (EPS)` or `24V DC aux`, and in simulation energises it. It's live when the device is on: clicked on and off like an output, or following the device's own supply in (a PSU is on when its input is). This replaces drawing a stand-in *Incoming supply* next to plant that provides power, as was needed for the inverter on ATS-1.
+- **PSUs, DC UPSs and batteries are plant**, built from ordinary points: no special part, no special type. They need nothing new beyond one thing, *follows* using the same plain conditions as expectations (up to two, joined with **and** / **or**), so one condition language serves both. For example, a DC UPS with a separate battery:
+
+  | Plant | Point | Form | Behaviour |
+  |---|---|---|---|
+  | DC UPS | Mains (L, N, PE) | Supply in | |
+  | | Battery (BAT+, BAT-) | Powered input | |
+  | | Output (+V, -V) | Supply out, `24V DC` | Follows: **Mains on or Battery on** |
+  | | AC fail | Contact C/NO/NC | Follows: **Mains off** |
+  | | DC OK | Contact | Follows: **Output on** |
+  | | Battery low, Charger fail | Contact | Clicked (faults to test with) |
+  | Battery | +, - | Supply out, `24V DC` | Clicked: on = charged, off = flat |
+
+  The battery is wired to the UPS's BAT terminals like any other circuit, so a fuse in BAT+ simulates naturally: blow it and the UPS loses its backup. Charging and discharging aren't modelled; a battery is charged or flat, by click. The battery and the UPS output share their distribution, so feeding the same DC bus from both is not a short.
+
+  **Ethos check:** everything here is points, forms, *follows* and wiring that plant already uses. A PSU is the same with no battery points; a controller's 24 V auxiliary output is just a supply out point. If a device ever needs more than this to simulate, the answer is to wire it from simpler plant, not to add options.
+- **Inputs and sources.** A dry input needs no source: the controller senses its own loop. A powered input needs one, usually the controller's own 24 V auxiliary output (a supply out point) or a PSU, wired round through the field contact like any other circuit.
 
 ## 4. Building devices
 
@@ -67,7 +85,7 @@ A controller is a device of kind **controller**:
 
 | Type | Channels | Notes |
 |---|---|---|
-| Power supply | — | Supply in, supply out |
+| Power supply | — | Supply in, supply out (a controller's own power module; stand-alone PSUs and UPSs are plant) |
 | Host | — | The controller's base: supply, comms ports, often some IO |
 | DI-*n* | *n* dry or powered inputs | |
 | DO-*n* | *n* contacts or powered outputs | |
@@ -93,7 +111,7 @@ A controller is a device of kind **controller**:
 
 ### Controller views: top of the sheet, terminals underneath
 
-A controller view sits **at the top of the sheet**, with its **terminals along the bottom**: the reverse of plant, whose terminals are along the top. Wires drop straight down from the controller and rise straight up to the plant. The layout follows the Schneider/Lloret module sheets:
+A controller view sits **at the top of the sheet**, with its **terminals along the bottom**: the reverse of plant, whose terminals are along the top. Wires drop straight down from the controller and rise straight up to the plant. The layout follows common practice for controller module sheets:
 
 ```
  A2-23            MODULE 3             SCHNEIDER ELECTRIC   SXWAOVBXX10001
@@ -113,7 +131,7 @@ A controller view sits **at the top of the sheet**, with its **terminals along t
 
 ### Controller map (Annotate)
 
-A **Controller map** table, from Annotate's *Tables* next to the revision list and symbol legend, draws a controller's modules in rail order, one box per module, after the Lloret drawings:
+A **Controller map** table, from Annotate's *Tables* next to the revision list and symbol legend, draws a controller's modules in rail order, one box per module:
 
 ```
 ┌────────────────┐┌────────────────┐┌────────────────┐┌ ─ ─ ─ ─ ─ ─ ─ ┐
@@ -126,7 +144,7 @@ A **Controller map** table, from Annotate's *Tables* next to the revision list a
 ```
 
 - Each box: the module's tag, its **address** in a circle (its position on the controller's bus, from rail order unless set by hand to match the DIP switches), maker, model and type, and **where it's drawn**: every view's sheet-column, so a split module lists both parts.
-- **Spare slots** are part of the controller's module list and drawn dashed (*Spare I/O*), as on the Lloret sheet.
+- **Spare slots** are part of the controller's module list and drawn dashed (*Spare I/O*).
 - It fills itself from the controller and keeps up to date, like the legend. Wraps onto more rows to fit its width.
 - Usually placed on the controller's first sheet, or a spare sheet of its own.
 
@@ -150,7 +168,7 @@ All that linking has to be easy (also design-v0.2 §6):
 ### Outputs: click them
 
 - **Controller DOs:** click to toggle. The contact closes or opens (or the powered output goes live), and the circuit reacts.
-- **Plant outputs** (a DPS, a fault relay): click to toggle, or **follow** another thing with an optional delay ("proven 5 s after SF-01 runs"). Following is the only automatic behaviour.
+- **Plant outputs** (a DPS, a fault relay, a UPS output): click to toggle, or **follow** up to two conditions joined with and/or, with an optional delay ("proven 5 s after SF-01 runs", "on when Mains on or Battery on"). The conditions are written exactly like expectations. Following is the only automatic behaviour.
 - Analogue outputs aren't simulated.
 
 ### Expectations: one way to check the whole drawing
