@@ -1,6 +1,6 @@
 # Field IO and controllers: design
 
-**Status:** draft, second round. Builds on [design-v0.2.md](design-v0.2.md) §8 and §9. Decisions from the first review (22/11/26) are folded in; what's still open is in [§11](#11-still-to-decide).
+**Status:** agreed design (reviewed 22/11/26). Builds on [design-v0.2.md](design-v0.2.md) §8 and §9. The decisions taken in review are listed in [§11](#11-decisions-from-review).
 
 ## 1. What this is for
 
@@ -106,8 +106,8 @@ A controller view sits **at the top of the sheet**, with its **terminals along t
 - **Title row:** the module's tag, its type, maker and model when known, and the controller it belongs to (`A3-23 · DI-8 · part of A2-5, AHU-1 outstation`).
 - **Group heading** (e.g. *Analogue outputs*, *Universal IO*), then per channel: group, pin ids, pin numbers, terminals.
 - **Point labels** (what each one does on this job) under the terminals, along the wire: `TPEF/09/01 E/FAN SPEED CONTROL`.
-- **One view per module** is the usual case. A module too wide for the sheet **continues** on the next with a break mark, as in the Trend example.
-- In simulation each channel shows its state where the Trend drawing has its LEDs (§6).
+- **Views show chosen channels**, like plant views. A module can be split across as many views and sheets as it needs to keep sheets well spaced: a DO-8 with all its terminals might take two sheets, DO1–4 on one and DO5–8 on the next. A split view shows a break mark at its cut edge, as in the Trend example. The module's tag comes from its first view.
+- In simulation each channel's terminal boxes are coloured by its state (§6).
 
 ### All connections go to the module
 
@@ -130,29 +130,37 @@ All that linking has to be easy (also design-v0.2 §6):
 - **Plant outputs** (a DPS, a fault relay): click to toggle, or **follow** another thing with an optional delay ("proven 5 s after SF-01 runs"). Following is the only automatic behaviour.
 - Analogue outputs aren't simulated.
 
-### Inputs: expected or not
+### Expectations: one way to check the whole drawing
 
-Each input (a controller DI, or a UI used as one; or a plant input) can have an **expectation**: when it should be on. While simulating, its terminal shows:
+An **expectation** is a plain statement about how the drawing should behave. It's checked live while you simulate, and exhaustively by **Check logic**. It replaces the separate "never both on" rules: one checking idea for everything.
 
-| Colour | Means |
+Two kinds:
+
+> **`A3-23:DI2` should be on when `K3-12` is energised**
+>
+> **Never: `K3-23` energised and `K3-56` energised**
+
+- **Should be … when …** belongs to an input: a controller DI (or a UI used as one), or a **plant input**, such as SF-01's run input should be on when K3-34 is energised. That checks plant against controllers and panel logic, as well as controllers against plant.
+- **Never …** can name anything: two contactors of a changeover, a fan running while its fire damper is shut.
+- *Things and states:* a coil (energised), a contact (closed), a point or DO (on), a lamp (lit). Up to two conditions joined with **and** or **or**. No maths and no timers.
+- Expectations are kept with the project in one list (**Expectations…** beside Check), and each input also shows its own in its properties.
+
+While simulating:
+
+| | Means |
 |---|---|
-| **Green** | It sees what was expected (on when it should be, off when it shouldn't) |
-| **Red** | It doesn't: something is wired, linked or drafted wrong |
-| Grey | No expectation set: shows on or off only |
+| Input terminal **green** | It sees what its expectation says |
+| Input terminal **red** | It doesn't: something is wired, linked or drafted wrong |
+| Input terminal grey | No expectation: on or off only |
+| **Never** statement comes true | Warning bar with the statement, and the parts involved ringed red |
 
-**Expectations are one plain sentence**, chosen from lists:
+An input's sensed state comes from the circuit: a dry input is on when its loop to its common is closed; a powered input when its pin is live.
 
-> `A3-23:DI2` should be **on** when **K3-12** is **energised**
-
-- *Things*: a coil (energised), a contact (closed), a plant point or DO (on), a lamp (lit).
-- Two conditions can be joined with **and** or **or**. Nothing more: no maths, no timers.
-- An input's sensed state comes from the circuit: a dry input is on when its loop to its common is closed; a powered input when its pin is live.
-
-**Check logic** gains a mode that tries every combination of outputs and plant states and reports any input that goes red, with the shortest way to get there and a replay.
+**Check logic** tries every combination of outputs, plant states and operator inputs, and reports any expectation that can fail, with the shortest way to get there and a replay.
 
 ### Seeing it
 
-- Channels show their state at the module (a dot, as in the Trend LEDs: filled when on).
+- **Terminal boxes are coloured** by state at the module: filled when on, green or red when the point has an expectation. No separate LED dots.
 - The simulation panel lists every device's points by module, with live states and colours. Red inputs come first. Clicking one jumps to it.
 
 ## 7. Points list
@@ -184,16 +192,25 @@ RS485 and other comms are **pins and groups only**: drawn on the module and plan
 - A DO wired to nothing: **info** (spare).
 - An analogue point wired to a digital one: **warning**.
 
-## 11. Still to decide
+## 11. Decisions from review
 
-1. ~~Module numbering in references~~ **Decided:** each module is tagged by where it's drawn; points are `A3-23:DI2`.
-2. **Expectations for plant inputs** (e.g. "SF-01's run input should be on when K3-34 is energised"): useful as well, or controllers only?
-3. **Module view width:** one module per view, continuing onto the next sheet when wide. Or would you sometimes want a whole controller's modules side by side across one sheet?
-4. **Channel state dots** on the drawing during simulation (like the Trend LEDs), or colour the terminals only?
+| Question | Decision |
+|---|---|
+| Vendor data | Generic module types only; makers' models entered from datasheets into the library |
+| Controller position | Top of the sheet, terminals along the bottom (the reverse of plant) |
+| Pin labelling | Three layers: number (always), id, group |
+| Outputs that switch panel circuits | Wired at the module, out through link arrows: every connection on the module's sheet |
+| Prefix | A (project decision, noted in designations) |
+| References | Modules tagged by where they're drawn; points `A3-23:DI2` |
+| Simulation | A wiring and logic check, not an emulator: click outputs, follow with delay, no analogue, no rules language |
+| Expectations | One system: "should be … when …" for inputs (controller and plant), "never …" for anything; replaces "never both on" rules |
+| Module views | Split across views and sheets as needed, like plant |
+| State display | Colour the terminal boxes |
+| Comms | Pins and groups only; network drawings later |
 
 ## 12. Phases
 
-1. **IO points for plant:** pins table and quick entry, forms, click and follow, expectations with green/red, the simulation panel. Replaces plant groups.
+1. **IO points for plant and expectations:** pins table and quick entry, forms, click and follow, expectations (should be / never) with green/red, the simulation panel. Replaces plant groups and the "never both on" rules.
 2. **Link workflow** (§5): useful everywhere, and needed before controllers multiply the arrows.
 3. **Controllers:** generic module types, the generator, library models, module views at the top of the sheet, references, the IO schedule, GA placement, checks, Check logic for red inputs.
 4. **MCP tools** for all of the above.

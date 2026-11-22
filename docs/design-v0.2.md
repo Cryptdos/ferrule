@@ -201,7 +201,7 @@ Result: 31 parts become 26, and each is the only way to draw its thing.
 
 ### Field IO and simulation (plant and controllers)
 
-Designed in full in [controller.md](controller.md). In short: plant and controllers share one model, **IO points** made of pins (number, optional id and group). Controllers are built from generic module types (power supply, host, DI/DO/UIO/AI/AO with a channel count), carry prefix **A**, and are drawn at the top of the sheet with terminals underneath, every connection wired at the module. Simulation is for proving wiring and links, not emulating a controller: outputs are clicked (plant outputs can also follow something with a delay), and inputs turn **green** or **red** depending on whether they see what was expected. No analogue simulation. Today's plant groups are replaced.
+Designed in full in [controller.md](controller.md). In short: plant and controllers share one model, **IO points** made of pins (number, optional id and group). Controllers are built from generic module types (power supply, host, DI/DO/UIO/AI/AO with a channel count), carry prefix **A**, and are drawn at the top of the sheet with terminals underneath, every connection wired at the module. Simulation is for proving wiring and links, not emulating a controller: outputs are clicked (plant outputs can also follow something with a delay), and **expectations** check the drawing: inputs turn **green** or **red** depending on whether they see what was expected, and "never" statements (e.g. two contactors both on) raise a warning. Expectations replace the separate "never both on" rules. No analogue simulation. Today's plant groups are replaced.
 
 ---
 
