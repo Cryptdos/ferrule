@@ -52,6 +52,7 @@ Ferrule is also an [MCP server](docs/mcp.md): connect Claude to it and ask for a
 
 - [Building Ferrule](docs/BUILDING.md): build the exe yourself, from a fresh clone
 - [Design document](docs/DESIGN.md): how it works and every decision taken
+- [v0.2 design](docs/design-v0.2.md): what's changing after testing v0.1.0-pre
 - [Benchmark: LSP-01 life safety panel](docs/benchmark-lsp01.md)
 - [MCP server: letting Claude draft drawings](docs/mcp.md)
 
