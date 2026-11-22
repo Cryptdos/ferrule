@@ -566,6 +566,8 @@
     overflow: hidden;
     display: grid;
     grid-template-columns: 1fr;
+    /* One row the height of the window: a table taller than it scrolls inside. */
+    grid-template-rows: minmax(0, 1fr);
     min-height: 0;
   }
   main.split {

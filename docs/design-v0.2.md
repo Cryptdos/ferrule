@@ -209,6 +209,21 @@ Designed in full in [controller.md](controller.md). In short: plant and controll
 ## 9. Simulation
 
 - **Sources (73, 74).** The incoming supply energises its distribution. A transformer supplies its secondary only while its primary is energised (it's an isolated circuit, so it must remain a source), and the polarity follows the primary: whichever primary side is live, the matching secondary side (P1→S1, P2→S2) is live. With distributions (§2) the ATS-1 changeover simulates correctly: W1-18 is live only through Q1-23.
+- **Colour by source (follow-up of 22/11/26).** While simulating, a live conductor is drawn in its **distribution's colour**, thicker than an unpowered one, so you can see what's live and where it came from. Neutrals and 0 V returns are coloured too, so the current's path reads both ways. The colours come from the distribution list (§2); defaults:
+
+  | Distribution | Colour |
+  |---|---|
+  | L1 / L (single phase) | Brown |
+  | L2 | Black |
+  | L3 | Grey |
+  | N | Blue |
+  | PE | Green-yellow |
+  | 24 V AC | Orange |
+  | 24 V DC (+) | Red |
+  | 0 V control | White, drawn with a dark edge so it shows on the sheet |
+
+  A conductor fed from two different distributions is a **short**: it flashes and raises a warning. Live with no known distribution (e.g. a stand-in source) stays red, as today. Print and PDF stay black.
+- **Plant that supplies power (follow-up of 22/11/26).** An inverter's EPS output, a PSU or a controller's 24 V auxiliary output are **supply out** points on the device, each with a distribution, and act as sources ([controller.md](controller.md) §3). No more stand-in incoming supplies.
 - **Break at a fuse (49).** Click a fuse or MCB while simulating to blow or trip it; click again to replace or reset. It's drawn open and marked.
 - **Plant and controller IO (53, and follow-up of 22/11/26).** Plant simulation is replaced by the IO point model ([controller.md](controller.md) §6): outputs clicked or following, inputs green or red against what's expected. A point you've changed is marked on the drawing and listed at the top of the simulation panel until reset.
 
@@ -218,6 +233,8 @@ Designed in full in [controller.md](controller.md). In short: plant and controll
 
 - **One window style (51, 52, 57, follow-up 9).** Every dialog is a floating window: a title bar with *minimise* and *close*, in the KDE manner, in the same greys as the rest of the interface, with no coloured close button. Windows can be dragged, don't block the drawing (you can still look and scroll behind them), and remember where they were.
 - **Plant (52).** The plant window lists the plant; *New plant…* opens its own window to fill in.
+- **Plant view text (follow-up of 22/11/26).** A plant view's own *Label* field goes. The box already shows the plant's tag, description and information lines, set once in Plant; a second, per-view label repeated what they say (or contradicted them). Anything specific to one sheet is an annotation.
+- **Tag fixed, not "lock" (follow-up of 22/11/26).** The table's *Lock* column and the properties' *Lock tag* were about one thing: Renumber leaving a typed tag alone. Both now say **Tag fixed**, and the table has a tick box per part (drawing parts only; annotations have no tag). Locking parts *in place* so they can't be moved isn't a feature; considered and left out for now, since nothing in testing needed it.
 - **Workbench focus (8).** Things you can't select in the current workbench are drawn in grey (about 55% black) on screen, not faded enough to hurt reading. Print is unaffected.
 - **Sheet indicator (10).** `3 / 14` under the overview.
 - **Split view (14).** Drag the divider to resize. The second pane zooms and pans, and has its own overview.
@@ -255,6 +272,8 @@ Designed in full in [controller.md](controller.md). In short: plant and controll
 | 74 | Voltage "inverts" at the transformer | The secondary's live side was always S1 | Polarity follows the primary (§9) |
 | — | Plant settings copied into later parts (ATS-1: `plant`, `pgroups`… on timers and contacts) | Placing a part after a plant view keeps the view's settings | Clear them between placements; strip unknown settings on load |
 | 16 | Save as won't overwrite | No replace option | Ask to replace |
+| — | The table (Table button) can't be scrolled: only the first rows can be seen | The table grew to its full height instead of fitting the window | **Fixed** in the fixes PR: it scrolls inside the window |
+| — | Plant information placeholder named a third party's product | Example text taken from a reference drawing | **Fixed**: generic example. Docs checked and cleaned of reference-drawing sources too |
 
 Both test files are kept privately as regression fixtures (not committed: they're your projects).
 

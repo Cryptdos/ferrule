@@ -116,7 +116,7 @@
       </label>
       <label class="check">
         <input type="checkbox" checked={one.params.locked === true} onchange={(e) => setParam("locked", e.currentTarget.checked)} />
-        Lock tag (Renumber keeps it)
+        Tag fixed (Renumber keeps it as it is)
       </label>
     {/if}
     {#if isMaster(one)}

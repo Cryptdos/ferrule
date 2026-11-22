@@ -46,11 +46,14 @@ The pin **number** is what's wired, so it's always there. The id and group are s
 | Dry input | In | Input + common | DI sensing a volt-free contact |
 | Powered input | In | Input + common | 24 V DI, a starter's 230 V run input |
 | Analogue | In or out | Signal + common | AI, AO, UI used for 0–10 V, 4–20 mA, NTC. Drawn and scheduled, **not simulated** |
-| Supply | — | L/N/E, +V/-V, 24 V AC | Power to the device |
+| Supply in | In | L/N/E, +V/-V, 24 V AC | Power to the device |
+| Supply out | Out | L/N, +V/-V, 24 V AC | Power **from** the device: an inverter's EPS output, a PSU's 24 V, a controller's 24 V auxiliary output for powering DIs and field devices |
 | Comms | — | A, B, screen; or a port | RS485, BACnet MS/TP, Modbus, KNX |
 
 - **Shared commons** (`⊥`, `C1`) are one pin used by several points, drawn once.
 - **Universal IO (UIO, UI)** is set per point to one of the forms above, as on the real kit.
+- **Supply out points are sources.** Each picks a distribution from the project's list (design-v0.2 §2), e.g. `L (EPS)` or `24V DC aux`, and in simulation energises it. It's live when the device is on: clicked on and off like an output, or following the device's own supply in (a PSU is on when its input is). This replaces drawing a stand-in *Incoming supply* next to plant that provides power, as was needed for the inverter on ATS-1.
+- **Inputs and sources.** A dry input needs no source: the controller senses its own loop. A powered input needs one, usually the controller's own 24 V auxiliary output (a supply out point) or a PSU, wired round through the field contact like any other circuit.
 
 ## 4. Building devices
 
@@ -93,7 +96,7 @@ A controller is a device of kind **controller**:
 
 ### Controller views: top of the sheet, terminals underneath
 
-A controller view sits **at the top of the sheet**, with its **terminals along the bottom**: the reverse of plant, whose terminals are along the top. Wires drop straight down from the controller and rise straight up to the plant. The layout follows the Schneider/Lloret module sheets:
+A controller view sits **at the top of the sheet**, with its **terminals along the bottom**: the reverse of plant, whose terminals are along the top. Wires drop straight down from the controller and rise straight up to the plant. The layout follows common practice for controller module sheets:
 
 ```
  A2-23            MODULE 3             SCHNEIDER ELECTRIC   SXWAOVBXX10001
@@ -113,7 +116,7 @@ A controller view sits **at the top of the sheet**, with its **terminals along t
 
 ### Controller map (Annotate)
 
-A **Controller map** table, from Annotate's *Tables* next to the revision list and symbol legend, draws a controller's modules in rail order, one box per module, after the Lloret drawings:
+A **Controller map** table, from Annotate's *Tables* next to the revision list and symbol legend, draws a controller's modules in rail order, one box per module:
 
 ```
 ┌────────────────┐┌────────────────┐┌────────────────┐┌ ─ ─ ─ ─ ─ ─ ─ ┐
@@ -126,7 +129,7 @@ A **Controller map** table, from Annotate's *Tables* next to the revision list a
 ```
 
 - Each box: the module's tag, its **address** in a circle (its position on the controller's bus, from rail order unless set by hand to match the DIP switches), maker, model and type, and **where it's drawn**: every view's sheet-column, so a split module lists both parts.
-- **Spare slots** are part of the controller's module list and drawn dashed (*Spare I/O*), as on the Lloret sheet.
+- **Spare slots** are part of the controller's module list and drawn dashed (*Spare I/O*).
 - It fills itself from the controller and keeps up to date, like the legend. Wraps onto more rows to fit its width.
 - Usually placed on the controller's first sheet, or a spare sheet of its own.
 

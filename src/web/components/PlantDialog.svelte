@@ -171,7 +171,7 @@
     <input bind:value={prefix} placeholder="Prefix, e.g. SEF" required />
     <input bind:value={description} placeholder="Description, e.g. Safety extract fan" />
     <input bind:value={terminals} placeholder="Terminals, e.g. L N E | ENABLE: 1 2" />
-    <textarea bind:value={info} rows="1" placeholder="Information, e.g. Lloret LMV-75, 400V 7.5kW"></textarea>
+    <textarea bind:value={info} rows="1" placeholder="Information, e.g. model, 400V 7.5kW"></textarea>
     <label class="pbo"><input type="checkbox" bind:checked={pbo} /> Power by others</label>
     <button type="submit">Add plant</button>
   </form>

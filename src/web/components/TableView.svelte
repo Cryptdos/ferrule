@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { benchOf } from "../../core/symbols";
   import { columnOf } from "../../core/geometry";
   import { resolveFields } from "../../core/fields";
   import { listSymbols, requireSymbol } from "../../core/symbols";
@@ -105,15 +106,15 @@
     <label><input type="checkbox" bind:checked={inLabels} /> labels</label>
     <button disabled={!ids.length || !find || (!inTags && !inLabels)} onclick={doReplace}>Replace</button>
     <span class="sep"></span>
-    <button disabled={!ids.length} onclick={() => { const l = ids; editor.apply((p) => setTagLocks(p, l, true)); }}>Lock tags</button>
-    <button disabled={!ids.length} onclick={() => { const l = ids; editor.apply((p) => setTagLocks(p, l, false)); }}>Unlock</button>
+    <button disabled={!ids.length} onclick={() => { const l = ids; editor.apply((p) => setTagLocks(p, l, true)); }}>Fix tags</button>
+    <button disabled={!ids.length} onclick={() => { const l = ids; editor.apply((p) => setTagLocks(p, l, false)); }}>Unfix</button>
   </div>
   <div class="scroll">
     <table>
       <thead>
         <tr>
           <th><input type="checkbox" checked={allChecked} onchange={toggleAll} /></th>
-          <th>Sheet</th><th>Col</th><th>Tag</th><th>Type</th><th>Label</th><th>Lock</th><th></th>
+          <th>Sheet</th><th>Col</th><th>Tag</th><th>Type</th><th>Label</th><th title="Renumber keeps a fixed tag as it is">Tag fixed</th><th></th>
         </tr>
       </thead>
       <tbody>
@@ -147,7 +148,19 @@
                 }}
               />
             </td>
-            <td>{r.el.params.locked === true ? "🔒" : ""}</td>
+            <td class="lock">
+              {#if benchOf(r.el) === "draft" && r.el.symbol !== "junction"}
+              <input
+                type="checkbox"
+                title="Renumber keeps this tag as it is"
+                checked={r.el.params.locked === true}
+                onchange={(e) => {
+                  const on = e.currentTarget.checked;
+                  editor.apply((p) => setTagLocks(p, [r.el.id], on));
+                }}
+              />
+              {/if}
+            </td>
             <td>
               <button
                 onclick={() => {
@@ -168,6 +181,7 @@
     display: flex;
     flex-direction: column;
     height: 100%;
+    min-height: 0;
     background: #fff;
   }
   .bar,
@@ -201,6 +215,10 @@
   .scroll {
     overflow: auto;
     flex: 1;
+    min-height: 0;
+  }
+  td.lock {
+    text-align: center;
   }
   table {
     border-collapse: collapse;
