@@ -172,6 +172,7 @@ Result: 31 parts become 26, and each is the only way to draw its thing.
   - Two arrows showing the same `1-24` is correct: that's the address of their partners, and both partners are in column 24 of sheet 1. It isn't a tag, so it can't take an A suffix. The arrow's label is what tells them apart.
   - The label sits at the arrow's tip, along the wire's direction: under it when the wire is horizontal, to its right when vertical, with the reference after the label. That clears the overlaps in 222814 and 223310.
   - A destination arrow takes its source's label, ticked by default (*Same label as its source*).
+  - **Linking workflow:** select an arrow, click *Link…*, go to any sheet and click the arrow to pair with (Esc cancels), or *Link to a new arrow* to drop an already-paired partner. Details in [controller.md](controller.md) §5.
 - **Coil tables (29).** A contact table has its coil's tag above it, centred, so a table moved away from its coil still says whose it is.
 
 ---
@@ -189,7 +190,7 @@ Result: 31 parts become 26, and each is the only way to draw its thing.
 - **Strips keep up (45).** A placed terminal strip grows when terminals are added to that strip in the schematic (the GA shows it longer). **Check** reports a GA strip whose terminals changed since you last looked, until you open the GA.
 - **Sheet type (12).** In sheet settings, *Spare sheet* becomes *Sheet type*: **Schematic / Spare / GA** (an empty sheet can become a GA).
 - **Remove GA Note (46).**
-- **Controllers (47, 48).** A controller (PLC, DDC, outstation) is a kind of plant with:
+- **Controllers (47, 48).** See [controller.md](controller.md). First outline, kept for reference: a controller (PLC, DDC, outstation) is a kind of plant with:
   - modules (CPU, IO cards), each with IO points: DI, DO, AI, AO, UI (universal), plus supply terminals;
   - IO points wired on the schematic like plant terminals, so the drawing shows `DO3` driving `K9-8`;
   - a GA footprint (modules side by side on a rail, sized from the device library);
@@ -200,17 +201,7 @@ Result: 31 parts become 26, and each is the only way to draw its thing.
 
 ### Field IO and simulation (plant and controllers)
 
-Plant and controllers both bring signals into the panel and take them out, so they share one model: **IO points**.
-
-- Every plant or controller has points. An **input** is driven by the panel and seen by the device (a fan's run command, a controller DI). An **output** is driven by the device and seen by the panel (a DPS contact, a fault relay, a controller DO).
-- Digital first; analogue (AI/AO) later, with a value to set.
-- Each output behaves one of three ways:
-  - **Manual**: click it.
-  - **Follows**: true after an input, with on and off delays, optionally inverted ("airflow proven 5 s after the run command").
-  - **Rule**: a small expression, e.g. `DO1 = DI3 and not DI4`, to simulate a controller's simple strategy without modelling its real program.
-- An output's contact form (C/NO/NC, volt-free or powered) is wired through ordinary terminals, so the drawing and the simulation can't disagree.
-- The simulation panel lists every device's points live, and any output can be **forced**, as on a BMS.
-- Today's plant groups (role, follows, delay, invert) are replaced by this, not kept alongside it.
+Designed in full in [controller.md](controller.md). In short: plant and controllers share one model, **IO points** made of pins (number, optional id and group). Controllers are built from generic module types (power supply, host, DI/DO/UIO/AI/AO with a channel count), carry prefix **A**, and are drawn at the top of the sheet with terminals underneath, every connection wired at the module. Simulation is for proving wiring and links, not emulating a controller: outputs are clicked (plant outputs can also follow something with a delay), and inputs turn **green** or **red** depending on whether they see what was expected. No analogue simulation. Today's plant groups are replaced.
 
 ---
 
@@ -218,7 +209,7 @@ Plant and controllers both bring signals into the panel and take them out, so th
 
 - **Sources (73, 74).** The incoming supply energises its distribution. A transformer supplies its secondary only while its primary is energised (it's an isolated circuit, so it must remain a source), and the polarity follows the primary: whichever primary side is live, the matching secondary side (P1→S1, P2→S2) is live. With distributions (§2) the ATS-1 changeover simulates correctly: W1-18 is live only through Q1-23.
 - **Break at a fuse (49).** Click a fuse or MCB while simulating to blow or trip it; click again to replace or reset. It's drawn open and marked.
-- **Plant and controller IO (53, and follow-up of 22/11/26).** Plant simulation is replaced by the IO point model (§8). A point you've changed or forced is outlined on the drawing and listed at the top of the simulation panel until reset.
+- **Plant and controller IO (53, and follow-up of 22/11/26).** Plant simulation is replaced by the IO point model ([controller.md](controller.md) §6): outputs clicked or following, inputs green or red against what's expected. A point you've changed is marked on the drawing and listed at the top of the simulation panel until reset.
 
 ---
 

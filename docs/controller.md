@@ -1,215 +1,198 @@
 # Field IO and controllers: design
 
-**Status:** draft for review. Builds on [design-v0.2.md](design-v0.2.md) §8 (field IO) and §9 (simulation). Open questions are collected in [§12](#12-open-questions); answers go back into the sections above them.
+**Status:** draft, second round. Builds on [design-v0.2.md](design-v0.2.md) §8 and §9. Decisions from the first review (22/11/26) are folded in; what's still open is in [§11](#11-still-to-decide).
 
 ## 1. What this is for
 
 Two things bring signals into a control panel and take them out:
 
 - **Plant:** field equipment by others: fans, dampers, lifts, fire alarm interfaces, pressure switches.
-- **Controllers:** the BMS outstation or PLC in the panel (Trend IQ, Siemens PXC, a generic PLC), with modules of inputs and outputs.
+- **Controllers:** the BMS outstation or PLC in the panel, built from modules of inputs and outputs.
 
-Both are drawn, wired, scheduled, laid out on the GA and simulated. Today plant has terminals in named groups with a few simulation settings, and controllers don't exist. This doc gives both **one model: IO points**, so they're drawn, checked and simulated the same way, and a controller is simply a plant item that lives in the panel and has modules.
+Both get **one model: IO points**, so they're drawn, wired, scheduled and simulated the same way. A controller is a device that lives in the panel and is built from modules.
 
-**Ethos check.** No new kind of drawing object is needed: a controller is drawn with views like plant, its outputs reuse the contact part, and everything else reuses terminals, wires, schedules and the GA.
+**What simulation is for here:** proving the drawing is wired and linked right before the panel is built. It's not a controller emulator: no analogue values, no strategy. Outputs are clicked; inputs say whether they see what you expected, in green or red.
 
 ## 2. Terms
 
 | Term | Meaning |
 |---|---|
 | **Device** | A plant item or a controller. Has a tag, a description and points. |
-| **Module** | Part of a controller: the CPU/base, an IO card, a power supply. Has a model, points and a GA size. |
-| **Point** | One signal or connection, e.g. `DO3`, `Airflow proven`, `24V supply`. Owns the terminals it uses. |
-| **Direction** | **In**: the panel drives it, the device sees it (a run command, a controller DI). **Out**: the device drives it, the panel sees it (a DPS contact, a controller DO). Always from the device's side. |
-| **Form** | How the point is wired electrically (§3). |
-| **Behaviour** | How an out point decides its state in simulation (§7). |
+| **Module** | Part of a controller: power supply, host, or an IO card. Has a type, a channel count and a GA size. |
+| **Pin** | One terminal on the device: a **number** (`61`), an optional **id** (`Y1`, `C`, `VO`) and an optional **group** (`IO1`, `AO1`). |
+| **Point** | One signal made of pins, e.g. `DI2` (pins 3 and C1) or `Airflow proven` (C, NO). |
+| **Direction** | **In**: the device senses it (a controller DI, a starter's run input). **Out**: the device switches it (a DO, a DPS contact). Always from the device's side. |
 
-## 3. Points
+## 3. Pins and points
+
+### Three layers on a pin
+
+Real kit labels its terminals in up to three layers, and the drawing should show the same:
+
+| Layer | Trend IQ5 IO module | Siemens DXR2 | Schneider AO module | Required? |
+|---|---|---|---|---|
+| Group | `IO1` | | `AO1` | No |
+| Id | `IO1`, `C` | `D1`, `X1`, `⊥`, `V+` | `VO`, `RET`, `CO` | No |
+| Number | `1`, `2` | `31`, `33` | `1`, `2`, `3` | **Yes** |
+
+The pin **number** is what's wired, so it's always there. The id and group are shown when present. A device with only numbers (most plant) just shows numbers.
 
 ### Forms
 
-| Form | Direction | Terminals | Example |
+| Form | Direction | Pins | Example |
 |---|---|---|---|
-| Volt-free contact | Out | C + NO, C + NC, or C + NO + NC | DPS proving switch, lift fault relay, controller relay DO |
-| Powered output | Out | Output + common (0V/N) | 24 V DC DO, triac DO, lamp driver |
-| Dry input | In | Input + common | Controller DI sensing a volt-free contact; plant "enable" input |
-| Powered input | In | Input + common | 230 V coil input of a starter by others; 24 V DI |
-| Analogue in | In | Signal + common | Controller AI/UI: 0–10 V, 4–20 mA, NTC/PT1000 |
-| Analogue out | Out | Signal + common | Controller AO: 0–10 V to a damper or valve |
-| Supply | — | L/N/E, +V/-V | Power to the device |
-| Comms | — | A/B/screen, or a port | RS485, BACnet MS/TP, Modbus |
+| Contact | Out | C + NO, C + NC, or C + NO + NC | DPS, lift fault relay, relay DO |
+| Powered output | Out | Output + common | 24 V DO, triac DO |
+| Dry input | In | Input + common | DI sensing a volt-free contact |
+| Powered input | In | Input + common | 24 V DI, a starter's 230 V run input |
+| Analogue | In or out | Signal + common | AI, AO, UI used for 0–10 V, 4–20 mA, NTC. Drawn and scheduled, **not simulated** |
+| Supply | — | L/N/E, +V/-V, 24 V AC | Power to the device |
+| Comms | — | A, B, screen; or a port | RS485, BACnet MS/TP, Modbus, KNX |
 
-- **Shared commons.** Several points can share a common terminal (most DI cards: eight inputs, one or two commons). A point names its common, and the common terminal is drawn once.
-- **Terminal names** come from the device (`11`, `14`, `C`, `NO`, or the maker's numbering), so the drawing matches the kit.
-- **Universal inputs (UI)** are configured per point as dry input or analogue in. That's what a UI is on real kit.
+- **Shared commons** (`⊥`, `C1`) are one pin used by several points, drawn once.
+- **Universal IO (UIO, UI)** is set per point to one of the forms above, as on the real kit.
 
-### Point fields
+## 4. Building devices
 
-```ts
-interface Point {
-  id: string;
-  name: string;          // "DO3", "Airflow proven", "24V supply"
-  label: string;         // what it does on this job: "SF-01 run command"
-  dir: "in" | "out" | "none";
-  form: "contact" | "powered-out" | "dry-in" | "powered-in" | "analog-in" | "analog-out" | "supply" | "comms";
-  terminals: string[];   // e.g. ["C", "NO", "NC"] or ["13", "14"]
-  common?: string;       // a shared common terminal, if any
-  signal?: string;       // analogue: "0-10V", "4-20mA", "NTC10k", "PT1000"
-  range?: [number, number]; units?: string;  // analogue: 0–100 %, 0–50 °C
-  sim?: Behaviour;       // §7, out points only
-}
-```
+### Plant
 
-## 4. Plant under the new model
+Plant keeps what it has: prefix tag, description, information lines, views, power by others. Its terminal groups become points. The quick entry (`L N E | R1: C NO NC | R2: C NO NC`) stays for speed. Behind it is a **pins table** (number, id, group, point, form), which is the real editor and the one that suits controllers.
 
-Plant keeps everything it has (prefix tag, description, information lines, views, power by others). **Terminal groups become points.** The plant dialog's terminal field (`L N E | R1: C NO NC | R2: C NO NC`) stays as the quick way in: each group becomes a point, and you then set its form and direction in the points table.
-
-| Plant | Points |
-|---|---|
-| Lift | `R1 Fault` (out, contact C/NO/NC), `R2 Running` (out, contact), supply (by others) |
-| DPS | `Airflow proven` (out, contact C/NO, follows its fan's run command after 5 s) |
-| Fire alarm interface | `Fire` (out, contact C/NC, manual) |
-| Fan starter by others | `Run` (in, dry input), `Running` (out, contact, follows Run), `Fault` (out, contact, manual) |
-| Damper actuator | `Command` (in, analogue 0–10 V), `Open` (out, contact, follows Command > 90 %) |
-
-Today's group roles, follows, delay and invert settings map directly onto points, so nothing is lost. They're replaced, not kept alongside (no compatibility before 1.0).
-
-## 5. Controllers
-
-### Building one
+### Controllers
 
 A controller is a device of kind **controller**:
 
-- Tag prefix **K** (information processing, per [designations](designations.md)). Tagged like everything else: prefix plus sheet-column of its first view, e.g. `K12-3`, or a typed tag.
-- **Modules**, in order on its rail: the base/CPU first, then IO cards. Each module comes from a **model** and gets a GA size from it.
-- **Points** come from the modules: an 8 DI card gives `DI1`…`DI8` with their terminals and shared commons.
-- Point references are `tag:point`, e.g. `K12-3:DO3`. That's how other parts, schedules and rules refer to them.
+- **Prefix A.** A project decision: IEC 81346-2 would class a controller as K, but A is what reads naturally for an outstation on these drawings. It's overridable per project like any prefix, and noted in [designations](designations.md).
+- **Modules** in rail order, each from one of the **generic module types** Ferrule ships:
 
-### Models live in the device library
-
-A controller or IO module model is a **device library entry** (design-v0.2 §8) with a channel layout added:
-
-```
-Model: Generic 8DI/8DO/8UI/4AO      size 105 × 90 × 60 mm
-  DI1–DI8:  dry input,  terminals 1–8,   common C1 (terminal 9)
-  DO1–DO8:  contact,    terminals 11/12 … 25/26 (C/NO)
-  UI1–UI8:  universal,  terminals 31–38, common 0V (39)
-  AO1–AO4:  analogue out 0–10V, terminals 41–44, common 0V (45)
-  Supply:   24V AC/DC, terminals G, G0
-  Comms:    RS485 A, B, screen
-```
-
-- Writing a model once makes it available to every project that uses the library, with its datasheet attached.
-- Ferrule ships **generic models only** (a base with mixed IO, 8 DI, 8 DO, 8 UI, 4 AO cards). Makers' models are entered by users from their datasheets; I'd rather not ship and maintain vendor data, and terminal numbering is easy to get subtly wrong.
-- A project that doesn't use the library builds its controller from generic modules, or describes channels by hand, as plant points are.
-
-## 6. On the drawing
-
-### Controller views
-
-A controller is drawn with **views**, like plant: a view shows one module, or chosen points, on a sheet. It sits **above the panel boundary** (it's in the panel). The layout follows the plant views:
-
-- terminal boxes along the top, with point names over them (`DI1 DI2 … C1`);
-- the point's label under each point (`SF-01 RUN`, `AHU FROST`);
-- the module and controller tag under the box (`K12-3 · Module 2: 8DI`);
-- hidden points give the box a break line, as plant views do.
-
-Field wiring runs from the view's terminals to the terminal block and out to the plant, like any other wiring.
-
-### Outputs that switch panel circuits
-
-A BMS output usually *enables* something inside the panel, e.g. a DO's contact in a fan starter circuit. There are two ways to draw that:
-
-- **A. Everything on the view.** The DO's terminals are on the controller view, and wires run from there to the starter circuit. Simple, but a sheet's wiring crosses to wherever the controller view is.
-- **B. Contacts linked to the output (recommended).** The DO's contact is drawn *in the circuit it switches*, as an ordinary contact linked to `K12-3:DO3`, exactly like a relay contact linked to its coil. The contact takes the DO's terminal numbers. The controller view shows `DO3` with a cross-reference to where its contact is (`→ 9-41`) instead of terminals.
-
-B is how relays already work in Ferrule (coil in one place, contacts where they act, cross-referenced both ways), so it adds no new idea and gives cleaner sheets. A DO not drawn elsewhere just shows its terminals on the view (A). Inputs are always drawn on the view: a field contact is wired to them.
-
-### Analogue
-
-Sensors (temperature, pressure) are plant: a `BT` temperature sensor with a `Signal` point (analogue, NTC10k), wired to the controller's UI. No new symbols: plant views show them as plant boxes, as today.
-
-## 7. Simulation
-
-### What a digital point does
-
-| Form | In simulation |
-|---|---|
-| Contact (out) | Its contacts are open or closed by its state, like a relay's |
-| Powered output (out) | When on, its output terminal is live at its supply's voltage |
-| Dry input (in) | On when its terminal and its common are connected through a closed circuit (a field contact) |
-| Powered input (in) | On when its terminal is live relative to its common |
-| Analogue in (in) | Reads a value you set (slider, in its units) |
-| Analogue out (out) | Its value is set by its behaviour or by hand |
-
-### Behaviour of out points
-
-Each out point has one behaviour:
-
-| Behaviour | Settings | Example |
+| Type | Channels | Notes |
 |---|---|---|
-| **Manual** | — | Fire alarm contact, a fault relay: you click it |
-| **Follows** | Point, on delay, off delay, invert | DPS: proven 5 s after the run command, drops 2 s after |
-| **Rule** | An expression | Controller DO: `DO1 = DI3 and not DI4` |
+| Power supply | — | Supply in, supply out |
+| Host | — | The controller's base: supply, comms ports, often some IO |
+| DI-*n* | *n* dry or powered inputs | |
+| DO-*n* | *n* contacts or powered outputs | |
+| UIO-*n* | *n* universal | Each set to a form |
+| AI-*n* | *n* analogue inputs | |
+| AO-*n* | *n* analogue outputs | |
 
-**Rules** stay deliberately small. They simulate a controller's basic strategy; they don't replace its real program:
+- ***n* is a setting**, like a contactor's poles: one DI module type gives DI-4, DI-8, DI-16.
+- **The module generator** fills the pins table from a pattern, so a module takes seconds:
+  - channels: *n*;
+  - pins per channel and their ids, e.g. `VO RET CO`, or `IO C`, or `Y ⊥` with the `⊥` shared by two channels;
+  - the first pin number, and the group name pattern (`AO#` → AO1, AO2…).
+
+  After generating, the table can be edited by hand for oddities (the DXR2's `V+`, a shared `⊥`).
+- **From datasheets.** Real models (a Trend IQ5-IO/16UIO, a DXR2.E18) are entered once from the datasheet with the generator and table, then saved in the device library with their GA size and datasheet. Ferrule ships no makers' data.
+- **Point references** are `tag:module.point`, e.g. `A2-23:3.DI2`, so channels numbered per module (Trend) and per controller (Siemens) both work. A controller with one module drops the module: `A2-23:DI2`.
+
+## 5. On the drawing
+
+### Controller views: top of the sheet, terminals underneath
+
+A controller view sits **at the top of the sheet**, with its **terminals along the bottom**: the reverse of plant, whose terminals are along the top. Wires drop straight down from the controller and rise straight up to the plant. The layout follows the Schneider/Lloret module sheets:
 
 ```
-value  :=  point | number | true | false | ( value )
-test   :=  value [ = != > < >= <= ] value
-expr   :=  test | not expr | expr and expr | expr or expr
-rule   :=  expr [ after 5s ] [ for 2s ]
+ A2-23            MODULE 3             SCHNEIDER ELECTRIC   SXWAOVBXX10001
+┌──────────────────────────────────────────────────────────────────────┐
+│                          ANALOGUE OUTPUTS                             │
+│      AO1             AO2             AO3            AO4   …           │
+│  VO  RET  CO     VO  RET  CO     VO  RET  CO    …                     │
+│   1   2    3      4   5    6      7   8    9    …                     │
+└───o───o────o──────o───o────o──────o───o────o─────────────────────────┘
 ```
 
-- `after` delays turning on; `for` holds on after the expression goes false.
-- Points are named by their own name on the same device (`DI3`) or `tag:point` anywhere else (`K12-3:AI1`, `SF-01:Running`).
-- An analogue out's rule gives a number: `AO1 = 100 if DI1 else 0`. Anything richer is out of scope.
+- **Title row:** controller tag, module number and type, maker and model when known.
+- **Group heading** (e.g. *Analogue outputs*, *Universal IO*), then per channel: group, pin ids, pin numbers, terminals.
+- **Point labels** (what each one does on this job) under the terminals, along the wire: `TPEF/09/01 E/FAN SPEED CONTROL`.
+- **One view per module** is the usual case. A module too wide for the sheet **continues** on the next with a break mark, as in the Trend example.
+- In simulation each channel shows its state where the Trend drawing has its LEDs (§6).
 
-### Forcing and seeing it
+### All connections go to the module
 
-- **Force** any out point on or off (or to a value), as on a BMS front end. A forced point is outlined on the drawing and listed at the top of the simulation panel with its forced value, until released.
-- The simulation panel groups points by device and module, with live states. Clicking one jumps to its view.
-- **Check logic** treats manual points as inputs to try, and follows/rule points as part of the logic.
+Every point's wiring is drawn **at the module**, outputs included. A DO that enables a fan starter is wired from the module's DO pins out through a **link arrow** to the starter circuit, and switched there. On site you check a controller by looking at its modules, so every one of its connections should be on that sheet. It's the same reason plant shows all its cores. (This replaces the first draft's "contacts linked to the output".)
 
-## 8. Schedules
+### Linking, made quicker
 
-An **IO schedule**, exported as CSV with the terminal and cable schedules:
+All that linking has to be easy (also design-v0.2 §6):
 
-| Device | Module | Point | Type | Terminals | Label | Wired to | Sheet |
+- Select a link arrow and click **Link…** in its properties.
+- Navigate anywhere: other sheets, zoom, pan. A bar says *Linking from 9-41: click the arrow to link to. Esc cancels.*
+- Click the target arrow. They're paired; the target becomes the destination, and takes the source's label (default on).
+- Also **Link to a new arrow**: drop a fresh partner arrow wherever you click, already paired.
+
+## 6. Simulation: proving wiring and logic
+
+### Outputs: click them
+
+- **Controller DOs:** click to toggle. The contact closes or opens (or the powered output goes live), and the circuit reacts.
+- **Plant outputs** (a DPS, a fault relay): click to toggle, or **follow** another thing with an optional delay ("proven 5 s after SF-01 runs"). Following is the only automatic behaviour.
+- Analogue outputs aren't simulated.
+
+### Inputs: expected or not
+
+Each input (a controller DI, or a UI used as one; or a plant input) can have an **expectation**: when it should be on. While simulating, its terminal shows:
+
+| Colour | Means |
+|---|---|
+| **Green** | It sees what was expected (on when it should be, off when it shouldn't) |
+| **Red** | It doesn't: something is wired, linked or drafted wrong |
+| Grey | No expectation set: shows on or off only |
+
+**Expectations are one plain sentence**, chosen from lists:
+
+> `A2-23:3.DI2` should be **on** when **K3-12** is **energised**
+
+- *Things*: a coil (energised), a contact (closed), a plant point or DO (on), a lamp (lit).
+- Two conditions can be joined with **and** or **or**. Nothing more: no maths, no timers.
+- An input's sensed state comes from the circuit: a dry input is on when its loop to its common is closed; a powered input when its pin is live.
+
+**Check logic** gains a mode that tries every combination of outputs and plant states and reports any input that goes red, with the shortest way to get there and a replay.
+
+### Seeing it
+
+- Channels show their state at the module (a dot, as in the Trend LEDs: filled when on).
+- The simulation panel lists every device's points by module, with live states and colours. Red inputs come first. Clicking one jumps to it.
+
+## 7. Points list
+
+An **IO schedule** (the job's points list) exported as CSV with the terminal and cable schedules:
+
+| Controller | Module | Point | Form | Pins | Label | Wired to | Sheet |
 |---|---|---|---|---|---|---|---|
-| K12-3 | 2: 8DI | DI3 | Dry input | 3, C1 | SF-01 running | SF-01:Running | 9-41 |
-| K12-3 | 3: 8DO | DO1 | Contact | 11, 12 | SF-01 enable | Contact at 3-34 | 3-34 |
+| A2-23 | 3: DI-8 | DI2 | Dry input | 3, C1 | SF-01 running | SF-01:Running | 9-41 |
+| A2-23 | 4: DO-8 | DO1 | Contact | 11, 12 | SF-01 enable | via 9-41 → 3-34 | 3-34 |
 
-For a BMS engineer this is the points list for the job, and it comes straight off the drawing.
+Plant points have a schedule of their own: device, point, pins, what they're wired to.
 
-## 9. GA
+## 8. GA
 
-A controller is placed on the GA as its modules side by side on a rail, each sized from its model. Parts not yet on a GA (design-v0.2 §8) list the controller as one item that places all its modules together.
+A controller is placed on the GA as its modules side by side on a rail, sized from their library entries (or generic sizes per type and channel count). *To place* lists the controller as one item that places all its modules.
+
+## 9. Comms
+
+RS485 and other comms are **pins and groups only**: drawn on the module and plant views, wired like anything else, listed in the schedules, not simulated.
+
+**For later: network drawings.** A sheet type that draws a bus as a flow diagram: controller → plant A → plant B → terminals, with the termination resistor and screen continuity marked, built from the comms wiring already on the schematic. Worth designing once controllers are in use.
 
 ## 10. Checks
 
 - A dry input wired to a live conductor (voltage onto a volt-free input): **error**.
-- An out point with a rule that names a point that doesn't exist: **error**.
-- A powered input with nothing able to energise it, or an in point wired to nothing: **warning**.
-- A DO with no contact drawn and no wiring: **info** (spare output).
-- An analogue point wired to a digital point: **warning**.
+- An expectation naming something that doesn't exist: **error**.
+- An input wired to nothing: **warning**.
+- A DO wired to nothing: **info** (spare).
+- An analogue point wired to a digital one: **warning**.
 
-## 11. MCP
+## 11. Still to decide
 
-New tools for Claude: `add_controller` (model and modules), `set_point` (form, label, behaviour), `place_controller_view`, `link_contact_to_point`, and `io_schedule`. `add_plant` takes points.
+1. **Module numbering in references:** `A2-23:3.DI2` (module number, then point) as proposed, or would you write it differently on site?
+2. **Expectations for plant inputs** (e.g. "SF-01's run input should be on when K3-34 is energised"): useful as well, or controllers only?
+3. **Module view width:** one module per view, continuing onto the next sheet when wide. Or would you sometimes want a whole controller's modules side by side across one sheet?
+4. **Channel state dots** on the drawing during simulation (like the Trend LEDs), or colour the terminals only?
 
-## 12. Open questions
+## 12. Phases
 
-1. **Outputs that switch panel circuits:** B (contacts linked to the output, cross-referenced like relays) as recommended, with A for outputs not drawn elsewhere?
-2. **Prefix K** for controllers, or would you rather a different letter on your drawings?
-3. **Generic models only**, makers' models entered by users from datasheets? Or should Ferrule ship a few common ones (e.g. Trend IQ4 and its IO modules, Siemens PXC)? Shipping them means keeping their terminal numbering right.
-4. **Rules:** is this small expression language enough for what you'd want to try on a drawing, or do you need timers and latches inside rules (e.g. a run-on after stop)?
-5. **Comms** (RS485 and so on): just terminals on the view for now, with no network drawing or simulation. OK?
-6. **Analogue simulation** comes after digital (phase 3 below). OK to wait?
-
-## 13. Phases
-
-1. **IO points for plant.** The model, the points table in the plant dialog, the three behaviours, forcing, the new simulation panel. Replaces plant groups.
-2. **Controllers, digital.** Devices of kind controller, modules from the library, views, contacts linked to outputs, dry and powered DIs, the IO schedule, GA placement, checks.
-3. **Analogue.** AI/AO/UI values, sliders, thresholds in rules, analogue plant (sensors, actuators).
+1. **IO points for plant:** pins table and quick entry, forms, click and follow, expectations with green/red, the simulation panel. Replaces plant groups.
+2. **Link workflow** (§5): useful everywhere, and needed before controllers multiply the arrows.
+3. **Controllers:** generic module types, the generator, library models, module views at the top of the sheet, references, the IO schedule, GA placement, checks, Check logic for red inputs.
 4. **MCP tools** for all of the above.
+5. **Later:** network drawings for comms.
