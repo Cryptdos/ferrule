@@ -1,0 +1,349 @@
+# Ferrule v0.2: design
+
+What changes after testing v0.1.0-pre, and why. It answers every note in the testing doc (`v0.1.0-pre Testing/testing.md`, numbered 1–75 below) and the follow-ups from 22/11/26. [DESIGN.md](DESIGN.md) stays the record of how Ferrule works; decisions made here are copied into its decisions table as each part lands.
+
+**The ethos, restated:** simple, modular parts; one way to do each thing; a clean interface with no redundant parts; the same conventions everywhere, so engineering takes less time and less effort. Every change below is checked against that.
+
+**No backwards compatibility before 1.0.** v0.2 writes file format **version 3** and refuses older files with a plain message ("made with Ferrule 0.1; this version can't open it") rather than half-opening them. The upgrade code in v0.1 (old file extension, lamp colours, plant tag prefixes, terminal block inference, lamp terminal names) is removed, and v0.2 adds none: no rescaling to the new grid, no rail-to-busbar conversion, no part conversions. That keeps the code small while the format is still moving. From 1.0 on, every format change comes with its upgrade. Checking files on load stays, because files can be hand-edited or written over MCP.
+
+## Contents
+
+1. [Bigger grid and readable text](#1-bigger-grid-and-readable-text)
+2. [Busbars and distributions](#2-busbars-and-distributions)
+3. [Parts audit](#3-parts-audit)
+4. [Contacts, timers and selectors](#4-contacts-timers-and-selectors)
+5. [Terminals and the terminal block](#5-terminals-and-the-terminal-block)
+6. [Wires, labels and links](#6-wires-labels-and-links)
+7. [Annotate](#7-annotate)
+8. [GA and controllers](#8-ga-and-controllers)
+9. [Simulation](#9-simulation)
+10. [Windows and interface](#10-windows-and-interface)
+11. [The app around it](#11-the-app-around-it)
+12. [Bugs found in testing](#12-bugs-found-in-testing)
+13. [Every testing note and its outcome](#13-every-testing-note-and-its-outcome)
+14. [Order of work](#14-order-of-work)
+
+---
+
+## 1. Bigger grid and readable text
+
+**Problem (2, 3, 7, 18, 19).** Printed on A4, the drawing reads like a thumbnail: tags are about 1.9 mm, terminal numbers and contact tables 1.1–1.3 mm. ISO 3098 and common drafting practice put the smallest text at 1.8 mm and ordinary text at 2.5 mm. The cause is the grid: one unit is 1.385 mm (277 mm ÷ 200 units), so symbols are small too (a coil is under 3 mm wide), and text can't grow without crowding them.
+
+**Decision: a bigger grid, done properly**, so everything scales together and stays in proportion.
+
+| | v0.1 | v0.2 |
+|---|---|---|
+| Columns per sheet | 100 | **75** |
+| Units per column | 2 | 2 |
+| Drawing area | 200 × 120 units | **150 × 90 units** |
+| One unit | 1.385 mm | **1.847 mm** (+33%) |
+
+The sheet holds three quarters as much in each direction. The scanned sheet used about 65% of the width and 70% of the height, so a typical sheet still fits, with room to spare.
+
+### Text styles, in millimetres
+
+Every piece of text on a drawing uses one of five named styles, defined once, in millimetres (ISO 3098 type B heights). Symbols name a style; they never give a number. This is the "do it right" part: changing a size, or the grid again, is one edit.
+
+| Style | Height | Used for |
+|---|---|---|
+| `title` | 5 mm | Cover sheet title |
+| `heading` | 3.5 mm | Section box titles, title block main fields |
+| `tag` | 2.5 mm | Part tags, labels, busbar names, link arrow labels, plant names |
+| `detail` | 1.8 mm | Terminal and pin numbers, wire numbers, colours and functions, contact tables, cross-references, ratings, plant information lines, title block captions |
+| `note` | 2.5 mm | Notes and text (the user can pick `detail` or `heading` instead) |
+
+**1.8 mm is the floor.** Nothing is drawn smaller: where text won't fit (a long terminal number in a block cell), the part makes room rather than the text shrinking. A test fails if any symbol draws text under 1.8 mm.
+
+Line weights get the same treatment: `thin` 0.25 mm (symbols, wires), `thick` 0.5 mm (busbars, terminal block, plant outline), `frame` 0.7 mm.
+
+### Old projects
+
+Not converted (see *No backwards compatibility* above): v0.1 projects are redrawn. The LSP-01 example is rebuilt by its script.
+
+### Terminal block and plant terminals (18, 19)
+
+At the new scale a block cell is 1 unit wide (1.85 mm) and 3 units tall (5.5 mm). Its number is `detail` (1.8 mm) running up the cell; a number that won't fit makes the cell taller across the whole block, not the text smaller. Fused, disconnect and switched-fuse marks scale with it and read clearly.
+
+Plant terminal boxes narrow to the same 1-unit pitch, so a plant under the block lines up cell for cell.
+
+---
+
+## 2. Busbars and distributions
+
+**Problem (5, 43, 61, 68, 73, follow-up 3).** There are two parts that do the same job (control rail and busbar). Busbars with the same *name* become one conductor across the whole project. That made W1-18 in ATS-1 live whatever the changeover did (73), until it was renamed `La`/`Na`. Wires leaving a busbar have no number (5). The `/2 /3 /5` list after a rail is clutter (5).
+
+### One part: Busbar
+
+The control rail is removed; **Busbar** does both jobs.
+
+- *Style*: **distribution** (thick, 0.5 mm, a little thinner than today, 13) or **control** (thin, like a control rail today). Only the look differs.
+- *Distribution*: which supply it carries, picked from the project's distribution list (below), or **Local** (this busbar alone).
+- Core colour and function, same as a wire (68).
+- Its name sits beside its tag (40), with an option to print it at both ends (41). There's no more list of other sheets: the name says what it is (5).
+
+### The distribution list
+
+A **Distribution** button beside Plant opens the project's list of supplies (43):
+
+| Name | Kind | Voltage | Colour | Function |
+|---|---|---|---|---|
+| L (grid) | AC line | 230 V | Bn | L |
+| N (grid) | AC neutral | | Bu | N |
+| L (EPS) | AC line | 230 V | Bn | L |
+| CCT | Control | 24 V DC | Bu | +24V |
+| 0V | Control | 0 V | Wh | 0V |
+
+- Busbars, link arrows and the incoming supply pick from this list instead of free text, so matching is by identity, not spelling.
+- **Busbars on the same distribution are one conductor**, on any sheet. That gives the continuity that rails had, explicitly, and only where it's meant.
+- **Local** busbars join nothing else (follow-up 3). That's ATS-1's W1-18: the changeover's output. It could equally be its own distribution, `L (ATS)`, if other sheets need it.
+- Colour and function come from the distribution unless overridden.
+
+### Wire numbers at busbars (5)
+
+A busbar is a joint, like a distribution block: **numbering stops at it**. Each wire leaving a busbar gets its own number, by the usual position scheme. Electrically they're still joined, so simulation and checks see one net. This is the opposite of terminals, where a wire keeps its number (review 2) because it's the same conductor carried on.
+
+
+---
+
+## 3. Parts audit
+
+**Ethos check (62).** Every part, and whether it earns its place.
+
+| Part | Verdict | Why |
+|---|---|---|
+| Contact NO, Contact NC, Changeover contact | **Keep** | Distinct symbols, distinct behaviour |
+| Timer contact | **Remove** | A contact linked to a timer coil *is* timed (§4). Two parts for one thing caused bug #6 |
+| Push button NO / NC | **Merge** into *Push button* with a NO/NC/both setting | Same part, different contact |
+| Selector / keyswitch | **Keep, reworked** (§4) | |
+| Isolator / MCB / contactor | **Keep**, operators rationalised (36) | |
+| Fuse | **Keep** | |
+| Relay / contactor coil, Timer coil | **Keep** | Different behaviour, different settings |
+| Indicator lamp, Socket, Transformer, Motor | **Keep** | |
+| Terminal | **Keep**; adds an *Earth* type (§5) | |
+| Busbar + Control rail | **Merge** into *Busbar* (§2) | Same job |
+| Earth | **Keep** | |
+| Link arrow | **Keep** | |
+| Cable screen | **Keep**, redrawn (25) | |
+| Incoming supply | **Keep**; picks a distribution | |
+| Plant view | **Keep** | |
+| Junction | **Keep** (not in the palette) | |
+| Text + Notes | **Merge** into *Text*, with formatting | Notes is a superset |
+| Box, Label plate, Section box | **Keep** | Different purposes: border, engraved plate, functional group |
+| Picture, Revision list, Symbol legend | **Keep** | |
+| GA Note tool | **Remove** (46) | Annotate's Text works on GA sheets |
+
+Result: 31 parts become 26, and each is the only way to draw its thing.
+
+---
+
+## 4. Contacts, timers and selectors
+
+- **Timed contacts follow their coil (6, 32).** Any contact linked to a timer coil switches with the timer's function (TON, TOF…), and the delay mark is drawn on it automatically. There's no function setting on the contact. A tick box, *Instantaneous*, covers the timer relays that also have plain contacts.
+- **Flip (31, 39).** `F` flips a part top to bottom (contacts that must be drawn upside down still read correctly); `R` rotates. **Fit** moves to a tap of `Space` (8 and follow-up 14): tapping fits the sheet, holding Space and dragging still pans. The Fit button stays.
+- **Selector (33, 35, 75).** One part, configured as:
+  - positions: 2 (0–I) or 3 (I–0–II);
+  - poles: 1 to 4;
+  - each pole: which positions close it, and NO or NC. That gives the I → C+NO and II → C+NO arrangement (four terminals: two separate contacts), changeovers, and NC selector contacts (35).
+
+  The position legend (`I 0 II`) moves clear of the terminal numbers (34).
+- **Isolator operators (36).** Rotary handle, door handle, key, or *none* (operated by something else, e.g. a contactor). No push-to-operate.
+- Timer function notes: "no IEC 61131-3 name" goes (37). The time box gets a `?` explaining what it takes: `500ms`, `5s`, `1.5s`, `2min`; decimals allowed (38).
+- Lamp test terminal `T` becomes `LT` (30). Lamp terminals `V+`/`V-` become `+V`/`-V`, and the DC incoming supply's `+`/`-` become `+V`/`-V` (44).
+
+---
+
+## 5. Terminals and the terminal block
+
+- **Earth terminals (9, 27, follow-up 7).** A fifth terminal *Type*: **Earth**. On the block its cell shows the earth sign ⏚ (osifont has it), drawn upright rather than turned with the number. Elsewhere it's the earth terminal symbol. Earth terminals are green-yellow in the GA and grouped with their strip.
+- **Terminal strip line (55).** A Draft tool: draw a dashed line through a group of terminals (e.g. X0 in 161627) and name it; every terminal it crosses joins that strip. The line shows the strip name at its end. It's how a strip that isn't on the boundary is grouped and read.
+- Sizes per §1.
+
+---
+
+## 6. Wires, labels and links
+
+- **Junctions (15).** A wire number is printed once per conductor per sheet, on the longest run, not on every branch meeting at a junction.
+- **Earth wires (24).** Wires to an earth or earth terminal get no number. *Number this earth wire* overrides it.
+- **Cable screen (25, 26).** A rounded rectangle round the cores, its tail leaving to the side so it routes easily. The wire from the screen is dashed like the screen.
+- **Colour and function (67).** Both print at the source end only, inset from the terminal (about 2 units), running along the wire like the colour does. That ends the clash in 215734 (`230V` over `Bn`).
+- **Labels wrap (28, 65).** Any part label can have a width; longer text wraps onto more lines. The incoming supply's label is centred and wraps.
+- **References (21).** Back to always showing the full reference (`11-06`), on the same sheet too.
+- **Link arrows (69, 70, 71).**
+  - Two arrows showing the same `1-24` is correct: that's the address of their partners, and both partners are in column 24 of sheet 1. It isn't a tag, so it can't take an A suffix. The arrow's label is what tells them apart.
+  - The label sits at the arrow's tip, along the wire's direction: under it when the wire is horizontal, to its right when vertical, with the reference after the label. That clears the overlaps in 222814 and 223310.
+  - A destination arrow takes its source's label, ticked by default (*Same label as its source*).
+- **Coil tables (29).** A contact table has its coil's tag above it, centred, so a table moved away from its coil still says whose it is.
+
+---
+
+## 7. Annotate
+
+- **New tools (16):** arrow, highlight (a translucent marker band), numbered call-out circles (auto-numbered 1, 2, 3… per sheet), polygon.
+- **Door items (11).** Lamps, pushbuttons, rotary handles and meters on a door are drawn by the **GA door view** from the schematic parts themselves (lamp lens in its colour, handle with its positions), rather than as Annotate shapes. That way the door GA can't drift from the schematic. The placeholder boxes go.
+- Text gains Notes' formatting (§3).
+
+---
+
+## 8. GA and controllers
+
+- **Strips keep up (45).** A placed terminal strip grows when terminals are added to that strip in the schematic (the GA shows it longer). **Check** reports a GA strip whose terminals changed since you last looked, until you open the GA.
+- **Sheet type (12).** In sheet settings, *Spare sheet* becomes *Sheet type*: **Schematic / Spare / GA** (an empty sheet can become a GA).
+- **Remove GA Note (46).**
+- **Controllers (47, 48).** A controller (PLC, DDC, outstation) is a kind of plant with:
+  - modules (CPU, IO cards), each with IO points: DI, DO, AI, AO, UI (universal), plus supply terminals;
+  - IO points wired on the schematic like plant terminals, so the drawing shows `DO3` driving `K9-8`;
+  - a GA footprint (modules side by side on a rail, sized from the device library);
+  - an IO schedule (point, type, tag, description, sheet) exported with the other schedules;
+  - in simulation, outputs can be set by hand, and inputs show their live state.
+
+  This needs its own design doc, `docs/controller.md`, written and reviewed before any of it is built. It covers plant and controllers together (below).
+
+### Field IO and simulation (plant and controllers)
+
+Plant and controllers both bring signals into the panel and take them out, so they share one model: **IO points**.
+
+- Every plant or controller has points. An **input** is driven by the panel and seen by the device (a fan's run command, a controller DI). An **output** is driven by the device and seen by the panel (a DPS contact, a fault relay, a controller DO).
+- Digital first; analogue (AI/AO) later, with a value to set.
+- Each output behaves one of three ways:
+  - **Manual**: click it.
+  - **Follows**: true after an input, with on and off delays, optionally inverted ("airflow proven 5 s after the run command").
+  - **Rule**: a small expression, e.g. `DO1 = DI3 and not DI4`, to simulate a controller's simple strategy without modelling its real program.
+- An output's contact form (C/NO/NC, volt-free or powered) is wired through ordinary terminals, so the drawing and the simulation can't disagree.
+- The simulation panel lists every device's points live, and any output can be **forced**, as on a BMS.
+- Today's plant groups (role, follows, delay, invert) are replaced by this, not kept alongside it.
+
+---
+
+## 9. Simulation
+
+- **Sources (73, 74).** The incoming supply energises its distribution. A transformer supplies its secondary only while its primary is energised (it's an isolated circuit, so it must remain a source), and the polarity follows the primary: whichever primary side is live, the matching secondary side (P1→S1, P2→S2) is live. With distributions (§2) the ATS-1 changeover simulates correctly: W1-18 is live only through Q1-23.
+- **Break at a fuse (49).** Click a fuse or MCB while simulating to blow or trip it; click again to replace or reset. It's drawn open and marked.
+- **Plant and controller IO (53, and follow-up of 22/11/26).** Plant simulation is replaced by the IO point model (§8). A point you've changed or forced is outlined on the drawing and listed at the top of the simulation panel until reset.
+
+---
+
+## 10. Windows and interface
+
+- **One window style (51, 52, 57, follow-up 9).** Every dialog is a floating window: a title bar with *minimise* and *close*, in the KDE manner, in the same greys as the rest of the interface, with no coloured close button. Windows can be dragged, don't block the drawing (you can still look and scroll behind them), and remember where they were.
+- **Plant (52).** The plant window lists the plant; *New plant…* opens its own window to fill in.
+- **Workbench focus (8).** Things you can't select in the current workbench are drawn in grey (about 55% black) on screen, not faded enough to hurt reading. Print is unaffected.
+- **Sheet indicator (10).** `3 / 14` under the overview.
+- **Split view (14).** Drag the divider to resize. The second pane zooms and pans, and has its own overview.
+- **Number boxes (42).** Shift+scroll steps by 10.
+- **Placing (72).** Place one part, then back to Select. A setting, *Keep placing until Esc*, brings back today's behaviour.
+- **Save as (follow-up 16).** Choosing an existing file asks *Replace it?* instead of refusing.
+- **Paper colour (63, follow-up 11).** The sheet on screen is a warm off-white (#FAF8F3), dimming the backlight without changing the drawing. The drawing stays black on paper, never inverted; print and PDF are pure white. The UI chrome gets an optional dark theme.
+
+---
+
+## 11. The app around it
+
+- **Export PDF (56, follow-up 4).** Kept: it worked from other projects. If it fails again, the error now names the cause and offers *Print → Save as PDF*.
+- **Status and Claude (59, 60, follow-up 10).** The console window stays (no tray icon: nothing that could upset antivirus). A **Status** page in settings shows:
+  - the version, the projects folder and the address;
+  - whether Claude is connected over MCP (and the last tool it used);
+  - how to connect Claude, with the exact settings to paste;
+  - a **Quit Ferrule** button that stops the server cleanly.
+- **Logo (58).** A simple mark from the trade, not AI imagery: a crimp ferrule (a wire end with its sleeve) or a terminal block silhouette, in flat shapes that still read at 16 px for the tab and the exe icon. Three sketches for review.
+
+---
+
+## 12. Bugs found in testing
+
+| # | Bug | Cause | Fix |
+|---|---|---|---|
+| 4, 23 | A wire loops through a coil (sheet 7 of *Example Building*) | The router fails and its fallback draws straight through | Reproduce from the file; the fallback must avoid bodies, and a failure is flagged |
+| 6 | TON contact closes immediately (ATS-1, K2-59) | The contact is an ordinary NO linked to the timer coil, which was treated as instantaneous | Contacts follow their timer coil (§4) |
+| 17 | A wire can't be dragged ("must start and end on its terminals") | Dragging the end run tries to move the wire's end | Dragging a run next to an end adds a jog; the end stays put |
+| 20, 54 | Jumping to a link or a Check item doesn't centre on it | It only re-centres when the target is near the edge | Always centre and ring it; Check uses the same jump |
+| 5 | Wires leaving a busbar have no number | They join the busbar's conductor | Numbering stops at busbars (§2) |
+| 64, 214359, 214950 | Incoming supply's arrows overlap its labels when rotated | Labels don't follow rotation | Labels placed by direction |
+| 66 | Straightening a wire bends it toward the fuse | The fuse's tag text is an obstacle on the straight path | Text only steers a wire with room to move; part labels kept off neighbouring wires |
+| 73 | Unknown voltage source (ATS-1, W1-18) | Same-name busbars were joined | Distributions (§2) |
+| 74 | Voltage "inverts" at the transformer | The secondary's live side was always S1 | Polarity follows the primary (§9) |
+| — | Plant settings copied into later parts (ATS-1: `plant`, `pgroups`… on timers and contacts) | Placing a part after a plant view keeps the view's settings | Clear them between placements; strip unknown settings on load |
+| 16 | Save as won't overwrite | No replace option | Ask to replace |
+
+Both test files are kept privately as regression fixtures (not committed: they're your projects).
+
+---
+
+## 13. Every testing note and its outcome
+
+| # | Note | Outcome |
+|---|---|---|
+| 1 | Printed and scanned sheet | Basis for §1 |
+| 2, 3, 7 | Text too small; there's room | §1: bigger grid, ISO text styles |
+| 4 | Routing error | §12 |
+| 5 | Rail sheet lists cluttered; busbar vs control voltage | §2 |
+| 8 | Grey out what you can't edit | §10 |
+| 9 | Earth terminals on strips | §5 |
+| 10 | Sheet indicator | §10 |
+| 11 | Door shapes | §7: drawn by the GA door view |
+| 12 | Sheet type drop-down | §8 |
+| 14 | Resizable, zoomable split | §10 |
+| 15 | No repeated numbers at junctions | §6 |
+| 16 | Arrows, highlights, call-outs, polygons | §7 |
+| 17 | Wire won't drag | §12 |
+| 18, 19 | Bigger block terminals, narrower plant terminals | §1 |
+| 20 | Jumps don't centre | §12 |
+| 21 | Full references again | §6 |
+| 23 | Routing loop again | §12 |
+| 24 | No numbers on earth wires | §6 |
+| 25, 26 | Cable screen shape; dashed screen wire | §6 |
+| 27 | Earth terminal on the block | §5 |
+| 28 | Wrapping labels | §6 |
+| 29 | Coil table header | §6 |
+| 30 | `T` → `LT` | §4 |
+| 31, 39 | Flip; F for flip | §4: Space for fit |
+| 32 | Timer contact function inherited | §4 |
+| 33, 35, 75 | Selector poles, NC, two-contact three-position | §4 |
+| 34 | `I 0 II` legend overlaps | §4 |
+| 36 | Isolator operators | §4 |
+| 37 | Flasher note | §4: removed |
+| 38 | Time format help | §4 |
+| 40, 41 | Busbar name by its tag, both ends | §2 |
+| 42 | Shift+scroll ×10 | §10 |
+| 43 | Distribution setup | §2 |
+| 44 | `+V`/`-V` | §4 |
+| 45 | GA strips and new terminals | §8 |
+| 46 | Remove GA Note | §3, §8 |
+| 47, 48 | Controllers | §8: own design doc first |
+| 49 | Break at a fuse | §9 |
+| 51, 52, 57 | Window style, plant sub-window, floating/minimisable windows | §10 |
+| 53 | Plant group changes visible | §9 |
+| 54 | Check doesn't centre | §12 |
+| 55 | Terminal strip line | §5 |
+| 56 | PDF export failed | §11: kept, better error |
+| 58 | Logo | §11 |
+| 59, 60 | MCP status; tray app | §11: status page, console kept |
+| 61 | Rails vs busbars | §2: one part |
+| 62 | Ethos review | §3 |
+| 63 | Dark mode | §10: off-white paper, dark chrome optional |
+| 64, 65 | Incoming supply labels | §6, §12 |
+| 66 | Straightening bends | §12 |
+| 67 | Colour/function overlap | §6 |
+| 68 | Busbar colour and function | §2 |
+| 69 | Duplicate `1-24` | §6: correct, explained |
+| 70 | Destination inherits label | §6 |
+| 71 | Arrow labels follow the wire | §6 |
+| 72 | Place one, then stop | §10 |
+| 73, 74 | Simulation sources | §9 |
+| 6, 13, 22, 50 | Removed by you | — |
+
+Follow-ups of 22/11/26: grid (1) §1; test file (2) §12; local busbars (3) §2; PDF export (4) §11; busbar wire numbers (5) §2; TON (6) §4, §12; ⏚ (7) §5; fit key (8, 14) §4; no red close (9) §10; console (10) §11; paper colour (11) §10; logo (12) §11; busbar weight (13) §2; Save as (16) §10.
+
+---
+
+## 14. Order of work
+
+Each step is one pull request, with a build to test.
+
+1. **Bug fixes** that don't depend on the rest: centring and Check (20, 54), wire dragging (17), plant settings leak, Save as (16), routing loop and straightening (4, 23, 66), transformer polarity (74).
+2. **Grid and text** (§1): the new scale, text styles, the version 3 file format (older files refused, v0.1 upgrade code removed), the LSP-01 example rebuilt. Everything after builds on this.
+3. **Busbars and distributions** (§2), with busbar numbering (5) and simulation sources (73).
+4. **Parts audit** (§3, §4): timer contacts, selector, push buttons, Text + Notes, isolator operators, flip, renamed terminals.
+5. **Wires, labels, terminals** (§5, §6).
+6. **Windows and interface** (§10), paper colour, the status page (§11).
+7. **Annotate tools and GA** (§7, §8 without controllers), fuse breaking and plant group marks (§9).
+8. **Controller and field IO design doc** (`docs/controller.md`, §8) for review; then IO points for plant, then controllers; then the logo sketches.

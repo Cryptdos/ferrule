@@ -50,7 +50,9 @@ Ferrule is also an [MCP server](docs/mcp.md): connect Claude to it and ask for a
 
 ## More
 
+- [Building Ferrule](docs/BUILDING.md): build the exe yourself, from a fresh clone
 - [Design document](docs/DESIGN.md): how it works and every decision taken
+- [v0.2 design](docs/design-v0.2.md): what's changing after testing v0.1.0-pre
 - [Benchmark: LSP-01 life safety panel](docs/benchmark-lsp01.md)
 - [MCP server: letting Claude draft drawings](docs/mcp.md)
 
@@ -62,11 +64,11 @@ Ferrule is also an [MCP server](docs/mcp.md): connect Claude to it and ask for a
 
 PDF export uses Microsoft Edge in the background (or Chrome, if Edge isn't there). Nothing needs installing. Windows may warn the first time because the .exe isn't signed: *More info → Run anyway*.
 
-Build it with `bun run build:exe` (→ `dist/ferrule.exe`). CI also builds it on every pull request; it's attached to the run as the `ferrule-windows` artifact.
+To build it yourself: install [Bun](https://bun.sh), then `bun install` and `bun run build:exe` (→ `dist/ferrule.exe`). [docs/BUILDING.md](docs/BUILDING.md) goes through it step by step, on Windows, Mac or Linux. CI also builds it on every pull request; it's attached to the run as the `ferrule-windows` artifact.
 
 ### From source
 
-Needs [Bun](https://bun.sh) 1.1 or newer.
+Needs [Bun](https://bun.sh) (developed with 1.4). Full steps, including Windows, in [docs/BUILDING.md](docs/BUILDING.md).
 
 ```sh
 bun install

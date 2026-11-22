@@ -20,8 +20,10 @@ import { McpServer, serveStdio } from "./mcp";
 import { loadServerAvoid } from "./avoid";
 import { slugify } from "./storage";
 import { buildLsp01 } from "../bench/lsp01";
+import pkg from "../../package.json" with { type: "json" };
 
-export const VERSION = "0.1.0";
+/** The version in package.json: the one place to change it for a release. */
+export const VERSION: string = pkg.version;
 
 export interface StartOptions {
   assets?: AssetSource;
