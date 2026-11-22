@@ -93,6 +93,7 @@ A **Distribution** button beside Plant opens the project's list of supplies (43)
 | CCT | Control | 24 V DC | Bu | +24V |
 | 0V | Control | 0 V | Wh | 0V |
 
+- **New projects start with an empty list**, as projects start bare in general. A preferred setup is kept in a template project and duplicated.
 - Busbars, link arrows and the incoming supply pick from this list instead of free text, so matching is by identity, not spelling.
 - **Busbars on the same distribution are one conductor**, on any sheet. That gives the continuity that rails had, explicitly, and only where it's meant.
 - **Local** busbars join nothing else (follow-up 3). That's ATS-1's W1-18: the changeover's output. It could equally be its own distribution, `L (ATS)`, if other sheets need it.
@@ -345,3 +346,17 @@ Each step is one pull request, with a build to test.
 6. **Windows and interface** (§10), paper colour, the status page (§11).
 7. **Annotate tools and GA** (§7, §8 without controllers), fuse breaking and plant group marks (§9).
 8. **Controller and field IO design doc** (`docs/controller.md`, §8) for review; then IO points for plant, then controllers; then the logo sketches.
+
+### How the sprint runs (agreed 22/11/26)
+
+- **One PR per step**, each built on the one before, so work never waits on a merge. Merged into `main` by you, in order (or by auto-merge once CI passes, if enabled: see below).
+- **A build with every PR:** `ferrule-windows-v0.2.0-pre.zip`, linked from the PR. Test the newest; go back to earlier ones only if the newest breaks badly.
+- **Version** `0.2.0-pre` throughout the sprint.
+- **Judgement calls:** small ones are decided and noted here under *Changed during build*. Anything costly or considerable to reverse or change is sent to you as a push notification first, and waits for an answer.
+- **Stop only at a PR boundary.** Never half a step. The last PR says what's next, so it's easy to pick up.
+- **Test files** (*Example Building*, ATS-1) are staged from `C:\Temp\eCAD\v0.1.0-pre Testing`, used for reproducing bugs only, never committed.
+- **No professional references** in code, docs, commits or PRs: no third-party firms, drawings or product names from reference material. Generic examples only.
+
+### Changed during build
+
+(None yet.)
