@@ -4,6 +4,8 @@ What changes after testing v0.1.0-pre, and why. It answers every note in the tes
 
 **The ethos, restated:** simple, modular parts; one way to do each thing; a clean interface with no redundant parts; the same conventions everywhere, so engineering takes less time and less effort. Every change below is checked against that.
 
+**No backwards compatibility before 1.0.** v0.2 writes file format **version 3** and refuses older files with a plain message ("made with Ferrule 0.1; this version can't open it") rather than half-opening them. The upgrade code in v0.1 (old file extension, lamp colours, plant tag prefixes, terminal block inference, lamp terminal names) is removed, and v0.2 adds none: no rescaling to the new grid, no rail-to-busbar conversion, no part conversions. That keeps the code small while the format is still moving. From 1.0 on, every format change comes with its upgrade. Checking files on load stays, because files can be hand-edited or written over MCP.
+
 ## Contents
 
 1. [Bigger grid and readable text](#1-bigger-grid-and-readable-text)
@@ -56,7 +58,7 @@ Line weights get the same treatment: `thin` 0.25 mm (symbols, wires), `thick` 0.
 
 ### Old projects
 
-The file format goes to **version 3**. Opening a version 2 project rescales it once: every position and size × (1.385 ÷ 1.847), snapped to the new grid, and all wires routed again. Hand-routed wires are kept where they still meet their ends. A dialog lists the sheets that came out crowded (parts overlapping after snapping) so they can be checked. The original is kept as `.v2.bak`. The LSP-01 example is rebuilt by its script.
+Not converted (see *No backwards compatibility* above): v0.1 projects are redrawn. The LSP-01 example is rebuilt by its script.
 
 ### Terminal block and plant terminals (18, 19)
 
@@ -100,9 +102,6 @@ A **Distribution** button beside Plant opens the project's list of supplies (43)
 
 A busbar is a joint, like a distribution block: **numbering stops at it**. Each wire leaving a busbar gets its own number, by the usual position scheme. Electrically they're still joined, so simulation and checks see one net. This is the opposite of terminals, where a wire keeps its number (review 2) because it's the same conductor carried on.
 
-### Old projects
-
-Rails become control-style busbars. Busbars and rails sharing a name become one distribution of that name, which keeps the old behaviour. Anything else becomes Local. The migration report lists the distributions created, so they can be renamed or split.
 
 ---
 
@@ -139,7 +138,7 @@ Result: 31 parts become 26, and each is the only way to draw its thing.
 
 ## 4. Contacts, timers and selectors
 
-- **Timed contacts follow their coil (6, 32).** Any contact linked to a timer coil switches with the timer's function (TON, TOF…), and the delay mark is drawn on it automatically. There's no function setting on the contact. A tick box, *Instantaneous*, covers the timer relays that also have plain contacts. Existing *Timer contact* parts become contacts, and their function moves to the coil if the coil had none.
+- **Timed contacts follow their coil (6, 32).** Any contact linked to a timer coil switches with the timer's function (TON, TOF…), and the delay mark is drawn on it automatically. There's no function setting on the contact. A tick box, *Instantaneous*, covers the timer relays that also have plain contacts.
 - **Flip (31, 39).** `F` flips a part top to bottom (contacts that must be drawn upside down still read correctly); `R` rotates. **Fit** moves to a tap of `Space` (8 and follow-up 14): tapping fits the sheet, holding Space and dragging still pans. The Fit button stays.
 - **Selector (33, 35, 75).** One part, configured as:
   - positions: 2 (0–I) or 3 (I–0–II);
@@ -197,7 +196,21 @@ Result: 31 parts become 26, and each is the only way to draw its thing.
   - an IO schedule (point, type, tag, description, sheet) exported with the other schedules;
   - in simulation, outputs can be set by hand, and inputs show their live state.
 
-  This needs its own design doc, `docs/controller.md`, written and reviewed before any of it is built.
+  This needs its own design doc, `docs/controller.md`, written and reviewed before any of it is built. It covers plant and controllers together (below).
+
+### Field IO and simulation (plant and controllers)
+
+Plant and controllers both bring signals into the panel and take them out, so they share one model: **IO points**.
+
+- Every plant or controller has points. An **input** is driven by the panel and seen by the device (a fan's run command, a controller DI). An **output** is driven by the device and seen by the panel (a DPS contact, a fault relay, a controller DO).
+- Digital first; analogue (AI/AO) later, with a value to set.
+- Each output behaves one of three ways:
+  - **Manual**: click it.
+  - **Follows**: true after an input, with on and off delays, optionally inverted ("airflow proven 5 s after the run command").
+  - **Rule**: a small expression, e.g. `DO1 = DI3 and not DI4`, to simulate a controller's simple strategy without modelling its real program.
+- An output's contact form (C/NO/NC, volt-free or powered) is wired through ordinary terminals, so the drawing and the simulation can't disagree.
+- The simulation panel lists every device's points live, and any output can be **forced**, as on a BMS.
+- Today's plant groups (role, follows, delay, invert) are replaced by this, not kept alongside it.
 
 ---
 
@@ -205,7 +218,7 @@ Result: 31 parts become 26, and each is the only way to draw its thing.
 
 - **Sources (73, 74).** The incoming supply energises its distribution. A transformer supplies its secondary only while its primary is energised (it's an isolated circuit, so it must remain a source), and the polarity follows the primary: whichever primary side is live, the matching secondary side (P1→S1, P2→S2) is live. With distributions (§2) the ATS-1 changeover simulates correctly: W1-18 is live only through Q1-23.
 - **Break at a fuse (49).** Click a fuse or MCB while simulating to blow or trip it; click again to replace or reset. It's drawn open and marked.
-- **Plant groups (53).** A group whose state you changed is outlined and listed at the top of the simulation panel until reset.
+- **Plant and controller IO (53, and follow-up of 22/11/26).** Plant simulation is replaced by the IO point model (§8). A point you've changed or forced is outlined on the drawing and listed at the top of the simulation panel until reset.
 
 ---
 
@@ -327,10 +340,10 @@ Follow-ups of 22/11/26: grid (1) §1; test file (2) §12; local busbars (3) §2;
 Each step is one pull request, with a build to test.
 
 1. **Bug fixes** that don't depend on the rest: centring and Check (20, 54), wire dragging (17), plant settings leak, Save as (16), routing loop and straightening (4, 23, 66), transformer polarity (74).
-2. **Grid and text** (§1): the new scale, text styles, the version 3 file format with migration, the LSP-01 example rebuilt. Everything after builds on this.
+2. **Grid and text** (§1): the new scale, text styles, the version 3 file format (older files refused, v0.1 upgrade code removed), the LSP-01 example rebuilt. Everything after builds on this.
 3. **Busbars and distributions** (§2), with busbar numbering (5) and simulation sources (73).
 4. **Parts audit** (§3, §4): timer contacts, selector, push buttons, Text + Notes, isolator operators, flip, renamed terminals.
 5. **Wires, labels, terminals** (§5, §6).
 6. **Windows and interface** (§10), paper colour, the status page (§11).
 7. **Annotate tools and GA** (§7, §8 without controllers), fuse breaking and plant group marks (§9).
-8. **Controller design doc** (`docs/controller.md`) for review, then the logo sketches.
+8. **Controller and field IO design doc** (`docs/controller.md`, §8) for review; then IO points for plant, then controllers; then the logo sketches.
