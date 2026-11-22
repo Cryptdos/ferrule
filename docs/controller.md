@@ -85,6 +85,8 @@ A controller is a device of kind **controller**:
 - **From datasheets.** Real models (a Trend IQ5-IO/16UIO, a DXR2.E18) are entered once from the datasheet with the generator and table, then saved in the device library with their GA size and datasheet. Ferrule ships no makers' data.
 - **Every module has its own tag**, by where its view is drawn, like any other part: a DI module drawn at sheet 3, column 23 is `A3-23`. The tag tells you straight away which sheet to turn to.
 - **Point references** are `module tag:point`, e.g. `A3-23:DI2`. That works whether the maker numbers channels per module (Trend) or per controller (Siemens), and matches how it's said on site: "this controller, DI2", with the tag saying where it is.
+- **A reference always lands where the point is.** Engineers learn to read `A3-23` as "sheet 3, column 23" and expect to find what they're after right there; that must never fail. So when a point is drawn on a continuation of its module (a split view, below), every reference to it adds where *that point* is drawn: `A3-23:DO5 (4-10)`. That applies on link arrows, contact tables, expectations and the IO schedule, and double-clicking jumps there. Points on the module's first view need nothing extra: `A3-23:DO2` is at 3-23.
+- **One module, one tag.** A split module is still one physical module with one label, so it keeps one tag (from its first view) on the GA, its label and the schedule. The continuation's title row says where it carries on from: `A3-23 · DO-8 · DO5–8, continued from 3-23`. (Considered and set aside for now: giving each part of a split module its own tag. It makes references land in the right place too, but names one module two ways. To be revisited if B doesn't work out in use.)
 - **The controller as a whole** is its modules together. It has a description (e.g. *AHU-1 outstation*) and is identified by its host module's tag; the modules list it in their title row (*part of A2-5, AHU-1 outstation*). The GA places its modules together.
 
 ## 5. On the drawing
@@ -201,7 +203,7 @@ RS485 and other comms are **pins and groups only**: drawn on the module and plan
 | Pin labelling | Three layers: number (always), id, group |
 | Outputs that switch panel circuits | Wired at the module, out through link arrows: every connection on the module's sheet |
 | Prefix | A (project decision, noted in designations) |
-| References | Modules tagged by where they're drawn; points `A3-23:DI2` |
+| References | Modules tagged by where they're drawn; points `A3-23:DI2`; a point drawn on a continuation adds its own position, `A3-23:DO5 (4-10)`, so a reference always lands where the point is |
 | Simulation | A wiring and logic check, not an emulator: click outputs, follow with delay, no analogue, no rules language |
 | Expectations | One system: "should be … when …" for inputs (controller and plant), "never …" for anything; replaces "never both on" rules |
 | Module views | Split across views and sheets as needed, like plant |
