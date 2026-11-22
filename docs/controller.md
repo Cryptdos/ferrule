@@ -53,6 +53,14 @@ The pin **number** is what's wired, so it's always there. The id and group are s
 - **Shared commons** (`⊥`, `C1`) are one pin used by several points, drawn once.
 - **Universal IO (UIO, UI)** is set per point to one of the forms above, as on the real kit.
 - **Supply out points are sources.** Each picks a distribution from the project's list (design-v0.2 §2), e.g. `L (EPS)` or `24V DC aux`, and in simulation energises it. It's live when the device is on: clicked on and off like an output, or following the device's own supply in (a PSU is on when its input is). This replaces drawing a stand-in *Incoming supply* next to plant that provides power, as was needed for the inverter on ATS-1.
+- **PSUs and DC UPSs with a battery** are vital panel kit and must simulate properly, since many panels run DC internals with a local battery backup. A typical DIN-rail DC UPS has:
+  - **Supply in** (L, N, PE) from the mains;
+  - **Supply out** (+V, -V), a source on its DC distribution;
+  - **Battery** (BAT+, BAT-): a battery point that's charged from the output while the mains is on, and **becomes the source** when the mains is lost;
+  - **Status relays**, each a contact point (C/NO/NC): *AC fail*, *DC OK*, *Battery low*, *Charger fail*;
+  - sometimes signal pins (remote inhibit, a force or battery-start input) and a comms port, drawn as pins only.
+
+  In simulation the output is live while the mains input is live, **or** while the battery is connected and not flat. *AC fail* follows the mains input (on when it's lost). *DC OK* follows the output. *Battery low* and *Charger fail* are clicked, as faults to test with, and a **battery flat** toggle lets you test what the panel does when the backup runs out. These are ordinary points with *follows*, so no special part is needed: a **generic PSU / DC UPS** module type is added to the shipped types (with or without battery and relays) to make it quick to set up.
 - **Inputs and sources.** A dry input needs no source: the controller senses its own loop. A powered input needs one, usually the controller's own 24 V auxiliary output (a supply out point) or a PSU, wired round through the field contact like any other circuit.
 
 ## 4. Building devices
@@ -70,7 +78,7 @@ A controller is a device of kind **controller**:
 
 | Type | Channels | Notes |
 |---|---|---|
-| Power supply | — | Supply in, supply out |
+| Power supply | — | Supply in, supply out; optionally battery, status relays (AC fail, DC OK, battery low, charger fail): covers PSUs and DC UPSs |
 | Host | — | The controller's base: supply, comms ports, often some IO |
 | DI-*n* | *n* dry or powered inputs | |
 | DO-*n* | *n* contacts or powered outputs | |
