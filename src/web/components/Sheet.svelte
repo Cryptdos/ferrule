@@ -8,7 +8,6 @@
   import { resolveFields } from "../../core/fields";
   import { cloudsOn } from "../../core/ops";
   import { cloudPath } from "../../core/titleblock";
-  import { liveColour } from "../../core/wirecolours";
   import ElementView from "./ElementView.svelte";
   import GaLayer from "./GaLayer.svelte";
   import type { GaItem } from "../../core/model";
@@ -103,17 +102,8 @@
     {#each page.segments as seg (seg.id)}
       {@const pts = routes?.get(seg.id) ?? routeOf(page, seg)}
       {@const c = condById.get(seg.conductor)}
-      {@const lc = live?.has(seg.conductor) ? liveColour(c?.colour) : null}
-      {#if lc?.edge}
-        <!-- A white core gets a dark edge so it shows on the sheet. -->
-        <polyline class="live-edge" points={pts.map((p) => p.join(",")).join(" ")} />
-      {/if}
-      <polyline
-        class:field={field.has(seg.id)}
-        class:live={!!lc}
-        style={lc ? `stroke: ${lc.stroke}` : undefined}
-        points={pts.map((p) => p.join(",")).join(" ")}
-      />
+      <!-- Live wires are red, whatever their core colour: a black or grey core would hide it. -->
+      <polyline class:field={field.has(seg.id)} class:live={!!live?.has(seg.conductor)} points={pts.map((p) => p.join(",")).join(" ")} />
       {#if c}
         {#each wireTexts(pts, {
           // Shown by the usual rules (numbers off on field wires), unless the wire says otherwise.
@@ -167,10 +157,6 @@
   .wires polyline.live {
     stroke: #d42020;
     stroke-width: var(--thick);
-  }
-  .wires polyline.live-edge {
-    stroke: #555;
-    stroke-width: calc(var(--thick) * 1.8);
   }
   .wires polyline.field {
     stroke-dasharray: 0.9 0.5;

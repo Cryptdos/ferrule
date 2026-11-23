@@ -34,7 +34,6 @@
     type WireEnd,
   } from "../../core/ops";
   import { benchOf, localGeometry, defaultParams, plantViewLayout, type Geometry } from "../../core/symbols";
-  import { liveColour } from "../../core/wirecolours";
   import { plantInputId } from "../../core/sim";
   import { GA_ORIGIN, mmToUnits, sheetToGa, snapToRail } from "../../core/ga";
   import type { GaItem } from "../../core/model";
@@ -951,21 +950,18 @@
     return g?.kind === "band" ? g : null;
   });
 
-  const simLive = $derived(sim ? new Set([...sim.state.live, ...(sim.state.returns ?? [])]) : null);
+  const simLive = $derived(sim ? new Set(sim.state.live) : null);
   const simOps = $derived(sim ? sim.ops : null);
-  /** Busbars on a live conductor, drawn in their own core colour like live wires. */
+  /** Busbars on a live conductor, drawn red like live wires. */
   const liveRails = $derived.by(() => {
     if (!sim || !simLive) return [];
-    const out: { x1: number; y1: number; x2: number; y2: number; bar: boolean; stroke: string; edge: boolean }[] = [];
+    const out: { x1: number; y1: number; x2: number; y2: number; bar: boolean }[] = [];
     for (const el of page.elements) {
       if (el.symbol !== "busbar") continue;
-      const c = editor.project.conductors.find((x) => x.terminals.some(([id]) => id === el.id) && simLive.has(x.id));
-      if (!c) continue;
-      const d = editor.project.distributions.find((x) => x.id === el.params.dist);
-      const lc = liveColour(String(el.params.colour || d?.colour || ""));
+      if (!editor.project.conductors.some((x) => x.terminals.some(([id]) => id === el.id) && simLive.has(x.id))) continue;
       const len = Number(el.params.length) || 0;
       const v = el.rot === 90 ? [0, 1] : el.rot === 180 ? [-1, 0] : el.rot === 270 ? [0, -1] : [1, 0];
-      out.push({ x1: el.pos[0], y1: el.pos[1], x2: el.pos[0] + v[0]! * len, y2: el.pos[1] + v[1]! * len, bar: el.params.style !== "control", ...lc });
+      out.push({ x1: el.pos[0], y1: el.pos[1], x2: el.pos[0] + v[0]! * len, y2: el.pos[1] + v[1]! * len, bar: el.params.style !== "control" });
     }
     return out;
   });
@@ -1115,8 +1111,7 @@
     {/snippet}
     {#snippet over()}
       {#each liveRails as r, i (i)}
-        {#if r.edge}<line class="sim-rail edge" class:bar={r.bar} x1={r.x1} y1={r.y1} x2={r.x2} y2={r.y2} />{/if}
-        <line class="sim-rail" class:bar={r.bar} x1={r.x1} y1={r.y1} x2={r.x2} y2={r.y2} style="stroke: {r.stroke}" />
+        <line class="sim-rail" class:bar={r.bar} x1={r.x1} y1={r.y1} x2={r.x2} y2={r.y2} />
       {/each}
       {#if sim}
         {#each page.elements as el (el.id)}
@@ -1304,13 +1299,6 @@
   }
   .sim-rail.bar {
     stroke-width: 0.6;
-  }
-  .sim-rail.edge {
-    stroke: #555 !important;
-    stroke-width: 0.55;
-  }
-  .sim-rail.bar.edge {
-    stroke-width: 0.9;
   }
   .countdown rect {
     fill: #1b2230;
