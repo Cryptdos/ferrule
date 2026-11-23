@@ -32,8 +32,8 @@ describe("tiles (design-v0.3 §7)", () => {
     const left = dropOn(a, a.id, "left", w);
     expect(left.kind === "split" && left.dir === "row" && left.a.id === "w").toBe(true);
     const mid = dropOn(a, a.id, "middle", w);
-    expect(mid.kind === "leaf" && mid.content.type === "window" && mid.id === a.id).toBe(true);
-    expect(findLeaf(mid, a.id)?.content.type).toBe("window");
+    expect(mid.kind === "leaf" && mid.content.type === "window" && mid.id === "w").toBe(true);
+    expect(findLeaf(mid, a.id)).toBeNull();
     const rect = { left: 0, top: 0, width: 100, height: 100 };
     expect(zoneAt(rect, 5, 50)).toBe("left");
     expect(zoneAt(rect, 50, 95)).toBe("bottom");

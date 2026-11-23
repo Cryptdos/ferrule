@@ -5,6 +5,11 @@
   let openCount = 0;
   /** Open windows, to close the topmost with Esc wherever the focus is. */
   const stack = new Set<{ z: () => number; close: () => void }>();
+  /** Where the next window to float should appear (a tile's window dragged out of its tile). */
+  let nextAt: { x: number; y: number } | null = null;
+  export function floatNextAt(x: number, y: number): void {
+    nextAt = { x, y };
+  }
   /** Close the window on top (the one clicked last). False if none is open. */
   export function closeTopmost(): boolean {
     let top: { z: () => number; close: () => void } | null = null;
@@ -15,8 +20,10 @@
 </script>
 
 <script lang="ts">
-  import type { Snippet } from "svelte";
+  import { getContext, setContext, type Snippet } from "svelte";
   import Icon from "./Icon.svelte";
+  import { docking, isDockable } from "../docking.svelte";
+  import { zoneAt } from "../tiles";
 
   /**
    * A floating window (design-v0.2 §10): a title bar with minimise and close,
@@ -33,6 +40,13 @@
     children,
   }: { title: string; onclose: () => void; wide?: boolean; width?: number; store?: string; children: Snippet } = $props();
 
+  /** Which window this is, and the tile it's in when it's docked (design-v0.3 §7). */
+  const ctx = getContext<{ name: string; tile?: string } | undefined>("ferrule.window");
+  const docked = !!ctx?.tile;
+  const dockName = ctx && isDockable(ctx.name) ? ctx.name : null;
+  // Windows opened from inside this one (a prompt, say) float, and aren't this window.
+  setContext("ferrule.window", undefined);
+
   const KEY = `ferrule.win.${store ?? title}`;
   function load(): { x: number; y: number; min?: boolean } | null {
     try {
@@ -42,12 +56,16 @@
       return null;
     }
   }
+  const placed = !docked && nextAt ? nextAt : null;
+  if (placed) nextAt = null;
   const saved = load();
-  let pos: { x: number; y: number } | null = $state(saved ? { x: saved.x, y: saved.y } : null);
+  let pos: { x: number; y: number } | null = $state(placed ?? (saved ? { x: saved.x, y: saved.y } : null));
   let min = $state(!!saved?.min);
   let z = $state(++topZ);
   const cascade = openCount++ * 28;
   $effect(() => {
+    // A window in a tile isn't closed by Esc: tiles close from their bar.
+    if (docked) return;
     const me = { z: () => z, close: () => onclose() };
     stack.add(me);
     return () => {
@@ -91,11 +109,25 @@
   function move(e: PointerEvent) {
     if (!drag) return;
     pos = clamp({ x: drag.x + e.clientX - drag.cx, y: drag.y + e.clientY - drag.cy });
+    // Over a tile: show where it would dock (an edge splits the tile, the middle replaces it).
+    if (dockName) {
+      const tileEl = document
+        .elementsFromPoint(e.clientX, e.clientY)
+        .map((el) => (el as HTMLElement).closest<HTMLElement>("[data-tile]"))
+        .find((el) => !!el && !win?.contains(el));
+      if (tileEl) {
+        const r = tileEl.getBoundingClientRect();
+        docking.hint = { tile: tileEl.dataset.tile!, zone: zoneAt(r, e.clientX, e.clientY), rect: { left: r.left, top: r.top, width: r.width, height: r.height } };
+      } else docking.hint = null;
+    }
   }
   function up() {
     if (!drag) return;
     drag = null;
     save();
+    const hint = docking.hint;
+    docking.hint = null;
+    if (hint && dockName) docking.dock?.(dockName, hint.tile, hint.zone);
   }
   function toggleMin() {
     min = !min;
@@ -103,6 +135,9 @@
   }
 </script>
 
+{#if docked}
+  <div class="docked" role="region" aria-label={title} bind:this={win}>{@render children()}</div>
+{:else}
 <div
   class="window"
   bind:this={win}
@@ -121,7 +156,17 @@
     }
   }}
 >
-  <div class="bar" role="toolbar" tabindex="-1" aria-label={title} onpointerdown={down} onpointermove={move} onpointerup={up} ondblclick={toggleMin}>
+  <div
+    class="bar"
+    role="toolbar"
+    tabindex="-1"
+    aria-label={title}
+    title={dockName ? "Drag by here; drop on a tile to put it there (an edge splits the tile, the middle replaces it)" : undefined}
+    onpointerdown={down}
+    onpointermove={move}
+    onpointerup={up}
+    ondblclick={toggleMin}
+  >
     <span class="title">{title}</span>
     <button class="icon" title={min ? "Restore" : "Minimise"} onclick={toggleMin}><Icon name={min ? "restore" : "minimise"} size={14} /></button>
     <button class="icon" title="Close (Esc)" onclick={onclose}><Icon name="close" size={14} /></button>
@@ -130,6 +175,7 @@
     <div class="body">{@render children()}</div>
   {/if}
 </div>
+{/if}
 
 <style>
   .window {
@@ -184,5 +230,13 @@
     overflow-y: auto;
     min-height: 0;
     padding: 10px 18px 16px;
+  }
+  /* In a tile: it fills the tile and scrolls; the tile's bar has its name and close. */
+  .docked {
+    height: 100%;
+    overflow: auto;
+    padding: 10px 14px 16px;
+    background: var(--panel, #fff);
+    color: var(--ink, #1b2230);
   }
 </style>
