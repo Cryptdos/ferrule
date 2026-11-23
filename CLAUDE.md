@@ -26,12 +26,7 @@ v0.2 sprint, version `0.2.0-pre`. Steps 1–6 and 7a are merged. Next:
 - **Never commit** the user's test projects or reference drawings; they're proprietary and stay in `C:\Temp\eCAD`.
 - Projects and distributions start empty; preferred setups go in templates.
 - Simple, consistent parts; no Swiss-army-knife features.
-- Commits end with:
-  ```
-  Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
-  Claude-Session: <the session URL>
-  ```
-  PR bodies end with `🤖 Generated with [Claude Code](https://claude.com/claude-code)`, a blank line, then the session URL.
+- **Chats stay private:** no links to Claude sessions or chats (no `Claude-Session:` line, no session URL) in commits, PR bodies, comments or files. Commits end with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>` only; PR bodies end with `🤖 Generated with [Claude Code](https://claude.com/claude-code)` only. Nothing from a chat (names, firms, drawings discussed) goes into the repo.
 
 ## Checking your work
 
