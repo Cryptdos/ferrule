@@ -40,29 +40,3 @@ export function lampColour(s: string): string {
 
 export const WIRE_FUNCTIONS = ["0V", "24V", "24V AC", "24V DC", "230V", "L", "N", "L1", "L2", "L3", "PE", "0-10V", "SIG", "COM", "FE"];
 
-/** Screen colours for core colours, for drawing live conductors while simulating. */
-const SCREEN: Record<string, string> = {
-  bk: "#222222",
-  bn: "#8b4a1c",
-  rd: "#d42020",
-  og: "#f08a1c",
-  ye: "#e0b800",
-  gn: "#1f9a3a",
-  bu: "#1f5fd4",
-  vt: "#8a3fd0",
-  gy: "#8a8f98",
-  wh: "#f4f4f4",
-  pk: "#ef7fb4",
-  tq: "#1fb5b0",
-};
-
-/**
- * How a live conductor of this core colour is drawn: its colour (the first
- * one of a pair like GnYe), red when it has none. White gets a dark edge so
- * it shows on the sheet.
- */
-export function liveColour(code: string | undefined): { stroke: string; edge: boolean } {
-  const first = (code ?? "").trim().slice(0, 2).toLowerCase();
-  const stroke = SCREEN[first] ?? "#d42020";
-  return { stroke, edge: first === "wh" };
-}

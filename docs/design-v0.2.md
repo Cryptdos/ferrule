@@ -393,7 +393,18 @@ Each step is one pull request, with a build to test.
 - **Control busbars** are drawn at 0.35 mm, between a wire and a distribution busbar, and carry no tag (CCT and 0V never had one). Distribution busbars are tagged W like before. The tag sits just before the name, on the bar's line, so stacked busbars don't collide.
 - **Incoming supply:** each terminal can feed a distribution, and does so with no wire drawn. A link arrow on a distribution is labelled with its name unless given a label.
 - **Without an Incoming supply,** line and DC + distributions are the supply, and neutral and DC 0 V the return. This replaces the old "rails named CCT…" rule.
-- **Live colours:** in Simulate, busbars and wires are drawn in their core colour, and returns (N, 0V) light up too. A wire with no colour set stays red. A conductor fed by two supplies is reported as a short.
+- **Live wires are red (reverted 23/11/26).** Drawing live wires and busbars in their core colour was tried and taken out: a black or grey core (L2, L3) looks the same live or dead. Live wires and busbars are red, as before; returns aren't lit. A conductor fed by two supplies is still reported as a short. The stand-in supply from CCT/0V busbars (no Incoming supply drawn) doesn't count as a second source, so a transformer feeding them isn't a short.
 - **Wire colour from the busbar (agreed 23/11/26):** a wire drawn from a busbar takes the busbar's colour (its own, else its distribution's) if its conductor has none yet. It's copied once, when the wire is drawn, not linked, so it can be changed like any other wire's colour. Wires carried on through terminals or joined at a junction are the same conductor, so they share it.
 - **Wire labels can be hidden per wire (agreed 23/11/26):** by default every wire prints its colour and number by the usual rules (field wires don't print their number). Each wire has **Show colour** and **Show number** ticks, so the drafter can dial back clutter where, in their judgement, nothing is lost.
 - **Templates** carry the distributions they use. When stamped into another project, each is matched by name, or added if it's missing.
+
+### Testing notes of 23/11/26 (step 3 build)
+
+| # | Note | Fix | Step |
+|---|---|---|---|
+| T1, T7 | Live wires in their core colour can't be told from dead ones (a black L2); simulation with distributions blocked testing | Reverted to red; stand-in CCT supply plus a transformer no longer a false short | Done (follow-up to 3) |
+| T2 | The example's "Logo: add one under Project…" box can't be made in Annotate. Section, cloud and picture sit in the top bar, apart from the other drawing tools. Picture opens the file picker straight away | Logo becomes a part in Annotate's list (it shows the project's logo). Section, cloud and picture move into Annotate's parts list with Text and Notes. A picture is placed like any part, and its file is chosen in its properties | 6 |
+| T3 | A blank Text or Notes stays on the sheet, invisible | Text and Notes with no content are removed when you click away | 4 (with Text + Notes) |
+| T4 | A control busbar gives no colour to its wires; its colour is free text; wires off it show no number | Busbar colour is the same colour dropdown as wires. Short wires off a busbar get their number (see T6) | 5 |
+| T5 | A wire from a fuse's other side (fuse 2 → lamp) doesn't take the colour of the wire into the fuse | A wire drawn from one side of an in-line part (fuse, contact, isolator pole, terminal) takes the colour of the wire on the other side of that pole, once, when drawn | 5 |
+| T6 | On a short wire the colour and number collide with things around them | When the wire is no longer than its text, the colour and number are centred on it | 5 |

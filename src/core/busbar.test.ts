@@ -140,3 +140,22 @@ describe("wire labels the drafter can hide", () => {
     expect([w.showNumber, w.showColour]).toEqual([undefined, undefined]);
   });
 });
+
+describe("simulating without an Incoming supply", () => {
+  test("CCT and 0V distributions are the supply; a transformer also feeding them isn't a short", () => {
+    const { p, pg } = project();
+    const cct = addDistribution(p, { name: "CCT", kind: "line", voltage: "24 V AC" });
+    const ov = addDistribution(p, { name: "0V", kind: "neutral" });
+    const c = addElement(p, pg, "busbar", [0, 30], { params: { style: "control", dist: cct.id, length: 100 } });
+    const o = addElement(p, pg, "busbar", [0, 80], { params: { style: "control", dist: ov.id, length: 100 } });
+    const t = addElement(p, pg, "transformer", [10, 15]);
+    connect(p, pg, [t.id, "S1"], [c.id, "10"]);
+    connect(p, pg, [t.id, "S2"], [o.id, "13"]);
+    const h = addElement(p, pg, "lamp", [40, 55]);
+    connect(p, pg, [c.id, "40"], [h.id, "V+"]);
+    connect(p, pg, [h.id, "V-"], [o.id, "40"]);
+    const s = initialState(compile(p));
+    expect(s.lamps[h.id]).toBe(true);
+    expect(s.short).toBe(false);
+  });
+});

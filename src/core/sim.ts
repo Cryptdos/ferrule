@@ -383,7 +383,9 @@ function pass(c: Circuit, s: SimState) {
       const ph = x.phases.map((p) => uf.find(p));
       return ph.some((p) => x.ret.some((r) => uf.find(r) === p)) || new Set(ph).size < ph.length;
     }) ||
+    // (The stand-in supply drawn from busbars isn't a real source: a transformer feeding them isn't a short.)
     live.some((x, i) =>
+      x.el !== "rails" &&
       x.phases.some((p) => {
         const r = uf.find(p);
         const other = fedBy.get(r);
