@@ -66,7 +66,7 @@ describe("MCP tools", () => {
     const ovd = (await call("add_distribution", { project, name: "0V", kind: "dc0" })).data.find((d: { name: string }) => d.name === "0V");
     const cct = await add("busbar", 0, 10, { params: { style: "control", dist: dists[0].id, length: 140 } });
     const ov = await add("busbar", 0, 60, { params: { style: "control", dist: ovd.id, length: 140 } });
-    const s1 = await add("pb-no", 30, 30, { label: "START" });
+    const s1 = await add("pushbutton", 30, 30, { label: "START" });
     const k1 = await add("coil", 30, 57);
     expect(s1.terminals.map((t: { name: string }) => t.name)).toEqual(["13", "14"]);
     await call("connect", { project, sheet: 1, from: { element: cct.id, terminal: "30" }, to: { element: s1.id, terminal: "13" } });

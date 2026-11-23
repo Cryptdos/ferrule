@@ -17,7 +17,7 @@
  * No motors, analogue or power flow. Fuses and breakers always conduct.
  */
 import type { Element, LogicRule, Project } from "./model";
-import { isolatorAux } from "./symbols";
+import { isolatorAux, selectorPoles } from "./symbols";
 import { masterOf } from "./xref";
 import { netJoins } from "./conductors";
 import { displayTag } from "./tags";
@@ -55,6 +55,8 @@ export interface Input {
   /** "toggle": a switch you leave; "press": a momentary push button; "select": 2 positions. */
   kind: "toggle" | "press" | "select";
   label: string;
+  /** A selector's positions, in the order it steps through them. */
+  positions?: string[];
   /** Setting at the start: isolators and breakers start on (1), everything else off (0). */
   initial: 0 | 1;
 }
@@ -161,15 +163,18 @@ export function compile(project: Project): Circuit {
       /** Is this contact operated? Coil-driven, or a manual input. */
       const operated = (s: SimState): boolean => {
         if (master) {
-          if (el.symbol === "timer-contact") return !!s.timed[master.id];
+          // A contact on a timer coil follows the timer's function, unless it's one of its plain contacts.
+          if (master.symbol === "timer-coil" && el.params.instant !== true) return !!s.timed[master.id];
           return !!s.energised[master.id];
         }
         return (s.inputs[el.id] ?? 0) === 1;
       };
       const manual = !master;
       const press = (s: SimState) => (s.inputs[el.id] ?? 0) === 1;
-      if (["contact-no", "contact-nc", "contact-co", "timer-contact"].includes(el.symbol)) ops.set(el.id, operated);
-      if (el.symbol === "pb-no" || el.symbol === "pb-nc" || el.symbol === "selector") ops.set(el.id, press);
+      if (["contact-no", "contact-nc", "contact-co"].includes(el.symbol)) ops.set(el.id, operated);
+      if (el.symbol === "pushbutton") ops.set(el.id, press);
+      // A selector is drawn turned whenever it's out of position 0.
+      if (el.symbol === "selector") ops.set(el.id, (s) => (s.inputs[el.id] ?? 0) !== 0);
       switch (el.symbol) {
         case "busbar": {
           const conds = project.conductors.filter((c) => c.terminals.some(([id]) => id === el.id)).map((c) => c.id);
@@ -210,30 +215,31 @@ export function compile(project: Project): Circuit {
           link(el, "11", "12", (s) => !operated(s));
           if (manual) inputs.push({ el: el.id, kind: "toggle", label: "Contact (no coil)", initial: 0 });
           break;
-        case "timer-contact": {
-          const nc = el.params.contact === "nc";
-          if (nc) link(el, "15", "16", (s) => !operated(s));
-          else link(el, "17", "18", operated);
-          if (manual) inputs.push({ el: el.id, kind: "toggle", label: "Timer contact (no timer)", initial: 0 });
+        case "pushbutton": {
+          const c = el.params.contact;
+          if (c !== "nc") link(el, "13", "14", press);
+          if (c === "nc" || c === "both") link(el, "21", "22", (s) => !press(s));
+          inputs.push({ el: el.id, kind: "press", label: el.label || "Push button", initial: 0 });
           break;
         }
-        case "pb-no":
-          link(el, "13", "14", (s) => (s.inputs[el.id] ?? 0) === 1);
-          inputs.push({ el: el.id, kind: "press", label: el.label || "Push button", initial: 0 });
+        case "selector": {
+          // Position 0, I (1) or II (2); each pole closed in the positions it's set to.
+          const at = (s: SimState) => s.inputs[el.id] ?? 0;
+          selectorPoles(el).forEach((p, i) => {
+            const k = i + 1;
+            if (p.kind === "co") {
+              link(el, `${k}1`, `${k}4`, (s) => p.closed.includes(at(s)));
+              link(el, `${k}1`, `${k}2`, (s) => (p.closed12 ?? []).includes(at(s)));
+            } else if (p.kind === "nc") {
+              link(el, `${k}1`, `${k}2`, (s) => p.closed.includes(at(s)));
+            } else {
+              link(el, `${k}3`, `${k}4`, (s) => p.closed.includes(at(s)));
+            }
+          });
+          const three = el.params.positions === "3";
+          inputs.push({ el: el.id, kind: "select", label: el.label || "Selector", initial: 0, positions: three ? ["0", "I", "II"] : ["0", "I"] });
           break;
-        case "pb-nc":
-          link(el, "21", "22", (s) => (s.inputs[el.id] ?? 0) !== 1);
-          inputs.push({ el: el.id, kind: "press", label: el.label || "Push button", initial: 0 });
-          break;
-        case "selector":
-          if (el.params.contact === "co") {
-            link(el, "11", "12", (s) => (s.inputs[el.id] ?? 0) === 0);
-            link(el, "11", "14", (s) => (s.inputs[el.id] ?? 0) === 1);
-          } else {
-            link(el, "13", "14", (s) => (s.inputs[el.id] ?? 0) === 1);
-          }
-          inputs.push({ el: el.id, kind: "select", label: el.label || "Selector", initial: 0 });
-          break;
+        }
         case "isolator": {
           const poles = typeof el.params.poles === "number" ? el.params.poles : 3;
           const coilDriven = el.params.function === "contactor" && !!master;
@@ -318,9 +324,9 @@ export function compile(project: Project): Circuit {
           loads.push({
             el: el.id,
             kind: "lamp",
-            a: n(el, "V+"),
-            b: n(el, "V-"),
-            ...(el.params.testPin === true ? { test: n(el, "T") } : {}),
+            a: n(el, "+V"),
+            b: n(el, "-V"),
+            ...(el.params.testPin === true ? { test: n(el, "LT") } : {}),
           });
           break;
       }
@@ -553,7 +559,9 @@ export function toggle(c: Circuit, s: SimState, el: string): SimState {
   const input = c.inputs.find((i) => i.el === el);
   if (!input) return s;
   const cur = s.inputs[el] ?? input.initial;
-  return settle(c, { ...s, inputs: { ...s.inputs, [el]: cur === 1 ? 0 : 1 } });
+  // A selector steps to its next position; anything else turns over.
+  const next = input.positions ? (cur + 1) % input.positions.length : cur === 1 ? 0 : 1;
+  return settle(c, { ...s, inputs: { ...s.inputs, [el]: next } });
 }
 
 /** An input's current setting. */
@@ -755,7 +763,7 @@ export function supplySystem(el: Element): { phases: string[]; ret: string | nul
     case "3ph":
       return { phases: ["L1", "L2", "L3"], ret: null };
     case "dc":
-      return { phases: ["+"], ret: "-" };
+      return { phases: ["+V"], ret: "-V" };
     default:
       return { phases: ["L1", "L2", "L3"], ret: "N" };
   }

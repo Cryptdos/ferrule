@@ -1,7 +1,7 @@
 import { STANDARDS } from "./designations";
 import type { Element, Project } from "./model";
 import { requireSymbol, type GeometryText } from "./symbols";
-import { masterOf, xrefText } from "./xref";
+import { isTimed, masterOf, xrefText } from "./xref";
 import { resolveFields } from "./fields";
 import { legendEntries, revisionRows } from "./annotations";
 
@@ -36,6 +36,10 @@ export function elementTexts(el: Element, project: Project): GeometryText {
   const m = masterOf(project, el);
   const masterTag = m ? displayTag(m.el, project) : "";
   const t: GeometryText = { tag: displayTag(el, project), xref: xrefText(project, el, masterTag), label: resolveFields(el.label, project) };
+  if (isTimed(project, el)) {
+    const coil = masterOf(project, el)!.el;
+    t.timed = typeof coil.params.mode === "string" ? coil.params.mode : "on";
+  }
   if (el.symbol === "revtable") t.rows = revisionRows(project);
   else if (el.symbol === "legend") t.legend = legendEntries(project);
   else if (el.symbol === "busbar" || el.symbol === "offpage") {

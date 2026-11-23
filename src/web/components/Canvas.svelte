@@ -94,6 +94,9 @@
   let gesture = $state<Gesture>(null);
   let pointer: Vec | null = $state(null);
   let spaceDown = $state(false);
+  /** A tap of Space (down and up, no panning in between) fits the sheet. */
+  let spaceAt = 0;
+  let spacePanned = false;
 
   /** A wire being drawn: where it starts. */
   type Pending = { end: WireEnd; at: Vec };
@@ -336,15 +339,6 @@
       gesture = { kind: "ganew", what: editor.tool === "ga-rail" ? "rail" : "trunking", start: s, cur: s };
       return;
     }
-    if (editor.tool === "ga-note") {
-      let id = "";
-      editor.apply((p) => {
-        id = addGaItem(p, editor.pageId, { kind: "note", x: snapMm(mm[0]), y: snapMm(mm[1]), w: 60, h: 8, text: "NOTE" }).id;
-      });
-      editor.tool = "select";
-      if (id) editor.selection = [id];
-      return;
-    }
     const corner = gaCorner();
     if (corner && corner.it.kind !== "note" && Math.abs(pt[0] - corner.at[0]) < 0.9 && Math.abs(pt[1] - corner.at[1]) < 0.9) {
       gesture = { kind: "gasize", id: corner.it.id, start: mm, size: [corner.it.w, corner.it.h], delta: [0, 0] };
@@ -412,6 +406,7 @@
   function onPointerDown(e: PointerEvent) {
     svg!.setPointerCapture(e.pointerId);
     if (e.button === 1 || (e.button === 0 && spaceDown)) {
+      if (spaceDown) spacePanned = true;
       gesture = { kind: "pan", client: [e.clientX, e.clientY], start: { x: view.x, y: view.y } };
       return;
     }
@@ -982,12 +977,19 @@
 <svelte:window
   onkeydown={(e) => {
     if (e.code === "Space" && !isTyping(e.target)) {
+      if (!spaceDown && !e.repeat) {
+        spaceAt = performance.now();
+        spacePanned = false;
+      }
       spaceDown = true;
       e.preventDefault();
     }
   }}
   onkeyup={(e) => {
-    if (e.code === "Space") spaceDown = false;
+    if (e.code !== "Space") return;
+    const tapped = spaceDown && !spacePanned && performance.now() - spaceAt < 400 && !isTyping(e.target);
+    spaceDown = false;
+    if (tapped) fit();
   }}
 />
 

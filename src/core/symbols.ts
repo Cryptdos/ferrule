@@ -83,6 +83,8 @@ export interface ParamDef {
   fixed?: string;
   /** An example of the format to follow, shown greyed in an empty box. */
   placeholder?: string;
+  /** What it takes, shown on a "?" beside the box. */
+  help?: string;
   /** Kept on the element but not shown for editing. */
   hidden?: boolean;
 }
@@ -223,14 +225,86 @@ const opOf = (el: Element) => el.params.__op === true;
 const NO_MID: Vec = [-0.6, 0];
 const NC_MID: Vec = [0.65, -0.15];
 
-/** Terminal names are fixed (wires refer to them); the printed marks follow the pole number. */
-function contactTerms(labels: [string, string], el?: Element): { prims: Prim[]; terminals: TerminalDef[] } {
+/**
+ * Terminal names are fixed (wires refer to them); the printed marks follow
+ * the pole number. `names`: the terminal names when the marks differ (a
+ * timed contact prints 17/18 on terminals 13/14).
+ */
+function contactTerms(labels: [string, string], el?: Element, names: [string, string] = labels): { prims: Prim[]; terminals: TerminalDef[] } {
   const marks = el ? poleMarks(el, labels) : labels;
   return {
     prims: [term(0.45, -2.2, marks[0]), term(0.45, 2.9, marks[1])],
-    terminals: vterms(labels[0], labels[1]),
+    terminals: vterms(names[0], names[1]),
   };
 }
+
+/**
+ * The delay mark on a contact timed by its coil (IEC 60617): a double stem
+ * from the blade to an arc. On-delay and off-delay arcs face opposite ways;
+ * on- and off-delay has both.
+ */
+function timingMark(mid: Vec, ax: number, fn: string): Prim[] {
+  const on = fn !== "off";
+  const both = fn === "on-off";
+  const end = both ? ax - 0.9 : ax;
+  const arc = (x: number, sweep: 0 | 1): Prim => ({ t: "arc", from: [x, -0.6], to: [x, 0.6], r: 0.6, sweep });
+  return [
+    line([mid[0], mid[1] - 0.15], [end, -0.15]),
+    line([mid[0], mid[1] + 0.15], [end, 0.15]),
+    arc(ax, on ? 0 : 1),
+    ...(both ? [arc(ax - 0.9, 1)] : []),
+  ];
+}
+
+/**
+ * A selector pole: which positions close it. NO poles are open in 0, NC
+ * poles closed in 0; a changeover (11 common) makes 11–12 in one position
+ * and 11–14 in another (0 and I on a 2 position switch, I and II on a 3).
+ */
+const SELECTOR_POLE_OPTIONS = [
+  { value: "I", label: "NO, closed in I" },
+  { value: "II", label: "NO, closed in II (3 position)" },
+  { value: "I+II", label: "NO, closed in I and II (3 position)" },
+  { value: "nc-I", label: "NC, opened in I" },
+  { value: "nc-II", label: "NC, opened in II (3 position)" },
+  { value: "co", label: "Changeover: 12 in 0 / I, 14 in I / II" },
+];
+
+export interface SelectorPole {
+  kind: "no" | "nc" | "co";
+  /** Positions (0, 1 = I, 2 = II) in which it's closed; for a changeover, those making 11–14. */
+  closed: number[];
+  /** A changeover's positions making 11–12. */
+  closed12?: number[];
+}
+
+/** A selector's poles, as set up. */
+export function selectorPoles(el: Element): SelectorPole[] {
+  const three = el.params.positions === "3";
+  const n = Math.max(1, Math.min(4, typeof el.params.poles === "number" ? el.params.poles : 1));
+  const out: SelectorPole[] = [];
+  for (let i = 1; i <= n; i++) {
+    const v = String(el.params[`pole${i}`] ?? (i === 2 ? "II" : "I"));
+    const usable = three || !v.includes("II") ? v : v === "nc-II" ? "nc-I" : "I";
+    if (usable === "co") out.push(three ? { kind: "co", closed: [2], closed12: [1] } : { kind: "co", closed: [1], closed12: [0] });
+    else if (usable === "nc-I") out.push({ kind: "nc", closed: three ? [0, 2] : [0] });
+    else if (usable === "nc-II") out.push({ kind: "nc", closed: [0, 1] });
+    else if (usable === "II") out.push({ kind: "no", closed: [2] });
+    else if (usable === "I+II") out.push({ kind: "no", closed: [1, 2] });
+    else out.push({ kind: "no", closed: [1] });
+  }
+  return out;
+}
+
+/** On a contact linked to a timer coil: switch with the coil itself, not after the delay. */
+const instantParam: ParamDef = {
+  key: "instant",
+  label: "Instantaneous (not delayed by its timer)",
+  type: "bool",
+  default: false,
+  when: (el) => el.links.length > 0,
+  fixed: "Only for a contact linked to a timer",
+};
 
 /** Push-button head on the left at x = hx. */
 function pushHead(hx: number): Prim[] {
@@ -273,8 +347,7 @@ export interface TimerFunction {
 }
 
 export const TIMER_FUNCTIONS: TimerFunction[] = [
-  // Names and shorthand as IEC 61131-3 where it has them (TON, TOF, TP);
-  // flashers have no IEC name.
+  // Names and shorthand as IEC 61131-3 where it has them (TON, TOF, TP).
   { value: "on", label: "TON: on-delay", short: "TON" },
   { value: "off", label: "TOF: off-delay", short: "TOF" },
   { value: "on-off", label: "TON+TOF: on- and off-delay", short: "TON/TOF" },
@@ -286,7 +359,7 @@ export const TIMER_FUNCTIONS: TimerFunction[] = [
   },
   {
     value: "flash-on",
-    label: "Flasher, ON first (cyclic; no IEC 61131-3 name)",
+    label: "Flasher, ON first (cyclic)",
     short: "FLASH",
     wave: [[0, 0.8], [0, -0.8], [0.33, -0.8], [0.33, 0.8], [0.67, 0.8], [0.67, -0.8], [1, -0.8]],
   },
@@ -322,14 +395,15 @@ const SYMBOLS: SymbolDef[] = [
     name: "Contact NO",
     group: "Contacts",
     palette: true,
-    params: [familyParam],
+    params: [familyParam, instantParam],
     kind: familyKind,
-    draw(el) {
-      const t = contactTerms(["13", "14"], el);
+    draw(el, t) {
+      const timed = t?.timed;
+      const c = contactTerms(timed ? ["17", "18"] : ["13", "14"], el, ["13", "14"]);
       return {
-        prims: [...noContact(0, opOf(el)), ...t.prims, ...tagAndLabel(-1.9, el)],
-        terminals: t.terminals,
-        body: { x: -1.3, y: -1.7, w: 1.4, h: 3.2 },
+        prims: [...noContact(0, opOf(el)), ...(timed ? timingMark(NO_MID, -2.1, timed) : []), ...c.prims, ...tagAndLabel(timed ? -3.2 : -1.9, el)],
+        terminals: c.terminals,
+        body: { x: timed ? -2.7 : -1.3, y: -1.7, w: timed ? 2.8 : 1.4, h: 3.2 },
       };
     },
   },
@@ -338,14 +412,15 @@ const SYMBOLS: SymbolDef[] = [
     name: "Contact NC",
     group: "Contacts",
     palette: true,
-    params: [familyParam],
+    params: [familyParam, instantParam],
     kind: familyKind,
-    draw(el) {
-      const t = contactTerms(["21", "22"], el);
+    draw(el, t) {
+      const timed = t?.timed;
+      const c = contactTerms(timed ? ["15", "16"] : ["21", "22"], el, ["21", "22"]);
       return {
-        prims: [...ncContact(0, opOf(el)), ...t.prims, ...tagAndLabel(-0.8, el)],
-        terminals: t.terminals,
-        body: { x: -0.1, y: -1.9, w: 1.5, h: 3.4 },
+        prims: [...ncContact(0, opOf(el)), ...(timed ? timingMark(NC_MID, -2.1, timed) : []), ...c.prims, ...tagAndLabel(timed ? -3.2 : -0.8, el)],
+        terminals: c.terminals,
+        body: { x: timed ? -2.7 : -0.1, y: -1.9, w: timed ? 4.1 : 1.5, h: 3.4 },
       };
     },
   },
@@ -354,122 +429,87 @@ const SYMBOLS: SymbolDef[] = [
     name: "Changeover contact",
     group: "Contacts",
     palette: true,
-    params: [familyParam],
+    params: [familyParam, instantParam],
     kind: familyKind,
-    draw(el) {
+    draw(el, t) {
+      const timed = t?.timed;
+      // Printed marks: 11 common, 12 NC, 14 NO; a timed changeover 15, 16, 18.
+      const [m12, m14, m11] = timed ? ["16", "18", "15"] : ["12", "14", "11"];
       return {
         prims: [
           line([0, -3], [0, -1.5]),
           line([-2, -3], [-2, -1.5], [-0.9, -1.5]),
           line([0, 1.5], [0, 3]),
           opOf(el) ? line([0, 1.5], [-0.25, -1.5]) : line([0, 1.5], [-1.1, -1.7]),
-          term(0.45, -2.2, poleMarks(el, ["14", "11"])[0]),
-          term(-2.45, -2.2, poleMarks(el, ["12", "11"])[0], "end"),
-          term(0.45, 2.9, poleMarks(el, ["14", "11"])[1]),
-          ...tagAndLabel(-2.6, el).map((p) => (p.t === "text" ? { ...p, at: [p.at[0], p.at[1] + 1.2] as Vec } : p)),
+          // The timing mark goes out past the NC fixed contact.
+          ...(timed ? timingMark([-0.55, 0], -3.2, timed) : []),
+          term(0.45, -2.2, poleMarks(el, [m14, m11])[0]),
+          term(-2.45, -2.2, poleMarks(el, [m12, m11])[0], "end"),
+          term(0.45, 2.9, poleMarks(el, [m14, m11])[1]),
+          ...tagAndLabel(timed ? -4.2 : -2.6, el).map((p) => (p.t === "text" ? { ...p, at: [p.at[0], p.at[1] + 1.2] as Vec } : p)),
         ],
         terminals: [
           { name: "12", at: [-2, -3], dir: "up" },
           { name: "14", at: [0, -3], dir: "up" },
           { name: "11", at: [0, 3], dir: "down" },
         ],
-        body: { x: -2, y: -1.8, w: 2.1, h: 3.3 },
+        body: { x: timed ? -3.8 : -2, y: -1.8, w: timed ? 3.9 : 2.1, h: 3.3 },
       };
     },
   },
   {
-    id: "timer-contact",
-    name: "Timer contact",
-    group: "Contacts",
+    id: "pushbutton",
+    name: "Push button",
+    group: "Operators",
     palette: true,
     params: [
       {
         key: "contact",
         label: "Contact",
         type: "select",
-        options: [
-          { value: "no", label: "NO (17/18)" },
-          { value: "nc", label: "NC (15/16)" },
-        ],
         default: "no",
-      },
-      {
-        key: "mode",
-        label: "Delay",
-        type: "select",
         options: [
-          { value: "on", label: "Delay on" },
-          { value: "off", label: "Delay off" },
+          { value: "no", label: "NO (13/14)" },
+          { value: "nc", label: "NC (21/22)" },
+          { value: "both", label: "NO and NC (13/14, 21/22)" },
         ],
-        default: "on",
       },
     ],
-    kind: () => "timer",
-    draw(el) {
-      const nc = str(el, "contact", "no") === "nc";
-      const labels: [string, string] = nc ? ["15", "16"] : ["17", "18"];
-      const mid = nc ? NC_MID : NO_MID;
-      const on = str(el, "mode", "on") === "on";
-      // Timing mark: double stem from the blade to an arc.
-      const ax = -2.1;
-      const arc: Prim = on
-        ? { t: "arc", from: [ax, -0.6], to: [ax, 0.6], r: 0.6, sweep: 0 }
-        : { t: "arc", from: [ax, -0.6], to: [ax, 0.6], r: 0.6, sweep: 1 };
-      return {
-        prims: [
-          ...(nc ? ncContact(0, opOf(el)) : noContact(0, opOf(el))),
-          line([mid[0], mid[1] - 0.15], [ax, -0.15]),
-          line([mid[0], mid[1] + 0.15], [ax, 0.15]),
-          arc,
-          ...contactTerms(labels, el).prims,
-          ...tagAndLabel(-3, el),
-        ],
-        terminals: vterms(labels[0], labels[1]),
-        body: { x: -2.7, y: -1.8, w: 4.1, h: 3.4 },
-      };
-    },
-  },
-  {
-    id: "pb-no",
-    name: "Push button NO",
-    group: "Operators",
-    palette: true,
-    params: [],
     kind: () => "pushButton",
     draw(el) {
+      const c = str(el, "contact", "no");
+      const op = opOf(el);
+      const head = (dy: number) => pushHead(-2.4).map((p) => (p.t === "line" ? { ...p, pts: p.pts.map(([x, y]) => [x, y + dy] as Vec) } : p));
+      if (c === "nc") {
+        return {
+          prims: [...ncContact(0, op), dashed(NC_MID, [-2.4, NC_MID[1]]), ...head(NC_MID[1]), ...contactTerms(["21", "22"]).prims, ...tagAndLabel(-3.2, el)],
+          terminals: vterms("21", "22"),
+          body: { x: -2.8, y: -1.9, w: 4.2, h: 3.4 },
+        };
+      }
+      if (c === "both") {
+        // NO on the left, NC 3 units to its right, one head working both.
+        const nc = ncContact(0, op).map((p) => (p.t === "line" ? { ...p, pts: p.pts.map(([x, y]) => [x + 3, y] as Vec) } : p));
+        return {
+          prims: [
+            ...noContact(0, op),
+            ...nc,
+            dashed(NO_MID, [-2.4, 0]),
+            dashed([NO_MID[0] + 0.6, 0], [3 + NC_MID[0], 0]),
+            ...head(0),
+            ...contactTerms(["13", "14"]).prims,
+            term(3.45, -2.2, "21"),
+            term(3.45, 2.9, "22"),
+            ...tagAndLabel(-3.2, el),
+          ],
+          terminals: [...vterms("13", "14"), { name: "21", at: [3, -3], dir: "up" }, { name: "22", at: [3, 3], dir: "down" }],
+          body: { x: -2.8, y: -1.9, w: 7.2, h: 3.4 },
+        };
+      }
       return {
-        prims: [
-          ...noContact(0, opOf(el)),
-          dashed(NO_MID, [-2.4, 0]),
-          ...pushHead(-2.4),
-          ...contactTerms(["13", "14"]).prims,
-          ...tagAndLabel(-3.2, el),
-        ],
+        prims: [...noContact(0, op), dashed(NO_MID, [-2.4, 0]), ...head(0), ...contactTerms(["13", "14"]).prims, ...tagAndLabel(-3.2, el)],
         terminals: vterms("13", "14"),
         body: { x: -2.8, y: -1.7, w: 2.9, h: 3.2 },
-      };
-    },
-  },
-  {
-    id: "pb-nc",
-    name: "Push button NC",
-    group: "Operators",
-    palette: true,
-    params: [],
-    kind: () => "pushButton",
-    draw(el) {
-      return {
-        prims: [
-          ...ncContact(0, opOf(el)),
-          dashed(NC_MID, [-2.4, NC_MID[1]]),
-          ...pushHead(-2.4).map((p) =>
-            p.t === "line" ? { ...p, pts: p.pts.map(([x, y]) => [x, y + NC_MID[1]] as Vec) } : p,
-          ),
-          ...contactTerms(["21", "22"]).prims,
-          ...tagAndLabel(-3.2, el),
-        ],
-        terminals: vterms("21", "22"),
-        body: { x: -2.8, y: -1.9, w: 4.2, h: 3.4 },
       };
     },
   },
@@ -484,66 +524,98 @@ const SYMBOLS: SymbolDef[] = [
         label: "Positions",
         type: "select",
         options: [
-          { value: "2", label: "2 position" },
-          { value: "3", label: "3 position" },
+          { value: "2", label: "2 position (0–I)" },
+          { value: "3", label: "3 position (I–0–II)" },
         ],
         default: "2",
       },
+      { key: "poles", label: "Poles", type: "number", min: 1, max: 4, default: 1 },
       {
-        key: "contact",
-        label: "Contact",
+        key: "pole1",
+        label: "Pole 1",
         type: "select",
-        options: [
-          { value: "no", label: "NO (13/14)" },
-          { value: "co", label: "Changeover (11/12/14)" },
-        ],
-        default: "no",
+        default: "I",
+        options: SELECTOR_POLE_OPTIONS,
+        when: (el) => num(el, "poles", 1, 1, 4) >= 1,
+        fixed: "–",
+      },
+      {
+        key: "pole2",
+        label: "Pole 2",
+        type: "select",
+        default: "II",
+        options: SELECTOR_POLE_OPTIONS,
+        when: (el) => num(el, "poles", 1, 1, 4) >= 2,
+        fixed: "–",
+      },
+      {
+        key: "pole3",
+        label: "Pole 3",
+        type: "select",
+        default: "I",
+        options: SELECTOR_POLE_OPTIONS,
+        when: (el) => num(el, "poles", 1, 1, 4) >= 3,
+        fixed: "–",
+      },
+      {
+        key: "pole4",
+        label: "Pole 4",
+        type: "select",
+        default: "I",
+        options: SELECTOR_POLE_OPTIONS,
+        when: (el) => num(el, "poles", 1, 1, 4) >= 4,
+        fixed: "–",
       },
       { key: "key", label: "Key operated", type: "bool", default: false },
-      { key: "legend", label: "Position legend", type: "text", default: "" },
+      { key: "legend", label: "Position legend", type: "text", default: "", placeholder: "e.g. HAND OFF AUTO" },
     ],
     kind: () => "selector",
     draw(el) {
       const key = bool(el, "key", false);
       const three = str(el, "positions", "2") === "3";
       const legend = str(el, "legend", "") || (three ? "I 0 II" : "0  I");
-      if (str(el, "contact", "no") === "co") {
-        // Changeover: common 11 at the bottom, 12 (left) and 14 (right) at the top.
-        const hx = -3.4;
-        return {
-          prims: [
-            line([0, -3], [0, -1.5]),
-            line([-2, -3], [-2, -1.5], [-0.9, -1.5]),
-            line([0, 1.5], [0, 3]),
-            opOf(el) ? line([0, 1.5], [-0.25, -1.5]) : line([0, 1.5], [-1.1, -1.7]),
-            dashed([-0.55, -0.1], [hx, -0.1]),
-            ...(key ? keyHead(hx) : turnHead(hx)).map((p) => (p.t === "line" ? { ...p, pts: p.pts.map(([x, y]) => [x, y - 0.1] as Vec) } : p)),
-            text(hx, -1.5, legend, DETAIL, "middle", "note"),
-            term(0.45, -2.2, "14"),
-            term(-2.45, -2.2, "12", "end"),
-            term(0.45, 2.9, "11"),
-            ...tagAndLabel(-4.6, el),
-          ],
-          terminals: [
-            { name: "12", at: [-2, -3], dir: "up" },
-            { name: "14", at: [0, -3], dir: "up" },
-            { name: "11", at: [0, 3], dir: "down" },
-          ],
-          body: { x: -3.9, y: -1.8, w: 4, h: 3.3 },
-        };
-      }
-      return {
-        prims: [
-          ...noContact(0, opOf(el)),
-          dashed(NO_MID, [-2.4, 0]),
-          ...(key ? keyHead(-2.4) : turnHead(-2.4)),
-          text(-2.4, -1.4, legend, DETAIL, "middle", "note"),
-          ...contactTerms(["13", "14"]).prims,
-          ...tagAndLabel(-3.6, el),
-        ],
-        terminals: vterms("13", "14"),
-        body: { x: -3.4, y: -1.7, w: 3.5, h: 3.2 },
-      };
+      const op = opOf(el);
+      const poles = selectorPoles(el);
+      const prims: Prim[] = [];
+      const terminals: TerminalDef[] = [];
+      // Poles 3 units apart; a changeover takes 2 more on its left for its NC side.
+      let x = 0;
+      let lastMid: Vec = NO_MID;
+      poles.forEach((p, i) => {
+        if (i > 0) x += 3 + (p.kind === "co" ? 2 : 0);
+        const k = i + 1;
+        if (p.kind === "co") {
+          prims.push(
+            line([x, -3], [x, -1.5]),
+            line([x - 2, -3], [x - 2, -1.5], [x - 0.9, -1.5]),
+            line([x, 1.5], [x, 3]),
+            op ? line([x, 1.5], [x - 0.25, -1.5]) : line([x, 1.5], [x - 1.1, -1.7]),
+            term(x + 0.45, -2.2, `${k}4`),
+            term(x - 2.45, -2.2, `${k}2`, "end"),
+            term(x + 0.45, 2.9, `${k}1`),
+          );
+          terminals.push(
+            { name: `${k}2`, at: [x - 2, -3], dir: "up" },
+            { name: `${k}4`, at: [x, -3], dir: "up" },
+            { name: `${k}1`, at: [x, 3], dir: "down" },
+          );
+          lastMid = [x - 0.55, -0.1];
+        } else if (p.kind === "nc") {
+          prims.push(...ncContact(x, op), term(x + 0.45, -2.2, `${k}1`), term(x + 0.45, 2.9, `${k}2`));
+          terminals.push({ name: `${k}1`, at: [x, -3], dir: "up" }, { name: `${k}2`, at: [x, 3], dir: "down" });
+          lastMid = [x + NC_MID[0], 0];
+        } else {
+          prims.push(...noContact(x, op), term(x + 0.45, -2.2, `${k}3`), term(x + 0.45, 2.9, `${k}4`));
+          terminals.push({ name: `${k}3`, at: [x, -3], dir: "up" }, { name: `${k}4`, at: [x, 3], dir: "down" });
+          lastMid = [x + NO_MID[0], 0];
+        }
+      });
+      // The head on the left, clear of a first changeover's NC side; the legend under it,
+      // away from the terminal numbers.
+      const hx = poles[0]?.kind === "co" ? -4.4 : -2.4;
+      prims.push(dashed([hx, 0], lastMid), ...(key ? keyHead(hx) : turnHead(hx)), text(hx, 2.5, legend, DETAIL, "middle", "note"));
+      prims.push(...tagAndLabel(hx - 1.6, el));
+      return { prims, terminals, body: { x: hx - 0.5, y: -1.9, w: x - hx + 1.9, h: 3.4 } };
     },
   },
   {
@@ -573,8 +645,9 @@ const SYMBOLS: SymbolDef[] = [
         default: "turn",
         options: [
           { value: "turn", label: "Rotary handle" },
-          { value: "push", label: "Push" },
-          { value: "none", label: "None" },
+          { value: "door", label: "Door handle (door interlocked)" },
+          { value: "key", label: "Key" },
+          { value: "none", label: "None (worked by something else)" },
         ],
         when: (el) => str(el, "function", "isolator") === "isolator",
         fixed: "none",
@@ -616,8 +689,10 @@ const SYMBOLS: SymbolDef[] = [
       const op = fn === "isolator" ? str(el, "operator", "turn") : "none";
       const hx = -2.4;
       prims.push(dashed([op === "none" ? NO_MID[0] : hx, 0], [lastMid, 0]));
-      if (op === "turn") prims.push(...turnHead(hx));
-      if (op === "push") prims.push(...pushHead(hx));
+      if (op === "turn" || op === "door") prims.push(...turnHead(hx));
+      // A door handle: the rotary head coupled through the door (a short bar across the shaft).
+      if (op === "door") prims.push(line([hx + 0.6, -0.7], [hx + 0.6, 0.7]));
+      if (op === "key") prims.push(...keyHead(hx));
       prims.push(...tagAndLabel(op === "none" ? -1.6 : -3.2, el));
       return { prims, terminals, body: { x: op === "none" ? -1.3 : -2.9, y: -1.9, w: lastX + (op === "none" ? 2.7 : 4.3), h: 3.4 } };
     },
@@ -697,8 +772,15 @@ const SYMBOLS: SymbolDef[] = [
         options: TIMER_FUNCTIONS.map((f) => ({ value: f.value, label: f.label })),
         default: "on",
       },
-      { key: "time", label: "Time", type: "text", default: "", placeholder: "e.g. 5s, 1.5s, 2min" },
-      { key: "code", label: "Maker's function code", type: "text", default: "", placeholder: "e.g. A (Selec 600XU)" },
+      {
+        key: "time",
+        label: "Time",
+        type: "text",
+        default: "",
+        placeholder: "e.g. 5s, 1.5s, 2min",
+        help: "A number and a unit: 500ms, 5s, 1.5s, 2min (or 2m). Decimals are fine; a number on its own is seconds.",
+      },
+      { key: "code", label: "Maker's function code", type: "text", default: "", placeholder: "e.g. A" },
     ],
     kind: () => "timer",
     draw(el) {
@@ -755,16 +837,16 @@ const SYMBOLS: SymbolDef[] = [
         circle(0, 0, r),
         line([-d, -d], [d, d]),
         line([-d, d], [d, -d]),
-        term(0.45, -2.2, "V+"),
-        term(0.45, 2.9, "V-"),
+        term(0.45, -2.2, "+V"),
+        term(0.45, 2.9, "-V"),
         ...(colour ? [text(1.8, 0.45, colour, DETAIL, "start", "note")] : []),
       ];
-      const terminals = vterms("V+", "V-");
+      const terminals = vterms("+V", "-V");
       if (test) {
         // Test terminal beside the supply, on the same side, so both wire from above.
         // Enters the bulb from the side, clear of the cross.
-        prims.push(line([-2, -3], [-2, -1.4], [-r * 0.87, -r * 0.5]), term(-2.45, -2.2, "T", "end"));
-        terminals.unshift({ name: "T", at: [-2, -3], dir: "up" });
+        prims.push(line([-2, -3], [-2, -1.4], [-r * 0.87, -r * 0.5]), term(-2.45, -2.2, "LT", "end"));
+        terminals.unshift({ name: "LT", at: [-2, -3], dir: "up" });
       }
       prims.push(...tagAndLabel(test ? -2.4 : -1.8, el));
       return { prims, terminals, body: { x: test ? -2 : -r, y: -r, w: test ? 2 + r : 2 * r, h: 2 * r } };
@@ -1153,22 +1235,37 @@ const SYMBOLS: SymbolDef[] = [
     ],
     kind: () => "cable",
     draw(el) {
-      // An ellipse drawn across the cores of a screened cable, the screen
-      // (drain) taken off one end to earth. Origin on the first core.
+      // A rounded rectangle drawn across the cores of a screened cable, the
+      // screen (drain) taken off one end, out to the side, so its wire can be
+      // routed sideways to earth. Origin on the first core.
       const span = num(el, "span", 3, 1, 60);
       const drain = str(el, "drain", "right");
-      const rx = span / 2 + 0.9;
+      const hw = span / 2 + 0.9;
       const cx = span / 2;
-      const prims: Prim[] = [{ t: "ellipse", c: [cx, 0], rx, ry: 0.7, dash: bool(el, "dashed", false) }];
+      const [x0, x1, y0, y1, r] = [cx - hw, cx + hw, -0.7, 0.7, 0.5];
+      // The outline as one line, corners rounded in short steps, so a dash runs round it evenly.
+      const corner = (ox: number, oy: number, a0: number): Vec[] =>
+        [0, 1, 2, 3, 4].map((i) => {
+          const a = ((a0 + i * 22.5) * Math.PI) / 180;
+          return [ox + r * Math.cos(a), oy + r * Math.sin(a)] as Vec;
+        });
+      const outline: Vec[] = [
+        ...corner(x1 - r, y0 + r, 270),
+        ...corner(x1 - r, y1 - r, 0),
+        ...corner(x0 + r, y1 - r, 90),
+        ...corner(x0 + r, y0 + r, 180),
+      ];
+      outline.push(outline[0]!);
+      const prims: Prim[] = [{ t: "line", pts: outline, ...(bool(el, "dashed", false) ? { dash: true } : {}) }];
       const terminals: TerminalDef[] = [];
       if (drain !== "none") {
         const side = drain === "left" ? -1 : 1;
-        const ex = side === 1 ? cx + rx : cx - rx;
-        const tx = side === 1 ? Math.ceil(ex + 0.6) : Math.floor(ex - 0.6);
-        prims.push(line([ex, 0], [tx, 0], [tx, 2]));
-        terminals.push({ name: "E", at: [tx, 2], dir: "down" });
+        const ex = side === 1 ? x1 : x0;
+        const tx = side === 1 ? Math.ceil(ex + 1) : Math.floor(ex - 1);
+        prims.push(line([ex, 0], [tx, 0]));
+        terminals.push({ name: "E", at: [tx, 0], dir: side === 1 ? "right" : "left" });
       }
-      const lx = drain === "left" ? cx + rx + 0.5 : cx - rx - 0.5;
+      const lx = drain === "left" ? x1 + 0.5 : x0 - 0.5;
       const anchor: Anchor = drain === "left" ? "start" : "end";
       prims.push(text(lx, -0.4, "{tag}", TAG, anchor, "tag"));
       if (el.label) prims.push(text(lx, 0.95, "{label}", TAG, anchor, "label"));
@@ -1243,13 +1340,7 @@ const SYMBOLS: SymbolDef[] = [
     group: "Drawing",
     palette: true,
     params: [
-      {
-        key: "size",
-        label: "Size",
-        type: "select",
-        default: "note",
-        options: TEXT_SIZE_OPTIONS,
-      },
+      { key: "size", label: "Size", type: "select", default: "note", options: TEXT_SIZE_OPTIONS },
       {
         key: "align",
         label: "Align",
@@ -1261,43 +1352,36 @@ const SYMBOLS: SymbolDef[] = [
           { value: "end", label: "Right" },
         ],
       },
-    ],
-    kind: () => null,
-    draw(el) {
-      const size = TEXT_SIZES[str(el, "size", "note")] ?? TEXT_SIZES.note!;
-      const anchor = str(el, "align", "start") as Anchor;
-      const lines = (el.label || "Text").split("\n");
-      const width = Math.max(...lines.map((l) => l.length)) * size * 0.5;
-      const x0 = anchor === "start" ? 0 : anchor === "middle" ? -width / 2 : -width;
-      return {
-        prims: lines.map((l, i) => text(0, i * size * 1.45, `{line${i}}`, size, anchor, "label")),
-        terminals: [],
-        body: { x: x0, y: -size * 0.8, w: Math.max(1, width), h: lines.length * size * 1.45 },
-      };
-    },
-  },
-  {
-    id: "notes",
-    bench: "annotate",
-    name: "Notes (formatted)",
-    group: "Drawing",
-    palette: true,
-    params: [
-      {
-        key: "size",
-        label: "Size",
-        type: "select",
-        default: "note",
-        options: TEXT_SIZE_OPTIONS,
-      },
-      { key: "width", label: "Width (units)", type: "number", min: 10, max: 200, default: 80 },
+      { key: "width", label: "Wrap at (units; 0: don't wrap)", type: "number", min: 0, max: 150, default: 0 },
     ],
     kind: () => null,
     draw(el, t) {
+      // Formatted text (headings, bold, lists, tables, rules), top left at the origin;
+      // centred or right-aligned lines are placed about it.
       const size = TEXT_SIZES[str(el, "size", "note")] ?? TEXT_SIZES.note!;
-      const md = (t?.label ?? el.label) || "## Notes\n- Write notes here";
-      const n = notesLayout(md, size, num(el, "width", 80, 10, 200));
-      return { prims: n.prims, terminals: [], body: { x: 0, y: 0, w: n.w, h: n.h } };
+      const width = num(el, "width", 0, 0, 150);
+      const n = notesLayout((t?.label ?? el.label) || "Text", size, width || 1000);
+      const anchor = str(el, "align", "start");
+      if (anchor === "start") return { prims: n.prims, terminals: [], body: { x: 0, y: 0, w: Math.max(1, wrappedWidth(n.prims)), h: n.h } };
+      // Line by line: each line's text moves left by all (right) or half (centre) its width.
+      const lines = new Map<number, { x0: number; x1: number }>();
+      const key = (y: number) => Math.round(y * 100);
+      for (const p of n.prims) {
+        if (p.t !== "text") continue;
+        const w = textWidth(p.text, p.size);
+        const l = lines.get(key(p.at[1])) ?? { x0: Infinity, x1: -Infinity };
+        l.x0 = Math.min(l.x0, p.at[0]);
+        l.x1 = Math.max(l.x1, p.at[0] + w);
+        lines.set(key(p.at[1]), l);
+      }
+      const k = anchor === "middle" ? 0.5 : 1;
+      const prims = n.prims.map((p): Prim => {
+        if (p.t !== "text") return p;
+        const l = lines.get(key(p.at[1]))!;
+        return { ...p, at: [p.at[0] - (l.x1 - l.x0) * k, p.at[1]] };
+      });
+      const w = Math.max(1, ...[...lines.values()].map((l) => l.x1 - l.x0));
+      return { prims, terminals: [], body: { x: -w * k, y: 0, w, h: n.h } };
     },
   },
   {
@@ -1455,7 +1539,7 @@ const SYMBOLS: SymbolDef[] = [
       // Where power comes in from outside: an arrow down into each conductor,
       // 3 units apart like switch poles. The label says what it is (415V 3PH+N 50Hz).
       const sys = str(el, "system", "3ph-n");
-      const names = sys === "1ph-n" ? ["L", "N"] : sys === "3ph" ? ["L1", "L2", "L3"] : sys === "dc" ? ["+", "-"] : ["L1", "L2", "L3", "N"];
+      const names = sys === "1ph-n" ? ["L", "N"] : sys === "3ph" ? ["L1", "L2", "L3"] : sys === "dc" ? ["+V", "-V"] : ["L1", "L2", "L3", "N"];
       const prims: Prim[] = [];
       const terminals: TerminalDef[] = [];
       // Text stays upright, so the names and label are placed for the way the
@@ -1655,6 +1739,31 @@ export function defaultParams(symbolId: string): Record<string, ParamValue> {
 // ---------------------------------------------------------------------------
 // Geometry
 
+/** Flip top to bottom (y → -y), before rotating. Text stays upright and reads the same way. */
+function flipPrim(p: Prim): Prim {
+  const f = (v: Vec): Vec => [v[0], -v[1]];
+  switch (p.t) {
+    case "line":
+    case "poly":
+      return { ...p, pts: p.pts.map(f) };
+    case "circle":
+    case "ellipse":
+      return { ...p, c: f(p.c) };
+    case "arc":
+      return { ...p, from: f(p.from), to: f(p.to), sweep: p.sweep ? 0 : 1 };
+    case "text": {
+      if (p.placed) return p;
+      // Text is placed by its baseline: keep it on the same side of what it labels.
+      if (p.vertical) return { ...p, at: f(p.at) };
+      const lift = p.size * CAP_HEIGHT;
+      return { ...p, at: [p.at[0], -p.at[1] + lift] };
+    }
+  }
+}
+const flipDir = (d: Dir): Dir => (d === "up" ? "down" : d === "down" ? "up" : d);
+const flipVec = (v: Vec): Vec => [v[0], -v[1]];
+const flipRect = (r: Rect): Rect => ({ x: r.x, y: -r.y - r.h, w: r.w, h: r.h });
+
 function rotatePrim(p: Prim, rot: Rotation): Prim {
   if (rot === 0) return p;
   switch (p.t) {
@@ -1720,6 +1829,8 @@ export interface GeometryText {
   label?: string;
   /** A busbar's name: its distribution's, or its own when it's local. */
   name?: string;
+  /** A contact timed by its timer coil: the coil's function (on, off, on-off…), so the delay mark is drawn. */
+  timed?: string;
   /** Revision list rows (revision table). */
   rows?: string[][];
   /** One of each part used (symbol legend). */
@@ -1730,6 +1841,13 @@ export interface GeometryText {
  * Element geometry relative to its origin, already rotated, with the tag,
  * cross-reference and label placeholders filled in.
  */
+/** How wide laid-out text actually is (its longest line). */
+function wrappedWidth(prims: Prim[]): number {
+  let w = 0;
+  for (const p of prims) if (p.t === "text") w = Math.max(w, p.at[0] + textWidth(p.text, p.size));
+  return w;
+}
+
 export function localGeometry(el: Element, texts: string | GeometryText): Geometry {
   const t: GeometryText = typeof texts === "string" ? { tag: texts } : texts;
   const def = requireSymbol(el.symbol);
@@ -1752,7 +1870,7 @@ export function localGeometry(el: Element, texts: string | GeometryText): Geomet
     if (m) return labelLines[Number(m[1])] ?? "";
     return s;
   };
-  const rotated = raw.map((p) => rotatePrim(p, el.rot));
+  const rotated = raw.map((p) => rotatePrim(el.flip ? flipPrim(p) : p, el.rot));
   const tagAt = rotated.find((p) => p.t === "text" && p.text === "{tag}");
   const prims = rotated.flatMap((q): Prim[] => {
     if (q.t !== "text") return [q];
@@ -1767,8 +1885,12 @@ export function localGeometry(el: Element, texts: string | GeometryText): Geomet
     }
     return [{ ...q, text: filled }];
   });
-  const terminals = d.terminals.map((t) => ({ ...t, at: rotate(t.at, el.rot), dir: rotateDir(t.dir, el.rot) }));
-  const body = rotateRect(d.body, el.rot);
+  const terminals = d.terminals.map((t) => ({
+    ...t,
+    at: rotate(el.flip ? flipVec(t.at) : t.at, el.rot),
+    dir: rotateDir(el.flip ? flipDir(t.dir) : t.dir, el.rot),
+  }));
+  const body = rotateRect(el.flip ? flipRect(d.body) : d.body, el.rot);
   let bbox = body;
   for (const p of prims) {
     const b = primBounds(p);
@@ -1788,7 +1910,7 @@ export function terminalPoint(el: Element, name: string): Vec | null {
     .draw(el)
     .terminals.find((x) => x.name === name);
   if (!t) return null;
-  const [x, y] = rotate(t.at, el.rot);
+  const [x, y] = rotate(el.flip ? flipVec(t.at) : t.at, el.rot);
   return [el.pos[0] + x, el.pos[1] + y];
 }
 
@@ -1796,5 +1918,5 @@ export function terminalDir(el: Element, name: string): Dir {
   const t = requireSymbol(el.symbol)
     .draw(el)
     .terminals.find((x) => x.name === name);
-  return t ? rotateDir(t.dir, el.rot) : "any";
+  return t ? rotateDir(el.flip ? flipDir(t.dir) : t.dir, el.rot) : "any";
 }

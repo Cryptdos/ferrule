@@ -50,15 +50,15 @@ describe("distributions (design-v0.2 §2)", () => {
     connect(p, pg, [busL.id, "16"], [q1.id, "1"]);
     connect(p, pg, [q1.id, "2"], [la.id, "16"]);
     const h1 = addElement(p, pg, "lamp", [40, 60]);
-    connect(p, pg, [la.id, "36"], [h1.id, "V+"]);
-    connect(p, pg, [h1.id, "V-"], [busN.id, "36"]);
+    connect(p, pg, [la.id, "36"], [h1.id, "+V"]);
+    connect(p, pg, [h1.id, "-V"], [busN.id, "36"]);
     // Another local busbar called La on another sheet, fed by nothing.
     const pg2 = addPage(p, "Two").id;
     const la2 = addElement(p, pg2, "busbar", [4, 40], { params: { name: "La", length: 60 } });
     const n2 = addElement(p, pg2, "busbar", [4, 80], { params: { dist: N.id, length: 60 } });
     const h2 = addElement(p, pg2, "lamp", [40, 60]);
-    connect(p, pg2, [la2.id, "36"], [h2.id, "V+"]);
-    connect(p, pg2, [h2.id, "V-"], [n2.id, "36"]);
+    connect(p, pg2, [la2.id, "36"], [h2.id, "+V"]);
+    connect(p, pg2, [h2.id, "-V"], [n2.id, "36"]);
     const c = compile(p);
     let s = initialState(c);
     // The supply feeds its distributions with no wire drawn from it.
@@ -109,7 +109,7 @@ describe("wire colour from the busbar", () => {
     const own = addElement(p, pg, "busbar", [0, 20], { params: { colour: "Bk", dist: n.id, length: 60 } });
     const h = addElement(p, pg, "lamp", [20, 40]);
     const k = addElement(p, pg, "coil", [40, 40]);
-    const w1 = connect(p, pg, [bus.id, "20"], [h.id, "V+"]);
+    const w1 = connect(p, pg, [bus.id, "20"], [h.id, "+V"]);
     const colourOf = (w: { conductor: string }) => p.conductors.find((c) => c.id === w.conductor)?.colour;
     expect(colourOf(w1)).toBe("Bu");
     // The busbar's own colour wins over its distribution's.
@@ -118,7 +118,7 @@ describe("wire colour from the busbar", () => {
     // Changed by hand, it stays changed; changing the busbar later doesn't touch it.
     setConductorInfo(p, w1.conductor, { colour: "Rd" });
     bus.params.colour = "Gy";
-    connect(p, pg, [h.id, "V-"], [k.id, "A2"]);
+    connect(p, pg, [h.id, "-V"], [k.id, "A2"]);
     expect(colourOf(w1)).toBe("Rd");
   });
 });
@@ -130,7 +130,7 @@ describe("wire labels the drafter can hide", () => {
     const { p, pg } = project();
     const h = addElement(p, pg, "lamp", [20, 40]);
     const k = addElement(p, pg, "coil", [40, 40]);
-    const w = connect(p, pg, [h.id, "V-"], [k.id, "A1"]);
+    const w = connect(p, pg, [h.id, "-V"], [k.id, "A1"]);
     expect(w.showNumber).toBeUndefined();
     setWireKind(p, pg, [w.id], { showNumber: false, showColour: false });
     expect([w.showNumber, w.showColour]).toEqual([false, false]);
@@ -152,8 +152,8 @@ describe("simulating without an Incoming supply", () => {
     connect(p, pg, [t.id, "S1"], [c.id, "10"]);
     connect(p, pg, [t.id, "S2"], [o.id, "13"]);
     const h = addElement(p, pg, "lamp", [40, 55]);
-    connect(p, pg, [c.id, "40"], [h.id, "V+"]);
-    connect(p, pg, [h.id, "V-"], [o.id, "40"]);
+    connect(p, pg, [c.id, "40"], [h.id, "+V"]);
+    connect(p, pg, [h.id, "-V"], [o.id, "40"]);
     const s = initialState(compile(p));
     expect(s.lamps[h.id]).toBe(true);
     expect(s.short).toBe(false);

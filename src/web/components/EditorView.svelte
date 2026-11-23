@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import {
     deleteClouds,
     deleteElements,
@@ -6,6 +7,7 @@
     deleteSegments,
     duplicateElements,
     moveElements,
+    flipElements,
     rotateElements,
   } from "../../core/ops";
   import { benchOf } from "../../core/symbols";
@@ -58,6 +60,22 @@
   }
 
   let canvas: Canvas | undefined = $state();
+
+  // Text left empty disappears when you click away from it: an empty box is invisible on the sheet.
+  let lastSelected: { page: string; ids: string[] } = { page: "", ids: [] };
+  $effect(() => {
+    const now = { page: editor.pageId, ids: [...editor.selection] };
+    untrack(() => {
+      const left = lastSelected.ids.filter((id) => !now.ids.includes(id));
+      const page = editor.project.pages.find((pg) => pg.id === lastSelected.page);
+      const empty = left.filter((id) => {
+        const el = page?.elements.find((e) => e.id === id);
+        return el?.symbol === "text" && !el.label.trim();
+      });
+      if (page && empty.length) editor.apply((p) => deleteElements(p, page.id, empty));
+      lastSelected = now;
+    });
+  });
   let showProject = $state(false);
   let dialog: "plant" | "distribution" | "checks" | "schedules" | "templates" | "renumber" | "devices" | null = $state(null);
   let tableView = $state(false);
@@ -187,8 +205,6 @@
         const pages = editor.project.pages;
         const i = editor.pageIndex + (e.key === "PageDown" ? 1 : -1);
         if (pages[i]) editor.setPage(pages[i].id);
-      } else if (e.key === "f" || e.key === "F") {
-        canvas?.fit();
       }
       return;
     }
@@ -199,8 +215,6 @@
         const pages = editor.project.pages;
         const i = editor.pageIndex + (e.key === "PageDown" ? 1 : -1);
         if (pages[i]) editor.setPage(pages[i].id);
-      } else if (e.key === "f" || e.key === "F") {
-        canvas?.fit();
       }
       return;
     }
@@ -274,7 +288,7 @@
       const i = editor.pageIndex + (e.key === "PageDown" ? 1 : -1);
       if (pages[i]) editor.setPage(pages[i].id);
     } else if (e.key === "f" || e.key === "F") {
-      canvas?.fit();
+      if (ids.length) editor.apply((p) => flipElements(p, pageId, ids));
     }
   }
 </script>
@@ -322,7 +336,7 @@
     </div>
     <div class="row two">
       {#if editor.mode === "simulate"}
-        <button class="icon" onclick={() => canvas?.fit()} title="Fit sheet (F)"><Icon name="fit" /></button>
+        <button class="icon" onclick={() => canvas?.fit()} title="Fit sheet (tap Space)"><Icon name="fit" /></button>
         <button class="icon" class:active={!!editor.splitPageId} onclick={toggleSplit} title="Show another sheet alongside"><Icon name="split" /></button>
         <span class="sep"></span>
         <span class="simnote">Simulating: click switches and buttons on the drawing; double-click to follow a link. Editing is off.</span>
@@ -340,9 +354,6 @@
           </button>
           <button class="tool" class:active={editor.tool === "ga-trunking"} onclick={() => ((editor.tool = "ga-trunking"), (editor.gaPlace = null))} title="Drag out a run of trunking">
             <Icon name="trunking" /> Trunking
-          </button>
-          <button class="tool" class:active={editor.tool === "ga-note"} onclick={() => ((editor.tool = "ga-note"), (editor.gaPlace = null))} title="Add a note">
-            <Icon name="note" /> Note
           </button>
           <span class="sep"></span>
           <button class="tool" onclick={() => (dialog = "devices")} title="Real devices with their sizes, datasheets and pictures">
@@ -373,7 +384,7 @@
         <button class="icon" disabled={!editor.canUndo} onclick={() => editor.undo()} title="Undo (Ctrl+Z)"><Icon name="undo" /></button>
         <button class="icon" disabled={!editor.canRedo} onclick={() => editor.redo()} title="Redo (Ctrl+Y)"><Icon name="redo" /></button>
         <span class="sep"></span>
-        <button class="icon" onclick={() => canvas?.fit()} title="Fit sheet (F)"><Icon name="fit" /></button>
+        <button class="icon" onclick={() => canvas?.fit()} title="Fit sheet (tap Space)"><Icon name="fit" /></button>
         <button class="icon" class:active={!!editor.splitPageId} onclick={toggleSplit} title="Show another sheet alongside"><Icon name="split" /></button>
         {#if editor.mode === "draft"}
           <button class="icon" class:active={tableView} onclick={() => (tableView = !tableView)} title="Table: every element in the project"><Icon name="table" /></button>
@@ -415,7 +426,7 @@
         <FloatBox title="Help" store="help" top={162} right={344} width={280} onclose={() => (help = false)}>
           <div class="help">
             <p>Pick a part in the browser and click to place it. Drag to move, <kbd>R</kbd> rotate, <kbd>Del</kbd> delete, <kbd>Ctrl</kbd>+<kbd>D</kbd> duplicate, arrows nudge.</p>
-            <p>Scroll to zoom, middle-drag or <kbd>Space</kbd>+drag to pan, <kbd>F</kbd> fits the sheet. Drag the outline in the overview (top right) to move about.</p>
+            <p>Scroll to zoom, middle-drag or <kbd>Space</kbd>+drag to pan; tap <kbd>Space</kbd> to fit the sheet. <kbd>R</kbd> rotates, <kbd>F</kbd> flips top to bottom. Drag the outline in the overview (top right) to move about.</p>
             <p><kbd>W</kbd> wire tool: click a terminal, then another; click on a wire to tee into it. <kbd>Esc</kbd> cancels, <kbd>S</kbd> back to select.</p>
             <p><kbd>PgUp</kbd>/<kbd>PgDn</kbd> change sheet. Double-click a contact, coil or link arrow to jump to its partner.</p>
             <p><kbd>Ctrl</kbd>+<kbd>Z</kbd> undo, <kbd>Ctrl</kbd>+<kbd>Y</kbd> redo, <kbd>Ctrl</kbd>+<kbd>A</kbd> select all on this workbench. Saving is automatic.</p>

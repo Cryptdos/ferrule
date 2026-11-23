@@ -101,8 +101,7 @@ export function sizeKey(project: Project, el: Element): { key: string; poles: nu
     case "busbar":
       return { key: "block", poles: 1 };
     case "lamp":
-    case "pb-no":
-    case "pb-nc":
+    case "pushbutton":
     case "selector":
       return { key: "door", poles: 1 };
     default:

@@ -69,7 +69,7 @@
           </button>
         {:else}
           <button class="op" class:on={sim.value(i.el) === 1} onclick={() => sim.operate(i.el)}>
-            {i.kind === "select" ? `Pos ${sim.value(i.el) + 1}` : sim.value(i.el) ? "On" : "Off"}
+            {i.kind === "select" ? (i.positions?.[sim.value(i.el)] ?? `Pos ${sim.value(i.el) + 1}`) : sim.value(i.el) ? "On" : "Off"}
           </button>
         {/if}
       </div>

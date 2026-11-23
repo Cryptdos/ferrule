@@ -408,3 +408,14 @@ Each step is one pull request, with a build to test.
 | T4 | A control busbar gives no colour to its wires; its colour is free text; wires off it show no number | Busbar colour is the same colour dropdown as wires. Short wires off a busbar get their number (see T6) | 5 |
 | T5 | A wire from a fuse's other side (fuse 2 → lamp) doesn't take the colour of the wire into the fuse | A wire drawn from one side of an in-line part (fuse, contact, isolator pole, terminal) takes the colour of the wire on the other side of that pole, once, when drawn | 5 |
 | T6 | On a short wire the colour and number collide with things around them | When the wire is no longer than its text, the colour and number are centred on it | 5 |
+
+**Step 4 (parts audit)**
+
+- **Timed contacts:** a contact linked to a timer coil prints the timer marks (17-18 NO, 15-16 NC, 15-16/18 changeover, by pole), so the contact table and the drawing agree. On-and-off delay draws both arcs; pulse and flasher draw the on-delay mark.
+- **Push button "both"** puts NO 13/14 and NC 21/22 side by side on one head.
+- **Selector poles** are each a single choice: *NO, closed in I*; *NO, closed in II*; *NO, closed in I and II*; *NC, opened in I*; *NC, opened in II*; or *Changeover* (12 in 0 and 14 in I on a 2-position switch; 12 in I and 14 in II on a 3-position one, both open in 0). Terminals are numbered by pole: NO k3/k4, NC k1/k2, changeover k1/k2/k4. In Simulate a click steps 0 → I → II → 0. The whole switch is drawn turned whenever it's out of 0.
+- **Isolator "door handle"** is drawn as the rotary head with a bar across the shaft (coupled through the door).
+- **Text:** the merged Text is laid out from its top left, where the old plain Text sat on its first baseline, so text from before sits about a line lower. Wrapping is off (0) unless a width is set.
+- **Contact tables** are a little wider (the marks column), so "15-16/18" doesn't run into "CO".
+- **Drawings from the 0.2 test builds** still open: timer contacts, push buttons NO/NC, Notes, the old selector changeover and lamp/DC-supply terminal names are mapped on load. That mapping is for the test period and comes out at release.
+- Not in this step: note 26 (wires to a cable screen drawn dashed) goes with the wire work in step 5.

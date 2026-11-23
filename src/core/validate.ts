@@ -32,6 +32,7 @@ export function parseProject(input: unknown): Project {
     throw new ProjectFormatError("This project was made with Ferrule 0.1; this version can't open it. Projects from 0.1 need redrawing.");
   }
   if (typeof input.id !== "string" || !input.id) throw new ProjectFormatError("Project has no id");
+  preRelease(input);
 
   const info = isObj(input.project) ? input.project : {};
   const base = emptyInfo();
@@ -223,6 +224,7 @@ function parsePage(pg: Record<string, unknown>, i: number): Project["pages"][num
       label: strOr(e.label),
       pos: e.pos,
       rot,
+      ...(e.flip === true ? { flip: true } : {}),
       zone: e.zone === "external" ? ("external" as const) : ("internal" as const),
       params: isObj(e.params)
         ? (Object.fromEntries(
@@ -314,4 +316,47 @@ function parseConductors(v: unknown): Project["conductors"] {
         (t): t is [string, string] => Array.isArray(t) && t.length === 2 && t.every((x) => typeof x === "string"),
       ),
     }));
+}
+
+/**
+ * Drawings made with the 0.2 test builds (format 3, before the parts audit)
+ * open with the parts and terminals renamed in the audit. For the test
+ * period only: remove when 0.2.0 is released.
+ */
+function preRelease(input: Record<string, unknown>): void {
+  const terms = new Map<string, Record<string, string>>(); // element id → old terminal → new
+  for (const pg of arr(input.pages).filter(isObj)) {
+    for (const e of arr(pg.elements).filter(isObj)) {
+      const params = (isObj(e.params) ? e.params : (e.params = {})) as Record<string, unknown>;
+      const id = String(e.id ?? "");
+      if (e.symbol === "timer-contact") {
+        const nc = params.contact === "nc";
+        e.symbol = nc ? "contact-nc" : "contact-no";
+        delete params.contact;
+        delete params.mode;
+        terms.set(id, nc ? { "15": "21", "16": "22" } : { "17": "13", "18": "14" });
+      } else if (e.symbol === "pb-no" || e.symbol === "pb-nc") {
+        params.contact = e.symbol === "pb-nc" ? "nc" : "no";
+        e.symbol = "pushbutton";
+      } else if (e.symbol === "notes") {
+        e.symbol = "text";
+      } else if (e.symbol === "selector" && params.contact === "co") {
+        params.pole1 = "co";
+        delete params.contact;
+      } else if (e.symbol === "lamp") {
+        terms.set(id, { "V+": "+V", "V-": "-V", T: "LT" });
+      } else if (e.symbol === "supply") {
+        terms.set(id, { "+": "+V", "-": "-V" });
+      }
+      if (e.symbol === "isolator" && params.operator === "push") params.operator = "turn";
+    }
+  }
+  if (!terms.size) return;
+  const fix = (r: unknown) => {
+    if (!Array.isArray(r) || typeof r[0] !== "string") return;
+    const to = terms.get(r[0])?.[String(r[1])];
+    if (to) r[1] = to;
+  };
+  for (const pg of arr(input.pages).filter(isObj)) for (const sg of arr(pg.segments).filter(isObj)) [sg.from, sg.to].forEach(fix);
+  for (const c of arr(input.conductors).filter(isObj)) arr(c.terminals).forEach(fix);
 }

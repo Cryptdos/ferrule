@@ -36,11 +36,11 @@ function sheet() {
 describe("lamps", () => {
   test("V+ and V-, with an optional test terminal on the supply side", () => {
     const { add } = sheet();
-    expect(terminalNames(add("lamp", 10, 10))).toEqual(["V+", "V-"]);
+    expect(terminalNames(add("lamp", 10, 10))).toEqual(["+V", "-V"]);
     const t = add("lamp", 20, 10, { testPin: true });
-    expect(terminalNames(t)).toEqual(["T", "V+", "V-"]);
+    expect(terminalNames(t)).toEqual(["LT", "+V", "-V"]);
     const g = localGeometry(t, "");
-    const tt = g.terminals.find((x) => x.name === "T")!;
+    const tt = g.terminals.find((x) => x.name === "LT")!;
     expect(tt.at[1]).toBe(-3);
     expect(tt.dir).toBe("up");
   });
@@ -48,11 +48,11 @@ describe("lamps", () => {
   test("the test terminal lights the lamp", () => {
     const { p, pg, add } = sheet();
     const { cct: cct, ov: ov } = controlBusbars(p, pg, 10, 80);
-    const lt = add("pb-no", 30, 20);
+    const lt = add("pushbutton", 30, 20);
     const h = add("lamp", 40, 60, { testPin: true });
     connect(p, pg, [cct.id, "30"], [lt.id, "13"]);
-    connect(p, pg, [lt.id, "14"], [h.id, "T"]);
-    connect(p, pg, [h.id, "V-"], [ov.id, "40"]);
+    connect(p, pg, [lt.id, "14"], [h.id, "LT"]);
+    connect(p, pg, [h.id, "-V"], [ov.id, "40"]);
     const c = compile(p);
     let s = initialState(c);
     expect(s.lamps[h.id]).toBe(false);
@@ -86,7 +86,7 @@ describe("isolators", () => {
   test("a contactor's auxiliaries follow its coil, NC opening", () => {
     const { p, pg, add } = sheet();
     const { cct: cct, ov: ov } = controlBusbars(p, pg, 10, 80);
-    const s = add("pb-no", 10, 20);
+    const s = add("pushbutton", 10, 20);
     const k = add("coil", 10, 60);
     connect(p, pg, [cct.id, "10"], [s.id, "13"]);
     connect(p, pg, [s.id, "14"], [k.id, "A1"]);
@@ -95,8 +95,8 @@ describe("isolators", () => {
     linkContact(p, q.id, k.id);
     const h = add("lamp", 70, 60);
     connect(p, pg, [cct.id, "70"], [q.id, "11"]);
-    connect(p, pg, [q.id, "12"], [h.id, "V+"]);
-    connect(p, pg, [h.id, "V-"], [ov.id, "70"]);
+    connect(p, pg, [q.id, "12"], [h.id, "+V"]);
+    connect(p, pg, [h.id, "-V"], [ov.id, "70"]);
     expect(contactTable(p, k).map((r) => r[0])).toEqual(["Main", "NC"]);
     const c = compile(p);
     let st = initialState(c);
@@ -143,12 +143,12 @@ describe("timer functions", () => {
     const kt = add("timer-coil", 10, 60, { mode: "flash-on", time: "1s" });
     connect(p, pg, [cct.id, "10"], [kt.id, "A1"]);
     connect(p, pg, [kt.id, "A2"], [ov.id, "10"]);
-    const tc = add("timer-contact", 40, 30);
+    const tc = add("contact-no", 40, 30);
     linkContact(p, tc.id, kt.id);
     const h = add("lamp", 40, 60);
-    connect(p, pg, [cct.id, "40"], [tc.id, "17"]);
-    connect(p, pg, [tc.id, "18"], [h.id, "V+"]);
-    connect(p, pg, [h.id, "V-"], [ov.id, "40"]);
+    connect(p, pg, [cct.id, "40"], [tc.id, "13"]);
+    connect(p, pg, [tc.id, "14"], [h.id, "+V"]);
+    connect(p, pg, [h.id, "-V"], [ov.id, "40"]);
     const c = compile(p);
     let s = initialState(c);
     expect(s.lamps[h.id]).toBe(true);
@@ -177,13 +177,17 @@ describe("off-page arrows", () => {
 });
 
 describe("cable screen", () => {
-  test("spans its cores and has a drain terminal, but no body for wires to route round", () => {
+  test("a rounded rectangle across its cores, the drain out to the side, and no body for wires to route round (25)", () => {
     const { add } = sheet();
     const s = add("screen", 10, 10, { span: 6 });
     const g = localGeometry(s, "W1");
     expect(g.body.w).toBe(0);
     expect(g.terminals.map((t) => t.name)).toEqual(["E"]);
-    expect(g.prims.some((x) => x.t === "ellipse" && x.rx > 3)).toBe(true);
+    // The drain leaves sideways, level with the screen.
+    expect(g.terminals[0]!.dir).toBe("right");
+    expect(g.terminals[0]!.at[1]).toBe(0);
+    const outline = g.prims.find((x) => x.t === "line" && x.pts.length > 10);
+    expect(outline && outline.t === "line" ? Math.max(...outline.pts.map((v) => v[0])) - Math.min(...outline.pts.map((v) => v[0])) : 0).toBeGreaterThan(7);
     expect(terminalNames(add("screen", 30, 10, { drain: "none" }))).toEqual([]);
   });
 });
@@ -248,7 +252,7 @@ describe("wire colour and function", () => {
     const { p, pg, add } = sheet();
     const a = add("coil", 10, 10);
     const b = add("lamp", 10, 30);
-    const s = connect(p, pg, [a.id, "A2"], [b.id, "V+"]);
+    const s = connect(p, pg, [a.id, "A2"], [b.id, "+V"]);
     setConductorInfo(p, s.conductor, { colour: "bu", function: "0V" });
     refreshConductors(p);
     const c = p.conductors.find((x) => x.id === s.conductor)!;

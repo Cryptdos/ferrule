@@ -12,7 +12,7 @@ import type { Element, Page, Project } from "./model";
 import { isolatorAux, type Prim } from "./symbols";
 
 export const MASTER_SYMBOLS = new Set(["coil", "timer-coil"]);
-const SLAVE_SYMBOLS = new Set(["contact-no", "contact-nc", "contact-co", "timer-contact"]);
+const SLAVE_SYMBOLS = new Set(["contact-no", "contact-nc", "contact-co"]);
 
 export function isMaster(el: Element): boolean {
   return MASTER_SYMBOLS.has(el.symbol);
@@ -88,8 +88,6 @@ export function contactType(el: Element): string {
       return "NC";
     case "contact-co":
       return "CO";
-    case "timer-contact":
-      return el.params.contact === "nc" ? "NC" : "NO";
     case "isolator":
       return "Main";
     default:
@@ -97,19 +95,27 @@ export function contactType(el: Element): string {
   }
 }
 
-/** Printed terminal marks of a contact, e.g. "23-24". */
-export function contactMarks(el: Element): string {
+/**
+ * Is this contact timed by its coil? Linked to a timer coil and not ticked
+ * Instantaneous: it switches with the timer's function and shows the delay mark.
+ */
+export function isTimed(project: Project, el: Element): boolean {
+  if (!SLAVE_SYMBOLS.has(el.symbol) || el.params.instant === true) return false;
+  return masterOf(project, el)?.el.symbol === "timer-coil";
+}
+
+/** Printed terminal marks of a contact, e.g. "23-24"; a timed one "17-18". */
+export function contactMarks(el: Element, timed = false): string {
   const pole = typeof el.params.pole === "number" && el.params.pole > 0 ? String(el.params.pole) : "";
   const pair = (a: string, b: string) => (pole ? `${pole}${a[1]}-${pole}${b[1]}` : `${a}-${b}`);
   switch (el.symbol) {
     case "contact-no":
-      return pair("13", "14");
+      return timed ? pair("17", "18") : pair("13", "14");
     case "contact-nc":
-      return pair("21", "22");
+      return timed ? pair("15", "16") : pair("21", "22");
     case "contact-co":
+      if (timed) return pole ? `${pole}5-${pole}6/${pole}8` : "15-16/18";
       return pole ? `${pole}1-${pole}2/${pole}4` : "11-12/14";
-    case "timer-contact":
-      return el.params.contact === "nc" ? pair("15", "16") : pair("17", "18");
     case "isolator": {
       const n = typeof el.params.poles === "number" ? el.params.poles : 3;
       return `1-${2 * n}`;
@@ -130,7 +136,7 @@ export function contactRows(project: Project, el: Element): { row: [string, stri
   return slavesOf(project, el).flatMap((s) => {
     const where = address(s.page, s.el.pos, here);
     const rows: { row: [string, string, string]; id: string }[] = [
-      { row: [contactType(s.el), contactMarks(s.el), where], id: s.el.id },
+      { row: [contactType(s.el), contactMarks(s.el, isTimed(project, s.el)), where], id: s.el.id },
     ];
     if (s.el.symbol === "isolator") {
       for (const a of isolatorAux(s.el)) rows.push({ row: [a.nc ? "NC" : "NO", `${a.a}-${a.b}`, where], id: s.el.id });
@@ -176,9 +182,9 @@ export function xrefText(project: Project, el: Element, masterTag: string): stri
 // Contact table layout, in grid units, sized for its text (the `detail` style).
 const TABLE_TEXT = textUnits("detail");
 const TABLE_ROW = TABLE_TEXT * 1.3;
-const TABLE_W = TABLE_TEXT * 7.6;
+const TABLE_W = TABLE_TEXT * 8.2;
 /** Where the marks column ends and the address column starts. */
-const TABLE_SEP = TABLE_TEXT * 4.5;
+const TABLE_SEP = TABLE_TEXT * 5.1;
 
 /**
  * Where a coil's contact table sits, relative to the coil, or wherever it

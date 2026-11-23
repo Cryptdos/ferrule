@@ -33,6 +33,8 @@ export interface Element {
   /** Origin in grid units. */
   pos: Vec;
   rot: Rotation;
+  /** Flipped top to bottom (before rotating): a contact drawn upside down still reads right. */
+  flip?: boolean;
   zone: "internal" | "external";
   /** Symbol-specific settings (lamp colour, rail label, pole count…). */
   params: Record<string, ParamValue>;

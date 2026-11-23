@@ -36,7 +36,7 @@ describe("spare sheets", () => {
     expect(spare.spare).toBe(true);
     expect(spare.title).toBe("Spare");
     expect(() => addElement(p, spare.id, "coil", [10, 10])).toThrow(/spare sheet/);
-    addElement(p, spare.id, "notes", [10, 10]);
+    addElement(p, spare.id, "text", [10, 10]);
     expect(parseProject(JSON.parse(JSON.stringify(p))).pages[1]!.spare).toBe(true);
     addElement(p, pg, "coil", [10, 10]);
     expect(() => setPageSpare(p, pg, true)).toThrow(/drawing items/);
@@ -314,8 +314,8 @@ describe("sprint 1: transformer polarity", () => {
       connect(p, pg, [sup.id, "L"], [t.id, swapped ? "P2" : "P1"]);
       connect(p, pg, [sup.id, "N"], [t.id, swapped ? "P1" : "P2"]);
       const h = addElement(p, pg, "lamp", [40, 60]);
-      const w1 = connect(p, pg, [t.id, "S1"], [h.id, "V+"]);
-      const w2 = connect(p, pg, [h.id, "V-"], [t.id, "S2"]);
+      const w1 = connect(p, pg, [t.id, "S1"], [h.id, "+V"]);
+      const w2 = connect(p, pg, [h.id, "-V"], [t.id, "S2"]);
       const c = compile(p);
       const s = initialState(c);
       expect(s.lamps[h.id]).toBe(true);

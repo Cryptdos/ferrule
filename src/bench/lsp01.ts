@@ -153,8 +153,8 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
   const fPower = add("fuse", 112, 56, { params: { rating: "4A" } });
   const hPower = add("lamp", 112, 66, { label: "POWER ON", params: { colour: "Ye" } });
   w(tap(busL1, 112), [fPower, "1"]);
-  w([fPower, "2"], [hPower, "V+"]);
-  w([hPower, "V-"], tap(busN, 118));
+  w([fPower, "2"], [hPower, "+V"]);
+  w([hPower, "-V"], tap(busN, 118));
   text(64, 54, "L1, L2, L3 AND N CONTINUE TO THE FAN\nSTARTER SECTIONS, SHEETS 3–6");
 
   // ===========================================================================
@@ -199,8 +199,8 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
   const kmRun = add("contact-no", 62, 35);
   const hRun = add("lamp", 62, 50, { label: `${tag(SF1.id)}\nRUNNING`, params: { colour: "Gn" } });
   w(tap(cctLocal, 62), [kmRun, "13"]);
-  w([kmRun, "14"], [hRun, "V+"]);
-  w([hRun, "V-"], tap(ovLocal, 62));
+  w([kmRun, "14"], [hRun, "+V"]);
+  w([hRun, "-V"], tap(ovLocal, 62));
   linkContact(p, kmRun.id, kmCoil.id);
   const kmSig = add("contact-no", 78, 35);
   const runOut = arrowOut(78, 45, "RUN SIGNAL");
@@ -250,8 +250,8 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
   w([smcb, "2"], tap(cct, 38));
   w([tx, "S2"], tap(ov, 38));
   const hHealthy = add("lamp", 48, 58, { label: "CONTROL CCT\nHEALTHY", params: { colour: "Wh", testPin: true } });
-  w(tap(cct, 48), [hHealthy, "V+"]);
-  w([hHealthy, "V-"], tap(ov, 48));
+  w(tap(cct, 48), [hHealthy, "+V"]);
+  w([hHealthy, "-V"], tap(ov, 48));
   const faView = placePlantView(p, page.id, FA.id, [56, 76]);
   const xFa = [56, 57].map((x) => add("terminal", x, 70));
   const fr = add("coil", 70, 58, { label: "FIRE ALARM\nRELAY" });
@@ -263,16 +263,16 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
   const frLamp = add("contact-no", 86, 51);
   const hFire = add("lamp", 86, 60, { label: "FIRE ALARM\nACTIVATED", params: { colour: "Rd", testPin: true } });
   w(tap(cct, 86), [frLamp, "13"]);
-  w([frLamp, "14"], [hFire, "V+"]);
-  w([hFire, "V-"], tap(ov, 86));
+  w([frLamp, "14"], [hFire, "+V"]);
+  w([hFire, "-V"], tap(ov, 86));
   linkContact(p, frLamp.id, fr.id);
-  const sLt = add("pb-no", 98, 51, { label: "LAMP TEST" });
+  const sLt = add("pushbutton", 98, 51, { label: "LAMP TEST" });
   const lt = ctl(null, 98, 57, 6, "LT");
   w(tap(cct, 98), [sLt, "13"]);
   w([sLt, "14"], tap(lt, 98));
   // Lamp test: the LT rail feeds each lamp's test terminal.
-  w(tap(lt, 98), [hFire, "T"]);
-  w([hFire, "T"], [hHealthy, "T"]);
+  w(tap(lt, 98), [hFire, "LT"]);
+  w([hFire, "LT"], [hHealthy, "LT"]);
   // CCT and 0V out to the four starters and the two controls sheets.
   const cctOuts = [108, 114, 120, 126, 132, 138].map((x) => {
     const a = arrowOut(x, 51);
@@ -302,7 +302,7 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
   const sAt = add("selector", 10, 13, { label: "AUTO/TEST", params: { key: true, legend: "AUTO TEST" } });
   const frEn = add("contact-no", 16, 13);
   const ffEn = add("contact-nc", 10, 24);
-  const sDuty = add("selector", 10, 35, { rot: 180, label: "DUTY\nSELECTOR", params: { contact: "co", key: true, legend: "1  2" } });
+  const sDuty = add("selector", 10, 35, { rot: 180, label: "DUTY\nSELECTOR", params: { pole1: "co", key: true, legend: "1  2" } });
   const er1 = add("coil", 10, 56, { label: `${tag(SF1.id)}\nENABLE` });
   const er2 = add("coil", 20, 56, { label: `${tag(SF2.id)}\nENABLE` });
   w(tap(c, 10), [sAt, "13"]);
@@ -375,16 +375,17 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
   const t1 = proving(66, er1, DPS.SF1.id, tag(SF1.id));
   const t2 = proving(93, er2, DPS.SF2.id, tag(SF2.id));
   // Fans-fail latch.
-  const t1c = add("timer-contact", 120, 13);
-  const t2c = add("timer-contact", 126, 13);
-  const ffHold = add("contact-no", 132, 13);
-  const sReset = add("pb-nc", 120, 33, { label: "FANS TRIP\nRESET" });
+  // Contacts of the fail timers: timed by their coils (the delay mark is drawn for them).
+  const t1c = add("contact-no", 120, 13);
+  const t2c = add("contact-no", 127, 13);
+  const ffHold = add("contact-no", 133, 13);
+  const sReset = add("pushbutton", 120, 33, { label: "FANS TRIP\nRESET", params: { contact: "nc" } });
   const ff = add("coil", 120, 56, { label: "FANS\nFAIL" });
-  w(tap(c, 120), [t1c, "17"]);
-  w([t1c, "18"], [sReset, "21"]);
-  w(tap(c, 126), [t2c, "17"]);
-  tee([t2c, "18"], [sReset, "21"], [120, 21]);
-  w(tap(c, 132), [ffHold, "13"]);
+  w(tap(c, 120), [t1c, "13"]);
+  w([t1c, "14"], [sReset, "21"]);
+  w(tap(c, 127), [t2c, "13"]);
+  tee([t2c, "14"], [sReset, "21"], [120, 21]);
+  w(tap(c, 133), [ffHold, "13"]);
   tee([ffHold, "14"], [sReset, "21"], [120, 23]);
   w([sReset, "22"], [ff, "A1"]);
   w([ff, "A2"], tap(o, 120));
@@ -394,11 +395,11 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
   linkContact(p, ffEn.id, ff.id);
   // Tripped lamps.
   const tripped = (x: number, t: Element, fanTag: string) => {
-    const k = add("timer-contact", x, 25);
+    const k = add("contact-no", x, 25);
     const h = add("lamp", x, 56, { label: `${fanTag}\nTRIPPED`, params: { colour: "Rd" } });
-    w(tap(c, x), [k, "17"]);
-    w([k, "18"], [h, "V+"]);
-    w([h, "V-"], tap(o, x));
+    w(tap(c, x), [k, "13"]);
+    w([k, "14"], [h, "+V"]);
+    w([h, "-V"], tap(o, x));
     linkContact(p, k.id, t.id);
   };
   tripped(137, t1, tag(SF1.id));
@@ -552,7 +553,7 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
   {
     const notes = addSparePage(p, p.pages[p.pages.length - 1]!.id);
     notes.title = "Notes, revisions and symbols";
-    addElement(p, notes.id, "notes", [4, 4], {
+    addElement(p, notes.id, "text", [4, 4], {
       params: { width: 70 },
       label: [
         "## General notes",
