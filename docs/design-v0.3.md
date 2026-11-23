@@ -195,6 +195,16 @@ Each step is one PR with a build, `ferrule-windows-v0.3.0-pre.zip`. The working 
 - **Dropped on a pin:** an arrow whose terminal sits exactly on another part's pin, with no wire, is joined to that pin's conductor, so it is genuinely on it (numbering, Simulate and Check agree), not just labelled.
 - **The example:** its CCT and 0V arrows on sheet 7 are 8 units apart (the lamp test moved 2 left to make room), and the second enable loop on sheets 8 and 9 moved down 2 units, so numbers and references don't run into each other.
 
+**Step 6 (tiles) is three PRs:** 6a the tiles and live sheet tiles; 6b windows in tiles (docking); 6c tidying what 6a and 6b leave (Esc, the help, the README pictures).
+
+**Step 6a (tiles)**
+
+- **Every tile has its bar**, even when there's only one, so splitting is always where you'd look. The outline marking the active tile shows once there are two sheet tiles. The tile's name sits at the right of its bar, by its buttons, so the floating browser (over the left of the drawing area) doesn't hide it.
+- **The top bar's Split** splits the active tile to the right; split down is on the tile's bar.
+- **Go to** (double-click a contact, coil or arrow) changes the active tile's sheet. The old split kept the sheet you came from in its other half; with tiles, open it in another tile to keep it in view.
+- **Clicking another tile** clears what's picked before the click acts there: what's picked belongs to one tile.
+- **Fit** on a tile covered by the browser leaves room for it only where the browser actually overlaps that tile.
+
 ## 11. Director notes, as written (23/11/26)
 
 **On tiling (§7):**

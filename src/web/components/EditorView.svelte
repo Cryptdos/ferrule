@@ -23,7 +23,6 @@
   import { deleteGaItems, moveGaItems, rotateGaItems } from "../../core/ops";
   import { isTyping } from "../typing";
   import type { Editor } from "../editor.svelte";
-  import Canvas from "./Canvas.svelte";
   import Props from "./Props.svelte";
   import ProjectDialog from "./ProjectDialog.svelte";
   import PlantDialog from "./PlantDialog.svelte";
@@ -34,7 +33,8 @@
   import RenumberDialog from "./RenumberDialog.svelte";
   import SchedulesDialog from "./SchedulesDialog.svelte";
   import TableView from "./TableView.svelte";
-  import SplitPane from "./SplitPane.svelte";
+  import Tiles from "./Tiles.svelte";
+  import { canvases } from "../canvases";
   import TemplatesDialog from "./TemplatesDialog.svelte";
   import SimPanel from "./SimPanel.svelte";
   import SettingsDialog from "./SettingsDialog.svelte";
@@ -64,20 +64,12 @@
     }
   }
 
-  let canvas: Canvas | undefined = $state();
-  let mainEl: HTMLElement | undefined = $state();
-  let dividerDrag = false;
-  /** Share of the width the working sheet takes in the split view. */
-  let splitAt = $state(
-    (() => {
-      try {
-        const v = Number(localStorage.getItem("ferrule.split"));
-        return v > 0.1 && v < 0.9 ? v : 0.5;
-      } catch {
-        return 0.5;
-      }
-    })(),
-  );
+  /** The active tile's canvas (design-v0.3 §7): Fit, Esc and pasting work on it. */
+  const canvas = {
+    fit: () => canvases.get(editor.activeTile)?.fit(),
+    cancel: () => canvases.get(editor.activeTile)?.cancel() ?? false,
+    placePictures: (files: Blob[]) => canvases.get(editor.activeTile)?.placePictures(files),
+  };
 
   // Text left empty disappears when you click away from it: an empty box is invisible on the sheet.
   let lastSelected: { page: string; ids: string[] } = { page: "", ids: [] };
@@ -142,16 +134,9 @@
     else if (editor.page.spare && editor.mode === "draft") setMode("annotate");
   });
 
-  function toggleSplit() {
-    if (editor.splitPageId) {
-      editor.splitPageId = null;
-      return;
-    }
-    const pages = editor.project.pages;
-    const next = pages[editor.pageIndex + 1] ?? pages[editor.pageIndex - 1] ?? pages[editor.pageIndex]!;
-    editor.splitPageId = next.id;
-    // The working half is narrower now: fit the sheet to it.
-    setTimeout(() => canvas?.fit(), 60);
+  /** Split the active tile: the new half, to its right, shows the same sheet. */
+  function split() {
+    editor.splitTile(editor.activeTile, "row");
   }
   let exporting = $state(false);
 
@@ -383,7 +368,7 @@
         <span class="sep"></span>
       {/if}
       <button class="icon" onclick={() => canvas?.fit()} title="Fit sheet (tap Space)"><Icon name="fit" /></button>
-      <button class="icon" class:active={!!editor.splitPageId} onclick={toggleSplit} title="Show another sheet alongside"><Icon name="split" /></button>
+      <button class="icon" onclick={split} title="Split: the active tile in two, side by side, both showing its sheet. Each tile has its own bar to split right or down and to close"><Icon name="split" /></button>
       {#if editor.mode === "draft"}
         <button class="icon" class:active={editor.colourCheck} onclick={() => (editor.colourCheck = !editor.colourCheck)}
           title="Colour check: every wire and busbar in its core colour (grey dashes: no colour set). Print and PDF stay black"><Icon name="colours" /></button>
@@ -423,35 +408,8 @@
       {/if}
     </div>
   </header>
-  <main class:split={!!editor.splitPageId} style:--split={splitAt} bind:this={mainEl}>
-    <div class="pane"><Canvas bind:this={canvas} {editor} {sim} insetLeft={browserWidth} atlas /></div>
-    {#if editor.splitPageId}
-      <!-- Drag the divider to share the width between the two sheets (note 14). -->
-      <div
-        class="divider"
-        role="separator"
-        aria-orientation="vertical"
-        aria-label="Drag to resize the split"
-        onpointerdown={(e) => {
-          e.currentTarget.setPointerCapture(e.pointerId);
-          dividerDrag = true;
-        }}
-        onpointermove={(e) => {
-          if (!dividerDrag || !mainEl) return;
-          const r = mainEl.getBoundingClientRect();
-          splitAt = Math.min(0.85, Math.max(0.15, (e.clientX - r.left) / r.width));
-        }}
-        onpointerup={() => {
-          dividerDrag = false;
-          try {
-            localStorage.setItem("ferrule.split", String(splitAt));
-          } catch {
-            /* storage may be unavailable */
-          }
-        }}
-      ></div>
-      <div class="pane"><SplitPane {editor} /></div>
-    {/if}
+  <main>
+    <div class="pane"><Tiles {editor} node={editor.tiles} {sim} insetLeft={browserWidth} /></div>
     <Browser {editor} bind:width={browserWidth} onplace={() => (open.place = true)} />
     {#if sim}
       <FloatBox title="Simulation" store="sim"><SimPanel {editor} {sim} onexpectations={() => (open.expectations = true)} /></FloatBox>
@@ -681,19 +639,6 @@
     /* One row the height of the window: a table taller than it scrolls inside. */
     grid-template-rows: minmax(0, 1fr);
     min-height: 0;
-  }
-  main.split {
-    grid-template-columns: minmax(0, calc(var(--split) * 100%)) 6px minmax(0, 1fr);
-  }
-  .divider {
-    cursor: col-resize;
-    background: var(--chrome, #e4e7ea);
-    border-left: 1px solid #b9c0c6;
-    border-right: 1px solid #b9c0c6;
-    touch-action: none;
-  }
-  .divider:hover {
-    background: #c9d3e0;
   }
   .cause {
     font-family: ui-monospace, Consolas, monospace;

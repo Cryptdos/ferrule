@@ -14,6 +14,9 @@ export const ICONS = {
   redo: '<path d="M15 6l5 5-5 5"/><path d="M20 11H10a5 5 0 0 0 0 10h3"/>',
   fit: '<path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/><rect x="8" y="8" width="8" height="8"/>',
   split: '<rect x="3" y="5" width="18" height="14" rx="1"/><path d="M12 5v14"/>',
+  // A tile split right and down (design-v0.3 §7): the new half shaded.
+  splitRight: '<rect x="3" y="5" width="18" height="14" rx="1"/><path d="M12 5v14"/><path d="M15 9h3M16.5 7.5v3"/>',
+  splitDown: '<rect x="3" y="5" width="18" height="14" rx="1"/><path d="M3 12h18"/><path d="M10.5 15.5h3M12 14v3"/>',
   colours: '<path d="M4 7h16" stroke-width="3"/><path d="M4 12h16" stroke-dasharray="3 2" stroke-width="3"/><path d="M4 17h16" stroke-width="3"/>',
   select: '<path d="M6 3l12 9-5.5 1L10 19z"/>',
   wire: '<path d="M4 18h5V7h11"/><circle cx="4" cy="18" r="1.6"/><circle cx="20" cy="7" r="1.6"/>',
