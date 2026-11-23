@@ -150,6 +150,19 @@ describe("LSP-01 simulation (criterion 5)", async () => {
     expect(s.energised[k1.id] || s.energised[k2.id]).toBeFalsy();
   });
 
+  test("the main isolator cuts the distribution busbars and everything after them", () => {
+    const power = find(2, "POWER ON");
+    const healthy7 = find(7, "CONTROL CCT HEALTHY");
+    const q = p.pages[1]!.elements.find((e) => e.symbol === "isolator")!;
+    let s = initialState(c);
+    expect([s.lamps[power.id], s.lamps[healthy7.id]]).toEqual([true, true]);
+    s = toggle(c, s, q.id);
+    expect([s.lamps[power.id], s.lamps[healthy7.id]]).toEqual([false, false]);
+    const busbars = p.pages[1]!.elements.filter((e) => e.symbol === "busbar");
+    const live = new Set(s.live);
+    expect(busbars.some((b) => p.conductors.some((cd) => live.has(cd.id) && cd.terminals.some(([id]) => id === b.id)))).toBe(false);
+  });
+
   test("fire alarm starts the duty fan through its starter sheet, and the running relay comes back", () => {
     let s = toggle(c, initialState(c), fa.id);
     expect(s.energised[fr.id]).toBe(true);

@@ -3,6 +3,7 @@
  * involved so the UI can jump to them.
  */
 import { gaCandidates } from "./ga";
+import { compile } from "./sim";
 import type { Element, Page, Project } from "./model";
 import { terminalNames } from "./symbols";
 import { displayTag } from "./tags";
@@ -138,6 +139,7 @@ export function checkProject(project: Project): Finding[] {
   }
 
   if (unnumbered) out.push({ level: "info", message: `${unnumbered} items not numbered yet: press Renumber`, ids: [] });
+  out.push(...supplyBypasses(project));
 
   // With a GA drawn, say what isn't on it yet; and GA devices whose schematic part has gone.
   if (project.pages.some((p) => p.ga)) {
@@ -157,4 +159,60 @@ export function checkProject(project: Project): Finding[] {
 
   const rank = { error: 0, warning: 1, info: 2 };
   return out.sort((a, b) => rank[a.level] - rank[b.level]);
+}
+
+/**
+ * An incoming supply terminal set to feed a distribution that its own wiring
+ * also reaches (through an isolator, say). Everything on a distribution is
+ * one net, so the wiring in between is bypassed: opening the isolator would
+ * leave the busbars live. The supply's distribution should be left empty.
+ */
+export function supplyBypasses(project: Project): Finding[] {
+  const out: Finding[] = [];
+  const supplies = project.pages.flatMap((pg) =>
+    pg.elements.filter((e) => e.symbol === "supply").map((el) => ({ el, page: pg })),
+  );
+  if (!supplies.some(({ el }) => Object.keys(el.params).some((k) => k.startsWith("dist_") && el.params[k]))) return out;
+  const c = compile(project);
+  const node = new Map<string, string>();
+  for (const cd of project.conductors) for (const [id, t] of cd.terminals) node.set(`${id}:${t}`, cd.id);
+  for (const { el, page } of supplies) {
+    for (const [k, v] of Object.entries(el.params)) {
+      if (!k.startsWith("dist_") || typeof v !== "string" || !v) continue;
+      const term = k.slice(5);
+      const d = project.distributions.find((x) => x.id === v);
+      if (!d) continue;
+      // Join everything the wiring joins, whatever the switches' state, but not this supply's own distribution joins.
+      const parent = new Map<string, string>();
+      const find = (x: string): string => {
+        let r = x;
+        while (parent.has(r) && parent.get(r) !== r) r = parent.get(r)!;
+        return r;
+      };
+      const union = (a: string, b: string) => {
+        const ra = find(a);
+        const rb = find(b);
+        if (ra !== rb) parent.set(ra, rb);
+      };
+      for (const l of c.links) if (l.el !== el.id) union(l.a, l.b);
+      const from = find(node.get(`${el.id}:${term}`) ?? `${el.id}:${term}`);
+      const reached = project.pages.some((pg) =>
+        pg.elements.some(
+          (b) =>
+            b.symbol === "busbar" &&
+            b.params.dist === v &&
+            project.conductors.some((cd) => cd.terminals.some(([id]) => id === b.id) && find(cd.id) === from),
+        ),
+      );
+      if (reached) {
+        out.push({
+          level: "warning",
+          message: `Sheet ${page.number}: the supply's ${term} feeds ${d.name} directly, and its wiring reaches ${d.name} too, so the parts in between (an isolator, say) are bypassed. Leave the supply's distribution for ${term} empty`,
+          pageId: page.id,
+          ids: [el.id],
+        });
+      }
+    }
+  }
+  return out;
 }
