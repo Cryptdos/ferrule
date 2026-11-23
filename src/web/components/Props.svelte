@@ -1,7 +1,7 @@
 <script lang="ts">
   import { resolveFields } from "../../core/fields";
   import { columnOf } from "../../core/geometry";
-  import { isFieldWire } from "../../core/wires";
+  import { earthConductors, isFieldWire, numberedSegments, routeOf } from "../../core/wires";
   import {
     deleteElements,
     deleteSegments,
@@ -155,6 +155,14 @@
       {#if partner}
         <button class="link-btn" onclick={() => editor.goTo(partner.el.id)}>Go to {address(partner.page, partner.el.pos)} →</button>
       {/if}
+      <!-- Quicker linking (controller.md §5): click the partner on any sheet, or drop a new one. -->
+      <div class="buttons">
+        <button onclick={() => (editor.linking = { from: one.id, address: address(editor.page, one.pos), mode: "pick" })}>Link…</button>
+        <button onclick={() => (editor.linking = { from: one.id, address: address(editor.page, one.pos), mode: "new" })}>Link to a new arrow</button>
+      </div>
+      {#if one.params.source === false && partner && one.params.sameLabel !== false && partner.el.label}
+        <p class="hint">Shows its source's label. Untick <em>Same label as its source</em> to give it its own.</p>
+      {/if}
     {/if}
     {#if one.symbol === "text"}
       <div class="sub">Text</div>
@@ -181,6 +189,20 @@
           onchange={(v) => patch({ label: v })}
         />
       </label>
+      {#if one.label && one.symbol !== "plate"}
+        <!-- Longer labels wrap onto more lines at this width (28). -->
+        <label>
+          Label width (units, 0: one line)
+          <input
+            type="number"
+            min="0"
+            max="150"
+            step="1"
+            value={typeof one.params.labelWidth === "number" ? one.params.labelWidth : 0}
+            onchange={(e) => setParam("labelWidth", Math.max(0, Math.min(150, Number(e.currentTarget.value) || 0)))}
+          />
+        </label>
+      {/if}
     {/if}
     {#if one.symbol === "busbar" || one.symbol === "offpage"}
       <label>
@@ -427,18 +449,30 @@
         </select>
       </label>
       <!-- Shown by the usual rules; the drafter can hide either to cut clutter. -->
+      {@const earth = earthConductors(editor.project)}
+      {@const usual = numberedSegments(
+        { ...page, segments: page.segments.map((s) => (s.id === seg.id ? { ...s, showNumber: undefined } : s)) },
+        earth,
+        (s) => routeOf(page, s),
+      ).has(seg.id)}
       <label class="check">
         <input
           type="checkbox"
-          checked={seg.showNumber ?? !isField}
+          checked={seg.showNumber ?? usual}
           onchange={(e) => {
             const v = e.currentTarget.checked;
             const id = seg.id;
             // Back to the usual rule when it matches it.
-            editor.apply((p) => setWireKind(p, editor.pageId, [id], { showNumber: v === !isField ? null : v }));
+            editor.apply((p) => setWireKind(p, editor.pageId, [id], { showNumber: v === usual ? null : v }));
           }}
         />
-        Show number{isField ? " (field wires don't, usually)" : ""}
+        Show number{isField
+          ? " (field wires don't, usually)"
+          : earth.has(seg.conductor)
+            ? " (earth wires don't, usually)"
+            : !usual && seg.showNumber === undefined
+              ? " (printed once per sheet, on its longest run)"
+              : ""}
       </label>
       {#if cond.colour}
         <label class="check">

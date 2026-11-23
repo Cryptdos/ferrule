@@ -96,7 +96,7 @@ describe("cross-references", () => {
     expect(a.params.pole).toBe(1);
     expect(b.params.pole).toBe(2);
     expect(contactTable(p, k1)).toEqual([
-      ["NO", "13-14", "41"], // same sheet: just the column
+      ["NO", "13-14", "1-41"], // same sheet: still in full (21)
       ["NC", "21-22", "2-21"],
     ]);
     // Position tags already say where the coil is, so no extra cross-reference…

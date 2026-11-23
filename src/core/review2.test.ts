@@ -48,12 +48,12 @@ describe("link arrows", () => {
     expect(a.params.source).toBe(false);
   });
 
-  test("on the same sheet a reference is just the column", () => {
+  test("on the same sheet too, a reference is the full sheet-column (21)", () => {
     const { p, pg } = project();
     const a = addElement(p, pg, "offpage", [10, 10]);
     const b = addElement(p, pg, "offpage", [50, 10]);
     linkOffpage(p, a.id, b.id);
-    expect(xrefText(p, a, "")).toBe("26");
+    expect(xrefText(p, a, "")).toBe("1-26");
   });
 
 });

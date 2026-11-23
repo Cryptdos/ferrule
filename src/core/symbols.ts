@@ -8,7 +8,8 @@
  * Default orientation is vertical, current flowing top to bottom, as in a
  * ladder rung between the CCT and 0V rails.
  */
-import { CAP_HEIGHT, textWidth } from "./textwidth";
+import { CAP_HEIGHT, textWidth, wrapText } from "./textwidth";
+import { BUSBAR_COLOUR_OPTIONS } from "./wirecolours";
 import { BLOCK_HALF } from "./blocks";
 import { legendTable, notesLayout, revisionTable, type LegendEntry } from "./annotations";
 import {
@@ -50,6 +51,8 @@ export type Prim =
       bold?: boolean;
       /** Already placed for the element's rotation: left exactly where the symbol put it. */
       placed?: boolean;
+      /** A label on several lines grows upwards from here (it sits above something). */
+      up?: boolean;
     };
 
 export type TextRole = "tag" | "label" | "term" | "note" | "xref";
@@ -140,6 +143,18 @@ const TEXT_SIZE_OPTIONS = [
 const line = (...pts: Vec[]): Prim => ({ t: "line", pts });
 const dashed = (...pts: Vec[]): Prim => ({ t: "line", pts, dash: true });
 const heavy = (w: number, ...pts: Vec[]): Prim => ({ t: "line", pts, w });
+/** Room an earth terminal's cell keeps at the top for its earth sign. */
+export const EARTH_CELL = 1.3;
+/**
+ * The earth sign (three bars, widest first) hanging down from `at`; `w` is
+ * the widest bar.
+ */
+function earthSign(at: Vec, w: number): Prim[] {
+  const [x, y] = at;
+  const stem = 0.3;
+  const bars = [w, w * 0.62, w * 0.25];
+  return [line([x, y], [x, y + stem]), ...bars.map((b, i) => line([x - b / 2, y + stem + i * 0.25], [x + b / 2, y + stem + i * 0.25]))];
+}
 /** A prim moved by (dx, dy). Lines and polys only. */
 function shift(p: Prim, dx: number, dy: number): Prim {
   if (p.t === "line" || p.t === "poly") return { ...p, pts: p.pts.map(([x, y]) => [x + dx, y + dy] as Vec) };
@@ -869,6 +884,7 @@ const SYMBOLS: SymbolDef[] = [
           { value: "fuse", label: "Fused terminal" },
           { value: "disconnect", label: "Disconnect (knife) terminal" },
           { value: "fuse-disconnect", label: "Switched fuse terminal (fuse disconnect)" },
+          { value: "earth", label: "Earth terminal (green-yellow)" },
         ],
       },
       {
@@ -895,7 +911,7 @@ const SYMBOLS: SymbolDef[] = [
       const half = onBlock ? cellHalf : 1;
       // A fused or disconnect terminal: the fuse or knife in the lead on the
       // panel side, right on top of the terminal, so it can't be missed.
-      const top = fn === "plain" ? -half : -half - 2;
+      const top = fn === "plain" || fn === "earth" ? -half : -half - 2;
       const y0 = -half; // where the terminal itself starts
       if (fn === "fuse") {
         // IEC fuse: a rectangle with the conductor through it.
@@ -916,15 +932,18 @@ const SYMBOLS: SymbolDef[] = [
           prims.push(line([a[0] + n[0], a[1] + n[1]], [b[0] + n[0], b[1] + n[1]], [b[0] - n[0], b[1] - n[1]], [a[0] - n[0], a[1] - n[1]], [a[0] + n[0], a[1] + n[1]]));
         }
       }
+      const earth = fn === "earth";
       if (onBlock) {
         // A cell of the boundary's terminal block, its number written up the cell.
+        // An earth terminal has the earth sign at the top of its cell, upright (9, 27).
+        if (earth) prims.push(...earthSign([0, -half + 0.25], 0.8));
         prims.push(
           line([-0.5, -half], [0.5, -half], [0.5, half], [-0.5, half], [-0.5, -half]),
           // Always the detail size: a long number makes the cells taller instead.
           {
             t: "text",
             // Centred across the cell: the capitals sit either side of the middle.
-            at: [DETAIL * CAP_HEIGHT * 0.5, 0],
+            at: [DETAIL * CAP_HEIGHT * 0.5, earth ? EARTH_CELL / 2 : 0],
             text: "{tag}",
             size: DETAIL,
             anchor: "middle",
@@ -948,6 +967,9 @@ const SYMBOLS: SymbolDef[] = [
         line([0, 0.45], [0, 1]),
         // White inside: a terminal on the panel boundary sits over the line.
         { t: "circle", c: [0, 0], r: 0.45, bg: true },
+        // An earth terminal: the earth sign hanging from a stub off its lower left,
+        // clear of its leads and of a strip line through it.
+        ...(earth ? [line([-0.32, 0.32], [-0.9, 0.9]), ...earthSign([-0.9, 0.9], 0.9)] : []),
         // The terminal's number sits beside it, across the wire, so it doesn't read as a wire number.
         text(0.6, -0.15, "{tag}", DETAIL, "start", "tag"),
         // Its strip on the other side, when asked for.
@@ -1097,7 +1119,8 @@ const SYMBOLS: SymbolDef[] = [
       { key: "dist", label: "Distribution", type: "text", default: "", hidden: true },
       { key: "name", label: "Name", type: "text", default: "", when: (el) => !el.params.dist, fixed: "From its distribution", placeholder: "e.g. La" },
       { key: "bothEnds", label: "Name at both ends", type: "bool", default: false },
-      { key: "colour", label: "Core colour", type: "text", default: "", placeholder: "from its distribution" },
+      // The same colours as a wire (T4); its wires take it when they're drawn.
+      { key: "colour", label: "Core colour", type: "select", default: "", options: BUSBAR_COLOUR_OPTIONS },
       { key: "function", label: "Function", type: "text", default: "", placeholder: "from its distribution" },
     ],
     // Control busbars (CCT, 0V) carry no tag; distribution busbars are tagged like other parts.
@@ -1178,6 +1201,15 @@ const SYMBOLS: SymbolDef[] = [
     params: [
       { key: "source", label: "Source (where the conductor comes from)", type: "bool", default: true },
       { key: "ref", label: "Reference (if not linked)", type: "text", default: "", placeholder: "e.g. 8-34" },
+      // A destination shows its source's label unless it has its own (70).
+      {
+        key: "sameLabel",
+        label: "Same label as its source",
+        type: "bool",
+        default: true,
+        when: (el) => el.params.source === false && el.links.length > 0,
+        fixed: "For a linked destination arrow",
+      },
       // Picked from the project's distribution list (Props): the arrow carries that supply.
       { key: "dist", label: "Distribution", type: "text", default: "", hidden: true },
     ],
@@ -1193,23 +1225,61 @@ const SYMBOLS: SymbolDef[] = [
       const head: Prim = source
         ? { t: "poly", pts: [[-w, 0], [w, 0], [0, h]], fill: false }
         : { t: "poly", pts: [[-w, h], [w, h], [0, 0]], fill: true };
+      // The label at the arrow's tip, then its reference (71): to the right of
+      // the tip on a vertical wire, under the arrow on a horizontal one,
+      // running on the way the arrow points. Text stays upright.
+      const xref = t?.xref ?? "";
+      // The reference follows the label's first line.
+      const lwidth = typeof el.params.labelWidth === "number" && el.params.labelWidth > 0 ? el.params.labelWidth : 0;
+      const first = label ? (lwidth ? wrapText(label, TAG, lwidth) : label.split("\n"))[0]! : "";
+      const lw = first ? textWidth(first, TAG) : 0;
+      const gap = label && xref ? 0.8 : 0;
+      const cap = TAG * CAP_HEIGHT;
+      const placed = (at: Vec, s: string, size: number, anchor: Anchor, role: TextRole): Prim => ({ t: "text", at, text: s, size, anchor, role, placed: true });
+      const texts: Prim[] = [];
+      const rot = el.rot;
+      if (rot === 0 || rot === 180) {
+        const y = rot === 0 ? h - 0.2 : -h + 0.2 + cap;
+        if (label) texts.push(placed([1, y], "{label}", TAG, "start", "label"));
+        texts.push(placed([1 + lw + gap, y], "{xref}", DETAIL, "start", "xref"));
+      } else {
+        // Pointing left (90) or right (270): under the arrow, from its middle on past the tip.
+        const y = w + 0.5 + cap;
+        const xw = xref ? textWidth(xref, DETAIL) : 0;
+        if (rot === 270) {
+          if (label) texts.push(placed([0, y], "{label}", TAG, "start", "label"));
+          texts.push(placed([lw + gap, y], "{xref}", DETAIL, "start", "xref"));
+        } else {
+          if (label) texts.push(placed([-xw - gap, y], "{label}", TAG, "end", "label"));
+          texts.push(placed([0, y], "{xref}", DETAIL, "end", "xref"));
+        }
+      }
       return {
-        prims: [
-          line([0, -2], [0, 0]),
-          head,
-          // Whichever way the arrow points, the reference reads on its right and the label on its left.
-          ...(el.rot === 180
-            ? [
-                text(-1, -1, "{xref}", DETAIL, "end", "xref"),
-                ...(label ? [text(1, -1, "{label}", TAG, "start", "label")] : []),
-              ]
-            : [
-                text(1, 1.2, "{xref}", DETAIL, "start", "xref"),
-                ...(label ? [text(-1, 1.2, "{label}", TAG, "end", "label")] : []),
-              ]),
-        ],
+        prims: [line([0, -2], [0, 0]), head, ...texts],
         terminals: [{ name: "1", at: [0, -2], dir: "up" }],
         body: { x: -w, y: 0, w: 2 * w, h },
+      };
+    },
+  },
+  {
+    id: "strip-line",
+    name: "Terminal strip line",
+    group: "Connection",
+    palette: true,
+    params: [
+      { key: "strip", label: "Terminal strip", type: "text", default: "X1", placeholder: "e.g. X0" },
+      { key: "length", label: "Length (units)", type: "number", min: 2, max: 150, default: 20 },
+    ],
+    kind: () => null,
+    draw(el) {
+      // A dashed line through a group of terminals, its strip's name at the end (55).
+      // Every terminal it crosses joins that strip (applyStripLines).
+      const len = num(el, "length", 20, 2, 150);
+      const name = str(el, "strip", "X1");
+      return {
+        prims: [dashed([0, 0], [len, 0]), ...(name ? [text(len + 0.6, 0.45, name, TAG, "start", "note")] : [])],
+        terminals: [],
+        body: { x: 0, y: -0.3, w: len, h: 0.6 },
       };
     },
   },
@@ -1566,12 +1636,13 @@ const SYMBOLS: SymbolDef[] = [
         terminals.push({ name, at: [x, 0], dir: "down" });
       });
       if (el.label) {
+        // Centred on the arrows (65); with a width it wraps, growing away from the names.
         const last = (names.length - 1) * 3;
         const label =
           rot === 0
-            ? placed([-0.6, -4.4], "{label}", TAG, "start", "label")
+            ? { ...placed([last / 2, -4.4], "{label}", TAG, "middle", "label"), up: true }
             : rot === 180
-              ? placed([-last - 0.6, 2.6 + 2 * gap + cap(DETAIL) + cap(TAG)], "{label}", TAG, "start", "label")
+              ? placed([-last / 2, 2.6 + 2 * gap + cap(DETAIL) + cap(TAG)], "{label}", TAG, "middle", "label")
               : rot === 90
                 ? placed([-0.6, -0.9], "{label}", TAG, "start", "label")
                 : placed([0.6, -last - 0.9], "{label}", TAG, "end", "label");
@@ -1877,9 +1948,11 @@ export function localGeometry(el: Element, texts: string | GeometryText): Geomet
     const filled = fill(q.text);
     // A label written on several lines reads down from where its first line
     // goes; a label drawn above the tag grows upwards instead, clear of it.
-    if (q.text === "{label}" && filled.includes("\n")) {
-      const lines = filled.split("\n");
-      const up = !!tagAt && tagAt.t === "text" && q.at[1] < tagAt.at[1];
+    // A label with a width wraps to it (28, 65).
+    const width = typeof el.params.labelWidth === "number" && el.params.labelWidth > 0 ? el.params.labelWidth : 0;
+    if (q.text === "{label}" && (filled.includes("\n") || (width && textWidth(filled, q.size) > width))) {
+      const lines = width ? wrapText(filled, q.size, width) : filled.split("\n");
+      const up = q.up || (!!tagAt && tagAt.t === "text" && q.at[1] < tagAt.at[1]);
       const lh = q.size * 1.25;
       return lines.map((line, i) => ({ ...q, at: [q.at[0], q.at[1] + (up ? i - (lines.length - 1) : i) * lh] as Vec, text: line }));
     }
@@ -1919,4 +1992,49 @@ export function terminalDir(el: Element, name: string): Dir {
     .draw(el)
     .terminals.find((x) => x.name === name);
   return t ? rotateDir(el.flip ? flipDir(t.dir) : t.dir, el.rot) : "any";
+}
+
+/**
+ * The terminals on the other side of the same pole of an in-line part
+ * (fuse, contact, isolator pole, terminal, push button, selector), for a
+ * wire drawn from one side to take the colour of the wire on the other (T5).
+ */
+export function poleMates(el: Element, terminal: string): string[] {
+  const pairs: [string, string][] = [];
+  const poles = (n: number) => {
+    for (let i = 0; i < n; i++) pairs.push([String(2 * i + 1), String(2 * i + 2)]);
+  };
+  switch (el.symbol) {
+    case "contact-no":
+      pairs.push(["13", "14"]);
+      break;
+    case "contact-nc":
+      pairs.push(["21", "22"]);
+      break;
+    case "contact-co":
+      pairs.push(["11", "14"], ["11", "12"]);
+      break;
+    case "pushbutton":
+      pairs.push(["13", "14"], ["21", "22"]);
+      break;
+    case "selector":
+      selectorPoles(el).forEach((p, i) => {
+        const k = i + 1;
+        if (p.kind === "co") pairs.push([`${k}1`, `${k}4`], [`${k}1`, `${k}2`]);
+        else if (p.kind === "nc") pairs.push([`${k}1`, `${k}2`]);
+        else pairs.push([`${k}3`, `${k}4`]);
+      });
+      break;
+    case "isolator":
+      poles(typeof el.params.poles === "number" ? el.params.poles : 3);
+      for (const a of isolatorAux(el)) pairs.push([a.a, a.b]);
+      break;
+    case "fuse":
+      poles(typeof el.params.poles === "number" ? el.params.poles : 1);
+      break;
+    case "terminal":
+      pairs.push(["1", "2"]);
+      break;
+  }
+  return pairs.flatMap(([a, b]) => (a === terminal ? [b] : b === terminal ? [a] : []));
 }

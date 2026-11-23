@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Element, Project } from "../../core/model";
   import { localGeometry } from "../../core/symbols";
-  import { elementTexts } from "../../core/tags";
+  import { displayTag, elementTexts } from "../../core/tags";
   import { contactTable, contactTableAt, contactTablePrims, isMaster } from "../../core/xref";
   import Prims from "./Prims.svelte";
 
@@ -16,7 +16,7 @@
   const table = $derived.by(() => {
     if (!isMaster(el)) return [];
     const rows = contactTable(project, el);
-    return contactTablePrims(rows, contactTableAt(el, geom.body, rows.length));
+    return contactTablePrims(rows, contactTableAt(el, geom.body, rows.length), displayTag(el, project));
   });
   // "@logo" shows the project's title block logo, wherever it's wanted (a cover sheet).
   const asset = $derived.by(() => {

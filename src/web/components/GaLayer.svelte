@@ -51,6 +51,13 @@
   const scaleText = $derived(Number.isInteger(ga.scale) ? `1:${ga.scale}` : `1:${ga.scale}`);
 </script>
 
+<defs>
+  <!-- Green-yellow stripes, for earth terminals. -->
+  <pattern id="ga-gnye" width="1.2" height="1.2" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+    <rect width="1.2" height="1.2" fill="#f2d21b" />
+    <rect width="0.6" height="1.2" fill="#2f9e44" />
+  </pattern>
+</defs>
 <g class="ga">
   <!-- The enclosure (or door), with its size. -->
   <rect class="encl" x={GA_ORIGIN[0]} y={GA_ORIGIN[1]} width={W} height={H} />
@@ -90,6 +97,16 @@
       {@const n = it.refs?.length ?? 0}
       {@const fit = fitLabel(text, w, h)}
       <rect class="device" {x} {y} width={w} height={h} />
+      <!-- Earth terminals are green-yellow, in their place in the strip (9). -->
+      {#each (it.refs ?? []).map((r) => byId.get(r)) as t, i (i)}
+        {#if t?.symbol === "terminal" && t.params.function === "earth"}
+          {#if w >= h}
+            <rect class="earth" x={x + (w / n) * i} {y} width={w / n} height={h} />
+          {:else}
+            <rect class="earth" {x} y={y + (h / n) * i} width={w} height={h / n} />
+          {/if}
+        {/if}
+      {/each}
       {#if n > 1}
         <!-- A terminal strip: each terminal. -->
         {#each Array.from({ length: n - 1 }, (_, i) => i + 1) as i (i)}
@@ -117,6 +134,11 @@
 </g>
 
 <style>
+  .ga .earth {
+    fill: url(#ga-gnye);
+    stroke: none;
+    opacity: 0.85;
+  }
   .ga text {
     font-family: var(--drawing-font);
     fill: #000;

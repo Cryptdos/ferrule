@@ -18,3 +18,29 @@ export function textWidth(s: string, size: number): number {
 
 /** Height of capitals as a share of the font size. */
 export const CAP_HEIGHT = 0.74;
+
+/**
+ * Text broken into lines no wider than `width` (same units as the size), at
+ * spaces; line breaks already in it are kept. A word longer than the width
+ * gets a line of its own.
+ */
+export function wrapText(s: string, size: number, width: number): string[] {
+  const out: string[] = [];
+  for (const para of s.split("\n")) {
+    const words = para.split(/\s+/).filter(Boolean);
+    if (!words.length) {
+      out.push("");
+      continue;
+    }
+    let cur = "";
+    for (const w of words) {
+      const next = cur ? `${cur} ${w}` : w;
+      if (cur && textWidth(next, size) > width) {
+        out.push(cur);
+        cur = w;
+      } else cur = next;
+    }
+    out.push(cur);
+  }
+  return out;
+}

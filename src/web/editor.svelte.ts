@@ -44,6 +44,12 @@ export class Editor {
   highlight: string | null = $state(null);
   /** Bumped by goTo so the canvas scrolls the highlighted element into view. */
   focusRequest = $state(0);
+  /**
+   * Linking a link arrow (Link… in its properties): the next click on an
+   * arrow, on any sheet, pairs it with this one; or, for "new", drops a
+   * paired destination where you click. Esc cancels.
+   */
+  linking: { from: string; address: string; mode: "pick" | "new" } | null = $state(null);
 
   private undoStack: string[] = [];
   private redoStack: string[] = [];

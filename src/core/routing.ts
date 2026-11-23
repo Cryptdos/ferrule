@@ -6,7 +6,7 @@
  * can each load the wasm their own way. Without it, routes fall back to a
  * simple one-bend route.
  */
-import { fitBlock } from "./blocks";
+import { applyStripLines, fitBlock } from "./blocks";
 import type { Avoid, ConnRef } from "libavoid-js";
 import type { Rect, Vec } from "./geometry";
 import type { Element, Page, Segment, TerminalRef } from "./model";
@@ -20,7 +20,7 @@ const BUFFER = 0.25;
 const INSET = 0.5;
 
 /** Symbols wires may cross or run along: conductors themselves, or a cable screen drawn over the cores. */
-const NOT_OBSTACLES = new Set(["junction", "busbar", "screen"]);
+const NOT_OBSTACLES = new Set(["junction", "busbar", "screen", "strip-line"]);
 
 /** Rough outline of a symbol's text, so wires keep off tags, labels and ratings. */
 function textRect(el: Element, p: Extract<Prim, { t: "text" }>): Rect | null {
@@ -255,6 +255,7 @@ export interface RouteOptions {
  * they can't be kept square).
  */
 export function routePage(avoid: Avoid | null, page: Page, opts: RouteOptions = {}): void {
+  applyStripLines(page);
   fitBlock(page);
   slideRailTaps(page);
   const auto: { seg: Segment; a: Vec; b: Vec }[] = [];
