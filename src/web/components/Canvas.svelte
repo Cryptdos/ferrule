@@ -309,10 +309,10 @@
   function hitGa(pt: Vec): GaItem | null {
     const items = page.gaItems ?? [];
     // Devices and notes over rails and trunking.
-    const order = [...items.filter((i) => i.kind === "device" || i.kind === "note"), ...items.filter((i) => i.kind === "rail" || i.kind === "trunking")];
+    const order = [...items.filter((i) => i.kind === "device"), ...items.filter((i) => i.kind === "rail" || i.kind === "trunking")];
     for (const it of order) {
       const r = gaRect(it);
-      if (r && pointInRect(pt, it.kind === "note" ? { ...r, y: r.y - 1, h: r.h + 1, w: Math.max(r.w, (it.text?.length ?? 4) * 0.9) } : r, 0.3)) return it;
+      if (r && pointInRect(pt, r, 0.3)) return it;
     }
     return null;
   }
@@ -348,7 +348,7 @@
       return;
     }
     const corner = gaCorner();
-    if (corner && corner.it.kind !== "note" && Math.abs(pt[0] - corner.at[0]) < 0.9 && Math.abs(pt[1] - corner.at[1]) < 0.9) {
+    if (corner && Math.abs(pt[0] - corner.at[0]) < 0.9 && Math.abs(pt[1] - corner.at[1]) < 0.9) {
       gesture = { kind: "gasize", id: corner.it.id, start: mm, size: [corner.it.w, corner.it.h], delta: [0, 0] };
       return;
     }
@@ -1130,7 +1130,7 @@
           {@const r = gaRect(gaPreview?.get(it.id) ?? it)}
           {#if r}
             <rect class="sel" x={r.x - 0.3} y={r.y - 0.3} width={r.w + 0.6} height={r.h + 0.6} />
-            {#if editor.selection.length === 1 && it.kind !== "note"}
+            {#if editor.selection.length === 1}
               <rect class="handle" x={r.x + r.w - 0.5} y={r.y + r.h - 0.5} width="1" height="1" />
             {/if}
           {/if}

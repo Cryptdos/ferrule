@@ -1,6 +1,6 @@
 <script lang="ts">
   import { deleteGaItems, rotateGaItems, setGaItemDevice, setGaSettings, setGaSize, updateGaItem, useLibraryDevice } from "../../core/ops";
-  import { GA_SCALES, deviceSize, gaSizes, sizeKey, stripSize } from "../../core/ga";
+  import { GA_SCALES, fitScale, suitsKey, deviceSize, gaSizes, sizeKey, stripSize } from "../../core/ga";
   import { deviceLabel } from "../../core/devices";
   import { api } from "../api";
   import { deviceLibrary } from "../devices.svelte";
@@ -23,7 +23,7 @@
     if (useLib) void deviceLibrary.load();
   });
   const first = $derived(one?.refs?.[0] ? byId.get(one.refs[0])?.e : undefined);
-  const kind = $derived(first ? (sizeKey(editor.project, first)?.key ?? "") : "");
+  const kind = $derived(first ? suitsKey(editor.project, first) : "");
   /** The size the part would have without a device from the table. */
   const generic = $derived.by(() => {
     if (!first || !one) return null;
@@ -64,7 +64,7 @@
     <h3>GA workbench</h3>
     <p class="hint">Pick a GA sheet from the list, or add one on the left.</p>
   {:else if one}
-    <h3>{one.kind === "rail" ? "DIN rail" : one.kind === "trunking" ? "Trunking" : one.kind === "note" ? "Note" : "Device"}</h3>
+    <h3>{one.kind === "rail" ? "DIN rail" : one.kind === "trunking" ? "Trunking" : "Device"}</h3>
     {#if one.kind === "device" && one.refs?.length}
       <div class="refs">
         {#each one.refs.slice(0, 12) as r (r)}
@@ -110,9 +110,9 @@
       {/if}
       <button class="link-btn" onclick={() => ondevices?.()}>Device table…</button>
     {/if}
-    {#if one.kind === "note" || one.kind === "device"}
+    {#if one.kind === "device"}
       <label>
-        {one.kind === "note" ? "Text" : "Label (instead of its tag)"}
+        Label (instead of its tag)
         <input value={one.text ?? ""} onchange={(e) => editor.apply((p) => updateGaItem(p, editor.pageId, one.id, { text: e.currentTarget.value }))} />
       </label>
     {/if}
@@ -152,9 +152,21 @@
       <label>Height (mm)<input type="number" step="10" value={page.ga.enclosure.h} onchange={(e) => editor.apply((p) => setGaSettings(p, editor.pageId, { enclosure: { w: page.ga!.enclosure.w, h: num(e.currentTarget.value) } }))} /></label>
       <label>
         Scale
-        <select value={page.ga.scale} onchange={(e) => editor.apply((p) => setGaSettings(p, editor.pageId, { scale: num(e.currentTarget.value) }))}>
-          {#each GA_SCALES as s (s)}<option value={s}>1:{s}</option>{/each}
-        </select>
+        <span class="scale">
+          1:<input
+            type="number"
+            min="0.5"
+            step="0.5"
+            list="ferrule-ga-scales"
+            value={page.ga.scale}
+            onchange={(e) => editor.apply((p) => setGaSettings(p, editor.pageId, { scale: num(e.currentTarget.value) }))}
+          />
+          <button
+            title="The largest that fits the sheet: 1:{fitScale(page.ga.enclosure.w, page.ga.enclosure.h)}"
+            onclick={() => editor.apply((p) => setGaSettings(p, editor.pageId, { scale: fitScale(page.ga!.enclosure.w, page.ga!.enclosure.h) }))}>Fit</button
+          >
+        </span>
+        <datalist id="ferrule-ga-scales">{#each GA_SCALES as s (s)}<option value={s}></option>{/each}</datalist>
       </label>
       <label>
         View
@@ -191,6 +203,20 @@
 </div>
 
 <style>
+  .scale {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .scale input {
+    flex: 1;
+    width: 0;
+    min-width: 4.5em;
+  }
+  .scale button {
+    padding: 2px 6px;
+    font-size: 12px;
+  }
   .props {
     padding: 10px 12px;
     display: flex;

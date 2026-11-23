@@ -2,7 +2,7 @@
  * Rule checks (DESIGN.md §6, §7, §10). Each finding names the elements
  * involved so the UI can jump to them.
  */
-import { gaCandidates } from "./ga";
+import { changedGaStrips, gaCandidates } from "./ga";
 import { compile } from "./sim";
 import type { Element, Page, Project } from "./model";
 import { terminalNames } from "./symbols";
@@ -146,6 +146,11 @@ export function checkProject(project: Project): Finding[] {
     const left = gaCandidates(project, (el) => el.tag);
     if (left.length) {
       out.push({ level: "info", message: `${left.length} panel device${left.length === 1 ? "" : "s"} not on a GA yet (see the GA workbench)`, ids: [] });
+    }
+    // A placed strip whose terminals changed since its GA was last open (note 45).
+    for (const c of changedGaStrips(project)) {
+      const what = [c.added ? `${c.added} terminal${c.added === 1 ? "" : "s"} added` : "", c.removed ? `${c.removed} removed` : ""].filter(Boolean).join(", ");
+      out.push({ level: "info", message: `Sheet ${c.page.number}: terminal strip ${c.it.strip} has changed (${what}); open the GA to check its length`, pageId: c.page.id, ids: [c.it.id] });
     }
     const all = new Set(project.pages.flatMap((p) => p.elements.map((e) => e.id)));
     for (const page of project.pages) {

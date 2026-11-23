@@ -732,7 +732,16 @@ const SYMBOLS: SymbolDef[] = [
         // One pole keeps the plain 1/2 marking; a carrier is 1/2, 3/4, 5/6…
         const a = String(2 * i + 1);
         const b = String(2 * i + 2);
-        prims.push(line([x, -3], [x, 3]), rect(x - 0.6, -1.6, 1.2, 3.2), term(x + 0.45, -2.2, a), term(x + 0.45, 2.9, b));
+        // Blown (simulating): the link is broken inside the carrier and crossed out.
+        const blown = opOf(el);
+        prims.push(
+          ...(blown
+            ? [line([x, -3], [x, -0.7]), line([x, 0.7], [x, 3]), line([x - 0.6, -1.6], [x + 0.6, 1.6]), line([x + 0.6, -1.6], [x - 0.6, 1.6])]
+            : [line([x, -3], [x, 3])]),
+          rect(x - 0.6, -1.6, 1.2, 3.2),
+          term(x + 0.45, -2.2, a),
+          term(x + 0.45, 2.9, b),
+        );
         terminals.push({ name: a, at: [x, -3], dir: "up" }, { name: b, at: [x, 3], dir: "down" });
       }
       if (poles > 1) prims.push(dashed([0.6, 0], [(poles - 1) * 3 - 0.6, 0]));

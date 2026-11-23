@@ -1,6 +1,6 @@
 <script lang="ts">
   import { columnOf } from "../../core/geometry";
-  import { cloudsOn, deleteClouds, renamePage, setBoundary, setPageSpare } from "../../core/ops";
+  import { cloudsOn, deleteClouds, renamePage, setBoundary, setPageType } from "../../core/ops";
   import type { Editor } from "../editor.svelte";
   import FieldInput from "./FieldInput.svelte";
 
@@ -21,19 +21,22 @@
       onchange={(v) => editor.apply((p) => renamePage(p, editor.pageId, v))}
     />
   </label>
-  {#if !page.ga}
-    <label class="check" title="Spare sheets hold annotations only: use them for spacing and organisation">
-      <input
-        type="checkbox"
-        checked={!!page.spare}
-        onchange={(e) => {
-          const on = e.currentTarget.checked;
-          if (!editor.apply((p) => setPageSpare(p, editor.pageId, on))) e.currentTarget.checked = !on;
-        }}
-      />
-      Spare sheet (annotations only)
-    </label>
-  {/if}
+  <!-- Sheet type (note 12): an empty sheet can become a GA. -->
+  <label>
+    Sheet type
+    <select
+      value={page.ga ? "ga" : page.spare ? "spare" : "schematic"}
+      onchange={(e) => {
+        const type = e.currentTarget.value as "schematic" | "spare" | "ga";
+        if (!editor.apply((p) => setPageType(p, editor.pageId, type))) e.currentTarget.value = page.ga ? "ga" : page.spare ? "spare" : "schematic";
+        else if (type === "ga") editor.mode = "ga";
+      }}
+    >
+      <option value="schematic">Schematic</option>
+      <option value="spare">Spare (annotations only)</option>
+      <option value="ga">GA (general arrangement)</option>
+    </select>
+  </label>
   {#if !page.spare && !page.ga}
     <label class="check">
       <input

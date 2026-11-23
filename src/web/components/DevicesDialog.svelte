@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { GA_SIZES } from "../../core/ga";
+  import { SUITS } from "../../core/ga";
   import { addProjectDevice, removeProjectDevice, updateProjectDevice, useLibraryDevice } from "../../core/ops";
   import type { DeviceEntry, ProjectDevice } from "../../core/devices";
   import { api } from "../api";
@@ -23,7 +23,8 @@
     if (useLib) void deviceLibrary.load();
   });
 
-  const kinds = Object.entries(GA_SIZES).map(([k, v]) => ({ key: k, label: v.label }));
+  /** What a device suits: the schematic parts you draw. */
+  const kinds = SUITS;
   const kindLabel = (k: string) => kinds.find((x) => x.key === k)?.label ?? "Any";
 
   const libShown = $derived.by(() => {

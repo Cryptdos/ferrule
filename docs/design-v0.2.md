@@ -447,3 +447,13 @@ Each step is one pull request, with a build to test.
 - **Export PDF (56):** the error names the browser it tried and why it failed (stopped after 90 s, or what it said), in a window with *Print → Save as PDF*.
 - **Example:** the starter sheets' outgoing link arrows are labelled with the fan's tag (`SF-01 ENABLE`, `SF-01 RUN`), since destinations now show their source's label.
 - **README screenshots** retaken.
+
+**Step 7a (GA and simulation; the rest of step 7 is 7b)**
+
+- **Split:** step 7 went into two PRs. 7a: fuse breaking, sheet type, GA notes gone, any scale, strips that keep up, device "suits". 7b: the Annotate tools (arrow, highlight, call-outs, polygon), door views with split doors and door devices drawn from the schematic, dimensions, the GA tool library and *Place parts…* window, bill of materials, rail and trunking fill, door cut-outs.
+- **Fuse (49):** a blown fuse is drawn with its link broken inside the carrier and crossed out, and is listed with the other inputs in the simulation panel (On = intact). An MCB already trips by clicking (it's an isolator with the breaker function) and is drawn open; no extra mark.
+- **Sheet type (12):** a GA can change type only with nothing laid out on it, and only an empty sheet (no parts, wires or sections) can become a GA, starting as a 600 × 800 backplate at the scale that fits.
+- **GA notes (46):** a note in a file from a test build becomes a Text annotation where it was. The example's rail note is a Text annotation.
+- **Any scale:** Fit rounds up to the next half step (1:12.5 for the example's 1000 × 1600 backplate, which was 1:15).
+- **Strips keep up (45):** a strip on a GA is tied to its strip name. Terminals added to it in the schematic join it at the end (existing order kept), removed ones leave it, and its length follows (along whichever side was its length) unless a real device sets its size. Opening the GA sheet marks it seen; Check reports it as *info* until then. Seen isn't an undo step.
+- **Device "suits":** keys from before carry on (relay, contactor, timer, MCB, isolator, fuse, terminals, transformer, socket, block); "door devices" splits into lamp, push button and selector, and a device that suited "door" now suits any part. Earth terminals are their own entry. Contacts aren't listed: they're never placed on a GA on their own (they go with their coil's device).

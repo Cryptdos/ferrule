@@ -27,6 +27,7 @@ import { benchOf, defaultParams, getSymbol, plantTerminalName, poleMates, requir
 import { isOrthogonal, routeOf, simplifyRoute } from "./wires";
 import { isMaster, isSlave, locate } from "./xref";
 import { colourCode, knownColour, lampColour } from "./wirecolours";
+import { fitScale, itemStrip } from "./ga";
 
 export class OpError extends Error {}
 
@@ -525,6 +526,33 @@ export function setPageSpare(project: Project, pageId: string, spare: boolean): 
   const drafted = page.elements.filter((e) => benchOf(e) !== "annotate").length + page.segments.length;
   if (drafted) throw new OpError(`Sheet ${page.number} has ${drafted} drawing items on it: move or delete them first`);
   page.spare = true;
+}
+
+/**
+ * A sheet's type (note 12): a schematic, a spare sheet (annotations only)
+ * or a GA. An empty sheet can become a GA; a GA with nothing placed on it
+ * can become either of the others.
+ */
+export function setPageType(project: Project, pageId: string, type: "schematic" | "spare" | "ga"): void {
+  const page = getPage(project, pageId);
+  const now = page.ga ? "ga" : page.spare ? "spare" : "schematic";
+  if (now === type) return;
+  if (page.ga) {
+    if (page.gaItems?.length) throw new OpError(`Sheet ${page.number} has ${page.gaItems.length} things laid out on it: delete them first`);
+    delete page.ga;
+    delete page.gaItems;
+  }
+  if (type === "ga") {
+    const used = page.elements.length + page.segments.length + page.sections.length;
+    if (used) throw new OpError(`Only an empty sheet can become a GA: sheet ${page.number} has ${used} things on it`);
+    delete page.spare;
+    page.boundaryY = null;
+    const enclosure = { w: 600, h: 800 };
+    page.ga = { scale: fitScale(enclosure.w, enclosure.h), enclosure, view: "backplate" };
+    page.gaItems = [];
+    return;
+  }
+  setPageSpare(project, pageId, type === "spare");
 }
 
 /** A spare sheet after the given one, titled "Spare". */
@@ -1139,6 +1167,12 @@ export function addGaItem(project: Project, pageId: string, item: Omit<GaItem, "
   const it: GaItem = { ...item, id: newId("g"), x: r(item.x), y: r(item.y), w: Math.max(1, r(item.w)), h: Math.max(1, r(item.h)) };
   // A schematic device is on one GA only.
   if (it.refs?.length) for (const pg of project.pages) for (const other of pg.gaItems ?? []) if (other.refs?.some((x) => it.refs!.includes(x))) throw new OpError("That's already on a GA");
+  // A terminal strip keeps up with the schematic from here on (note 45).
+  const strip = itemStrip(project, it);
+  if (strip) {
+    it.strip = strip;
+    it.seen = [...(it.refs ?? [])];
+  }
   page.gaItems.push(it);
   return it;
 }

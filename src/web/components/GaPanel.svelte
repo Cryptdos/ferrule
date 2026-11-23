@@ -15,7 +15,7 @@
   let w = $state(600);
   let h = $state(800);
   let view: "backplate" | "door" = $state("backplate");
-  let scale = $state(0);
+  let scale: number | null = $state(null);
   const autoScale = $derived(fitScale(w, h));
 
   function create(e: SubmitEvent) {
@@ -44,11 +44,9 @@
         </select>
       </label>
       <label>
-        Scale
-        <select bind:value={scale}>
-          <option value={0}>Fit (1:{autoScale})</option>
-          {#each GA_SCALES as s (s)}<option value={s}>1:{s}</option>{/each}
-        </select>
+        Scale 1: (empty: the largest that fits, 1:{autoScale})
+        <input type="number" min="0.5" step="0.5" list="ferrule-new-ga-scales" placeholder={String(autoScale)} bind:value={scale} />
+        <datalist id="ferrule-new-ga-scales">{#each GA_SCALES as s (s)}<option value={s}></option>{/each}</datalist>
       </label>
       <button type="submit">Add GA sheet after this one</button>
     </form>

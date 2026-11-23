@@ -25,14 +25,14 @@
     const p = editor.project;
     if (page.ga) {
       return (page.gaItems ?? [])
-        .filter((i) => i.kind === "device" || i.kind === "note")
+        .filter((i) => i.kind === "device")
         .map((i) => {
           const ref = i.refs?.[0];
           const el = ref ? p.pages.flatMap((pg) => pg.elements).find((e) => e.id === ref) : undefined;
           return {
             id: i.id,
             tag: el ? displayTag(el, p) : "",
-            text: i.kind === "note" ? i.text || "Note" : i.text || (el ? requireSymbol(el.symbol).name : "Device"),
+            text: i.text || (el ? requireSymbol(el.symbol).name : "Device"),
             col: Math.round(i.x),
             y: i.y,
           };

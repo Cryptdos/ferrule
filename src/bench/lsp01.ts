@@ -36,7 +36,7 @@ import {
   wire,
 } from "../core/ops";
 import { renumber } from "../core/renumber";
-import { fitScale, gaCandidates, type GaCandidate } from "../core/ga";
+import { fitScale, gaCandidates, gaToSheet, type GaCandidate } from "../core/ga";
 import { routePage } from "../core/routing";
 import { saveSheetTemplate, stampTemplate } from "../core/templates";
 import { placePlantView } from "../core/ops";
@@ -517,7 +517,8 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
       addGaItem(p, gaPg.id, { kind: "rail", x: 80, y: y - 17.5, w: 840, h: 35 });
       addGaItem(p, gaPg.id, { kind: "trunking", x: 80, y: y + 80 + (i === rails.length - 1 ? 40 : 0), w: 840, h: 60 });
     });
-    addGaItem(p, gaPg.id, { kind: "note", x: 80, y: 1500, w: 300, h: 10, text: "35 mm DIN RAIL. TRUNKING 60 × 60." });
+    // A note on a GA is an ordinary Text annotation (note 46).
+    addElement(p, gaPg.id, "text", gaToSheet(gaPg.ga!, [80, 1490]), { label: "35 mm DIN RAIL. TRUNKING 60 × 60.", params: { size: "detail" } });
     // Relays and timers on the first two rails, terminals on the last; the rest left to place by hand.
     const wanted = (c: GaCandidate) => {
       const el = p.pages.flatMap((pg) => pg.elements).find((e) => e.id === c.refs[0]);

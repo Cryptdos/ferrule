@@ -252,8 +252,12 @@ export function compile(project: Project): Circuit {
           break;
         }
         case "fuse": {
+          // Click to blow it, again to replace it (note 49). Drawn broken while blown.
           const poles = typeof el.params.poles === "number" ? el.params.poles : 1;
-          for (let i = 0; i < poles; i++) link(el, String(2 * i + 1), String(2 * i + 2), () => true);
+          const intact = (s: SimState) => (s.inputs[el.id] ?? 1) === 1;
+          for (let i = 0; i < poles; i++) link(el, String(2 * i + 1), String(2 * i + 2), intact);
+          ops.set(el.id, (s) => !intact(s));
+          inputs.push({ el: el.id, kind: "toggle", label: el.label || "Fuse (click to blow)", initial: 1 });
           break;
         }
         case "plant-view": {
