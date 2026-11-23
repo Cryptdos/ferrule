@@ -235,6 +235,17 @@ Each step is one PR with a build, `ferrule-windows-v0.3.0-pre.zip`. The working 
 - **Unlit lamps are dimmed** on the door while simulating, as each lens is already drawn in its colour; otherwise a lit lamp hardly stands out from an unlit one. Out of Simulate the door is drawn as before.
 - **The door back** shows a lit lamp's glow in its cut-out, as the design names door back views too.
 
+**Step 10 is two PRs:** 10a the details, detail sheets and frames (frames show their area, read only); 10b editing through a frame, and dimensions that belong to a frame.
+
+**Step 10a (detail sheets)**
+
+- **A frame's mm are paper mm:** a detail sheet is a GA sheet at 1:1 with no enclosure drawn, so frames are placed, moved and aligned in mm like any GA item.
+- **Inside a frame** the source sheet is drawn at the frame's scale (not enlarged as a picture), so tags and legends stay at their normal sizes and label plates read at true size at 1:1. The source sheet's own dimensions, title and detail boxes aren't drawn in frames.
+- **Too big for any scale:** a detail larger than the sheet even at 1:5 is still placed (at 1:5), with a message; a frame is kept on the sheet with room for its caption where it fits.
+- **The detail box** is picked by its outline, so what's inside it can still be picked and moved.
+- **A detail sheet** can't be turned into another view, nor another view into one: it's added as a detail sheet.
+- **Place detail…** is the Place parts window on a detail sheet; its top-bar button reads *Place detail…* there.
+
 ## 11. Director notes, as written (23/11/26)
 
 **On tiling (§7):**

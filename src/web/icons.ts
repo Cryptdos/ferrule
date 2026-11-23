@@ -60,6 +60,8 @@ export const ICONS = {
   place: '<rect x="4" y="12" width="16" height="8" rx="1"/><path d="M12 3v8M8.5 7.5L12 11l3.5-3.5"/>',
   devices: '<path d="M5 4h11a2 2 0 0 1 2 2v14H7a2 2 0 0 1-2-2z"/><path d="M5 18a2 2 0 0 1 2-2h11"/><path d="M9 8h5"/>',
   project: '<path d="M4 4h16v16H4z"/><path d="M4 15h16M11 15v5M15 15v5"/>',
+  // A detail: a dashed box with a magnifier (design-v0.3 §6).
+  detail: '<rect x="3" y="3" width="11" height="11" stroke-dasharray="2.5 1.5"/><circle cx="15" cy="15" r="4"/><path d="M18 18l3 3"/>',
   // Alignment (design-v0.3 §5): the line aligned to, and two bodies of different sizes.
   alignLeft: '<path d="M4 3v18"/><rect x="7" y="6" width="12" height="4"/><rect x="7" y="14" width="7" height="4"/>',
   alignCentre: '<path d="M12 3v18" stroke-dasharray="2 2"/><rect x="5" y="6" width="14" height="4"/><rect x="8" y="14" width="8" height="4"/>',

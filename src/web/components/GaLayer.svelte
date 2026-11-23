@@ -9,6 +9,9 @@
     drawnGaItems,
     gaFrame,
     gaSize,
+    detailLabel,
+    detailOf,
+    frameCaption,
     isDoorView,
     mmToUnits,
     parseCutout,
@@ -20,16 +23,24 @@
   import { displayTag } from "../../core/tags";
   import { resolveFields } from "../../core/fields";
   import { lampGlow } from "../lamps";
+  import { UNIT_MM } from "../../core/geometry";
+  import GaLayer from "./GaLayer.svelte";
 
   /** A GA sheet's enclosure (or door) and items, drawn at its scale (grid units, like the rest of the sheet). */
   let {
     project,
-    page,
+    page: sheet,
     preview = null,
     lit = null,
+    zoomScale,
   }: {
     project: Project;
     page: Page;
+    /**
+     * Drawn inside a detail frame (design-v0.3 §6): the sheet at this scale
+     * instead of its own, without its title, size, dimensions or detail boxes.
+     */
+    zoomScale?: number;
     /** Items being dragged or sized: their temporary place, by id. */
     preview?: Map<string, GaItem> | null;
     /**
@@ -39,7 +50,10 @@
     lit?: Set<string> | null;
   } = $props();
 
+  const inFrame = $derived(zoomScale !== undefined);
+  const page = $derived(zoomScale !== undefined ? { ...sheet, ga: { ...sheet.ga!, scale: zoomScale } } : sheet);
   const ga = $derived(page.ga!);
+  const detailView = $derived(ga.view === "detail");
   const frame = $derived(gaFrame(project, page));
   const size = $derived(gaSize(project, page));
   const u = (mm: number) => mmToUnits(frame, mm);
@@ -110,6 +124,7 @@
   </pattern>
 </defs>
 <g class="ga">
+  {#if !inFrame && !detailView}
   <!-- The enclosure (or door), with its size. -->
   <rect class="encl" x={GA_ORIGIN[0]} y={GA_ORIGIN[1]} width={W} height={H} />
   <text class="title" x={GA_ORIGIN[0]} y={GA_ORIGIN[1] - 5.5}>{title}</text>
@@ -123,6 +138,7 @@
   <text class="dimtext" transform="rotate(-90 {GA_ORIGIN[0] - 2.5} {GA_ORIGIN[1] + H / 2})" x={GA_ORIGIN[0] - 2.5} y={GA_ORIGIN[1] + H / 2} text-anchor="middle"
     >{frame.h}</text
   >
+  {/if}
 
   {#if door}
     <!-- Each leaf: the split between two, and the hinge side shown by the usual converging swing lines. -->
@@ -140,13 +156,35 @@
     {/each}
   {/if}
 
-  {#each drawn as d (d.it.id + (d.own ? "" : "~"))}
+  {#each drawn.filter((d) => !inFrame || (d.it.kind !== "dim" && d.it.kind !== "detail")) as d (d.it.id + (d.own ? "" : "~"))}
     {@const it = d.it}
     {@const x = X(it.x)}
     {@const y = Y(it.y)}
     {@const w = u(it.w)}
     {@const h = u(it.h)}
-    {#if it.kind === "dim"}
+    {#if it.kind === "detail"}
+      <!-- An area shown on a detail sheet: dashed, with its letter and where it's shown, A (12). -->
+      <rect class="detailbox" {x} {y} width={w} height={h} />
+      <text class="detaillabel halo" x={x} y={y - 0.6}>{detailLabel(project, it)}</text>
+    {:else if it.kind === "frame"}
+      <!-- What's inside the detail, at the frame's scale, cut off at its edge (design-v0.3 §6). -->
+      {@const det = detailOf(project, it)}
+      {#if det && det.page.ga}
+        {@const k = it.zoom ?? 1}
+        {@const src = { ...det.page, ga: { ...det.page.ga, scale: 1 / k } }}
+        {@const sx0 = gaFrame(project, src).x0}
+        {@const qx = GA_ORIGIN[0] + ((det.it.x - sx0) * k) / UNIT_MM}
+        {@const qy = GA_ORIGIN[1] + (det.it.y * k) / UNIT_MM}
+        <clipPath id="frame-clip-{it.id}"><rect {x} {y} width={w} height={h} /></clipPath>
+        <g clip-path="url(#frame-clip-{it.id})">
+          <g transform="translate({x - qx} {y - qy})">
+            <GaLayer {project} page={det.page} zoomScale={1 / k} {lit} />
+          </g>
+        </g>
+      {/if}
+      <rect class="frame" {x} {y} width={w} height={h} />
+      <text class="caption" x={x + w / 2} y={y + h + 3.2} text-anchor="middle">{frameCaption(project, it)}</text>
+    {:else if it.kind === "dim"}
       {@const lay = dimLayout(project, page, it, drawn)}
       <g class="dimension">
         {#each lay.lines as l, i (i)}<line x1={l[0]} y1={l[1]} x2={l[2]} y2={l[3]} />{/each}
@@ -379,6 +417,25 @@
   }
   .button-in {
     stroke-width: 0.07;
+  }
+  .detailbox {
+    fill: none;
+    stroke: #000;
+    stroke-width: var(--thin, 0.14);
+    stroke-dasharray: 1.2 0.6;
+  }
+  .detaillabel {
+    font-family: var(--drawing-font);
+    font-size: var(--tag, 1.35px);
+  }
+  .frame {
+    fill: none;
+    stroke: #000;
+    stroke-width: var(--thick, 0.27);
+  }
+  .caption {
+    font-family: var(--drawing-font);
+    font-size: var(--tag, 1.35px);
   }
   .lens {
     stroke: #000;

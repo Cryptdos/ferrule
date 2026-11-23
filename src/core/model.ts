@@ -132,7 +132,8 @@ export interface GaSettings {
   of?: string;
 }
 
-export type GaView = "backplate" | "door-front" | "door-back";
+/** "detail": a sheet of frames, each showing an area of another GA sheet at a larger scale (design-v0.3 §6). */
+export type GaView = "backplate" | "door-front" | "door-back" | "detail";
 
 export interface DoorLeaf {
   /** Width, mm. The leaves add up to the door's width. */
@@ -143,7 +144,12 @@ export interface DoorLeaf {
 /** Something on a GA sheet, in real mm from the enclosure's (or door's) top-left corner, as the sheet sees it. */
 export interface GaItem {
   id: string;
-  kind: "rail" | "trunking" | "device" | "label" | "dim";
+  /**
+   * "detail": an area of this sheet shown on a detail sheet (a dashed box,
+   * lettered). "frame": on a detail sheet, what's inside one detail, at the
+   * frame's own scale (design-v0.3 §6).
+   */
+  kind: "rail" | "trunking" | "device" | "label" | "dim" | "detail" | "frame";
   x: number;
   y: number;
   w: number;
@@ -164,6 +170,12 @@ export interface GaItem {
   seen?: string[];
   /** A door device's cut-out, as written: "22.3" (a round hole, mm) or "92 x 92". Shown on the door back. */
   cutout?: string;
+  /** A detail: its letter, unique across the project (A, B, C…). Its title is `text`. */
+  letter?: string;
+  /** A frame: the detail it shows (that item's id, on another GA sheet). */
+  detail?: string;
+  /** A frame: its scale, paper mm per real mm (2 for 2:1, 0.5 for 1:2). Its w and h follow its detail × this. */
+  zoom?: number;
   /** A label plate's engraved text height, mm. */
   textMm?: number;
   /** A dimension: what it measures and where its line is (x, y, w and h are its extent, worked out). */

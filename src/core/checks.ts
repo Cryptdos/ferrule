@@ -2,7 +2,7 @@
  * Rule checks (DESIGN.md §6, §7, §10). Each finding names the elements
  * involved so the UI can jump to them.
  */
-import { changedGaStrips, doorOwner, gaCandidates, railFill, railNumber } from "./ga";
+import { allDetails, allFrames, changedGaStrips, detailOf, doorOwner, frameOf, gaCandidates, railFill, railNumber } from "./ga";
 import { compile, pinNode } from "./sim";
 import { controllerName, modulesOf, moduleTypeName, slotAddress, viewsOf } from "./modules";
 import { contactPins, isAnalogueForm, isInputForm, missingRefs, describeExpectation, things } from "./points";
@@ -143,6 +143,11 @@ export function checkProject(project: Project): Finding[] {
 
   if (unnumbered) out.push({ level: "info", message: `${unnumbered} items not numbered yet: press Renumber`, ids: [] });
   out.push(...terminalNumberChecks(project));
+  // Detail sheets (design-v0.3 §6): a detail is shown in a frame; a frame shows a detail that's still there.
+  for (const d of allDetails(project))
+    if (!frameOf(project, d.it.id)) out.push({ level: "warning", message: `Sheet ${d.page.number}: detail ${d.it.letter ?? "?"} isn't shown on a detail sheet (Place detail…)`, pageId: d.page.id, ids: [d.it.id] });
+  for (const f of allFrames(project))
+    if (!detailOf(project, f.it)) out.push({ level: "warning", message: `Sheet ${f.page.number}: a frame shows a detail that has been deleted`, pageId: f.page.id, ids: [f.it.id] });
   out.push(...supplyBypasses(project));
   out.push(...pointChecks(project));
   out.push(...controllerChecks(project));

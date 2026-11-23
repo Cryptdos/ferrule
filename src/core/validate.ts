@@ -383,7 +383,7 @@ function parsePage(pg: Record<string, unknown>, i: number): Project["pages"][num
       scale: typeof pg.ga.scale === "number" && pg.ga.scale > 0 ? pg.ga.scale : 5,
       enclosure: { w: typeof e.w === "number" && e.w > 0 ? e.w : 600, h: typeof e.h === "number" && e.h > 0 ? e.h : 800 },
       // "door" from the 0.2 test builds is the door front.
-      view: v === "door" || v === "door-front" ? "door-front" : v === "door-back" ? "door-back" : "backplate",
+      view: v === "door" || v === "door-front" ? "door-front" : v === "door-back" ? "door-back" : v === "detail" ? "detail" : "backplate",
     };
     const leaves = arr(pg.ga.leaves)
       .filter(isObj)
@@ -412,7 +412,7 @@ function parsePage(pg: Record<string, unknown>, i: number): Project["pages"][num
   }
   const gaItems = arr(pg.gaItems)
     .filter(isObj)
-    .filter((it) => typeof it.id === "string" && ["rail", "trunking", "device", "label", "dim"].includes(String(it.kind)))
+    .filter((it) => typeof it.id === "string" && ["rail", "trunking", "device", "label", "dim", "detail", "frame"].includes(String(it.kind)))
     .map((it): GaItem => ({
       id: it.id as string,
       kind: it.kind as GaItem["kind"],
@@ -429,6 +429,9 @@ function parsePage(pg: Record<string, unknown>, i: number): Project["pages"][num
       ...(Array.isArray(it.seen) ? { seen: it.seen.filter((r): r is string => typeof r === "string") } : {}),
       ...(typeof it.cutout === "string" && it.cutout.trim() ? { cutout: it.cutout.trim() } : {}),
       ...(typeof it.textMm === "number" && it.textMm > 0 ? { textMm: it.textMm } : {}),
+      ...(it.kind === "detail" && typeof it.letter === "string" && it.letter.trim() ? { letter: it.letter.trim() } : {}),
+      ...(it.kind === "frame" && typeof it.detail === "string" ? { detail: it.detail } : {}),
+      ...(it.kind === "frame" && typeof it.zoom === "number" && it.zoom > 0 ? { zoom: it.zoom } : {}),
       ...(it.kind === "dim" ? { dim: parseDim(it.dim) } : {}),
     }))
     .filter((it) => it.kind !== "dim" || it.dim!.points.length >= 2);

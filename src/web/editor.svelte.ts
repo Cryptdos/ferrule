@@ -7,13 +7,13 @@ import type { Project } from "../core/model";
 import { OpError } from "../core/ops";
 import { routePage } from "../core/routing";
 import { routesStale } from "../core/wires";
-import { markGaSeen, syncGaStrips } from "../core/ga";
+import { markGaSeen, syncDetailFrames, syncGaStrips } from "../core/ga";
 import { refreshConductors } from "../core/conductors";
 import { api, ConflictError } from "./api";
 import { dropOn, findLeaf, leaves, removeLeaf, setContent, sheetLeaf, splitLeaf, tileId, type DropZone, type TileNode } from "./tiles";
 import { getAvoid } from "./avoid";
 
-export type Tool = "select" | "place" | "wire" | "section" | "cloud" | "polygon" | "stamp" | "ga-rail" | "ga-trunking" | "ga-dim" | "ga-label";
+export type Tool = "select" | "place" | "wire" | "section" | "cloud" | "polygon" | "stamp" | "ga-rail" | "ga-trunking" | "ga-dim" | "ga-label" | "ga-detail";
 export type SaveState = "saved" | "pending" | "saving" | "error";
 
 const HISTORY_LIMIT = 200;
@@ -54,7 +54,7 @@ export class Editor {
   saveState: SaveState = $state("saved");
   message: string = $state("");
   /** A schematic device (or terminal strip) being placed on a GA sheet. */
-  gaPlace: { refs: string[]; part?: "handle"; modules?: { id: string; w: number; h: number }[]; w: number; h: number; label: string } | null = $state(null);
+  gaPlace: { refs: string[]; part?: "handle"; modules?: { id: string; w: number; h: number }[]; detail?: string; w: number; h: number; label: string } | null = $state(null);
   /** How the Dimension tool measures: the gaps along a run, or each distance from the first point. */
   gaDimStyle: "chain" | "baseline" = $state("chain");
   /** Sheet settings open in the floating properties box (nothing need be selected). */
@@ -146,8 +146,9 @@ export class Editor {
       // Keep every wire on the current page attached and routed.
       routePage(getAvoid(), this.page);
       refreshConductors(this.project);
-      // Placed terminal strips follow the schematic (note 45).
+      // Placed terminal strips follow the schematic (note 45); detail frames follow their details.
       syncGaStrips(this.project);
+      syncDetailFrames(this.project);
     } catch (e) {
       // Roll back anything the operation changed before it failed.
       this.project = JSON.parse(before);

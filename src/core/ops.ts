@@ -38,7 +38,7 @@ import { cleanPoints, formatQuickEntry, mergePoints, isInputForm, missingRefs, p
 import { isOrthogonal, routeOf, simplifyRoute } from "./wires";
 import { isMaster, isSlave, locate } from "./xref";
 import { colourCode, knownColour, lampColour } from "./wirecolours";
-import { doorOwner, fitScale, itemStrip, sheetTakes, viewTakes } from "./ga";
+import { DETAIL_ZOOMS, allDetails, detailOf, detailSpace, doorOwner, fitScale, fitZoom, frameOf, itemStrip, nextDetailLetter, sheetTakes, syncDetailFrames, viewTakes } from "./ga";
 
 export class OpError extends Error {}
 
@@ -1372,6 +1372,7 @@ const VIEW_TITLES: Record<GaView, string> = {
   backplate: "General arrangement: backplate",
   "door-front": "General arrangement: door front",
   "door-back": "General arrangement: door back",
+  detail: "General arrangement: details",
 };
 
 /**
@@ -1386,6 +1387,13 @@ export function addGaPage(project: Project, title: string, ga: GaSettings, after
   } else if (ga.view === "door-back") throw new OpError("A door back is the back of a door front: pick its sheet");
   const page = addPage(project, title || VIEW_TITLES[ga.view], afterId);
   page.ga = { scale: ga.scale, enclosure: { ...ga.enclosure }, view: ga.view };
+  // A detail sheet has no enclosure and no scale of its own: its frames are in paper mm (design-v0.3 §6).
+  if (ga.view === "detail") {
+    const s = detailSpace();
+    page.ga = { scale: 1, enclosure: { w: Math.round(s.w), h: Math.round(s.h) }, view: "detail" };
+    page.gaItems = [];
+    return page;
+  }
   if (ga.of) {
     page.ga.of = ga.of;
     page.ga.enclosure = { ...project.pages.find((p) => p.id === ga.of)!.ga!.enclosure };
@@ -1419,6 +1427,7 @@ export function setGaSettings(project: Project, pageId: string, patch: Partial<O
     ga.scale = patch.scale;
   }
   if (patch.view && patch.view !== ga.view) {
+    if (patch.view === "detail" || ga.view === "detail") throw new OpError("A detail sheet is added as one, and stays one");
     // Only what the new view takes may be on the sheet.
     const misfit = (page.gaItems ?? []).filter((it) => !viewTakes(patch.view!, it.kind));
     if (misfit.length) throw new OpError(`A ${patch.view.replace("-", " ")} can't have the ${misfit.length} rail, trunking or label item${misfit.length === 1 ? "" : "s"} on this sheet: delete them first`);
@@ -1475,7 +1484,7 @@ function gaPage(project: Project, pageId: string): Page & { ga: GaSettings; gaIt
 export function addGaItem(project: Project, pageId: string, item: Omit<GaItem, "id">): GaItem {
   const page = gaPage(project, pageId);
   if (!sheetTakes(project, page, item.kind)) {
-    const what = { rail: "A DIN rail", trunking: "Trunking", device: "A device", label: "A label plate", dim: "A dimension" }[item.kind];
+    const what = { rail: "A DIN rail", trunking: "Trunking", device: "A device", label: "A label plate", dim: "A dimension", detail: "A detail", frame: "A detail frame" }[item.kind];
     const owner = doorOwner(project, page);
     throw new OpError(
       owner && owner !== page && page.ga.view === "door-front"
@@ -1500,6 +1509,16 @@ export function addGaItem(project: Project, pageId: string, item: Omit<GaItem, "
   if (it.kind === "label") {
     it.text ??= "LABEL";
     it.textMm ??= 5;
+  }
+  // A detail gets the next free letter; a frame shows one detail, once, at the largest scale that fits (design-v0.3 §6).
+  if (it.kind === "detail") it.letter = nextDetailLetter(project);
+  if (it.kind === "frame") {
+    const d = it.detail ? detailOf(project, it) : null;
+    if (!d) throw new OpError("A frame shows a detail: pick one in Place detail…");
+    if (frameOf(project, d.it.id)) throw new OpError(`Detail ${d.it.letter} is already shown in a frame`);
+    it.zoom = it.zoom && DETAIL_ZOOMS.includes(it.zoom) ? it.zoom : fitZoom(d.it.w, d.it.h);
+    it.w = d.it.w * it.zoom;
+    it.h = d.it.h * it.zoom;
   }
   page.gaItems.push(it);
   return it;
@@ -1530,6 +1549,17 @@ export function updateGaItem(project: Project, pageId: string, id: string, patch
   }
   if (patch.textMm !== undefined && patch.textMm > 0) it.textMm = patch.textMm;
   if (patch.dim !== undefined && it.kind === "dim") it.dim = { ...it.dim!, ...patch.dim };
+  if (patch.letter !== undefined && it.kind === "detail") {
+    const letter = patch.letter.trim().toUpperCase();
+    if (!letter) throw new OpError("A detail needs a letter");
+    if (allDetails(project).some((d) => d.it.id !== it.id && d.it.letter === letter)) throw new OpError(`There's already a detail ${letter}`);
+    it.letter = letter;
+  }
+  if (patch.zoom !== undefined && it.kind === "frame") {
+    if (!DETAIL_ZOOMS.includes(patch.zoom)) throw new OpError("A frame's scale is 2:1, 1:1, 1:2 or 1:5");
+    it.zoom = patch.zoom;
+  }
+  syncDetailFrames(project);
 }
 
 export function moveGaItems(project: Project, pageId: string, ids: string[], d: Vec): void {
@@ -1562,6 +1592,8 @@ export function deleteGaItems(project: Project, pageId: string, ids: string[]): 
   const page = gaPage(project, pageId);
   page.gaItems = page.gaItems.filter((x) => !ids.includes(x.id));
   detachDims(project, new Set(ids));
+  // A detail's frame goes with it.
+  for (const pg of project.pages) if (pg.gaItems?.some((it) => it.kind === "frame" && it.detail && ids.includes(it.detail))) pg.gaItems = pg.gaItems.filter((it) => !(it.kind === "frame" && it.detail && ids.includes(it.detail)));
 }
 
 /** Dimension points on items that have gone stay where they were. */
