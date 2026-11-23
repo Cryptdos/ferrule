@@ -188,6 +188,13 @@ Each step is one PR with a build, `ferrule-windows-v0.3.0-pre.zip`. The working 
 - **Two strips in one column** (X1 and X2 terminals at the same place) give the same number to two wires, since each wire must agree with its terminal. Check warns, and moving one terminal along fixes it.
 - **Sequential scheme:** the same rule; a wire on a terminal takes the terminal's sequence number.
 
+**Step 5 (link arrows)**
+
+- **Where the number goes:** on a vertical arrow (the usual case) it's left of the head, on the same line as the label and reference: `3-24 ▼ SF-01 (3-24)`. Below the tip it ran into a two-line label. On a horizontal arrow it's beyond the free end, in line with the wire. Source and destination are placed the same way; the arrow's shape already says which is which.
+- **Size:** the number is 2.5 mm like every wire number; the bracketed reference stays at the cross-reference size (1.8 mm).
+- **Dropped on a pin:** an arrow whose terminal sits exactly on another part's pin, with no wire, is joined to that pin's conductor, so it is genuinely on it (numbering, Simulate and Check agree), not just labelled.
+- **The example:** its CCT and 0V arrows on sheet 7 are 8 units apart (the lamp test moved 2 left to make room), and the second enable loop on sheets 8 and 9 moved down 2 units, so numbers and references don't run into each other.
+
 ## 11. Director notes, as written (23/11/26)
 
 **On tiling (§7):**

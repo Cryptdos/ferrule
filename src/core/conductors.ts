@@ -14,7 +14,7 @@
  * shares with its old self), so numbers don't jump about while drawing.
  */
 import { type Conductor, type Project, type TerminalRef, newId } from "./model";
-import { isBar, requireSymbol } from "./symbols";
+import { isBar, requireSymbol, terminalPoint } from "./symbols";
 
 const key = (r: TerminalRef) => `${r[0]}\u0000${r[1]}`;
 const unkey = (k: string): TerminalRef => k.split("\u0000") as TerminalRef;
@@ -82,6 +82,25 @@ export function refreshConductors(project: Project): void {
         const present = group.filter((n) => names.has(n));
         for (let i = 1; i < present.length; i++) uf.union(key([elId, present[0]!]), key([elId, present[i]!]));
       }
+    }
+  }
+
+  // An arrow dropped straight onto a part's pin, with no wire between, is on that pin's conductor (v0.3 §2, 32).
+  for (const page of project.pages) {
+    const arrows = page.elements.filter((e) => e.symbol === "offpage");
+    if (!arrows.length) continue;
+    const at = new Map<string, TerminalRef[]>();
+    for (const el of page.elements) {
+      if (el.symbol === "offpage") continue;
+      for (const t of requireSymbol(el.symbol).draw(el).terminals) {
+        const pt = terminalPoint(el, t.name);
+        if (pt) at.set(`${pt[0]},${pt[1]}`, [...(at.get(`${pt[0]},${pt[1]}`) ?? []), [el.id, t.name]]);
+      }
+    }
+    for (const a of arrows) {
+      const pt = terminalPoint(a, "1");
+      const pins = pt ? at.get(`${pt[0]},${pt[1]}`) : undefined;
+      for (const pin of pins ?? []) uf.union(key([a.id, "1"]), key(pin));
     }
   }
 

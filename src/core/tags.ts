@@ -58,6 +58,8 @@ export function elementTexts(el: Element, project: Project): GeometryText {
         if (src?.label) t.label = resolveFields(src.label, project);
       }
       if (d && !t.label) t.label = d.name;
+      const c = project.conductors.find((x) => x.terminals.some(([id]) => id === el.id));
+      if (c?.number) t.wire = c.number;
     }
   }
   return t;

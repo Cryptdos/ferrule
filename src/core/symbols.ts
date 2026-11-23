@@ -1319,6 +1319,16 @@ const SYMBOLS: SymbolDef[] = [
       const placed = (at: Vec, s: string, size: number, anchor: Anchor, role: TextRole): Prim => ({ t: "text", at, text: s, size, anchor, role, placed: true });
       const texts: Prim[] = [];
       const rot = el.rot;
+      // The wire number it carries, horizontal and in line with the arrow (v0.3 §2): on a
+      // vertical arrow, left of the head on the label's line (number, arrow, label); on a
+      // horizontal one, beyond its free end.
+      const wire = t?.wire ?? "";
+      if (wire) {
+        if (rot === 0) texts.push(placed([-w - 0.5, h - 0.2], wire, TAG, "end", "note"));
+        else if (rot === 180) texts.push(placed([-w - 0.5, -h + 0.2 + cap], wire, TAG, "end", "note"));
+        else if (rot === 270) texts.push(placed([h + 0.5, cap / 2], wire, TAG, "start", "note"));
+        else texts.push(placed([-h - 0.5, cap / 2], wire, TAG, "end", "note"));
+      }
       if (rot === 0 || rot === 180) {
         const y = rot === 0 ? h - 0.2 : -h + 0.2 + cap;
         if (label) texts.push(placed([1, y], "{label}", TAG, "start", "label"));
@@ -2301,6 +2311,8 @@ export interface GeometryText {
   xref?: string;
   /** Label with any fields filled in. Defaults to the element's label. */
   label?: string;
+  /** A link arrow: the number of the wire it carries (v0.3 §2). */
+  wire?: string;
   /** A busbar's name: its distribution's, or its own when it's local. */
   name?: string;
   /** A contact timed by its timer coil: the coil's function (on, off, on-off…), so the delay mark is drawn. */
