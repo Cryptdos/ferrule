@@ -155,3 +155,62 @@ describe("terminal order on the GA (v0.3 §2, 28)", () => {
     expect(e.tag).not.toBe("");
   });
 });
+
+describe("terminals drive wire numbers (v0.3 §2, 33)", () => {
+  test("a wire on a terminal takes its number; a wire on none is numbered from its highest end", async () => {
+    const { setConductorNumber } = await import("./ops");
+    const { checkProject } = await import("./checks");
+    const { p, pg } = project();
+    const page = p.pages[0]!;
+    page.boundaryY = 70;
+    const k = addElement(p, pg, "coil", [61, 40]);
+    const t = addElement(p, pg, "terminal", [59, 70]);
+    const k2 = addElement(p, pg, "coil", [80, 20]);
+    const k3 = addElement(p, pg, "coil", [80, 40]);
+    connect(p, pg, [k.id, "A2"], [t.id, "1"]);
+    connect(p, pg, [k2.id, "A2"], [k3.id, "A1"]);
+    renumber(p);
+    const cond = (ref: [string, string]) => p.conductors.find((c) => c.terminals.some(([id, n]) => id === ref[0] && n === ref[1]))!;
+    // The coil sits in column 31, the terminal in 30: the wire is the terminal's.
+    expect(t.tag).toBe("1-30");
+    expect(cond([k.id, "A2"]).number).toBe("1-30");
+    expect(cond([k2.id, "A2"]).number).toBe("1-41");
+    // A locked number that disagrees stays, and Check says so.
+    setConductorNumber(p, cond([k.id, "A2"]).id, "1-99");
+    renumber(p);
+    expect(cond([k.id, "A2"]).number).toBe("1-99");
+    expect(checkProject(p).some((f) => f.message.includes("wire 1-99 is locked but lands on terminal X1:1-30"))).toBe(true);
+  });
+
+  test("a conductor through two terminals takes the first along the strip, by sheet then left to right", async () => {
+    const { addPage } = await import("./ops");
+    const { p, pg } = project();
+    p.pages[0]!.boundaryY = 70;
+    const a = addElement(p, pg, "terminal", [40, 70]);
+    const b = addElement(p, pg, "terminal", [20, 70]);
+    connect(p, pg, [a.id, "1"], [b.id, "1"]);
+    const pg2 = addPage(p, "two");
+    void pg2;
+    renumber(p);
+    const c = p.conductors.find((x) => x.terminals.some(([id]) => id === a.id))!;
+    expect(c.number).toBe(b.tag);
+    expect(c.number).toBe("1-11");
+  });
+
+  test("a positional wire number steps aside for a terminal's", () => {
+    const { p, pg } = project();
+    p.pages[0]!.boundaryY = 70;
+    // A wire starting at column 30 that is on no terminal, and a terminal in column 30.
+    const k1 = addElement(p, pg, "coil", [59, 10]);
+    const k2 = addElement(p, pg, "coil", [59, 30]);
+    connect(p, pg, [k1.id, "A2"], [k2.id, "A1"]);
+    const k3 = addElement(p, pg, "coil", [70, 40]);
+    const t = addElement(p, pg, "terminal", [58, 70]);
+    connect(p, pg, [k3.id, "A2"], [t.id, "1"]);
+    renumber(p);
+    const free = p.conductors.find((x) => x.terminals.some(([id]) => id === k1.id))!;
+    const onT = p.conductors.find((x) => x.terminals.some(([id]) => id === t.id))!;
+    expect(onT.number).toBe(t.tag);
+    expect(free.number).not.toBe(onT.number);
+  });
+});

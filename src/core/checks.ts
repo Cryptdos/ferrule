@@ -8,6 +8,7 @@ import { controllerName, modulesOf, moduleTypeName, slotAddress, viewsOf } from 
 import { contactPins, isAnalogueForm, isInputForm, missingRefs, describeExpectation, things } from "./points";
 import type { Element, Page, Project } from "./model";
 import { isBar, terminalNames } from "./symbols";
+import { numberingTerminal } from "./renumber";
 import { displayTag } from "./tags";
 import { isMaster, isSlave, masterOf, partnerOf, slavesOf } from "./xref";
 
@@ -141,6 +142,7 @@ export function checkProject(project: Project): Finding[] {
   }
 
   if (unnumbered) out.push({ level: "info", message: `${unnumbered} items not numbered yet: press Renumber`, ids: [] });
+  out.push(...terminalNumberChecks(project));
   out.push(...supplyBypasses(project));
   out.push(...pointChecks(project));
   out.push(...controllerChecks(project));
@@ -354,5 +356,32 @@ export function controllerChecks(project: Project): Finding[] {
       if (!m.terminals.length) out.push({ level: "warning", message: `Module ${tag} (${moduleTypeName(m.module)}) has no pins: Generate… or Pins and points…`, ids: views.map((v) => v.el.id) });
     }
   }
+  return out;
+}
+
+/**
+ * Wires and terminals agree (v0.3 §2): a locked wire number that isn't its
+ * terminal's, and one number on two wires (terminals of different strips in
+ * the same place).
+ */
+export function terminalNumberChecks(project: Project): Finding[] {
+  const out: Finding[] = [];
+  const seen = new Map<string, string[]>();
+  for (const c of project.conductors) {
+    const t = numberingTerminal(project, c);
+    if (!t) continue;
+    const name = `${t.el.params.strip ?? "X1"}:${t.el.tag}`;
+    if (c.locked && c.number && c.number !== t.el.tag) {
+      out.push({
+        level: "warning",
+        message: `Sheet ${t.page.number}: wire ${c.number} is locked but lands on terminal ${name}; a wire on a terminal is numbered by it`,
+        pageId: t.page.id,
+        ids: [t.el.id],
+      });
+    }
+    if (c.number) seen.set(c.number, [...(seen.get(c.number) ?? []), name]);
+  }
+  for (const [n, names] of seen)
+    if (names.length > 1) out.push({ level: "warning", message: `Wire number ${n} is on ${names.length} wires (terminals ${names.join(", ")}): move one of the terminals`, ids: [] });
   return out;
 }
