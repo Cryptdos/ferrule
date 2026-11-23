@@ -16,6 +16,7 @@
   import Browser from "./Browser.svelte";
   import FloatBox from "./FloatBox.svelte";
   import Icon from "./Icon.svelte";
+  import LabelButton from "./LabelButton.svelte";
   import SheetProps from "./SheetProps.svelte";
   import DevicesDialog from "./DevicesDialog.svelte";
   import GaProps from "./GaProps.svelte";
@@ -353,15 +354,18 @@
       <button class="icon" onclick={onclose} title="Back to the project list"><Icon name="projects" /></button>
       <strong class="title" title={editor.project.project.title}>{editor.project.project.title}</strong>
       <div class="workbench" role="group" aria-label="Workbench">
-        <button class:active={editor.mode === "draft"} disabled={!!editor.page.spare} onclick={() => setMode("draft")}
-          title={editor.page.spare ? "This is a spare sheet: annotations only" : "The electrical drawing: parts, wires, rails, plant"}>Draft</button>
-        <button class:active={editor.mode === "annotate"} onclick={() => setMode("annotate")} title="Text, boxes, label plates, sections, revision clouds and pictures">Annotate</button>
-        <button class:active={editor.mode === "ga"} onclick={() => setMode("ga")} title="General arrangement: the panel laid out at true scale">GA</button>
-        <button class:active={editor.mode === "simulate"} onclick={() => setMode("simulate")} title="Try the logic as drawn">Simulate</button>
+        <LabelButton icon="draft" label="Draft" active={editor.mode === "draft"} onclick={() => setMode("draft")} disabled={!!editor.page.spare}
+          title={editor.page.spare ? "This is a spare sheet: annotations only" : "The electrical drawing: parts, wires, rails, plant"} />
+        <LabelButton icon="annotate" label="Annotate" active={editor.mode === "annotate"} onclick={() => setMode("annotate")}
+          title="Text, boxes, label plates, sections, revision clouds and pictures" />
+        <LabelButton icon="ga" label="GA" active={editor.mode === "ga"} onclick={() => setMode("ga")}
+          title="General arrangement: the panel laid out at true scale" />
+        <LabelButton icon="simulate" label="Simulate" active={editor.mode === "simulate"} onclick={() => setMode("simulate")}
+          title="Try the logic as drawn" />
       </div>
       <span class="grow"></span>
       <div class="group">
-        <button onclick={() => (showProject = true)} title="Project details, logo and revisions (title block)">Project…</button>
+        <LabelButton icon="project" label="Project…" onclick={() => (showProject = true)} title="Project details, logo and revisions (title block)" />
         <button class="icon" onclick={() => (savingAs = true)} title="Save as… (a copy of this project, to a file anywhere)"><Icon name="saveAs" /></button>
         <button class="icon" onclick={exportPdf} disabled={exporting} title={exporting ? "Exporting…" : "Export PDF: every sheet as an A4 PDF"}><Icon name="pdf" /></button>
         <button class="icon" onclick={print} title="Print (opens the print view)"><Icon name="print" /></button>
@@ -398,24 +402,24 @@
       {#if editor.mode === "simulate"}
         <span class="sep"></span>
         <span class="simnote">Simulating: click switches, buttons and plant outputs on the drawing; double-click to follow a link. Editing is off.</span>
-        <button class:active={!!open.expectations} onclick={() => toggle("expectations")} title="What the drawing should do: checked live, and by Check logic">Expectations…</button>
+        <LabelButton icon="expectations" label="Expectations…" active={!!open.expectations} onclick={() => toggle("expectations")} title="What the drawing should do: checked live, and by Check logic" />
       {:else if editor.mode === "draft"}
         <span class="sep"></span>
-        <button class:active={!!open.renumber} onclick={() => toggle("renumber")} title="See what Renumber would change to tags, terminal and wire numbers, then apply">Renumber</button>
-        <button class:active={!!open.templates} onclick={() => toggle("templates")} title="Save and stamp sheet and section templates">Templates</button>
-        <button class:active={!!open.plant} onclick={() => toggle("plant")} title="Field equipment: define plant and place views">Plant</button>
-        <button class:active={!!open.controllers} onclick={() => toggle("controllers")} title="Outstations and PLCs: their modules, in rail order, and module views">Controllers</button>
-        <button class:active={!!open.distribution} onclick={() => toggle("distribution")} title="The supplies busbars, link arrows and the incoming supply pick from">Distribution</button>
-        <button class:active={!!open.table} onclick={() => toggle("table")} title="Table: every element in the project, to filter, edit and find-and-replace">Table</button>
-        <button class:active={!!open.checks} onclick={() => toggle("checks")} title="Check the drawing for problems">Check</button>
-        <button class:active={!!open.expectations} onclick={() => toggle("expectations")} title="What the drawing should do: checked live in Simulate, and by Check logic">Expectations…</button>
-        <button class:active={!!open.schedules} onclick={() => toggle("schedules")} title="Terminal, cable and IO schedules">Schedules</button>
+        <LabelButton icon="renumber" label="Renumber" active={!!open.renumber} onclick={() => toggle("renumber")} title="See what Renumber would change to tags, terminal and wire numbers, then apply" />
+        <LabelButton icon="templates" label="Templates" active={!!open.templates} onclick={() => toggle("templates")} title="Save and stamp sheet and section templates" />
+        <LabelButton icon="plant" label="Plant" active={!!open.plant} onclick={() => toggle("plant")} title="Field equipment: define plant and place views" />
+        <LabelButton icon="controllers" label="Controllers" active={!!open.controllers} onclick={() => toggle("controllers")} title="Outstations and PLCs: their modules, in rail order, and module views" />
+        <LabelButton icon="distribution" label="Distribution" active={!!open.distribution} onclick={() => toggle("distribution")} title="The supplies busbars, link arrows and the incoming supply pick from" />
+        <LabelButton icon="table" label="Table" active={!!open.table} onclick={() => toggle("table")} title="Table: every element in the project, to filter, edit and find-and-replace" />
+        <LabelButton icon="check" label="Check" active={!!open.checks} onclick={() => toggle("checks")} title="Check the drawing for problems" />
+        <LabelButton icon="expectations" label="Expectations…" active={!!open.expectations} onclick={() => toggle("expectations")} title="What the drawing should do: checked live in Simulate, and by Check logic" />
+        <LabelButton icon="schedules" label="Schedules" active={!!open.schedules} onclick={() => toggle("schedules")} title="Terminal, cable and IO schedules" />
       {:else if editor.mode === "ga"}
         <span class="sep"></span>
-        <button class:active={!!open.checks} onclick={() => toggle("checks")} title="Check the drawing for problems, with how full each DIN rail is">Check</button>
-        <button class:active={!!open.schedules} onclick={() => toggle("schedules")} title="Terminal and cable schedules, and the bill of materials">Schedules</button>
-        <button class:active={!!open.place} onclick={() => (open.place = !open.place)} title="Parts from the schematic not on a GA yet: pick one, then click on the sheet">Place parts…</button>
-        <button class:active={!!open.devices} onclick={() => toggle("devices")} title="Real devices with their sizes, datasheets and pictures">Device table…</button>
+        <LabelButton icon="check" label="Check" active={!!open.checks} onclick={() => toggle("checks")} title="Check the drawing for problems, with how full each DIN rail is" />
+        <LabelButton icon="schedules" label="Schedules" active={!!open.schedules} onclick={() => toggle("schedules")} title="Terminal and cable schedules, and the bill of materials" />
+        <LabelButton icon="place" label="Place parts…" active={!!open.place} onclick={() => (open.place = !open.place)} title="Parts from the schematic not on a GA yet: pick one, then click on the sheet" />
+        <LabelButton icon="devices" label="Device table…" active={!!open.devices} onclick={() => toggle("devices")} title="Real devices with their sizes, datasheets and pictures" />
       {/if}
     </div>
   </header>
@@ -566,7 +570,7 @@
     background: #fbfbfc;
     border-top: 1px solid #e3e6e9;
   }
-  header button {
+  header :global(button) {
     white-space: nowrap;
     flex: none;
   }
@@ -616,17 +620,17 @@
   .workbench {
     display: flex;
   }
-  .workbench button {
+  .workbench :global(button) {
     border-radius: 0;
     padding: 4px 12px;
   }
-  .workbench button:first-child {
+  .workbench :global(button:first-child) {
     border-radius: 4px 0 0 4px;
   }
-  .workbench button:last-child {
+  .workbench :global(button:last-child) {
     border-radius: 0 4px 4px 0;
   }
-  .workbench button + button {
+  .workbench :global(button + button) {
     margin-left: -1px;
   }
   .group {

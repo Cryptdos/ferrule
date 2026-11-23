@@ -218,6 +218,11 @@ Each step is one PR with a build, `ferrule-windows-v0.3.0-pre.zip`. The working 
 - **Splitting** a tile fits its sheet to its new, smaller size, as the old split did; other tiles keep their zoom.
 - The help has a line on tiles and docking; the README's drafting and simulating pictures are retaken with two tiles. The other pictures (Annotate, GA, controllers) show one view and are left until their workbenches change.
 
+**Step 7 (icons on buttons)**
+
+- **Project…** is in the list and gets an icon too, as the design names it with the menus. The Wire tool keeps its icon and name together under every setting: it's a tool beside Select, which is already an icon.
+- **The icons:** a pencil (Draft), a T over lines (Annotate), a door with lamps (GA), play (Simulate), # (Renumber), stacked sheets (Templates), a fan (Plant), a module with terminals (Controllers), a busbar with taps (Distribution), the table (Table), a tick in a circle (Check), a checklist (Expectations…), a list on a sheet (Schedules), a part going down onto the plate (Place parts…), a catalogue (Device table…), a sheet with its title block (Project…).
+
 ## 11. Director notes, as written (23/11/26)
 
 **On tiling (§7):**

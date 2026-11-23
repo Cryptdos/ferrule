@@ -1,7 +1,8 @@
 /**
- * Toolbar icons: 24×24 line drawings in the current text colour. Used for
- * actions everyone recognises (save, print, undo…); Ferrule's own tools keep
- * their names.
+ * Toolbar icons: 24×24 line drawings in the current text colour. Actions
+ * everyone recognises (save, print, undo…) are icons only; the workbenches
+ * and menus have an icon too, shown beside or instead of their name as the
+ * Buttons setting says (design-v0.3 §8).
  */
 export const ICONS = {
   projects: '<rect x="4" y="4" width="7" height="7" rx="1"/><rect x="13" y="4" width="7" height="7" rx="1"/><rect x="4" y="13" width="7" height="7" rx="1"/><rect x="13" y="13" width="7" height="7" rx="1"/>',
@@ -43,6 +44,22 @@ export const ICONS = {
   plate: '<rect x="3" y="8" width="18" height="8" rx="1"/><rect x="5" y="10" width="14" height="4"/>',
   note: '<path d="M5 4h14v12l-4 4H5z"/><path d="M15 20v-4h4"/><path d="M8 9h8M8 12.5h5"/>',
   library: '<path d="M4 4h4v16H4zM10 4h4v16h-4z"/><path d="M16 5l3.5-1 3 15.5-3.5 1z"/>',
+  // Workbenches and menus (design-v0.3 §8).
+  draft: '<path d="M4 20l1-4L16 5l3 3L8 19z"/><path d="M14 7l3 3"/>',
+  annotate: '<path d="M5 6h10M10 6v11"/><path d="M14 13h6M14 17h6M5 20h15"/>',
+  ga: '<rect x="4" y="3" width="16" height="18" rx="1"/><circle cx="9" cy="8" r="1.5"/><circle cx="15" cy="8" r="1.5"/><path d="M8 13h8M8 16h8M17 11v2"/>',
+  simulate: '<path d="M7 4l12 8-12 8z"/>',
+  renumber: '<path d="M9 4L7 20M17 4l-2 16M4 9h16M3 15h16"/>',
+  templates: '<rect x="7" y="3" width="13" height="15" rx="1"/><path d="M4 7v14h12"/><path d="M10 8h7M10 11h7M10 14h4"/>',
+  plant: '<circle cx="12" cy="12" r="8"/><path d="M12 12l-2-5M12 12l5 2M12 12l-3 4"/><circle cx="12" cy="12" r="1"/>',
+  controllers: '<rect x="5" y="3" width="14" height="18" rx="1"/><path d="M5 7h14M5 17h14"/><path d="M8 20v1M11 20v1M14 20v1M17 20v1"/><path d="M9 10h2M9 13h2M13 10h2M13 13h2"/>',
+  distribution: '<path d="M3 6h18" stroke-width="3"/><path d="M7 6v12M12 6v12M17 6v12"/><circle cx="7" cy="6" r="1"/><circle cx="12" cy="6" r="1"/><circle cx="17" cy="6" r="1"/>',
+  check: '<circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.7 2.7L16.5 9"/>',
+  expectations: '<path d="M9 6h11M9 12h11M9 18h11"/><path d="M3 6l1.5 1.5L7 5M3 12l1.5 1.5L7 11"/><circle cx="5" cy="18" r="1.4"/>',
+  schedules: '<rect x="4" y="3" width="16" height="18" rx="1"/><path d="M8 8h8M8 12h8M8 16h5"/>',
+  place: '<rect x="4" y="12" width="16" height="8" rx="1"/><path d="M12 3v8M8.5 7.5L12 11l3.5-3.5"/>',
+  devices: '<path d="M5 4h11a2 2 0 0 1 2 2v14H7a2 2 0 0 1-2-2z"/><path d="M5 18a2 2 0 0 1 2-2h11"/><path d="M9 8h5"/>',
+  project: '<path d="M4 4h16v16H4z"/><path d="M4 15h16M11 15v5M15 15v5"/>',
 } as const;
 
 export type IconName = keyof typeof ICONS;
