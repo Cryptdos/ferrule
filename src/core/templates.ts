@@ -150,13 +150,21 @@ export function stampTemplate(project: Project, templateId: string, opts: StampO
     } else if (m && "newTag" in m) {
       // Letters only (SF): a prefix, and Renumber gives the tag. A full tag (SF-02) is kept as typed.
       const typed = /\d/.test(m.newTag) ? m.newTag : "";
+      // Its points follow its own points by ref: those move to the new item.
+      const own = `plant:${item.id}:`;
+      const points = clone(item.points ?? []).map((pt) => ({
+        ...pt,
+        ...(pt.follows ? { follows: pt.follows.map((c) => (c.ref.startsWith(own) ? { ...c, ref: `plant:@new:${c.ref.slice(own.length)}` } : c)) } : {}),
+      }));
       target = addPlant(project, typed, m.description ?? item.description, item.terminals, {
-        groups: item.groups,
+        points,
+        pins: item.pins,
         info: item.info,
         prefix: prefixOf(m.newTag) || item.prefix || "U",
         powerByOthers: item.powerByOthers,
       });
       if (typed) target.locked = true;
+      for (const pt of target.points ?? []) for (const c of pt.follows ?? []) if (c.ref.startsWith("plant:@new:")) c.ref = `plant:${target.id}:${c.ref.slice(11)}`;
     } else {
       target = project.plant.find((p) => p.id === item.id) ?? project.plant.find((p) => p.tag === item.tag);
       if (!target) {

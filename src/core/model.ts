@@ -205,33 +205,105 @@ export interface PlantItem {
   locked?: boolean;
   description: string;
   /**
-   * Terminal ids. Usually just the name (L, 1, NO); where two groups use the
-   * same name (R1: C NO NC | R2: C NO NC) the id is group.name (R2.C).
+   * Pin numbers, in order: what's wired. Usually as printed (L, 1, NO);
+   * where two points use the same one (R1: C NO NC | R2: C NO NC) it's kept
+   * apart as point.number (R2.C), printed C.
    */
   terminals: string[];
   /** Its power supply isn't on these drawings: a break on the left, marked POWER BY OTHERS. */
   powerByOthers?: boolean;
-  /** Named groups of terminals, e.g. ENABLE: 1 2. Shown inside the box under their terminals. */
-  groups?: PlantGroup[];
+  /** A pin's other labels, by its number: its id (C, Y1, VO) and its group (IO1, AO1). */
+  pins?: Record<string, PinInfo>;
+  /** Its signals, each made of pins (controller.md §3): what's drawn under the boxes, and how it simulates. */
+  points?: IoPoint[];
   /** More information shown under the box (model, rating, supply…). May have several lines. */
   info?: string;
 }
 
-export interface PlantGroup {
+/** A pin's labels beyond its number (controller.md §3): both optional, shown when present. */
+export interface PinInfo {
+  id?: string;
+  group?: string;
+}
+
+/**
+ * How a point works (controller.md §3), always from the device's side: an
+ * output is something the device switches, an input something it senses.
+ */
+export type PointForm =
+  | "contact"
+  | "powered-out"
+  | "dry-in"
+  | "powered-in"
+  | "analogue-in"
+  | "analogue-out"
+  | "supply-in"
+  | "supply-out"
+  | "comms";
+
+export const POINT_FORMS: { value: PointForm; label: string; hint: string }[] = [
+  { value: "contact", label: "Contact", hint: "C + NO, C + NC, or C + NO + NC: the device switches it" },
+  { value: "powered-out", label: "Powered output", hint: "Output + common: the device puts out a voltage" },
+  { value: "dry-in", label: "Dry input", hint: "Input + common: on when the loop between them is closed" },
+  { value: "powered-in", label: "Powered input", hint: "Input + common: on when there's a voltage across them" },
+  { value: "analogue-in", label: "Analogue input", hint: "Signal + common: drawn and scheduled, not simulated" },
+  { value: "analogue-out", label: "Analogue output", hint: "Signal + common: drawn and scheduled, not simulated" },
+  { value: "supply-in", label: "Supply in", hint: "Power to the device: on when it's powered" },
+  { value: "supply-out", label: "Supply out", hint: "Power from the device: a source, on its distributions" },
+  { value: "comms", label: "Comms", hint: "RS485, Modbus…: drawn and scheduled, not simulated" },
+];
+
+/** Forms the device senses. */
+export const INPUT_FORMS: PointForm[] = ["dry-in", "powered-in", "supply-in"];
+/** Forms the device switches: clicked in simulation, or following something. */
+export const OUTPUT_FORMS: PointForm[] = ["contact", "powered-out", "supply-out"];
+export const ANALOGUE_FORMS: PointForm[] = ["analogue-in", "analogue-out"];
+
+/** One signal made of pins, e.g. `Airflow proven` (C, NO) or `Mains` (L, N, PE). */
+export interface IoPoint {
+  /** Unique on its device. */
   name: string;
-  terminals: string[];
-  /**
-   * What it does when simulating. Unset: worked out from its terminals and
-   * name (C/NO/NC: a relay output; ENABLE, START…: an input; other pairs: a
-   * volt-free output).
-   */
-  role?: "input" | "output" | "none";
-  /** An output that follows one of the plant's input groups (e.g. RUNNING follows ENABLE). */
-  follows?: string;
+  form: PointForm;
+  /** Pin numbers, in the device's order. */
+  pins: string[];
+  /** Outputs: what it follows (up to two conditions). Unset: clicked by hand in simulation. */
+  follows?: Condition[];
+  /** How two conditions join. */
+  join?: "and" | "or";
   /** Seconds it takes to follow. */
   delay?: number;
-  /** Follows the opposite way (e.g. FAULT opens when ENABLE is on). */
-  invert?: boolean;
+  /** Supply out: the distribution each pin feeds, by pin number. */
+  dists?: Record<string, string>;
+}
+
+/**
+ * A plain condition (controller.md §6): a thing and a state. `ref` is an
+ * element id (a coil energised, a contact closed, a lamp lit, a switch on)
+ * or a point, `plant:<plant id>:<point name>`.
+ */
+export interface Condition {
+  ref: string;
+  on: boolean;
+}
+
+/**
+ * A statement about how the drawing should behave (controller.md §6),
+ * checked live in Simulate and exhaustively by Check logic:
+ *  - "should": an input point should be on (or off) when the conditions
+ *    hold, and the other way when they don't;
+ *  - "never": the conditions should never hold.
+ */
+export interface Expectation {
+  id: string;
+  kind: "should" | "never";
+  /** "should": the input point, `plant:<id>:<point>`. */
+  point?: string;
+  /** "should": the state it should be in when the conditions hold (on unless set). */
+  on?: boolean;
+  /** One or two conditions. */
+  when: Condition[];
+  join?: "and" | "or";
+  note?: string;
 }
 
 /** A revision cloud around what changed, on one sheet. */
@@ -321,8 +393,8 @@ export interface Project {
   conductors: Conductor[];
   revisions: Revision[];
   templates: Template[];
-  /** Logic rules the simulator checks, e.g. two contactors never on together (DESIGN.md §10). */
-  rules: LogicRule[];
+  /** What the drawing should do, checked by simulation (controller.md §6). */
+  expectations: Expectation[];
   /** Pictures kept in the project file: pasted or dropped images, the title block logo. */
   assets: Record<string, Asset>;
   /** The title block's logo, an asset id. */
@@ -343,15 +415,6 @@ export interface Asset {
   w: number;
   h: number;
   name?: string;
-}
-
-export interface LogicRule {
-  id: string;
-  /** "never-both": a and b are never energised/lit together. "never": a never is. */
-  kind: "never-both" | "never";
-  a: string;
-  b?: string;
-  note?: string;
 }
 
 export function emptyInfo(title = "Untitled project"): ProjectInfo {
@@ -397,7 +460,7 @@ export function newProject(id: string, title = "Untitled project"): Project {
     conductors: [],
     revisions: [{ rev: "A", date: "", drawnBy: "", description: "First issue", clouds: [] }],
     templates: [],
-    rules: [],
+    expectations: [],
     assets: {},
   };
 }

@@ -1,6 +1,6 @@
 # Field IO and controllers: design
 
-**Status:** agreed design (reviewed 22/11/26). Builds on [design-v0.2.md](design-v0.2.md) §8 and §9. The decisions taken in review are listed in [§11](#11-decisions-from-review).
+**Status:** agreed design (reviewed 22/11/26). Phases 1 and 2 are built (step 8a; phase 2 came with step 5); phase 3 is next (8b). Builds on [design-v0.2.md](design-v0.2.md) §8 and §9. The decisions taken in review are listed in [§11](#11-decisions-from-review).
 
 ## 1. What this is for
 

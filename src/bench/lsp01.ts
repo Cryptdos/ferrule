@@ -40,7 +40,8 @@ import { renumber } from "../core/renumber";
 import { ENCL, fitScale, gaCandidates, gaToSheet, type GaCandidate } from "../core/ga";
 import { routePage } from "../core/routing";
 import { saveSheetTemplate, stampTemplate } from "../core/templates";
-import { placePlantView } from "../core/ops";
+import { placePlantView, setExpectation } from "../core/ops";
+import { pointRef } from "../core/points";
 
 type End = [Element, string];
 
@@ -69,16 +70,30 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
   const SF2 = addPlant(p, "SF-02", "Supply fan 2, 1.73 kW, 3.48 A FLC", fanTerms);
   const EF1 = addPlant(p, "EF-01", "Extract fan 1, 1.73 kW, 3.48 A FLC", fanTerms);
   const EF2 = addPlant(p, "EF-02", "Extract fan 2, 1.73 kW, 3.48 A FLC", fanTerms);
+  // Points (controller.md §3): the airflow switch and the fire alarm's interlock are
+  // contacts clicked in Simulate; the fire alarm's monitoring inputs sense the
+  // panel's volt-free running contacts, with expectations to say what they should see.
   const dpsTerms = ["C", "NO"];
+  const dps = (tag: string, desc: string) =>
+    addPlant(p, tag, desc, dpsTerms, { points: [{ name: "Airflow proven", form: "contact", pins: ["C", "NO"] }] });
   const DPS = {
-    SF1: addPlant(p, "DPS-SF-01", "Supply airflow proving, SF-01", dpsTerms),
-    SF2: addPlant(p, "DPS-SF-02", "Supply airflow proving, SF-02", dpsTerms),
-    EF1: addPlant(p, "DPS-EF-01", "Extract airflow proving, EF-01", dpsTerms),
-    EF2: addPlant(p, "DPS-EF-02", "Extract airflow proving, EF-02", dpsTerms),
+    SF1: dps("DPS-SF-01", "Supply airflow proving, SF-01"),
+    SF2: dps("DPS-SF-02", "Supply airflow proving, SF-02"),
+    EF1: dps("DPS-EF-01", "Extract airflow proving, EF-01"),
+    EF2: dps("DPS-EF-02", "Extract airflow proving, EF-02"),
   };
-  const FA = addPlant(p, "FA", "Fire alarm system interlock (by others)", ["1", "2"]);
-  const FAM_SF = addPlant(p, "FA-SF", "Fire alarm monitoring, supply fans (by others)", ["1", "2", "3", "4"]);
-  const FAM_EF = addPlant(p, "FA-EF", "Fire alarm monitoring, extract fans (by others)", ["1", "2", "3", "4"]);
+  const FA = addPlant(p, "FA", "Fire alarm system interlock (by others)", ["1", "2"], {
+    points: [{ name: "Fire alarm", form: "contact", pins: ["1", "2"] }],
+  });
+  const monitoring = (tag: string, desc: string, a: string, b: string) =>
+    addPlant(p, tag, desc, ["1", "2", "3", "4"], {
+      points: [
+        { name: `${a} running`, form: "dry-in", pins: ["1", "2"] },
+        { name: `${b} running`, form: "dry-in", pins: ["3", "4"] },
+      ],
+    });
+  const FAM_SF = monitoring("FA-SF", "Fire alarm monitoring, supply fans (by others)", "SF-01", "SF-02");
+  const FAM_EF = monitoring("FA-EF", "Fire alarm monitoring, extract fans (by others)", "EF-01", "EF-02");
   const tag = (id: string) => `{plant:${id}.tag}`;
 
   // --- Distributions: what the busbars, arrows and the incoming supply carry ---
@@ -440,6 +455,26 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
     linkOffpage(p, at(s.page, "offpage", 78, 45).id, at(sh, "offpage", i % 2 === 0 ? 45 : 55, 44).id);
   });
   void starterSheet;
+
+  // --- Expectations (controller.md §6) -------------------------------------------
+  // The fire alarm should see each fan running exactly when its running relay is in;
+  // and a duty/standby pair is never enabled together.
+  for (const [sh, mon, a, b] of [
+    [controlsSheet, FAM_SF, "SF-01", "SF-02"],
+    [efSheet, FAM_EF, "EF-01", "EF-02"],
+  ] as const) {
+    setExpectation(p, { kind: "should", point: pointRef(mon.id, `${a} running`), when: [{ ref: at(sh, "coil", 45, 56).id, on: true }] });
+    setExpectation(p, { kind: "should", point: pointRef(mon.id, `${b} running`), when: [{ ref: at(sh, "coil", 55, 56).id, on: true }] });
+    setExpectation(p, {
+      kind: "never",
+      when: [
+        { ref: at(sh, "coil", 10, 56).id, on: true },
+        { ref: at(sh, "coil", 20, 56).id, on: true },
+      ],
+      join: "and",
+      note: "Duty and standby never run together",
+    });
+  }
 
   // ===========================================================================
   // Sheet 10: general arrangement (not to scale)

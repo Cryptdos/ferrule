@@ -28,6 +28,7 @@
   import ProjectDialog from "./ProjectDialog.svelte";
   import PlantDialog from "./PlantDialog.svelte";
   import DistributionDialog from "./DistributionDialog.svelte";
+  import ExpectationsDialog from "./ExpectationsDialog.svelte";
   import ChecksDialog from "./ChecksDialog.svelte";
   import RenumberDialog from "./RenumberDialog.svelte";
   import SchedulesDialog from "./SchedulesDialog.svelte";
@@ -94,7 +95,7 @@
   });
   let showProject = $state(false);
   /** Open windows: they don't block the drawing, and several can be open at once. */
-  type DialogName = "plant" | "distribution" | "checks" | "schedules" | "templates" | "renumber" | "devices" | "settings" | "place";
+  type DialogName = "expectations" | "plant" | "distribution" | "checks" | "schedules" | "templates" | "renumber" | "devices" | "settings" | "place";
   let open: Partial<Record<DialogName, boolean>> = $state({});
   /** Export PDF failed: what went wrong, with the Print way round it. */
   let pdfError = $state("");
@@ -388,7 +389,8 @@
       {/if}
       {#if editor.mode === "simulate"}
         <span class="sep"></span>
-        <span class="simnote">Simulating: click switches and buttons on the drawing; double-click to follow a link. Editing is off.</span>
+        <span class="simnote">Simulating: click switches, buttons and plant outputs on the drawing; double-click to follow a link. Editing is off.</span>
+        <button onclick={() => (open.expectations = true)} title="What the drawing should do: checked live, and by Check logic">Expectations…</button>
       {:else if editor.mode === "draft"}
         <span class="sep"></span>
         <button onclick={doRenumber} title="See what Renumber would change to tags, terminal and wire numbers, then apply">Renumber</button>
@@ -396,6 +398,7 @@
         <button onclick={() => (open.plant = true)} title="Field equipment: define plant and place views">Plant</button>
         <button onclick={() => (open.distribution = true)} title="The supplies busbars, link arrows and the incoming supply pick from">Distribution</button>
         <button onclick={() => (open.checks = true)} title="Check the drawing for problems">Check</button>
+        <button onclick={() => (open.expectations = true)} title="What the drawing should do: checked live in Simulate, and by Check logic">Expectations…</button>
         <button onclick={() => (open.schedules = true)} title="Terminal and cable schedules">Schedules</button>
       {:else if editor.mode === "ga"}
         <span class="sep"></span>
@@ -440,7 +443,7 @@
       {/if}
       <Browser {editor} bind:width={browserWidth} onplace={() => (open.place = true)} />
       {#if sim}
-        <FloatBox title="Simulation" store="sim"><SimPanel {editor} {sim} /></FloatBox>
+        <FloatBox title="Simulation" store="sim"><SimPanel {editor} {sim} onexpectations={() => (open.expectations = true)} /></FloatBox>
       {:else if editor.mode === "ga"}
         {#if gaSelected || editor.sheetSettings}
           <FloatBox title={gaSelected ? "Properties" : "Sheet"} store="props" onclose={closeProps}>
@@ -489,7 +492,10 @@
   <DistributionDialog {editor} onclose={() => (open.distribution = false)} />
 {/if}
 {#if open.plant}
-  <PlantDialog {editor} onclose={() => (open.plant = false)} />
+  <PlantDialog {editor} onclose={() => (open.plant = false)} onexpectations={() => (open.expectations = true)} />
+{/if}
+{#if open.expectations}
+  <ExpectationsDialog {editor} onclose={() => (open.expectations = false)} />
 {/if}
 {#if open.renumber}
   <RenumberDialog {editor} onclose={() => (open.renumber = false)} />

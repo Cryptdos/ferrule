@@ -13,7 +13,10 @@ import {
   type Page,
   type ParamValue,
   type PlantItem,
-  type PlantGroup,
+  type IoPoint,
+  type PinInfo,
+  type Expectation,
+  type Condition,
   type Asset,
   type DoorLeaf,
   type GaDim,
@@ -26,7 +29,8 @@ import {
   type TerminalRef,
   newId,
 } from "./model";
-import { benchOf, defaultParams, formatPoints, getSymbol, partPoints, plantTerminalName, poleMates, requireSymbol, terminalPoint } from "./symbols";
+import { benchOf, defaultParams, formatPoints, getSymbol, partPoints, poleMates, requireSymbol, terminalPoint } from "./symbols";
+import { cleanPoints, formatQuickEntry, mergePoints, isInputForm, missingRefs, parseQuickEntry, pointOfPin, printedPin } from "./points";
 import { isOrthogonal, routeOf, simplifyRoute } from "./wires";
 import { isMaster, isSlave, locate } from "./xref";
 import { colourCode, knownColour, lampColour } from "./wirecolours";
@@ -771,59 +775,37 @@ export function getPlant(project: Project, id: string): PlantItem {
 const cleanTerminals = (list: string[]) => [...new Set(list.map((t) => t.trim()).filter(Boolean))];
 
 /**
- * Terminals written with their groups: "L N E | ENABLE: 1 2 | 0-10V: 3 4".
- * Runs are separated by "|"; a run may start with a group name and a colon.
+ * What a plant view needs to draw its boxes, copied from its plant item:
+ * per pin its number as printed, its id, and the label under its run (its
+ * group, else its point's name). JSON: [[pin, printed, id, label], …].
  */
-export function parseTerminalSpec(spec: string): { terminals: string[]; groups: PlantGroup[] } {
-  const runs = spec.split("|").map((run) => {
-    const i = run.indexOf(":");
-    return {
-      name: i >= 0 ? run.slice(0, i).trim() : "",
-      terms: cleanTerminals((i >= 0 ? run.slice(i + 1) : run).split(/[,\s]+/)),
-    };
-  });
-  // A name used in more than one group (C, NO, NC on two relays) is told apart by its group: R2.C.
-  const count = new Map<string, number>();
-  for (const r of runs) for (const t of r.terms) count.set(t, (count.get(t) ?? 0) + 1);
-  const terminals: string[] = [];
-  const groups: PlantGroup[] = [];
-  for (const r of runs) {
-    const ids = r.terms
-      .map((t) => ((count.get(t) ?? 0) > 1 && r.name ? `${r.name}.${t}` : t))
-      .filter((id) => !terminals.includes(id));
-    terminals.push(...ids);
-    if (r.name && ids.length) {
-      const g = groups.find((x) => x.name === r.name);
-      if (g) g.terminals.push(...ids);
-      else groups.push({ name: r.name, terminals: ids });
-    }
-  }
-  return { terminals, groups };
+export function plantPinsParam(item: PlantItem): string {
+  const pointOf = pointOfPin(item);
+  return JSON.stringify(
+    item.terminals.map((t) => {
+      const point = pointOf.get(t) ?? "";
+      const info = item.pins?.[t];
+      return [t, printedPin(t, point), info?.id ?? "", info?.group || point];
+    }),
+  );
 }
 
-export { plantTerminalName };
+/** Kept for callers of the old name: quick entry, "L N E | ENABLE: 1 2 | R1: C NO NC". */
+export const parseTerminalSpec = parseQuickEntry;
+export const formatTerminalSpec = formatQuickEntry;
 
-/** The other way: a plant item's terminals and groups as one line. */
-export function formatTerminalSpec(item: Pick<PlantItem, "terminals" | "groups">): string {
-  const groupOf = new Map<string, string>();
-  for (const g of item.groups ?? []) for (const t of g.terminals) groupOf.set(t, g.name);
-  const runs: { name: string; terms: string[] }[] = [];
-  for (const t of item.terminals) {
-    const name = groupOf.get(t) ?? "";
-    const shown = plantTerminalName(t, name);
-    const last = runs[runs.length - 1];
-    if (last && last.name === name) last.terms.push(shown);
-    else runs.push({ name, terms: [shown] });
+/** Pin labels only for pins the device has, and not empty. */
+function cleanPins(pins: Record<string, PinInfo> | undefined, terminals: string[]): Record<string, PinInfo> | undefined {
+  if (!pins) return undefined;
+  const out: Record<string, PinInfo> = {};
+  for (const t of terminals) {
+    const p = pins[t];
+    if (!p) continue;
+    const id = p.id?.trim();
+    const group = p.group?.trim();
+    if (id || group) out[t] = { ...(id ? { id } : {}), ...(group ? { group } : {}) };
   }
-  return runs.map((r) => (r.name ? `${r.name}: ${r.terms.join(" ")}` : r.terms.join(" "))).join(" | ");
-}
-
-/** Groups that only mention terminals the item has, and not empty. Anything else a group carries is kept. */
-function cleanGroups(groups: PlantGroup[], terminals: string[]): PlantGroup[] {
-  const have = new Set(terminals);
-  return groups
-    .map((g) => ({ ...g, name: g.name.trim(), terminals: cleanTerminals(g.terminals).filter((t) => have.has(t)) }))
-    .filter((g) => g.name && g.terminals.length);
+  return Object.keys(out).length ? out : undefined;
 }
 
 /** The letters a tag starts with: SF-01 → SF, U3-13 → U. */
@@ -846,7 +828,7 @@ export function addPlant(
   tag: string,
   description = "",
   terminals: string[] = [],
-  more: { groups?: PlantGroup[]; info?: string; prefix?: string; powerByOthers?: boolean } = {},
+  more: { points?: IoPoint[]; pins?: Record<string, PinInfo>; info?: string; prefix?: string; powerByOthers?: boolean } = {},
 ): PlantItem {
   const t = tag.trim();
   const prefix = (more.prefix?.trim() || prefixOf(t) || "U").toUpperCase();
@@ -855,8 +837,10 @@ export function addPlant(
   const item: PlantItem = { id: newId("p"), tag: t, prefix, description: description.trim(), terminals: terms };
   // A tag typed in is kept; otherwise Renumber gives it one from where its first view is.
   if (t && more.prefix === undefined) item.locked = true;
-  const groups = cleanGroups(more.groups ?? [], terms);
-  if (groups.length) item.groups = groups;
+  const points = cleanPoints(more.points ?? [], terms);
+  if (points.length) item.points = points;
+  const pins = cleanPins(more.pins, terms);
+  if (pins) item.pins = pins;
   if (more.info?.trim()) item.info = more.info.trim();
   if (more.powerByOthers) item.powerByOthers = true;
   project.plant.push(item);
@@ -871,7 +855,8 @@ export function updatePlant(
     prefix?: string;
     description?: string;
     terminals?: string[];
-    groups?: PlantGroup[];
+    points?: IoPoint[];
+    pins?: Record<string, PinInfo>;
     info?: string;
     powerByOthers?: boolean;
   },
@@ -907,36 +892,169 @@ export function updatePlant(
     if (patch.info.trim()) item.info = patch.info.trim();
     else delete item.info;
   }
-  const groups = cleanGroups(patch.groups ?? item.groups ?? [], item.terminals);
-  if (groups.length) item.groups = groups;
-  else delete item.groups;
+  const before = item.points ?? [];
+  const points = cleanPoints(patch.points ?? before, item.terminals);
+  if (points.length) item.points = points;
+  else delete item.points;
+  const pins = cleanPins(patch.pins ?? item.pins, item.terminals);
+  if (pins) item.pins = pins;
+  else delete item.pins;
+  // A point renamed or gone: expectations and conditions that named it by name follow, or are left to Check.
+  for (const old of before) {
+    if (points.some((p) => p.name === old.name)) continue;
+    const renamed = points.find((p) => !before.some((b) => b.name === p.name) && p.pins.join() === old.pins.join());
+    if (renamed) renamePointRefs(project, item.id, old.name, renamed.name);
+  }
   syncPlantViews(project);
 }
 
-/** How a plant group behaves when simulating: role, what it follows, delay, inverted. */
-export function updatePlantGroup(
+/** Point refs that named plant:<id>:<old> now name plant:<id>:<new>. */
+function renamePointRefs(project: Project, plantId: string, from: string, to: string): void {
+  const a = `plant:${plantId}:${from}`;
+  const b = `plant:${plantId}:${to}`;
+  const fix = (cs: Condition[] | undefined) => cs?.forEach((c) => c.ref === a && (c.ref = b));
+  for (const e of project.expectations) {
+    if (e.point === a) e.point = b;
+    fix(e.when);
+  }
+  for (const it of project.plant) for (const p of it.points ?? []) fix(p.follows);
+}
+
+/** Quick entry edited: pins and points from one line, keeping what unchanged points had. */
+export function setQuickEntry(project: Project, plantId: string, spec: string): void {
+  const item = getPlant(project, plantId);
+  const v = parseQuickEntry(spec);
+  updatePlant(project, plantId, { terminals: v.terminals, points: mergePoints(item.points ?? [], v.points) });
+}
+
+/** Change one point's form or behaviour: what it follows, its delay, its distributions. */
+export function updatePoint(
   project: Project,
   plantId: string,
-  group: string,
-  patch: { role?: PlantGroup["role"] | null; follows?: string | null; delay?: number; invert?: boolean },
+  point: string,
+  patch: {
+    name?: string;
+    form?: IoPoint["form"];
+    follows?: Condition[] | null;
+    join?: "and" | "or";
+    delay?: number;
+    dists?: Record<string, string>;
+  },
 ): void {
-  const g = getPlant(project, plantId).groups?.find((x) => x.name === group);
-  if (!g) throw new OpError(`No group ${group}`);
-  if (patch.role !== undefined) {
-    if (patch.role) g.role = patch.role;
-    else delete g.role;
+  const item = getPlant(project, plantId);
+  const p = item.points?.find((x) => x.name === point);
+  if (!p) throw new OpError(`${item.tag || "That plant"} has no point ${point}`);
+  if (patch.name !== undefined) {
+    const n = patch.name.trim();
+    if (!n) throw new OpError("A point needs a name");
+    if (n !== p.name && item.points!.some((x) => x.name === n)) throw new OpError(`There's already a point ${n}`);
+    if (n !== p.name) {
+      renamePointRefs(project, plantId, p.name, n);
+      p.name = n;
+    }
   }
+  if (patch.form) p.form = patch.form;
   if (patch.follows !== undefined) {
-    if (patch.follows) g.follows = patch.follows;
-    else delete g.follows;
+    const list = (patch.follows ?? []).filter((c) => c.ref).slice(0, 2);
+    if (list.length) p.follows = list;
+    else delete p.follows;
   }
+  if (patch.join) p.join = patch.join;
   if (patch.delay !== undefined) {
-    if (patch.delay > 0) g.delay = patch.delay;
-    else delete g.delay;
+    if (patch.delay > 0) p.delay = patch.delay;
+    else delete p.delay;
   }
-  if (patch.invert !== undefined) {
-    if (patch.invert) g.invert = true;
-    else delete g.invert;
+  if (patch.dists !== undefined) p.dists = patch.dists;
+  updatePlant(project, plantId, {});
+}
+
+/** One pin's number, id, group or point, as edited in the pins table. */
+export function updatePin(
+  project: Project,
+  plantId: string,
+  pin: string,
+  patch: { number?: string; id?: string; group?: string; point?: string },
+): void {
+  const item = getPlant(project, plantId);
+  if (!item.terminals.includes(pin)) throw new OpError(`No pin ${pin}`);
+  let key = pin;
+  if (patch.number !== undefined) {
+    const n = patch.number.trim();
+    if (!n) throw new OpError("A pin needs a number");
+    if (n !== pin) {
+      if (item.terminals.includes(n)) throw new OpError(`There's already a pin ${n}`);
+      renamePin(project, item, pin, n);
+      key = n;
+    }
+  }
+  if (patch.id !== undefined || patch.group !== undefined) {
+    const pins = { ...(item.pins ?? {}) };
+    const cur = { ...(pins[key] ?? {}) };
+    if (patch.id !== undefined) cur.id = patch.id;
+    if (patch.group !== undefined) cur.group = patch.group;
+    pins[key] = cur;
+    item.pins = pins;
+  }
+  if (patch.point !== undefined) {
+    const name = patch.point.trim();
+    const points = (item.points ?? []).map((p) => ({ ...p, pins: p.pins.filter((t) => t !== key) }));
+    if (name) {
+      const p = points.find((x) => x.name === name);
+      if (p) p.pins = item.terminals.filter((t) => t === key || p.pins.includes(t));
+      else points.push({ name, form: "contact", pins: [key] });
+    }
+    item.points = points;
+  }
+  updatePlant(project, plantId, {});
+}
+
+/** Add a pin at the end, or after a given one. */
+export function addPin(project: Project, plantId: string, number: string, after?: string): void {
+  const item = getPlant(project, plantId);
+  const n = number.trim();
+  if (!n) throw new OpError("A pin needs a number");
+  if (item.terminals.includes(n)) throw new OpError(`There's already a pin ${n}`);
+  const terms = [...item.terminals];
+  const i = after ? terms.indexOf(after) : -1;
+  terms.splice(i >= 0 ? i + 1 : terms.length, 0, n);
+  updatePlant(project, plantId, { terminals: terms });
+}
+
+export function deletePin(project: Project, plantId: string, pin: string): void {
+  const item = getPlant(project, plantId);
+  updatePlant(project, plantId, { terminals: item.terminals.filter((t) => t !== pin) });
+}
+
+/** A pin renumbered: its points, labels, views and wires follow. */
+function renamePin(project: Project, item: PlantItem, from: string, to: string): void {
+  item.terminals = item.terminals.map((t) => (t === from ? to : t));
+  for (const p of item.points ?? []) {
+    p.pins = p.pins.map((t) => (t === from ? to : t));
+    if (p.dists?.[from]) {
+      p.dists[to] = p.dists[from]!;
+      delete p.dists[from];
+    }
+  }
+  if (item.pins?.[from]) {
+    item.pins[to] = item.pins[from]!;
+    delete item.pins[from];
+  }
+  for (const page of project.pages) {
+    const views = new Set(page.elements.filter((e) => e.symbol === "plant-view" && e.params.plant === item.id).map((e) => e.id));
+    if (!views.size) continue;
+    for (const e of page.elements) {
+      if (!views.has(e.id)) continue;
+      e.params.show = String(e.params.show ?? "").split(",").map((t) => (t === from ? to : t)).join(",");
+    }
+    for (const sg of page.segments) {
+      for (const r of [sg.from, sg.to]) if (views.has(r[0]) && r[1] === from) r[1] = to;
+    }
+  }
+  for (const c of project.conductors) {
+    for (const r of c.terminals) {
+      if (r[1] !== from) continue;
+      if (project.pages.some((pg) => pg.elements.some((e) => e.id === r[0] && e.symbol === "plant-view" && e.params.plant === item.id))) r[1] = to;
+    }
   }
 }
 
@@ -972,7 +1090,7 @@ export function setPlantViewTerminals(project: Project, pageId: string, elId: st
 
 /** Copy plant data into its views (they draw from their own params) and drop wires on terminals that went away. */
 /** Settings that belong to plant views only; any other part carrying them picked them up by mistake. */
-export const PLANT_VIEW_KEYS = ["plant", "show", "terms", "pdesc", "pinfo", "pgroups", "pbo"];
+export const PLANT_VIEW_KEYS = ["plant", "show", "terms", "pdesc", "pinfo", "ppins", "pgroups", "pbo"];
 
 export function syncPlantViews(project: Project): void {
   for (const page of project.pages) {
@@ -985,7 +1103,8 @@ export function syncPlantViews(project: Project): void {
       el.params.show = show.join(",");
       el.params.pdesc = item?.description ?? "";
       el.params.pinfo = item?.info ?? "";
-      el.params.pgroups = (item?.groups ?? []).map((g) => `${g.name}=${g.terminals.join(",")}`).join(";");
+      el.params.ppins = item ? plantPinsParam(item) : "[]";
+      delete el.params.pgroups;
       el.params.pbo = item?.powerByOthers === true;
       const keep = new Set(show);
       page.segments = page.segments.filter(
@@ -1153,19 +1272,38 @@ export function cloudsOn(project: Project, pageId: string): { id: string; rect: 
 }
 
 // ---------------------------------------------------------------------------
-// Logic rules (simulation)
+// Expectations (controller.md §6)
 
-export function addRule(project: Project, kind: "never-both" | "never", a: string, b?: string, note = ""): string {
-  const exists = (id: string) => project.pages.some((pg) => pg.elements.some((e) => e.id === id));
-  if (!exists(a) || (kind === "never-both" && (!b || !exists(b)))) throw new OpError("Pick the coils or lamps the rule is about");
-  if (kind === "never-both" && a === b) throw new OpError("Pick two different items");
-  const id = newId("r");
-  project.rules.push({ id, kind, a, ...(kind === "never-both" ? { b } : {}), ...(note ? { note } : {}) });
-  return id;
+/** Add or replace an expectation. "should" needs an input point; both need one or two conditions. */
+export function setExpectation(project: Project, e: Omit<Expectation, "id"> & { id?: string }): string {
+  const when = (e.when ?? []).filter((c) => c.ref).slice(0, 2).map((c) => ({ ref: c.ref, on: c.on !== false }));
+  if (!when.length) throw new OpError("Say when: pick what it depends on");
+  if (e.kind === "should") {
+    if (!e.point) throw new OpError("Pick the input it's about");
+    const r = /^plant:([^:]+):(.+)$/.exec(e.point);
+    const item = r && project.plant.find((p) => p.id === r[1]);
+    const point = item?.points?.find((p) => p.name === r![2]);
+    if (!point) throw new OpError("Pick the input it's about");
+    if (!isInputForm(point.form)) throw new OpError(`${point.name} isn't an input: "should be … when …" is for inputs. Use "Never …" for anything else`);
+  }
+  const next: Expectation = {
+    id: e.id ?? newId("x"),
+    kind: e.kind === "never" ? "never" : "should",
+    ...(e.kind === "should" ? { point: e.point, ...(e.on === false ? { on: false } : {}) } : {}),
+    when,
+    ...(when.length > 1 ? { join: e.join === "or" ? "or" : "and" } : {}),
+    ...(e.note?.trim() ? { note: e.note.trim() } : {}),
+  };
+  const missing = missingRefs(project, next);
+  if (missing.length) throw new OpError("It names something that isn't on the drawing");
+  const i = project.expectations.findIndex((x) => x.id === next.id);
+  if (i >= 0) project.expectations[i] = next;
+  else project.expectations.push(next);
+  return next.id;
 }
 
-export function deleteRule(project: Project, id: string): void {
-  project.rules = project.rules.filter((r) => r.id !== id);
+export function deleteExpectation(project: Project, id: string): void {
+  project.expectations = project.expectations.filter((x) => x.id !== id);
 }
 
 // ---------------------------------------------------------------------------

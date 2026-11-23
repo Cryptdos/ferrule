@@ -45,12 +45,13 @@ An open editor tab follows changes Claude makes: it reloads the project and says
 | `label_wire` | A wire's number, core colour (IEC 60757, e.g. Bu) and function (e.g. 0V), printed along it |
 | `link` | Contact → coil, or pair off-page arrows |
 | `add_distribution` | The project's distributions (L1, N, CCT, 0V…): busbars, link arrows and the incoming supply pick one with `params.dist` (supply: `dist_<terminal>`) |
-| `add_plant`, `place_plant_view` | Field equipment (prefix or fixed tag, terminals, named terminal groups, information lines, power by others) and its views |
+| `add_plant`, `place_plant_view` | Field equipment (prefix or fixed tag, pins and points by quick entry or in full: forms, what outputs follow, supply out distributions, pin ids and groups; information lines, power by others) and its views |
 | `add_section` | Labelled section boxes |
 | `save_template`, `apply_template` | Templates and stamping for other plant |
 | `renumber`, `check`, `schedules` | Tags and wire numbers, rule checks, terminal/cable schedules |
-| `simulate` | Run the relay logic through a sequence of actions; reports coils energised and lamps lit after each |
-| `check_logic` | Search for any sequence that breaks a rule (e.g. two contactors on together), or shorts the supply |
+| `simulate` | Run the relay logic through a sequence of actions (switches, push buttons, plant outputs, waiting); reports coils energised, lamps lit, plant points on and expectations broken after each |
+| `set_expectation` | List, add, replace or delete expectations: "should be on/off when …" for plant inputs, "never …" for anything |
+| `check_logic` | Search for any sequence that breaks an expectation (e.g. two contactors on together), shorts the supply or makes relays chatter |
 | `export_pdf` | Saves the A4 PDF into an `exports` folder beside `projects` |
 
 Coordinates are grid units: x 0–150 across (2 per column, 75 columns), y 0–90 down. Sheets are referred to by number, elements and wires by id.

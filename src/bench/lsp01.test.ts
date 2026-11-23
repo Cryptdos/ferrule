@@ -145,7 +145,8 @@ describe("LSP-01 simulation (criterion 5)", async () => {
     throw new Error(tag);
   };
   const c = compile(p);
-  const fa = plantView("FA");
+  void plantView;
+  const faPoint = `plant:${p.plant.find((x) => x.tag === "FA")!.id}:Fire alarm`;
   const fr = find(7, "FIRE ALARM RELAY");
   const healthy = find(7, "CONTROL CCT HEALTHY");
   const en1 = find(8, "SF-01 ENABLE");
@@ -180,7 +181,7 @@ describe("LSP-01 simulation (criterion 5)", async () => {
   });
 
   test("fire alarm starts the duty fan through its starter sheet, and the running relay comes back", () => {
-    let s = toggle(c, initialState(c), fa.id);
+    let s = toggle(c, initialState(c), faPoint);
     expect(s.energised[fr.id]).toBe(true);
     // Duty selector in position 1 (11–12): SF-02 is duty as drawn.
     expect(s.energised[en2.id]).toBe(true);
@@ -195,8 +196,9 @@ describe("LSP-01 simulation (criterion 5)", async () => {
   });
 
   test("proven airflow stops the fail timer; unproven trips the fans after 10 s", () => {
-    let s = toggle(c, initialState(c), fa.id);
-    const proven = toggle(c, s, plantView("DPS-SF-02").id);
+    let s = toggle(c, initialState(c), faPoint);
+    const dps = p.plant.find((x) => x.tag === "DPS-SF-02")!;
+    const proven = toggle(c, s, `plant:${dps.id}:Airflow proven`);
     expect(advance(c, proven, 30).energised[ff.id]).toBe(false);
     s = advance(c, s, 9);
     expect(s.energised[ff.id]).toBe(false);
@@ -218,11 +220,19 @@ describe("LSP-01 simulation (criterion 5)", async () => {
     expect(s.energised[k2.id]).toBe(true);
   });
 
-  test("rule search: the two supply fans are never enabled together", () => {
-    const r = search(c, initialState(c), [{ id: "duty", kind: "never-both", a: k1.id, b: k2.id }]);
+  test("check logic: the two supply fans are never on together", () => {
+    const r = search(c, initialState(c), [{ id: "duty", kind: "never", when: [{ ref: k1.id, on: true }, { ref: k2.id, on: true }], join: "and" }]);
     // Every sequence tried (only the inputs that can affect these contactors are searched).
     expect(r.truncated).toBe(false);
     expect(r.violations).toEqual([]);
     expect(r.faults).toEqual([]);
   });
+
+  test("the example's own expectations hold: monitoring sees the running relays, duty and standby never together", () => {
+    expect(p.expectations).toHaveLength(6);
+    // Each sheet's are searched apart (their inputs don't overlap), and in full.
+    const r = search(c, initialState(c), p.expectations);
+    expect(r.truncated).toBe(false);
+    expect(r.violations).toEqual([]);
+  }, 30000);
 });

@@ -1421,8 +1421,20 @@ const SYMBOLS: SymbolDef[] = [
           role: "term",
           vertical: true,
         });
+        // A pin's id (C, Y1, VO) in its own box under its number.
+        if (lay.idH && t.pinId) {
+          prims.push(rect(t.x - half, lay.termH, PLANT.pitch, lay.idH), {
+            t: "text",
+            at: [t.x + DETAIL * CAP_HEIGHT * 0.5, lay.termH + lay.idH / 2],
+            text: t.pinId,
+            size: DETAIL,
+            anchor: "middle",
+            role: "note",
+            vertical: true,
+          });
+        }
       }
-      for (const g of lay.groups) prims.push(text((g.x0 + g.x1) / 2, lay.termH + 1.9, g.name, PLANT.group, "middle", "note"));
+      for (const g of lay.groups) prims.push(text((g.x0 + g.x1) / 2, lay.termH + lay.idH + 1.9, g.name, PLANT.group, "middle", "note"));
       // Tag, description and information under the box: centred under a box
       // wider than they are, otherwise left-aligned from its left edge.
       const lines: [string, number, TextRole][] = [["{tag}", TAG, "tag"]];
@@ -1849,20 +1861,17 @@ export function isolatorAux(el: Element): { a: string; b: string; nc: boolean }[
   return out;
 }
 
-/** Terminal groups of a plant view's params: "ENABLE=1,2;0-10V=3,4". */
-export function parsePlantGroups(s: string): { name: string; terminals: string[] }[] {
-  return s
-    .split(";")
-    .map((g) => {
-      const i = g.indexOf("=");
-      return i < 0 ? null : { name: g.slice(0, i).trim(), terminals: g.slice(i + 1).split(",").filter(Boolean) };
-    })
-    .filter((g): g is { name: string; terminals: string[] } => !!g && !!g.name);
-}
-
-/** A plant terminal's name as printed: its id without any group qualifier (R2.C → C). */
-export function plantTerminalName(id: string, group?: string): string {
-  return group && id.startsWith(`${group}.`) ? id.slice(group.length + 1) : id;
+/** A plant view's pins as its params carry them (ops.ts plantPinsParam): number, as printed, id, label under its run. */
+export function parsePlantPins(s: string): { pin: string; printed: string; id: string; label: string }[] {
+  try {
+    const v = JSON.parse(s || "[]");
+    if (!Array.isArray(v)) return [];
+    return v
+      .filter((r): r is string[] => Array.isArray(r) && typeof r[0] === "string")
+      .map((r) => ({ pin: r[0]!, printed: String(r[1] ?? r[0]), id: String(r[2] ?? ""), label: String(r[3] ?? "") }));
+  } catch {
+    return [];
+  }
 }
 
 /** Plant view sizes, grid units. */
@@ -1873,6 +1882,8 @@ export const PLANT = {
   termH: 3,
   /** Room under the boxes for the group names. */
   below: 3,
+  /** Pin ids, in a row of boxes under the numbers, as tall as their longest id. */
+  idH: 3,
   /** Group names, in capitals. */
   group: textUnits("tag"),
 };
@@ -1884,30 +1895,31 @@ export const PLANT = {
  * terminals need.
  */
 export function plantViewLayout(el: Element): {
-  terms: { id: string; name: string; x: number }[];
+  terms: { id: string; name: string; pinId: string; x: number }[];
   groups: { name: string; x0: number; x1: number }[];
   left: number;
   right: number;
   h: number;
+  /** Height of the number boxes; the id boxes (if any) run from there to termH + idH. */
   termH: number;
+  idH: number;
   partial: boolean;
 } {
   const all = str(el, "terms", "").split(",").filter(Boolean);
   const showSet = new Set(str(el, "show", "").split(",").filter(Boolean));
   const shown = all.filter((t) => showSet.has(t));
-  const groupOf = new Map<string, string>();
-  for (const g of parsePlantGroups(str(el, "pgroups", ""))) for (const t of g.terminals) groupOf.set(t, g.name);
-  // Runs of shown terminals in the same group.
+  const info = new Map(parsePlantPins(str(el, "ppins", "")).map((p) => [p.pin, p]));
+  // Runs of shown pins under the same label (their group, else their point).
   const runs: { name: string; terms: string[] }[] = [];
   for (const t of shown) {
-    const name = groupOf.get(t) ?? "";
+    const name = info.get(t)?.label ?? "";
     const last = runs[runs.length - 1];
     if (last && last.name === name) last.terms.push(t);
     else runs.push({ name, terms: [t] });
   }
   const textW = (name: string) => (name ? textWidth(name, PLANT.group) : 0);
   const P = PLANT.pitch;
-  const terms: { id: string; name: string; x: number }[] = [];
+  const terms: { id: string; name: string; pinId: string; x: number }[] = [];
   const groups: { name: string; x0: number; x1: number }[] = [];
   let prevRight = -Infinity; // right edge of whatever the previous run drew (boxes or name)
   for (const [i, r] of runs.entries()) {
@@ -1917,7 +1929,7 @@ export function plantViewLayout(el: Element): {
     let x0 = 0;
     if (i > 0) x0 = Math.ceil(prevRight + 1.5 + half - span / 2);
     const centre = x0 + span / 2;
-    r.terms.forEach((t, j) => terms.push({ id: t, name: plantTerminalName(t, r.name), x: x0 + j * P }));
+    r.terms.forEach((t, j) => terms.push({ id: t, name: info.get(t)?.printed ?? t, pinId: info.get(t)?.id ?? "", x: x0 + j * P }));
     if (r.name) groups.push({ name: r.name.toUpperCase(), x0, x1: x0 + span });
     prevRight = centre + half;
   }
@@ -1926,9 +1938,11 @@ export function plantViewLayout(el: Element): {
   const left = Math.min(-1.5, ...groups.map((g) => nameEdge(g, -1) - 1));
   const right = Math.max(lastX + 1.5, left + 6, ...groups.map((g) => nameEdge(g, 1) + 1));
   // Boxes tall enough for the longest name written up them, in half-unit steps.
-  const longest = Math.max(0, ...terms.map((t) => textWidth(t.name, DETAIL)));
-  const termH = Math.max(PLANT.termH, Math.ceil((longest + 0.4) * 2) / 2);
-  return { terms, groups, left, right, h: termH + PLANT.below, termH, partial: shown.length < all.length };
+  const tall = (names: string[], min: number) => Math.max(min, Math.ceil((Math.max(0, ...names.map((n) => textWidth(n, DETAIL))) + 0.4) * 2) / 2);
+  const termH = tall(terms.map((t) => t.name), PLANT.termH);
+  const ids = terms.map((t) => t.pinId).filter(Boolean);
+  const idH = ids.length ? tall(ids, PLANT.idH) : 0;
+  return { terms, groups, left, right, h: termH + idH + PLANT.below, termH, idH, partial: shown.length < all.length };
 }
 
 /** Does a parameter apply to this element as it's set now? */

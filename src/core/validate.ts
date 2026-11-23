@@ -7,7 +7,7 @@
 import { PLANT_VIEW_KEYS } from "./ops";
 import { parseProjectDevices } from "./devices";
 import { AREA_UNITS } from "./geometry";
-import { DISTRIBUTION_KINDS, type DistributionKind, FORMAT, FORMAT_VERSION, type GaDim, type GaDimPoint, type GaItem, type Page, type Project, emptyInfo } from "./model";
+import { DISTRIBUTION_KINDS, type DistributionKind, POINT_FORMS, type Condition, type Expectation, type IoPoint, type PinInfo, type PointForm, FORMAT, FORMAT_VERSION, type GaDim, type GaDimPoint, type GaItem, type Page, type Project, emptyInfo } from "./model";
 import { defaultParams, getSymbol } from "./symbols";
 import { gaToSheet } from "./ga";
 import { colourCode, knownColour } from "./wirecolours";
@@ -75,7 +75,7 @@ export function parseProject(input: unknown): Project {
           .map((c) => ({ id: typeof c.id === "string" ? c.id : `cl_${Math.random().toString(36).slice(2, 9)}`, pageId: c.pageId as string, rect: c.rect as [number, number, number, number] })),
       })),
     templates: [],
-    rules: [],
+    expectations: [],
   };
 
   arr(input.pages).forEach((pg, i) => {
@@ -88,16 +88,7 @@ export function parseProject(input: unknown): Project {
     .filter((t) => typeof t.id === "string")
     .map((t, i) => parseTemplate(t, i));
 
-  project.rules = arr(input.rules)
-    .filter(isObj)
-    .filter((r) => typeof r.id === "string" && typeof r.a === "string")
-    .map((r) => ({
-      id: r.id as string,
-      kind: r.kind === "never" ? ("never" as const) : ("never-both" as const),
-      a: r.a as string,
-      ...(typeof r.b === "string" ? { b: r.b } : {}),
-      ...(typeof r.note === "string" ? { note: r.note } : {}),
-    }));
+  project.expectations = parseExpectations(input.expectations);
   project.assets = parseAssets(input.assets);
   for (const pg of project.pages) {
     for (const el of pg.elements) {
@@ -192,23 +183,76 @@ export function parsePlant(v: unknown): Project["plant"] {
       ...(pl.powerByOthers === true ? { powerByOthers: true } : {}),
       description: strOr(pl.description),
       terminals: arr(pl.terminals).filter((t): t is string => typeof t === "string"),
-      ...(Array.isArray(pl.groups)
-        ? {
-            groups: arr(pl.groups)
-              .filter(isObj)
-              .map((g) => ({
-                name: strOr(g.name),
-                terminals: arr(g.terminals).filter((t): t is string => typeof t === "string"),
-                ...(g.role === "input" || g.role === "output" || g.role === "none" ? { role: g.role as "input" | "output" | "none" } : {}),
-                ...(typeof g.follows === "string" && g.follows ? { follows: g.follows } : {}),
-                ...(typeof g.delay === "number" && g.delay > 0 ? { delay: g.delay } : {}),
-                ...(g.invert === true ? { invert: true } : {}),
-              }))
-              .filter((g) => g.name && g.terminals.length),
-          }
-        : {}),
+      ...parsePoints(pl.points, pl.pins),
       ...(typeof pl.info === "string" && pl.info ? { info: pl.info } : {}),
     }));
+}
+
+const FORMS = new Set(POINT_FORMS.map((f) => f.value));
+
+function parseConditions(v: unknown): Condition[] {
+  return arr(v)
+    .filter(isObj)
+    .filter((c) => typeof c.ref === "string" && c.ref)
+    .slice(0, 2)
+    .map((c) => ({ ref: c.ref as string, on: c.on !== false }));
+}
+
+function parsePoints(points: unknown, pins: unknown): { points?: IoPoint[]; pins?: Record<string, PinInfo> } {
+  const out: { points?: IoPoint[]; pins?: Record<string, PinInfo> } = {};
+  const list = arr(points)
+    .filter(isObj)
+    .filter((p) => typeof p.name === "string" && p.name)
+    .map((p) => {
+      const follows = parseConditions(p.follows);
+      const dists = isObj(p.dists)
+        ? (Object.fromEntries(Object.entries(p.dists).filter(([, d]) => typeof d === "string" && d)) as Record<string, string>)
+        : undefined;
+      const q: IoPoint = {
+        name: p.name as string,
+        form: FORMS.has(p.form as PointForm) ? (p.form as PointForm) : "contact",
+        pins: arr(p.pins).filter((t): t is string => typeof t === "string"),
+        ...(follows.length ? { follows } : {}),
+        ...(follows.length > 1 && (p.join === "or" || p.join === "and") ? { join: p.join } : {}),
+        ...(typeof p.delay === "number" && p.delay > 0 ? { delay: p.delay } : {}),
+        ...(dists && Object.keys(dists).length ? { dists } : {}),
+      };
+      return q;
+    })
+    .filter((p) => p.pins.length);
+  if (list.length) out.points = list;
+  if (isObj(pins)) {
+    const m: Record<string, PinInfo> = {};
+    for (const [k, v] of Object.entries(pins)) {
+      if (!isObj(v)) continue;
+      const id = strOr(v.id);
+      const group = strOr(v.group);
+      if (id || group) m[k] = { ...(id ? { id } : {}), ...(group ? { group } : {}) };
+    }
+    if (Object.keys(m).length) out.pins = m;
+  }
+  return out;
+}
+
+export function parseExpectations(v: unknown): Expectation[] {
+  return arr(v)
+    .filter(isObj)
+    .filter((e) => typeof e.id === "string")
+    .map((e) => {
+      const when = parseConditions(e.when);
+      const kind = e.kind === "never" ? ("never" as const) : ("should" as const);
+      const x: Expectation = {
+        id: e.id as string,
+        kind,
+        ...(kind === "should" && typeof e.point === "string" ? { point: e.point } : {}),
+        ...(kind === "should" && e.on === false ? { on: false } : {}),
+        when,
+        ...(when.length > 1 && (e.join === "or" || e.join === "and") ? { join: e.join } : {}),
+        ...(typeof e.note === "string" && e.note ? { note: e.note } : {}),
+      };
+      return x;
+    })
+    .filter((e) => e.when.length && (e.kind === "never" || e.point));
 }
 
 function parsePage(pg: Record<string, unknown>, i: number): Project["pages"][number] {
@@ -376,6 +420,39 @@ function parseConductors(v: unknown): Project["conductors"] {
  * period only: remove when 0.2.0 is released.
  */
 function preRelease(input: Record<string, unknown>): void {
+  // Plant groups became points, and logic rules expectations (step 8a).
+  for (const pl of arr(input.plant).filter(isObj)) {
+    if (!Array.isArray(pl.groups) || pl.points) continue;
+    const groups = arr(pl.groups).filter(isObj);
+    const formOf = (g: Record<string, unknown>): PointForm => {
+      const names = arr(g.terminals).map((t) => String(t).split(".").pop()!.toUpperCase());
+      const relay = names.some((t) => t === "C" || t === "COM") && names.some((t) => t === "NO" || t === "NC");
+      if (g.role === "input") return "powered-in";
+      if (g.role === "none") return names.includes("L") || names.includes("+V") ? "supply-in" : "analogue-in";
+      if (g.role === "output" || relay) return "contact";
+      return /ENABLE|START|RUN\s*(CMD|COMMAND)|COMMAND|CMD|INPUT|ON\/OFF|DEMAND|CALL|STOP/i.test(String(g.name)) ? "powered-in" : "contact";
+    };
+    pl.points = groups.map((g) => ({
+      name: g.name,
+      form: formOf(g),
+      pins: g.terminals,
+      ...(typeof g.follows === "string" && g.follows
+        ? { follows: [{ ref: `plant:${String(pl.id)}:${g.follows}`, on: g.invert !== true }], ...(typeof g.delay === "number" ? { delay: g.delay } : {}) }
+        : {}),
+    }));
+    delete pl.groups;
+  }
+  if (Array.isArray(input.rules) && !input.expectations) {
+    input.expectations = arr(input.rules)
+      .filter(isObj)
+      .filter((r) => typeof r.a === "string")
+      .map((r) => ({
+        id: r.id,
+        kind: "never",
+        when: [{ ref: r.a, on: true }, ...(r.kind !== "never" && typeof r.b === "string" ? [{ ref: r.b, on: true }] : [])],
+        join: "and",
+      }));
+  }
   const terms = new Map<string, Record<string, string>>(); // element id → old terminal → new
   for (const pg of arr(input.pages).filter(isObj)) {
     for (const e of arr(pg.elements).filter(isObj)) {

@@ -14,9 +14,14 @@
  * coils, so the circuit is solved again until nothing changes. Timers run
  * on a simulation clock.
  *
- * No motors, analogue or power flow. Fuses and breakers always conduct.
+ * Plant is simulated by its IO points (controller.md §6): outputs are
+ * clicked or follow up to two conditions; inputs sense their pins, and
+ * expectations say whether they see what they should.
+ *
+ * No motors, analogue or power flow.
  */
-import type { Element, LogicRule, Project } from "./model";
+import type { Condition, Element, Expectation, Project } from "./model";
+import { contactPins, isAnalogueForm, pointRef, signalPins } from "./points";
 import { isolatorAux, selectorPoles } from "./symbols";
 import { masterOf } from "./xref";
 import { netJoins } from "./conductors";
@@ -25,9 +30,9 @@ import { displayTag } from "./tags";
 // ---------------------------------------------------------------------------
 // Compiled circuit
 
-type Kind = "coil" | "timer" | "lamp" | "transformer" | "plant";
+type Kind = "coil" | "timer" | "lamp" | "transformer" | "plant" | "dry";
 
-interface Link {
+export interface Link {
   a: string;
   b: string;
   /** Element this link belongs to. */
@@ -35,6 +40,8 @@ interface Link {
   /** What decides it: the coil or timer driving it, or the element itself if it's operated by hand. */
   src: string;
   closed: (s: SimState) => boolean;
+  /** Always closed: a plain join (a plant view to its device's pin, a busbar, a distribution), not a switch. */
+  fixed?: true;
 }
 
 interface Load {
@@ -67,8 +74,10 @@ export interface Supply {
   el: string;
   phases: string[];
   ret: string[];
-  /** A transformer's secondary is only a source while its primary is energised. */
+  /** Only a source while this is on: a transformer's primary, a plant output. */
   when?: string;
+  /** The distribution it feeds, if any: two sources on the same distribution aren't a short. */
+  dist?: string;
   /**
    * A transformer's primary ends (P1, P2). The secondary's live side follows
    * the primary's: P1 on the phase makes S1 live, P2 on the phase makes S2 live.
@@ -76,11 +85,12 @@ export interface Supply {
   primary?: [string, string];
 }
 
-/** A plant output that follows one of its inputs, e.g. RUNNING after ENABLE. */
+/** A plant output that follows up to two conditions, after a delay: "proven 5 s after SF-01 runs". */
 export interface Follower {
+  /** The output point's ref; its timer is `${id}:f`. */
   id: string;
-  /** Load id of the input it follows. */
-  source: string;
+  when: Condition[];
+  join: "and" | "or";
 }
 
 export interface Circuit {
@@ -98,6 +108,12 @@ export interface Circuit {
   /** Timer settings by element id: delay in seconds and mode. */
   timers: Map<string, { delay: number; mode: TimerMode }>;
   names: Map<string, string>;
+  /** Output points (contacts, powered outputs, supply out) by ref: what's on decides them. */
+  outputs: Map<string, (s: SimState) => boolean>;
+  /** Every point by ref: its form, for the panel and expectations. */
+  points: Map<string, { form: string; plant: string; name: string }>;
+  /** Whether each thing a condition can name is on, by ref. */
+  states: Map<string, (s: SimState) => boolean>;
 }
 
 export interface SimState {
@@ -146,9 +162,14 @@ export function compile(project: Project): Circuit {
   const followers: Follower[] = [];
   const ops = new Map<string, (s: SimState) => boolean>();
   const railNodes = new Set<string>();
+  const outputs = new Map<string, (s: SimState) => boolean>();
+  const points = new Map<string, { form: string; plant: string; name: string }>();
+  const states = new Map<string, (s: SimState) => boolean>();
   /** Distributions already standing in as the supply (no Incoming supply part). */
   const fallback = new Set<string>();
   const hasIncoming = project.pages.some((pg) => pg.elements.some((e) => e.symbol === "supply"));
+  // Distributions a plant supply out feeds aren't stood in for by their busbars: the plant is their source.
+  for (const item of project.plant) for (const pt of item.points ?? []) for (const d of Object.values(pt.dists ?? {})) fallback.add(d);
 
   const byId = new Map<string, Element>();
   for (const pg of project.pages) for (const el of pg.elements) byId.set(el.id, el);
@@ -261,56 +282,12 @@ export function compile(project: Project): Circuit {
           break;
         }
         case "plant-view": {
+          // Each shown pin is the device's own pin, the same on every view of it (simulated once, below).
           const item = project.plant.find((p) => p.id === el.params.plant);
-          const tag = item ? item.tag || `${item.prefix || "U"}?` : "plant";
-          names.set(el.id, tag);
-          const shown = new Set(String(el.params.show ?? "").split(",").filter(Boolean));
-          const groups = item?.groups ?? [];
-          if (!groups.length) {
-            // Ungrouped: a volt-free contact joining its shown terminals.
-            const list = [...shown];
-            if (list.length >= 2 && !list.includes("U")) {
-              for (let i = 1; i < list.length; i++) link(el, list[0]!, list[i]!, (s) => (s.inputs[el.id] ?? 0) === 1);
-              inputs.push({ el: el.id, kind: "toggle", label: `${tag} contact (field)`, initial: 0 });
-            }
-            break;
-          }
-          // Grouped: each group does its own job, the same on every view of this plant.
-          for (const g of groups) {
-            const role = plantGroupRole(g);
-            const term = (name: string) => g.terminals.find((t) => t === name || t.endsWith(`.${name}`) || t.toUpperCase() === name);
-            const key = plantInputId(item!.id, g.name);
-            if (role === "input") {
-              const [a, b] = g.terminals.filter((t) => shown.has(t));
-              if (a && b) loads.push({ el: key, kind: "plant", a: n(el, a), b: n(el, b) });
-              names.set(key, `${tag} ${g.name}`);
-              continue;
-            }
-            if (role !== "output") continue;
-            // Output: a relay (C / NO / NC) or a volt-free pair, switched by hand or following an input.
-            const follows = g.follows ? groups.find((x) => x.name === g.follows) : undefined;
-            const on: (s: SimState) => boolean = follows
-              ? (s) => !!s.timed[`${key}:f`] !== !!g.invert
-              : (s) => (s.inputs[key] ?? 0) === 1;
-            if (follows && !followers.some((f) => f.id === `${key}:f`)) {
-              followers.push({ id: `${key}:f`, source: plantInputId(item!.id, follows.name) });
-              timers.set(`${key}:f`, { delay: g.delay ?? 0, mode: "on-off" });
-            }
-            if (!follows && !inputs.some((i) => i.el === key)) {
-              inputs.push({ el: key, kind: "toggle", label: `${tag} ${g.name}`, initial: 0 });
-            }
-            names.set(key, `${tag} ${g.name}`);
-            const c = term("C") ?? term("COM");
-            const no = term("NO");
-            const nc = term("NC");
-            const has = (t?: string) => !!t && shown.has(t);
-            if (c && (no || nc)) {
-              if (has(c) && has(no)) link(el, c, no!, on);
-              if (has(c) && has(nc)) link(el, c, nc!, (s) => !on(s));
-            } else {
-              const [a, b] = g.terminals.filter((t) => shown.has(t));
-              if (a && b) link(el, a, b, on);
-            }
+          names.set(el.id, item ? item.tag || `${item.prefix || "U"}?` : "plant");
+          if (!item) break;
+          for (const t of String(el.params.show ?? "").split(",").filter(Boolean)) {
+            links.push({ a: n(el, t), b: pinNode(item.id, t), el: el.id, src: el.id, closed: () => true, fixed: true });
           }
           break;
         }
@@ -336,10 +313,76 @@ export function compile(project: Project): Circuit {
       }
     }
   }
+  // Plant points (controller.md §6), once per device, on its own pins.
+  for (const item of project.plant) {
+    const tag = item.tag || `${item.prefix || "U"}?`;
+    const pn = (t: string) => pinNode(item.id, t);
+    for (const pt of item.points ?? []) {
+      const key = pointRef(item.id, pt.name);
+      names.set(key, `${tag} ${pt.name}`);
+      points.set(key, { form: pt.form, plant: item.id, name: pt.name });
+      if (isAnalogueForm(pt.form) || pt.form === "comms") continue;
+      if (pt.form === "dry-in" || pt.form === "powered-in" || pt.form === "supply-in") {
+        // Sensed: a dry input when its loop is closed, the others when there's a voltage across them.
+        const { sig, com } = signalPins(pt);
+        if (sig && com) loads.push({ el: key, kind: pt.form === "dry-in" ? "dry" : "plant", a: pn(sig), b: pn(com) });
+        states.set(key, (s) => !!s.energised[key]);
+        continue;
+      }
+      // Outputs: clicked, or following their conditions (through a timer for the delay).
+      const on: (s: SimState) => boolean = pt.follows?.length ? (s) => !!s.timed[`${key}:f`] : (s) => (s.inputs[key] ?? 0) === 1;
+      outputs.set(key, on);
+      states.set(key, on);
+      if (pt.follows?.length) {
+        followers.push({ id: key, when: pt.follows, join: pt.join ?? "and" });
+        timers.set(`${key}:f`, { delay: pt.delay ?? 0, mode: "on-off" });
+      } else {
+        inputs.push({ el: key, kind: "toggle", label: `${tag} ${pt.name}`, initial: 0 });
+      }
+      if (pt.form === "contact") {
+        const { c, no, nc } = contactPins(pt);
+        if (c && no) links.push({ a: pn(c), b: pn(no), el: key, src: key, closed: on });
+        if (c && nc) links.push({ a: pn(c), b: pn(nc), el: key, src: key, closed: (s) => !on(s) });
+      } else {
+        // A powered output or supply out is a source while it's on: its first pin against its second.
+        const { sig, com } = signalPins(pt);
+        if (sig) supplies.push({ el: key, phases: [pn(sig)], ret: com ? [pn(com)] : [], when: key, ...(pt.dists?.[sig] ? { dist: pt.dists[sig] } : {}) });
+      }
+    }
+  }
   // Busbars and distributions join their wires electrically (each wire still has its own number).
-  for (const j of netJoins(project)) links.push({ a: node.get(`${j.a[0]}:${j.a[1]}`) ?? `${j.a[0]}:${j.a[1]}`, b: node.get(`${j.b[0]}:${j.b[1]}`) ?? `${j.b[0]}:${j.b[1]}`, el: j.el, src: j.el, closed: () => true });
+  for (const j of netJoins(project)) links.push({ a: node.get(`${j.a[0]}:${j.a[1]}`) ?? `${j.a[0]}:${j.a[1]}`, b: node.get(`${j.b[0]}:${j.b[1]}`) ?? `${j.b[0]}:${j.b[1]}`, el: j.el, src: j.el, closed: () => true, fixed: true });
   if (supply.size && ret.size) supplies.push({ el: "rails", phases: [...supply], ret: [...ret] });
-  return { links, loads, supply, ret, supplies, followers, railNodes, ops, inputs, timers, names };
+  // What each part's "on" is, for conditions: energised, lit, closed, operated.
+  for (const [id, fn] of ops) {
+    const el = byId.get(id);
+    if (!el) continue;
+    if (el.symbol === "contact-nc") states.set(id, (s) => !fn(s));
+    else states.set(id, fn);
+  }
+  for (const l of loads) {
+    if (l.kind === "lamp") states.set(l.el, (s) => !!s.lamps[l.el]);
+    else if (!states.has(l.el)) states.set(l.el, (s) => !!s.energised[l.el]);
+  }
+  for (const i of inputs) if (!states.has(i.el)) states.set(i.el, (s) => (s.inputs[i.el] ?? i.initial) !== 0);
+  return { links, loads, supply, ret, supplies, followers, railNodes, ops, inputs, timers, names, outputs, points, states };
+}
+
+/** A device's own pin, whichever views show it. */
+export function pinNode(plantId: string, pin: string): string {
+  return `pin:${plantId}:${pin}`;
+}
+
+/** Is a condition met? */
+export function conditionMet(c: Circuit, s: SimState, cond: Condition): boolean {
+  const fn = c.states.get(cond.ref);
+  return (fn ? fn(s) : false) === cond.on;
+}
+
+/** One or two conditions, joined. */
+export function conditionsMet(c: Circuit, s: SimState, when: Condition[], join: "and" | "or" = "and"): boolean {
+  if (!when.length) return false;
+  return join === "or" ? when.some((x) => conditionMet(c, s, x)) : when.every((x) => conditionMet(c, s, x));
 }
 
 // ---------------------------------------------------------------------------
@@ -350,6 +393,13 @@ class UF {
   find(x: string): string {
     let r = x;
     while (this.p.has(r) && this.p.get(r) !== r) r = this.p.get(r)!;
+    // Path compression: the next find is one step.
+    let y = x;
+    while (y !== r) {
+      const next = this.p.get(y)!;
+      this.p.set(y, r);
+      y = next;
+    }
     return r;
   }
   union(a: string, b: string) {
@@ -384,7 +434,8 @@ function pass(c: Circuit, s: SimState) {
       (d) => (d.phases.has(a) && d.ret.has(b)) || (d.phases.has(b) && d.ret.has(a)) || (d.phases.has(a) && d.phases.has(b)),
     );
   };
-  const on = (l: Load) => across(l.a, l.b) || (!!l.test && across(l.test, l.b));
+  const on = (l: Load) =>
+    l.kind === "dry" ? uf.find(l.a) === uf.find(l.b) : across(l.a, l.b) || (!!l.test && across(l.test, l.b));
   // A short: a phase joined straight to its return, two phases of one supply
   // joined, or two different supplies feeding one conductor.
   const fedBy = new Map<string, number>();
@@ -400,7 +451,8 @@ function pass(c: Circuit, s: SimState) {
         const r = uf.find(p);
         const other = fedBy.get(r);
         fedBy.set(r, i);
-        return other !== undefined && other !== i;
+        // Two sources on the same distribution (a battery and the UPS output it backs) feed it together.
+        return other !== undefined && other !== i && !(x.dist && live[other]!.dist === x.dist);
       }),
     );
   return { uf, phaseRoots, retRoots, short, on, live };
@@ -450,11 +502,19 @@ export function settle(c: Circuit, s: SimState): SimState {
         changed = true;
       }
     }
-    // Plant outputs that follow an input: driven like a timer by that input.
+    // Plant outputs that follow conditions: the conditions drive a timer (for the delay), and the timer the output.
     for (const f of c.followers) {
-      const v = !!next.energised[f.source];
-      if (!!next.energised[f.id] !== v) {
-        next.energised[f.id] = v;
+      const v = conditionsMet(c, next, f.when, f.join);
+      if (!!next.energised[`${f.id}:f`] !== v) {
+        next.energised[`${f.id}:f`] = v;
+        changed = true;
+      }
+    }
+    // Outputs' own state, so sources (a powered output, a supply out) switch with them.
+    for (const [id, fn] of c.outputs) {
+      const v = fn(next);
+      if (!!next.energised[id] !== v) {
+        next.energised[id] = v;
         changed = true;
       }
     }
@@ -471,7 +531,7 @@ export function settle(c: Circuit, s: SimState): SimState {
     }
     if (!changed) {
       for (const l of c.loads) if (l.kind !== "lamp") next.energised[l.el] = !!next.energised[l.el];
-      for (const f of c.followers) next.energised[f.id] = !!next.energised[f.id];
+      for (const f of c.followers) next.energised[`${f.id}:f`] = !!next.energised[`${f.id}:f`];
       next.lamps = Object.fromEntries(c.loads.filter((l) => l.kind === "lamp").map((l) => [l.el, r.on(l)]));
       next.short = r.short;
       const live = new Set<string>();
@@ -608,23 +668,72 @@ export function nextTimer(c: Circuit, s: SimState): number | null {
 }
 
 // ---------------------------------------------------------------------------
-// Rule search (DESIGN.md §10)
-
-export type Rule = LogicRule;
+// Expectations and Check logic (controller.md §6)
 
 export type Action = { do: "toggle"; el: string } | { do: "press"; el: string } | { do: "wait"; seconds: number };
 
 export interface Violation {
-  rule: Rule;
+  rule: Expectation;
   /** Shortest sequence of actions from the start that breaks it. */
   path: Action[];
 }
 
-const isOn = (s: SimState, id: string) => !!s.energised[id] || !!s.lamps[id];
+/**
+ * Nothing is part-way through timing (a flasher doesn't count: it never
+ * stops). "Should be … when …" is only judged at rest, so an input that
+ * follows a few seconds behind isn't red while it catches up.
+ */
+export function atRest(c: Circuit, s: SimState, only?: Set<string>): boolean {
+  for (const [id, t] of c.timers) {
+    if (t.mode === "flash-on" || t.mode === "flash-off") continue;
+    if (only && !only.has(id)) continue;
+    if (timerEvent(t.mode, t.delay, s.since[id], s.t) !== null) return false;
+  }
+  return true;
+}
 
-export function breaks(rule: Rule, s: SimState): boolean {
-  if (rule.kind === "never") return isOn(s, rule.a);
-  return isOn(s, rule.a) && !!rule.b && isOn(s, rule.b);
+/**
+ * How an expectation stands now: "ok" (green), "bad" (red, or a never
+ * statement come true), or "wait" while something is still timing.
+ */
+export function judge(c: Circuit, s: SimState, e: Expectation): "ok" | "bad" | "wait" {
+  const met = conditionsMet(c, s, e.when, e.join);
+  if (e.kind === "never") return met ? "bad" : "ok";
+  // Only timers this expectation depends on hold it: a fail timer elsewhere doesn't.
+  if (!atRest(c, s, timersFor(c, e))) return "wait";
+  const want = met ? e.on !== false : e.on === false;
+  const is = c.states.get(e.point ?? "")?.(s) ?? false;
+  return is === want ? "ok" : "bad";
+}
+
+const timerCache = new WeakMap<Circuit, Map<string, Set<string>>>();
+
+/**
+ * The timers between an input and its conditions: those one side depends on
+ * and the other doesn't (a plant output's delay, a timer relay in the path).
+ * A timer upstream of both moves them together, so it doesn't hold the
+ * expectation.
+ */
+function timersFor(c: Circuit, e: Expectation): Set<string> {
+  let cache = timerCache.get(c);
+  if (!cache) timerCache.set(c, (cache = new Map()));
+  const k = [e.point ?? "", ...e.when.map((w) => w.ref)].join("|");
+  let out = cache.get(k);
+  if (!out) {
+    const timersOf = (refs: string[]) => {
+      const seen = trace(c, refs).seen;
+      return new Set([...c.timers.keys()].filter((id) => seen.has(id) || (id.endsWith(":f") && seen.has(id.slice(0, -2)))));
+    };
+    const a = timersOf(e.point ? [e.point] : []);
+    const b = timersOf(e.when.map((w) => w.ref));
+    out = new Set([...a, ...b].filter((id) => a.has(id) !== b.has(id)));
+    cache.set(k, out);
+  }
+  return out;
+}
+
+export function breaks(c: Circuit, e: Expectation, s: SimState): boolean {
+  return judge(c, s, e) === "bad";
 }
 
 function key(s: SimState): string {
@@ -649,9 +758,9 @@ export interface SearchResult {
 
 /**
  * Try every sequence of operator actions (flip a switch, press a button,
- * wait for the timers), breadth first, from the given start. Reports the
- * shortest sequence that breaks each rule, plus any that short the supply
- * or don't settle.
+ * click a plant output, wait for the timers), breadth first, from the given
+ * start. Reports the shortest sequence that breaks each expectation, plus
+ * any that short the supply or don't settle.
  */
 export interface SearchOptions {
   limit?: number;
@@ -662,10 +771,37 @@ export interface SearchOptions {
   includeIsolators?: boolean;
 }
 
-export function search(c: Circuit, start: SimState, rules: Rule[], opts: SearchOptions | number = {}): SearchResult {
+export function search(c: Circuit, start: SimState, rules: Expectation[], opts: SearchOptions | number = {}): SearchResult {
   const o = typeof opts === "number" ? { limit: opts } : opts;
+  // Each expectation is searched over only the inputs that can affect it
+  // (those with the same inputs together): whether it can fail depends on
+  // nothing else, and one sheet's fans don't multiply the sequences tried
+  // for another's.
+  const refsOf = (r: Expectation) => [...(r.point ? [r.point] : []), ...r.when.map((w) => w.ref)];
+  const groups: { rules: Expectation[]; inputs: Set<string> }[] = [];
+  for (const r of rules) {
+    const inputs = influences(c, refsOf(r));
+    const same = groups.find((g) => g.inputs.size === inputs.size && [...inputs].every((x) => g.inputs.has(x)));
+    if (same) same.rules.push(r);
+    else groups.push({ rules: [r], inputs });
+  }
+  if (groups.length <= 1) return searchGroup(c, start, rules, o);
+  const out: SearchResult = { violations: [], states: 0, truncated: false, faults: [] };
+  for (const g of groups) {
+    const r = searchGroup(c, start, g.rules, o);
+    out.violations.push(...r.violations);
+    out.states += r.states;
+    out.truncated ||= r.truncated;
+    for (const f of r.faults) if (!out.faults.some((x) => x.kind === f.kind)) out.faults.push(f);
+  }
+  // In the order the expectations are listed.
+  out.violations.sort((a, b) => rules.indexOf(a.rule) - rules.indexOf(b.rule));
+  return out;
+}
+
+function searchGroup(c: Circuit, start: SimState, rules: Expectation[], o: SearchOptions): SearchResult {
   const limit = o.limit ?? 20000;
-  const relevant = rules.length ? influences(c, rules.flatMap((r) => (r.b ? [r.a, r.b] : [r.a]))) : null;
+  const relevant = rules.length ? influences(c, rules.flatMap((r) => [...(r.point ? [r.point] : []), ...r.when.map((w) => w.ref)])) : null;
   const inputs = c.inputs.filter((i) => (o.includeIsolators || i.initial !== 1) && (!relevant || relevant.has(i.el)));
   const first = settle(c, start);
   const seen = new Set<string>([key(first)]);
@@ -674,7 +810,7 @@ export function search(c: Circuit, start: SimState, rules: Rule[], opts: SearchO
   const faults: SearchResult["faults"] = [];
   const faultSeen = new Set<string>();
   const check = (s: SimState, path: Action[]) => {
-    for (const r of rules) if (!violations.has(r.id) && breaks(r, s)) violations.set(r.id, { rule: r, path });
+    for (const r of rules) if (!violations.has(r.id) && breaks(c, r, s)) violations.set(r.id, { rule: r, path });
     for (const kind of ["short", "unstable"] as const) {
       if (s[kind] && !faultSeen.has(kind)) {
         faultSeen.add(kind);
@@ -708,11 +844,18 @@ export function search(c: Circuit, start: SimState, rules: Rule[], opts: SearchO
 }
 
 /**
- * The inputs that can affect the given coils or lamps: those on their
- * circuits, and on the circuits of the coils that drive their contacts,
- * and so on. Supply and return rails don't count as joining circuits.
+ * The inputs that can affect the given things (coils, lamps, contacts,
+ * points): those on their circuits, and on the circuits of the coils that
+ * drive their contacts, and what plant outputs follow, and so on. Supply
+ * and return rails don't count as joining circuits, so plant outputs that
+ * are sources (a powered output, a supply out) are always included.
  */
-export function influences(c: Circuit, loads: string[]): Set<string> {
+export function influences(c: Circuit, refs: string[]): Set<string> {
+  return trace(c, refs).inputs;
+}
+
+/** What the given things depend on: the inputs that can change them, and every load, output and part passed on the way. */
+function trace(c: Circuit, refs: string[]): { inputs: Set<string>; seen: Set<string> } {
   const uf = new UF();
   const rails = new Set([...c.supplies.flatMap((x) => [...x.phases, ...x.ret]), ...c.railNodes]);
   for (const l of c.links) if (!rails.has(l.a) && !rails.has(l.b)) uf.union(l.a, l.b);
@@ -727,24 +870,31 @@ export function influences(c: Circuit, loads: string[]): Set<string> {
   }
   const loadById = new Map(c.loads.map((l) => [l.el, l]));
   const inputIds = new Set(c.inputs.map((i) => i.el));
+  const followerOf = new Map(c.followers.map((f) => [f.id, f]));
   const out = new Set<string>();
+  for (const x of c.supplies) if (x.when && inputIds.has(x.when)) out.add(x.when);
   const seen = new Set<string>();
-  const queue = [...loads];
+  const queue = [...refs];
   while (queue.length) {
     const id = queue.pop()!;
     if (seen.has(id)) continue;
     seen.add(id);
+    if (inputIds.has(id)) out.add(id);
+    const f = followerOf.get(id);
+    if (f) queue.push(...f.when.map((w) => w.ref));
+    // A contact (or other switched part) named directly: what drives it.
+    for (const l of c.links) if (l.el === id && l.src !== id) queue.push(l.src);
     const load = loadById.get(id);
     if (!load) continue;
     for (const x of [load.a, load.b]) {
       if (rails.has(x)) continue;
       for (const l of linksByComp.get(uf.find(x)) ?? []) {
         if (inputIds.has(l.src)) out.add(l.src);
-        else if (loadById.has(l.src)) queue.push(l.src);
+        else queue.push(l.src);
       }
     }
   }
-  return out;
+  return { inputs: out, seen };
 }
 
 /** Describe an action for people. */
@@ -773,24 +923,8 @@ export function supplySystem(el: Element): { phases: string[]; ret: string | nul
   }
 }
 
-/** The simulator's id for a plant group (shared by every view of the plant). */
-export function plantInputId(plantId: string, group: string): string {
-  return `plant:${plantId}:${group}`;
-}
-
-/**
- * What a plant group does in simulation. Set by hand, or worked out:
- * C/NO/NC (or COM) terminals are a relay output; a pair named like a command
- * (ENABLE, START, RUN, INPUT…) is an input the panel drives; any other pair
- * is a volt-free output (RUNNING, FAULT, PROVEN…).
- */
-export function plantGroupRole(g: { name: string; terminals: string[]; role?: string }): "input" | "output" | "none" {
-  if (g.role === "input" || g.role === "output" || g.role === "none") return g.role;
-  const names = g.terminals.map((t) => t.split(".").pop()!.toUpperCase());
-  if (names.some((t) => t === "C" || t === "COM") && names.some((t) => t === "NO" || t === "NC")) return "output";
-  if (g.terminals.length !== 2) return "none";
-  return /ENABLE|START|RUN\s*(CMD|COMMAND)|COMMAND|CMD|INPUT|ON\/OFF|DEMAND|CALL|STOP/i.test(g.name) ? "input" : "output";
-}
+/** Kept for callers of the old name: a point's ref. */
+export const plantInputId = pointRef;
 
 /** For drawing: which elements are operated just now (contacts in their operated position). */
 export function operatedNow(c: Circuit, s: SimState): Record<string, boolean> {

@@ -39,7 +39,7 @@
   } from "../../core/ops";
   import { settings } from "../settings.svelte";
   import { benchOf, localGeometry, defaultParams, formatPoints, partPoints, plantViewLayout, type Geometry } from "../../core/symbols";
-  import { plantInputId } from "../../core/sim";
+  import { isInputForm, parsePointRef, pointRef } from "../../core/points";
   import {
     GA_ORIGIN,
     dimLayout,
@@ -820,24 +820,85 @@
     }
   }
 
-  /** The simulator input under the pointer on an element: the element, or a plant view's group. */
+  /** The simulator input under the pointer on an element: the element, or a plant view's clicked output. */
   function simInputAt(el: Element, pt: Vec): string | null {
     if (!sim) return null;
     if (sim.isInput(el.id)) return el.id;
     if (el.symbol !== "plant-view") return null;
-    const lay = plantViewLayout(el);
-    const x = pt[0] - el.pos[0];
-    // The group whose terminals are nearest across.
-    let best: { name: string; d: number } | null = null;
-    for (const g of lay.groups) {
-      const d = x < g.x0 - 1 ? g.x0 - 1 - x : x > g.x1 + 1 ? x - g.x1 - 1 : 0;
-      if (!best || d < best.d) best = { name: g.name, d };
-    }
     const item = editor.project.plant.find((p) => p.id === el.params.plant);
-    const group = item?.groups?.find((g) => g.name.toUpperCase() === best?.name);
-    const id = item && group ? plantInputId(item.id, group.name) : null;
-    return id && sim.isInput(id) ? id : null;
+    const g = geoms.get(el.id);
+    if (!item || !g) return null;
+    // The clicked output whose pins are nearest.
+    let best: { ref: string; d: number } | null = null;
+    for (const t of g.terminals) {
+      const p = item.points?.find((x) => x.pins.includes(t.name));
+      if (!p) continue;
+      const ref = pointRef(item.id, p.name);
+      if (!sim.isInput(ref)) continue;
+      const d = Math.hypot(pt[0] - el.pos[0] - t.at[0], pt[1] - el.pos[1] - t.at[1]);
+      if (!best || d < best.d) best = { ref, d };
+    }
+    return best && best.d < 6 ? best.ref : null;
   }
+
+  /**
+   * Simulate: a plant view's terminal boxes coloured by state (controller.md §6):
+   * filled when on, green or red when the point has an expectation.
+   */
+  const simPins = $derived.by(() => {
+    if (!sim) return [];
+    void sim.state;
+    const exps = editor.project.expectations;
+    const judged = sim.judged(exps);
+    const out: { key: string; x: number; y: number; w: number; h: number; on: boolean; colour: string | null; clicked: boolean }[] = [];
+    for (const el of page.elements) {
+      if (el.symbol !== "plant-view") continue;
+      const item = editor.project.plant.find((p) => p.id === el.params.plant);
+      const g = geoms.get(el.id);
+      if (!item || !g) continue;
+      const termH = plantViewLayout(el).termH;
+      for (const t of g.terminals) {
+        const p = item.points?.find((x) => x.pins.includes(t.name));
+        if (!p) continue;
+        const ref = pointRef(item.id, p.name);
+        // The box runs inwards from the terminal, against the way its wire leaves.
+        const inward: Vec = t.dir === "up" ? [0, 1] : t.dir === "down" ? [0, -1] : t.dir === "left" ? [1, 0] : [-1, 0];
+        const cx = el.pos[0] + t.at[0] + (inward[0] * termH) / 2;
+        const cy = el.pos[1] + t.at[1] + (inward[1] * termH) / 2;
+        const w = inward[0] ? termH : 1;
+        const h = inward[1] ? termH : 1;
+        out.push({
+          key: `${el.id}:${t.name}`,
+          x: cx - w / 2,
+          y: cy - h / 2,
+          w,
+          h,
+          on: sim.isOn(ref),
+          colour: isInputForm(p.form) ? sim.inputColour(ref, exps, judged) : null,
+          clicked: sim.isInput(ref),
+        });
+      }
+    }
+    return out;
+  });
+
+  /** Parts named by a "never" statement that has come true: ringed red. */
+  const simNever = $derived.by(() => {
+    if (!sim) return new Set<string>();
+    void sim.state;
+    const exps = editor.project.expectations.filter((e) => e.kind === "never");
+    const judged = sim.judged(exps);
+    const ids = new Set<string>();
+    for (const e of exps) {
+      if (judged.get(e.id) !== "bad") continue;
+      for (const c of e.when) {
+        const r = parsePointRef(c.ref);
+        if (!r) ids.add(c.ref);
+        else for (const el of page.elements) if (el.symbol === "plant-view" && el.params.plant === r.plant) ids.add(el.id);
+      }
+    }
+    return ids;
+  });
   let heldButton: string | null = null;
 
   function onPointerUp() {
@@ -1296,6 +1357,9 @@
               <!-- An energised coil (or transformer) is filled. -->
               <rect class="sim-on" x={el.pos[0] + g.body.x} y={el.pos[1] + g.body.y} width={g.body.w} height={g.body.h} />
             {/if}
+            {#if simNever.has(el.id)}
+              <rect class="sim-never" x={el.pos[0] + g.bbox.x - 0.8} y={el.pos[1] + g.bbox.y - 0.8} width={g.bbox.w + 1.6} height={g.bbox.h + 1.6} rx="0.8" />
+            {/if}
             {#if sim.isInput(el.id)}
               <rect
                 class="sim-input"
@@ -1307,6 +1371,19 @@
               />
             {/if}
           {/if}
+        {/each}
+        {#each simPins as b (b.key)}
+          <rect
+            class="sim-pin"
+            class:on={b.on}
+            class:ok={b.colour === "ok"}
+            class:bad={b.colour === "bad"}
+            class:clicked={b.clicked}
+            x={b.x}
+            y={b.y}
+            width={b.w}
+            height={b.h}
+          />
         {/each}
       {/if}
       {#each page.elements as el (el.id)}
@@ -1580,6 +1657,39 @@
     fill: rgba(30, 160, 60, 0.08);
     stroke: #1a8f3a;
     stroke-width: 0.15;
+    stroke-dasharray: 0.8 0.4;
+  }
+  .sim-pin {
+    fill: none;
+    stroke: none;
+  }
+  .sim-pin.clicked {
+    stroke: #e08a00;
+    stroke-width: 0.12;
+  }
+  .sim-pin.on {
+    fill: rgba(90, 100, 120, 0.45);
+  }
+  .sim-pin.ok {
+    fill: rgba(26, 143, 58, 0.25);
+    stroke: #1a8f3a;
+    stroke-width: 0.15;
+  }
+  .sim-pin.ok.on {
+    fill: rgba(26, 143, 58, 0.7);
+  }
+  .sim-pin.bad {
+    fill: rgba(198, 40, 40, 0.25);
+    stroke: #c62828;
+    stroke-width: 0.15;
+  }
+  .sim-pin.bad.on {
+    fill: rgba(198, 40, 40, 0.7);
+  }
+  .sim-never {
+    fill: none;
+    stroke: #c62828;
+    stroke-width: 0.3;
     stroke-dasharray: 0.8 0.4;
   }
   .sim-on {

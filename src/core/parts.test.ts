@@ -192,18 +192,19 @@ describe("cable screen", () => {
   });
 });
 
-describe("plant terminal groups", () => {
+describe("plant pins and points (quick entry)", () => {
   test("written as one line and read back", () => {
     const spec = parseTerminalSpec("L N E | ENABLE: 1 2 | 0-10V: 3, 4 | FAULT: 5 6");
     expect(spec.terminals).toEqual(["L", "N", "E", "1", "2", "3", "4", "5", "6"]);
-    expect(spec.groups.map((g) => g.name)).toEqual(["ENABLE", "0-10V", "FAULT"]);
+    expect(spec.points.map((g) => g.name)).toEqual(["ENABLE", "0-10V", "FAULT"]);
+    expect(spec.points.map((g) => g.form)).toEqual(["powered-in", "analogue-in", "contact"]);
     expect(formatTerminalSpec(spec)).toBe("L N E | ENABLE: 1 2 | 0-10V: 3 4 | FAULT: 5 6");
   });
 
   test("the box is as wide as its terminals, with room for each group name", () => {
     const { p, pg } = sheet();
     const spec = parseTerminalSpec("1 2 | ENABLE: 3 4 | 0-10V: 5 6");
-    const item = addPlant(p, "SF-01", "SUPPLY FAN", spec.terminals, { groups: spec.groups, info: "MODEL X\n7.5kW" });
+    const item = addPlant(p, "SF-01", "SUPPLY FAN", spec.terminals, { points: spec.points, info: "MODEL X\n7.5kW" });
     const v = placePlantView(p, pg, item.id, [20, 90]);
     const lay = plantViewLayout(v);
     const xs = lay.terms.map((t) => t.x);
@@ -226,12 +227,12 @@ describe("plant terminal groups", () => {
     expect(g.body.h).toBe(6);
   });
 
-  test("the same terminal names in two groups are told apart: R1: C NO NC | R2: C NO NC", () => {
+  test("the same terminal names in two points are told apart: R1: C NO NC | R2: C NO NC", () => {
     const spec = parseTerminalSpec("R1: C NO NC | R2: C NO NC");
     expect(spec.terminals).toEqual(["R1.C", "R1.NO", "R1.NC", "R2.C", "R2.NO", "R2.NC"]);
     expect(formatTerminalSpec(spec)).toBe("R1: C NO NC | R2: C NO NC");
     const { p, pg } = sheet();
-    const item = addPlant(p, "", "DPS", spec.terminals, { groups: spec.groups, prefix: "DPS" });
+    const item = addPlant(p, "", "DPS", spec.terminals, { points: spec.points, prefix: "DPS" });
     const v = placePlantView(p, pg, item.id, [20, 90]);
     const lay = plantViewLayout(v);
     expect(lay.terms.map((t) => t.name)).toEqual(["C", "NO", "NC", "C", "NO", "NC"]);

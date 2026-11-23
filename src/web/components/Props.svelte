@@ -30,6 +30,7 @@
   import { WIRE_COLOURS, WIRE_FUNCTIONS } from "../../core/wirecolours";
   import { displayTag, tagPrefix } from "../../core/tags";
   import type { ParamValue } from "../../core/model";
+  import { describeExpectation, formLabel, isInputForm, pointOfPin, pointRef, printedPin } from "../../core/points";
   import type { Editor } from "../editor.svelte";
   import FieldInput from "./FieldInput.svelte";
   import SheetProps from "./SheetProps.svelte";
@@ -377,11 +378,22 @@
                   editor.apply((p) => setPlantViewTerminals(p, editor.pageId, id, next));
                 }}
               />
-              {t}
+              {printedPin(t, pointOfPin(item).get(t))}
             </label>
           {/each}
         </div>
         <p class="hint">Hidden terminals give the box a break line. Edit the plant itself under Plant….</p>
+        {#if item.points?.length}
+          <div class="sub">Points</div>
+          {#each item.points as pt (pt.name)}
+            {@const mine = editor.project.expectations.filter((x) => x.point === pointRef(item.id, pt.name))}
+            <div class="point">
+              <strong>{pt.name}</strong> · {formLabel(pt.form)} · {pt.pins.map((t) => printedPin(t, pt.name)).join(" ")}
+              {#each mine as x (x.id)}<div class="hint">{describeExpectation(editor.project, x)}</div>{/each}
+              {#if isInputForm(pt.form) && !mine.length}<div class="hint">No expectation (Expectations…)</div>{/if}
+            </div>
+          {/each}
+        {/if}
       {/if}
     {/if}
     <div class="row">
@@ -672,6 +684,10 @@
 </div>
 
 <style>
+  .point {
+    font-size: 12px;
+    margin-bottom: 3px;
+  }
   .props {
     padding: 10px 12px;
     display: flex;
