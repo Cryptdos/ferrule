@@ -161,8 +161,15 @@ describe("MCP simulation", () => {
     await call("renumber", { project });
     const run = (await call("simulate", { project, actions: [{ toggle: s1.id }] })).data;
     expect(run.steps[1].energised).toEqual(["Q1-11"]);
-    const check = (await call("check_logic", { project, neverBoth: [[q1.id, q2.id]] })).data;
+    const check = (await call("check_logic", { project, never: [[q1.id, q2.id]] })).data;
     expect(check.complete).toBe(true);
     expect(check.broken[0].after).toHaveLength(2);
+    // The same as a saved expectation, named by tag.
+    const tags = run.steps[1].energised[0] as string;
+    const other = (await call("get_page", { project, sheet: 1 })).data.elements.find((e: { id: string }) => e.id === q2.id).tag;
+    const set = (await call("set_expectation", { project, kind: "never", when: [{ thing: tags }, { thing: other }], join: "and" })).data;
+    expect(set.expectations[0].text).toMatch(/^Never: Q.* energised and Q.* energised$/);
+    const saved = (await call("check_logic", { project })).data;
+    expect(saved.broken[0].expectation).toBe(set.expectations[0].text);
   });
 });

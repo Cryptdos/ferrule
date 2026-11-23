@@ -143,7 +143,7 @@ describe("parts", () => {
 });
 
 import { advance, compile, hold, initialState, operatedNow, plantInputId, timerRemaining, toggle } from "./sim";
-import { parseTerminalSpec } from "./ops";
+import { parseTerminalSpec, updatePoint } from "./ops";
 
 describe("simulation: supplies", () => {
   test("an Incoming supply feeds busbars; the isolator cuts them; a transformer makes its own supply", () => {
@@ -177,12 +177,12 @@ describe("simulation: supplies", () => {
   });
 });
 
-describe("simulation: plant groups", () => {
+describe("simulation: plant points", () => {
   function plantRig(spec: string) {
     const { p, pg } = project();
     const { cct: cct, ov: ov } = controlBusbars(p, pg, 10, 60);
     const parsed = parseTerminalSpec(spec);
-    const item = addPlant(p, "", "Fan", parsed.terminals, { groups: parsed.groups, prefix: "SF" });
+    const item = addPlant(p, "", "Fan", parsed.terminals, { points: parsed.points, prefix: "SF" });
     const v = placePlantView(p, pg, item.id, [20, 90]);
     return { p, pg, cct, ov, item, v };
   }
@@ -217,10 +217,10 @@ describe("simulation: plant groups", () => {
     connect(p, pg, [cct.id, "50"], [v.id, "5"]);
     connect(p, pg, [v.id, "6"], [fault.id, "+V"]);
     connect(p, pg, [fault.id, "-V"], [ov.id, "60"]);
-    item.groups!.find((g) => g.name === "RUNNING")!.follows = "ENABLE";
-    item.groups!.find((g) => g.name === "RUNNING")!.delay = 3;
-    item.groups!.find((g) => g.name === "FAULT")!.follows = "ENABLE";
-    item.groups!.find((g) => g.name === "FAULT")!.invert = true;
+    // RUNNING and FAULT are volt-free pairs (C, NO) following the ENABLE input.
+    const enable = { ref: plantInputId(item.id, "ENABLE"), on: true };
+    updatePoint(p, item.id, "RUNNING", { follows: [enable], delay: 3 });
+    updatePoint(p, item.id, "FAULT", { follows: [{ ...enable, on: false }] });
     const c = compile(p);
     let s = initialState(c);
     expect([s.lamps[run.id], s.lamps[fault.id]]).toEqual([false, true]);

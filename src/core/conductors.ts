@@ -167,5 +167,12 @@ export function netJoins(project: Project): { a: TerminalRef; b: TerminalRef; el
       }
     }
   }
+  // A plant supply out feeds its distributions from the device's own pin (sim.ts pinNode), drawn or not.
+  for (const item of project.plant) {
+    for (const p of item.points ?? []) {
+      if (p.form !== "supply-out") continue;
+      for (const [pin, d] of Object.entries(p.dists ?? {})) onDist(d, [`pin:${item.id}`, pin], `plant:${item.id}`);
+    }
+  }
   return out;
 }

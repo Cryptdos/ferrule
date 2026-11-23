@@ -125,7 +125,7 @@ describe("rule search", () => {
   test("finds the shortest way to parallel the supplies when there's no interlock", () => {
     const { p, q1, q2 } = ats(false);
     const c = compile(p);
-    const r = search(c, initialState(c), [{ id: "r1", kind: "never-both", a: q1.id, b: q2.id }]);
+    const r = search(c, initialState(c), [{ id: "r1", kind: "never", when: [{ ref: q1.id, on: true }, { ref: q2.id, on: true }], join: "and" }]);
     expect(r.violations).toHaveLength(1);
     expect(r.violations[0]!.path).toHaveLength(2);
     expect(r.violations[0]!.path.map((a) => describeAction(c, a, false))[0]).toMatch(/^operate S/);
@@ -134,7 +134,7 @@ describe("rule search", () => {
   test("proves the interlocked version safe", () => {
     const { p, q1, q2 } = ats(true);
     const c = compile(p);
-    const r = search(c, initialState(c), [{ id: "r1", kind: "never-both", a: q1.id, b: q2.id }]);
+    const r = search(c, initialState(c), [{ id: "r1", kind: "never", when: [{ ref: q1.id, on: true }, { ref: q2.id, on: true }], join: "and" }]);
     expect(r.violations).toEqual([]);
     expect(r.truncated).toBe(false);
     expect(r.faults).toEqual([]);

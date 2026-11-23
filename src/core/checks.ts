@@ -3,7 +3,8 @@
  * involved so the UI can jump to them.
  */
 import { changedGaStrips, doorOwner, gaCandidates, railFill, railNumber } from "./ga";
-import { compile } from "./sim";
+import { compile, pinNode } from "./sim";
+import { contactPins, isAnalogueForm, isInputForm, missingRefs, describeExpectation, things } from "./points";
 import type { Element, Page, Project } from "./model";
 import { terminalNames } from "./symbols";
 import { displayTag } from "./tags";
@@ -140,6 +141,7 @@ export function checkProject(project: Project): Finding[] {
 
   if (unnumbered) out.push({ level: "info", message: `${unnumbered} items not numbered yet: press Renumber`, ids: [] });
   out.push(...supplyBypasses(project));
+  out.push(...pointChecks(project));
 
   // With a GA drawn, say what isn't on it yet; and GA devices whose schematic part has gone.
   if (project.pages.some((p) => p.ga)) {
@@ -181,6 +183,83 @@ export function checkProject(project: Project): Finding[] {
 
   const rank = { error: 0, warning: 1, info: 2 };
   return out.sort((a, b) => rank[a.level] - rank[b.level]);
+}
+
+/**
+ * Field IO checks (controller.md §10): expectations that name something
+ * missing; dry inputs wired to a live conductor; inputs wired to nothing;
+ * outputs wired to nothing (spare); analogue points wired to digital ones.
+ */
+export function pointChecks(project: Project): Finding[] {
+  const out: Finding[] = [];
+  const list = things(project);
+  for (const e of project.expectations) {
+    if (missingRefs(project, e, list).length) {
+      out.push({ level: "error", message: `Expectation "${describeExpectation(project, e, list)}" names something that isn't on the drawing`, ids: [] });
+    }
+  }
+  if (!project.plant.some((it) => it.points?.length)) return out;
+  const c = compile(project);
+  // Everything joined by wire, regardless of switches: conductors, busbars, distributions, views to their device.
+  const parent = new Map<string, string>();
+  const find = (x: string): string => {
+    let r = x;
+    while (parent.has(r) && parent.get(r) !== r) r = parent.get(r)!;
+    return r;
+  };
+  for (const l of c.links) {
+    if (!l.fixed) continue;
+    const a = find(l.a);
+    const b = find(l.b);
+    if (a !== b) parent.set(a, b);
+  }
+  const wired = new Set(project.conductors.filter((cd) => cd.terminals.length > 1).map((cd) => cd.id));
+  const pinWired = (plant: string, pin: string) =>
+    project.pages.some((pg) =>
+      pg.elements.some(
+        (el) =>
+          el.symbol === "plant-view" &&
+          el.params.plant === plant &&
+          project.conductors.some((cd) => wired.has(cd.id) && cd.terminals.some(([id, t]) => id === el.id && t === pin)),
+      ),
+    );
+  const viewIds = (plant: string) => project.pages.flatMap((pg) => pg.elements.filter((e) => e.symbol === "plant-view" && e.params.plant === plant).map((e) => e.id));
+  // Live: every source's phase, through plain joins.
+  const live = new Set(c.supplies.flatMap((s) => s.phases.map(find)));
+  // Analogue against digital: which roots have an analogue pin, which a digital one.
+  const kinds = new Map<string, Set<"a" | "d">>();
+  for (const item of project.plant) {
+    const tag = item.tag || `${item.prefix || "U"}?`;
+    for (const pt of item.points ?? []) {
+      const any = pt.pins.some((t) => pinWired(item.id, t));
+      const fed = pt.form === "supply-out" && Object.values(pt.dists ?? {}).some(Boolean);
+      if (!any && !fed) {
+        if (isInputForm(pt.form) && pt.form !== "supply-in") {
+          out.push({ level: "warning", message: `Plant ${tag}: input ${pt.name} isn't wired to anything`, ids: viewIds(item.id) });
+        } else if (pt.form === "contact" || pt.form === "powered-out") {
+          out.push({ level: "info", message: `Plant ${tag}: output ${pt.name} isn't wired to anything (spare)`, ids: viewIds(item.id) });
+        }
+      }
+      if (pt.form === "dry-in" && pt.pins.some((t) => pinWired(item.id, t) && live.has(find(pinNode(item.id, t))))) {
+        out.push({ level: "error", message: `Plant ${tag}: dry input ${pt.name} is wired to a live conductor (a voltage onto a volt-free input)`, ids: viewIds(item.id) });
+      }
+      // Signal pins only: commons are often shared (an analogue 0 V with a DI common) and that's fine.
+      if (pt.form === "comms" || pt.form === "supply-in" || pt.form === "supply-out") continue;
+      const signals = pt.form === "contact" ? [contactPins(pt).no, contactPins(pt).nc].filter((x): x is string => !!x) : pt.pins.slice(0, 1);
+      for (const t of signals) {
+        if (!pinWired(item.id, t)) continue;
+        const r = find(pinNode(item.id, t));
+        const set = kinds.get(r) ?? new Set();
+        set.add(isAnalogueForm(pt.form) ? "a" : "d");
+        kinds.set(r, set);
+      }
+    }
+  }
+  const mixed = [...kinds.values()].filter((k) => k.size > 1).length;
+  if (mixed) {
+    out.push({ level: "warning", message: `${mixed} conductor${mixed === 1 ? " joins" : "s join"} an analogue point to a digital one`, ids: [] });
+  }
+  return out;
 }
 
 /**

@@ -2,7 +2,7 @@
  * The Simulate workbench (DESIGN.md §9): the same sheets, but clicking a
  * switch operates it, coils pull in, lamps light and timers run.
  */
-import type { Project } from "../core/model";
+import type { Expectation, Project } from "../core/model";
 import {
   advance,
   compile,
@@ -12,6 +12,7 @@ import {
   nextTimer,
   operatedNow,
   hold,
+  judge,
   timerRemaining,
   press,
   search,
@@ -120,11 +121,30 @@ export class Simulator {
     this.searching = true;
     // Let the panel show "Searching…" first.
     await new Promise((r) => setTimeout(r, 20));
-    this.result = search(this.circuit, initialState(this.circuit), project.rules, {
+    this.result = search(this.circuit, initialState(this.circuit), project.expectations, {
       limit: 20000,
       includeIsolators: this.includeIsolators,
     });
     this.searching = false;
+  }
+
+  /** Is a part or point on just now (energised, lit, closed; a point sensed or switched on)? */
+  isOn(ref: string): boolean {
+    return this.circuit.states.get(ref)?.(this.state) ?? false;
+  }
+
+  /** How each expectation stands now: ok (green), bad (red), or wait while something is timing. */
+  judged(list: Expectation[]): Map<string, "ok" | "bad" | "wait"> {
+    return new Map(list.map((e) => [e.id, judge(this.circuit, this.state, e)]));
+  }
+
+  /** An input point's colour: green or red by its expectations (red wins), grey with none. */
+  inputColour(ref: string, list: Expectation[], judged = this.judged(list)): "ok" | "bad" | "wait" | null {
+    const mine = list.filter((e) => e.kind === "should" && e.point === ref).map((e) => judged.get(e.id));
+    if (!mine.length) return null;
+    if (mine.includes("bad")) return "bad";
+    if (mine.includes("wait")) return "wait";
+    return "ok";
   }
 
   describe(a: Action): string {

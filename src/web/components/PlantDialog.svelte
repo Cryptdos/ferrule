@@ -1,10 +1,11 @@
 <script lang="ts">
-  import { addPlant, deletePlant, formatTerminalSpec, parseTerminalSpec, plantLabel, updatePlant, updatePlantGroup } from "../../core/ops";
-  import { plantGroupRole } from "../../core/sim";
+  import { addPlant, deletePlant, plantLabel, plantPinsParam, setQuickEntry, updatePlant } from "../../core/ops";
+  import { formatQuickEntry, parseQuickEntry } from "../../core/points";
   import type { Editor } from "../editor.svelte";
   import Modal from "./Modal.svelte";
+  import PointsDialog from "./PointsDialog.svelte";
 
-  let { editor, onclose }: { editor: Editor; onclose: () => void } = $props();
+  let { editor, onclose, onexpectations }: { editor: Editor; onclose: () => void; onexpectations?: () => void } = $props();
 
   let prefix = $state("");
   let description = $state("");
@@ -18,10 +19,10 @@
     e.preventDefault();
     const pre = prefix;
     const d = description;
-    const spec = parseTerminalSpec(terminals);
+    const spec = parseQuickEntry(terminals);
     const i = info;
     const power = pbo;
-    if (editor.apply((p) => addPlant(p, "", d, spec.terminals, { groups: spec.groups, info: i, prefix: pre, powerByOthers: power }))) {
+    if (editor.apply((p) => addPlant(p, "", d, spec.terminals, { points: spec.points, info: i, prefix: pre, powerByOthers: power }))) {
       prefix = "";
       description = "";
       terminals = "";
@@ -41,7 +42,7 @@
       terms: item.terminals.join(","),
       pdesc: item.description,
       pinfo: item.info ?? "",
-      pgroups: (item.groups ?? []).map((g) => `${g.name}=${g.terminals.join(",")}`).join(";"),
+      ppins: plantPinsParam(item),
       pbo: item.powerByOthers === true,
     };
     onclose();
@@ -50,8 +51,7 @@
   const usedOn = (id: string) =>
     editor.project.pages.filter((pg) => pg.elements.some((e) => e.symbol === "plant-view" && e.params.plant === id)).map((pg) => pg.number);
   const update = (id: string, patch: Parameters<typeof updatePlant>[2]) => editor.apply((p) => updatePlant(p, id, patch));
-  const updateGroup = (id: string, group: string, patch: Parameters<typeof updatePlantGroup>[3]) =>
-    editor.apply((p) => updatePlantGroup(p, id, group, patch));
+  /** The device whose pins and points window is open. */
   let open = $state<string | null>(null);
 </script>
 
@@ -68,7 +68,7 @@
   <table>
     <thead>
       <tr>
-        <th>Prefix</th><th>Tag</th><th>Description</th><th>Terminals and groups</th><th>Information (under the box)</th>
+        <th>Prefix</th><th>Tag</th><th>Description</th><th title="Quick entry: Mains: L N E | Run: 1 2 | Running: C NO NC. Pins and points… for the full table">Pins and points</th><th>Information (under the box)</th>
         <th title="Its power isn't on these drawings: a break on the left of the box, marked POWER BY OTHERS">Power by others</th>
         <th>Sheets</th><th></th>
       </tr>
@@ -88,10 +88,10 @@
           <td><input value={item.description} onchange={(e) => update(item.id, { description: e.currentTarget.value })} /></td>
           <td>
             <input
-              value={formatTerminalSpec(item)}
+              value={formatQuickEntry(item)}
               onchange={(e) => {
-                const v = parseTerminalSpec(e.currentTarget.value);
-                update(item.id, { terminals: v.terminals, groups: v.groups });
+                const v = e.currentTarget.value;
+                editor.apply((p) => setQuickEntry(p, item.id, v));
               }}
             />
           </td>
@@ -100,11 +100,9 @@
           <td class="sheets">{usedOn(item.id).join(", ") || "–"}</td>
           <td class="actions">
             <button onclick={() => place(item.id)} title="Place a view of this on the current sheet">Place view</button>
-            {#if item.groups?.length}
-              <button class:active={open === item.id} onclick={() => (open = open === item.id ? null : item.id)} title="How its groups behave when simulating">
-                Simulation
-              </button>
-            {/if}
+            <button class:active={open === item.id} onclick={() => (open = open === item.id ? null : item.id)} title="Its pins (number, id, group) and points: what each signal is and how it simulates">
+              Pins and points…
+            </button>
             <button
               class="danger"
               title="Delete this plant item and all its views"
@@ -114,64 +112,15 @@
             >
           </td>
         </tr>
-        {#if open === item.id && item.groups?.length}
-          <tr class="groups">
-            <td colspan="8">
-              <p class="hint">
-                In Simulate, an <strong>output</strong> (a relay C/NO/NC, or a volt-free pair like RUNNING or FAULT) is
-                switched by clicking it, or follows one of the plant's <strong>inputs</strong> (a pair the panel drives,
-                like ENABLE) after a delay. NO and NC work as they should: C–NO closes when operated, C–NC opens.
-              </p>
-              <table class="inner">
-                <thead><tr><th>Group</th><th>Role</th><th>Follows</th><th>Delay (s)</th><th>Inverted</th></tr></thead>
-                <tbody>
-                  {#each item.groups as g (g.name)}
-                    {@const role = plantGroupRole(g)}
-                    <tr>
-                      <td><strong>{g.name}</strong> <span class="terms">{g.terminals.map((t) => t.split(".").pop()).join(" ")}</span></td>
-                      <td>
-                        <select
-                          value={g.role ?? ""}
-                          onchange={(e) => updateGroup(item.id, g.name, { role: (e.currentTarget.value || null) as "input" | "output" | "none" | null })}
-                        >
-                          <option value="">Automatic ({plantGroupRole({ ...g, role: undefined })})</option>
-                          <option value="output">Output (contacts the plant switches)</option>
-                          <option value="input">Input (the panel drives it)</option>
-                          <option value="none">Neither (supply, signal)</option>
-                        </select>
-                      </td>
-                      <td>
-                        {#if role === "output"}
-                          <select value={g.follows ?? ""} onchange={(e) => updateGroup(item.id, g.name, { follows: e.currentTarget.value || null })}>
-                            <option value="">Nothing: click it</option>
-                            {#each item.groups.filter((x) => x.name !== g.name && plantGroupRole(x) === "input") as x (x.name)}
-                              <option value={x.name}>{x.name}</option>
-                            {/each}
-                          </select>
-                        {:else}–{/if}
-                      </td>
-                      <td>
-                        {#if role === "output" && g.follows}
-                          <input type="number" min="0" step="0.5" value={g.delay ?? 0} onchange={(e) => updateGroup(item.id, g.name, { delay: Number(e.currentTarget.value) || 0 })} />
-                        {:else}–{/if}
-                      </td>
-                      <td>
-                        {#if role === "output" && g.follows}
-                          <input type="checkbox" checked={g.invert === true} onchange={(e) => updateGroup(item.id, g.name, { invert: e.currentTarget.checked })} />
-                        {:else}–{/if}
-                      </td>
-                    </tr>
-                  {/each}
-                </tbody>
-              </table>
-            </td>
-          </tr>
-        {/if}
       {/each}
     </tbody>
   </table>
   {/if}
 </Modal>
+
+{#if open}
+  <PointsDialog {editor} plantId={open} onclose={() => (open = null)} {onexpectations} />
+{/if}
 
 {#if adding}
   <Modal title="New plant" store="new-plant" width={520} onclose={() => (adding = false)}>
@@ -179,12 +128,14 @@
       <label>Prefix <input bind:value={prefix} placeholder="e.g. SEF" required /></label>
       <label>Description <input bind:value={description} placeholder="e.g. Safety extract fan" /></label>
       <label>
-        Terminals and groups
-        <input bind:value={terminals} placeholder="e.g. L N E | ENABLE: 1 2" />
+        Pins and points
+        <input bind:value={terminals} placeholder="e.g. Mains: L N E | Run: 1 2 | Running: C NO NC" />
       </label>
       <p class="hint">
-        Group terminals by function with <code>|</code> and a name: <code>L N E | ENABLE: 1 2 | R1: C NO NC | R2: C NO NC</code>.
-        The same terminal names can be used in different groups.
+        Pin numbers, split into points (one signal each) with <code>|</code> and a name:
+        <code>Mains: L N E | Run: 1 2 | R1: C NO NC | R2: C NO NC</code>. The same numbers can be used in different points.
+        Each point's form is guessed (C/NO/NC a contact, L/N a supply in, RUN/ENABLE a powered input); change it, and how it
+        simulates, in <em>Pins and points…</em>.
       </p>
       <label>Information (under the box) <textarea bind:value={info} rows="2" placeholder="e.g. model, 400V 7.5kW"></textarea></label>
       <label class="pbo"><input type="checkbox" bind:checked={pbo} /> Power by others (its power isn't on these drawings)</label>
@@ -216,20 +167,6 @@
     font: inherit;
     font-size: 13px;
     resize: vertical;
-  }
-  tr.groups td {
-    background: #f6f8fb;
-    padding: 6px 10px;
-  }
-  table.inner {
-    width: auto;
-  }
-  table.inner td {
-    padding: 2px 8px 2px 0;
-  }
-  .terms {
-    color: #778;
-    font-size: 12px;
   }
   button.active {
     border-color: #1e6ee6;

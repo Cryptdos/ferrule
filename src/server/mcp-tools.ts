@@ -18,7 +18,9 @@ import { listSymbols, localGeometry } from "../core/symbols";
 import { displayTag, elementTexts } from "../core/tags";
 import { saveSectionTemplate, saveSheetTemplate, stampTemplate, type PlantMapping } from "../core/templates";
 import { contactTable, isMaster, masterOf, partnerOf } from "../core/xref";
-import { advance, compile, describeAction, initialState, press, search, toggle, type Action, type SimState } from "../core/sim";
+import { advance, compile, describeAction, initialState, judge, press, search, toggle, type Action, type Circuit, type SimState } from "../core/sim";
+import { describeExpectation, findThing, parseQuickEntry, pointRef, things } from "../core/points";
+import { POINT_FORMS, type Condition, type IoPoint, type PinInfo, type PointForm } from "../core/model";
 import type { Library, Storage } from "./storage";
 
 export interface ToolContext {
@@ -74,6 +76,59 @@ function pageOfElement(p: Project, id: string): Page {
   const page = p.pages.find((pg) => pg.elements.some((e) => e.id === id) || pg.segments.some((s) => s.id === id));
   if (!page) throw new ArgError(`No element or wire "${id}"`);
   return page;
+}
+
+/** Conditions given as [{thing: "K3-12", on: true}] or [{ref, on}]: things by tag, points as "SF-01 Running". */
+function conditionsArg(p: Project, v: unknown): Condition[] {
+  const list = things(p);
+  return (Array.isArray(v) ? v : []).map((raw) => {
+    const o = (raw ?? {}) as Record<string, unknown>;
+    const name = String(o.thing ?? o.ref ?? "");
+    const t = findThing(p, name, list);
+    if (!t) throw new ArgError(`Nothing called "${name}": name a coil, contact, lamp or switch by tag, or a point as "<plant tag> <point>"`);
+    return { ref: t.ref, on: o.on !== false };
+  });
+}
+
+/** Points given to add_plant: [{name, form, pins, follows?, join?, delay?, dists?}]. */
+function pointsArg(p: Project, v: unknown, own?: { id: string; points: IoPoint[] }): IoPoint[] {
+  const forms = new Set(POINT_FORMS.map((f) => f.value));
+  return (Array.isArray(v) ? v : []).map((raw) => {
+    const o = (raw ?? {}) as Record<string, unknown>;
+    const form = String(o.form ?? "contact") as PointForm;
+    if (!forms.has(form)) throw new ArgError(`Point form must be one of ${[...forms].join(", ")}`);
+    const pt: IoPoint = { name: String(o.name ?? ""), form, pins: Array.isArray(o.pins) ? o.pins.map(String) : [] };
+    if (Array.isArray(o.follows) && o.follows.length) {
+      // A point of the same device can be named by its name alone.
+      const list = (o.follows as Record<string, unknown>[]).map((f) => {
+        const name = String(f.thing ?? f.ref ?? "");
+        if (own && !name.includes(" ") && !name.startsWith("plant:")) {
+          const mine = (Array.isArray(v) ? v : []).some((x) => (x as Record<string, unknown>)?.name === name) || own.points.some((x) => x.name === name);
+          if (mine) return { ref: pointRef(own.id, name), on: f.on !== false };
+        }
+        return conditionsArg(p, [f])[0]!;
+      });
+      pt.follows = list;
+      if (o.join === "or") pt.join = "or";
+      if (typeof o.delay === "number") pt.delay = o.delay;
+    }
+    if (o.dists && typeof o.dists === "object") {
+      const d: Record<string, string> = {};
+      for (const [pin, name] of Object.entries(o.dists as Record<string, unknown>)) {
+        const dist = p.distributions.find((x) => x.id === name || x.name === name);
+        if (!dist) throw new ArgError(`No distribution "${String(name)}"`);
+        d[pin] = dist.id;
+      }
+      pt.dists = d;
+    }
+    return pt;
+  });
+}
+
+/** Expectations broken just now, in words (for simulate's report). */
+function brokenNow(c: Circuit, s: SimState, p: Project, list: ReturnType<typeof things>): { broken?: string[] } {
+  const bad = p.expectations.filter((e) => judge(c, s, e) === "bad").map((e) => describeExpectation(p, e, list));
+  return bad.length ? { broken: bad } : {};
 }
 
 function plantByRef(p: Project, ref: string) {
@@ -509,46 +564,53 @@ export const TOOLS: Tool[] = [
         description: { type: "string" },
         terminals: { type: "array", items: { type: "string" } },
         powerByOthers: { type: "boolean", description: "Draw the 'power by others' break on the left of its views" },
-        groups: {
-          type: "array",
-          description: "Named groups of its terminals, shown in capitals over the terminal boxes, e.g. [{name: 'R1', terminals: ['C','NO','NC']}]",
-          items: { type: "object" },
+        quick: {
+          type: "string",
+          description:
+            "Pins and points in one line, as in the Plant window: 'Mains: L N E | Run: 1 2 | Running: C NO NC'. Forms are guessed (C/NO/NC a contact, L/N a supply in, ENABLE/START/RUN a powered input); set them with points. Replaces terminals",
         },
+        points: {
+          type: "array",
+          items: { type: "object" },
+          description:
+            "Its signals (controller.md §3), replacing any it had: [{name, form, pins, follows?, join?, delay?, dists?}]. form: contact, powered-out, dry-in, powered-in, analogue-in, analogue-out, supply-in, supply-out, comms. An output (contact, powered-out, supply-out) is clicked in simulation unless it follows up to two conditions [{thing, on}] (thing: a coil/contact/lamp/switch tag, '<plant tag> <point>', or one of this device's own point names), joined by join 'and'/'or', after delay seconds. A supply out's dists maps pin → distribution name, e.g. {'+V': '24V DC'}",
+        },
+        pins: { type: "object", description: "Pin labels beyond the number, by pin: {'61': {id: 'C', group: 'R1'}}" },
         info: { type: "string", description: "More lines under the box: model, rating, supply…" },
       },
       ["project"],
     ),
     run: async (a, ctx) =>
       edit(ctx, str(a, "project"), (p) => {
-        const groups = Array.isArray(a.groups)
-          ? a.groups.map((g) => {
-              const o = (g ?? {}) as Record<string, unknown>;
-              return { name: String(o.name ?? ""), terminals: Array.isArray(o.terminals) ? o.terminals.map(String) : [] };
-            })
-          : undefined;
+        const quick = typeof a.quick === "string" ? parseQuickEntry(a.quick) : undefined;
+        const terminals = quick?.terminals ?? (Array.isArray(a.terminals) ? a.terminals.map(String) : undefined);
+        const pins = a.pins && typeof a.pins === "object" ? (a.pins as Record<string, PinInfo>) : undefined;
         const info = typeof a.info === "string" ? a.info : undefined;
         const prefix = typeof a.prefix === "string" ? a.prefix : undefined;
         const powerByOthers = typeof a.powerByOthers === "boolean" ? a.powerByOthers : undefined;
         if (typeof a.plant === "string") {
           const item = plantByRef(p, a.plant);
+          const points = Array.isArray(a.points) ? pointsArg(p, a.points, { id: item.id, points: item.points ?? [] }) : quick?.points;
           op.updatePlant(p, item.id, {
             tag: typeof a.tag === "string" ? a.tag : undefined,
             description: typeof a.description === "string" ? a.description : undefined,
-            terminals: Array.isArray(a.terminals) ? a.terminals.map(String) : undefined,
-            groups,
+            terminals,
+            points,
+            pins,
             info,
             prefix,
             powerByOthers,
           });
           return item;
         }
-        const item = op.addPlant(
-          p,
-          typeof a.tag === "string" ? a.tag : "",
-          str(a, "description", false),
-          Array.isArray(a.terminals) ? a.terminals.map(String) : [],
-          { groups, info, prefix, powerByOthers },
-        );
+        const item = op.addPlant(p, typeof a.tag === "string" ? a.tag : "", str(a, "description", false), terminals ?? [], {
+          points: quick?.points,
+          pins,
+          info,
+          prefix,
+          powerByOthers,
+        });
+        if (Array.isArray(a.points)) op.updatePlant(p, item.id, { points: pointsArg(p, a.points, { id: item.id, points: [] }) });
         if (item.tag) item.locked = true;
         return item;
       }),
@@ -710,7 +772,7 @@ export const TOOLS: Tool[] = [
   {
     name: "simulate",
     description:
-      "Run the relay logic as drawn (DESIGN.md §9). Start with everything off (isolators and breakers on), apply actions in order — {toggle: id} for switches, selectors, isolators and field plant contacts (a plant view acts as a volt-free contact), {press: id} for push buttons, {wait: seconds} for timers — and report which coils are energised and which lamps are lit after each step. Supply is the Incoming supply part (and transformers); with none drawn, busbars on a line or DC + distribution supply and those on a neutral or DC 0 V distribution return.",
+      "Run the relay logic as drawn (DESIGN.md §9, controller.md §6). Start with everything off (isolators and breakers on), apply actions in order — {toggle: id} for switches, selectors, isolators, fuses and plant outputs that are clicked (id plant:<plant id>:<point>, listed in inputs), {press: id} for push buttons, {wait: seconds} for timers — and report after each step which coils are energised, which lamps lit, which plant points on, and expectations that are broken. Supply is the Incoming supply part, transformers and plant supply out points; with none drawn, busbars on a line or DC + distribution supply and those on a neutral or DC 0 V distribution return.",
     inputSchema: obj(
       {
         project,
@@ -723,10 +785,13 @@ export const TOOLS: Tool[] = [
       const c = compile(p);
       const tagOf = new Map<string, string>();
       for (const pg of p.pages) for (const el of pg.elements) tagOf.set(el.id, `${displayTag(el, p)}${el.label ? " " + resolveFields(el.label, p) : ""}`.trim());
+      const list = things(p);
       const report = (s: SimState) => ({
         t: Math.round(s.t * 10) / 10,
-        energised: Object.entries(s.energised).filter(([, v]) => v).map(([k]) => tagOf.get(k) ?? k),
+        energised: Object.entries(s.energised).filter(([k, v]) => v && !c.points.has(k) && !k.endsWith(":f")).map(([k]) => tagOf.get(k) ?? k),
         lit: Object.entries(s.lamps).filter(([, v]) => v).map(([k]) => tagOf.get(k) ?? k),
+        pointsOn: [...c.points.keys()].filter((k) => c.states.get(k)?.(s)).map((k) => c.names.get(k) ?? k),
+        ...brokenNow(c, s, p, list),
         ...(s.short ? { short: true } : {}),
         ...(s.unstable ? { unstable: true } : {}),
       });
@@ -742,18 +807,21 @@ export const TOOLS: Tool[] = [
         s = act.do === "wait" ? advance(c, s, act.seconds) : act.do === "press" ? press(c, s, act.el) : toggle(c, s, act.el);
         steps.push({ step: describeAction(c, act), ...report(s) });
       }
-      return { inputs: c.inputs.map((i) => ({ id: i.el, kind: i.kind, name: tagOf.get(i.el), label: i.label })), steps };
+      return { inputs: c.inputs.map((i) => ({ id: i.el, kind: i.kind, name: tagOf.get(i.el) ?? c.names.get(i.el), label: i.label })), steps };
     },
   },
   {
     name: "check_logic",
     description:
-      "Search every sequence of operations (and waiting for timers) for one that breaks a rule, e.g. two contactors that must never both be on (an ATS paralleling supplies). Uses the project's saved rules plus any given here; also reports shorts and relays that chatter.",
+      "Check the drawing's expectations (controller.md §6) exhaustively: try every sequence of operations, plant outputs clicked and waiting for timers, and report each expectation that can fail, with the shortest way there. Also reports shorts and relays that chatter. Uses the project's expectations (see set_expectation) plus any 'never' statements given here.",
     inputSchema: obj(
       {
         project,
-        neverBoth: { type: "array", items: { type: "array", items: { type: "string" } }, description: "Pairs of coil/lamp ids" },
-        never: { type: "array", items: { type: "string" } },
+        never: {
+          type: "array",
+          items: { type: "array", items: { type: "string" } },
+          description: "Extra 'never' statements, each one or two things that must never be on together, by tag: [['K3-23', 'K3-56']]",
+        },
         limit: { type: "integer", description: "States to explore (default 20000)" },
         includeIsolators: { type: "boolean", description: "Also try opening isolators and breakers (default false)" },
       },
@@ -762,16 +830,11 @@ export const TOOLS: Tool[] = [
     run: async (a, ctx) => {
       const p = await ctx.storage.load(str(a, "project"));
       const c = compile(p);
-      const rules = [...p.rules];
-      for (const [x, y] of (a.neverBoth as string[][]) ?? []) rules.push({ id: `nb${rules.length}`, kind: "never-both", a: x!, b: y });
-      for (const x of (a.never as string[]) ?? []) rules.push({ id: `n${rules.length}`, kind: "never", a: x });
-      const tagOf = (id: string) => {
-        for (const pg of p.pages) {
-          const el = pg.elements.find((e) => e.id === id);
-          if (el) return displayTag(el, p) || el.symbol;
-        }
-        return id;
-      };
+      const list = things(p);
+      const rules = [...p.expectations];
+      for (const pair of (a.never as string[][]) ?? []) {
+        rules.push({ id: `n${rules.length}`, kind: "never", when: conditionsArg(p, pair.map((t) => ({ thing: t }))), join: "and" });
+      }
       const r = search(c, initialState(c), rules, {
         limit: typeof a.limit === "number" ? a.limit : 20000,
         includeIsolators: a.includeIsolators === true,
@@ -779,13 +842,51 @@ export const TOOLS: Tool[] = [
       return {
         explored: r.states,
         complete: !r.truncated,
-        broken: r.violations.map((v) => ({
-          rule: v.rule.kind === "never" ? `never ${tagOf(v.rule.a)}` : `never both ${tagOf(v.rule.a)} and ${tagOf(v.rule.b!)}`,
-          after: v.path.map((x) => describeAction(c, x)),
-        })),
+        expectations: rules.length,
+        broken: r.violations.map((v) => ({ expectation: describeExpectation(p, v.rule, list), after: v.path.map((x) => describeAction(c, x)) })),
         faults: r.faults.map((f) => ({ fault: f.kind, after: f.path.map((x) => describeAction(c, x)) })),
-        coils: p.pages.flatMap((pg) => pg.elements.filter((e) => isMaster(e)).map((e) => ({ id: e.id, tag: displayTag(e, p) }))),
       };
+    },
+  },
+  {
+    name: "set_expectation",
+    description:
+      "Add, replace or delete an expectation (controller.md §6). kind 'should': an input point should be on (or off, on: false) when the conditions hold, and the other way when they don't, e.g. point 'SF-01 Run' should be on when [{thing: 'K3-34', on: true}]. kind 'never': the conditions must never hold, e.g. [{thing: 'K3-23'}, {thing: 'K3-56'}] joined by 'and'. Things are named by tag (coil, contact, lamp, switch) or as '<plant tag> <point>'. Give id to replace one, or id with delete: true to remove it. With no kind, lists the expectations.",
+    inputSchema: obj(
+      {
+        project,
+        id: { type: "string" },
+        delete: { type: "boolean" },
+        kind: { type: "string", enum: ["should", "never"] },
+        point: { type: "string", description: "'should': the input point, '<plant tag> <point>'" },
+        on: { type: "boolean", description: "'should': on (default) or off when the conditions hold" },
+        when: { type: "array", items: { type: "object" }, description: "One or two conditions: [{thing, on}]" },
+        join: { type: "string", enum: ["and", "or"] },
+        note: { type: "string" },
+      },
+      ["project"],
+    ),
+    run: async (a, ctx) => {
+      const list = (p: Project) => p.expectations.map((e) => ({ id: e.id, text: describeExpectation(p, e) }));
+      if (!a.kind && !a.delete) return list(await ctx.storage.load(str(a, "project")));
+      return edit(ctx, str(a, "project"), (p) => {
+        if (a.delete === true) {
+          op.deleteExpectation(p, str(a, "id"));
+          return list(p);
+        }
+        const point = typeof a.point === "string" ? findThing(p, a.point) : undefined;
+        if (a.kind === "should" && !point) throw new ArgError(`No point "${String(a.point)}"`);
+        const id = op.setExpectation(p, {
+          ...(typeof a.id === "string" ? { id: a.id } : {}),
+          kind: a.kind === "never" ? "never" : "should",
+          point: point?.ref,
+          on: a.on !== false,
+          when: conditionsArg(p, a.when),
+          join: a.join === "or" ? "or" : "and",
+          note: typeof a.note === "string" ? a.note : undefined,
+        });
+        return { id, expectations: list(p) };
+      });
     },
   },
   {

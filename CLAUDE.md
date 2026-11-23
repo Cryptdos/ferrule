@@ -4,9 +4,11 @@ Read this first. The design record is `docs/DESIGN.md`; the plan being built is 
 
 ## Where the sprint is
 
-v0.2 sprint, version `0.2.0-pre`. Steps 1–7 (7a and 7b) are merged. Next:
+v0.2 sprint, version `0.2.0-pre`. Steps 1–7 (7a and 7b) are merged. Step 8 is split:
 
-- **8**: field IO and controllers per `docs/controller.md` (likely split), then the logo sketches.
+- **8a**: IO points for plant and expectations (controller.md phases 1–2). Done when its PR is merged.
+- **8b**: controllers (controller.md phase 3: module types, generator, module views at the top of the sheet, references, controller map, IO schedule with the plant points schedule, GA placement, checks) with their MCP tools.
+- **8c**: the logo sketches (design-v0.2 §11).
 - At the 0.2.0 release, remove `preRelease()` in `src/core/validate.ts` (maps test-build files).
 
 ## How a step runs

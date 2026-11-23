@@ -1,13 +1,13 @@
 <script lang="ts">
-  import { addRule, deleteRule } from "../../core/ops";
   import { displayTag } from "../../core/tags";
   import { resolveFields } from "../../core/fields";
   import { isMaster } from "../../core/xref";
+  import { describeExpectation, formLabel, isInputForm, parsePointRef, pointRef, things } from "../../core/points";
   import type { Element } from "../../core/model";
   import type { Editor } from "../editor.svelte";
   import type { Simulator } from "../sim.svelte";
 
-  let { editor, sim }: { editor: Editor; sim: Simulator } = $props();
+  let { editor, sim, onexpectations }: { editor: Editor; sim: Simulator; onexpectations?: () => void } = $props();
 
   const all = $derived(editor.project.pages.flatMap((pg) => pg.elements.map((el) => ({ el, page: pg }))));
   const byId = $derived(new Map(all.map((x) => [x.el.id, x])));
@@ -17,17 +17,41 @@
     return [t, l].filter(Boolean).join(" ") || el.symbol;
   };
   const loads = $derived(all.filter(({ el }) => isMaster(el) || el.symbol === "lamp"));
-  /** A plant group's input (plant:<id>:<group>) lives on the plant's first view. */
-  const plantViewOf = (inputId: string) => {
-    const m = /^plant:([^:]+):/.exec(inputId);
-    return m ? all.find(({ el }) => el.symbol === "plant-view" && el.params.plant === m[1]) : undefined;
+  /** A point (plant:<id>:<point>) lives on its device's first view that shows one of its pins. */
+  const viewOf = (ref: string) => {
+    const m = parsePointRef(ref);
+    if (!m) return undefined;
+    const item = editor.project.plant.find((p) => p.id === m.plant);
+    const pins = item?.points?.find((p) => p.name === m.point)?.pins ?? [];
+    const views = all.filter(({ el }) => el.symbol === "plant-view" && el.params.plant === m.plant);
+    return views.find(({ el }) => String(el.params.show ?? "").split(",").some((t) => pins.includes(t))) ?? views[0];
   };
   const s = $derived(sim.state);
   const on = (id: string) => !!s.energised[id] || !!s.lamps[id];
-
-  let ruleA = $state("");
-  let ruleB = $state("");
-  let ruleKind: "never-both" | "never" = $state("never-both");
+  const list = $derived(things(editor.project));
+  const exps = $derived(editor.project.expectations);
+  const judged = $derived.by(() => {
+    void s;
+    return sim.judged(exps);
+  });
+  /** Every device's points with their live state; red inputs first. */
+  const devices = $derived.by(() => {
+    void s;
+    const rank = (c: string | null) => (c === "bad" ? 0 : c === "wait" ? 1 : 2);
+    return editor.project.plant
+      .filter((item) => item.points?.length)
+      .map((item) => {
+        const points = (item.points ?? []).map((pt) => {
+          const ref = pointRef(item.id, pt.name);
+          const colour = isInputForm(pt.form) ? sim.inputColour(ref, exps, judged) : null;
+          return { pt, ref, colour, on: sim.isOn(ref), clicked: sim.isInput(ref) };
+        });
+        points.sort((a, b) => rank(a.colour) - rank(b.colour));
+        return { item, points, worst: Math.min(...points.map((p) => rank(p.colour))) };
+      })
+      .sort((a, b) => a.worst - b.worst);
+  });
+  const neverBroken = $derived(exps.filter((e) => e.kind === "never" && judged.get(e.id) === "bad"));
 </script>
 
 <div class="sim">
@@ -44,36 +68,54 @@
   </div>
   {#if s.short}<div class="fault">Short circuit: the supply is shorted to 0V through closed contacts.</div>{/if}
   {#if s.unstable}<div class="fault">The circuit doesn't settle: relays chatter.</div>{/if}
+  {#each neverBroken as e (e.id)}<div class="fault">{describeExpectation(editor.project, e, list)}: it's happened.</div>{/each}
   <p class="hint">
-    Click switches, selectors and field contacts on the drawing (outlined in orange). A push button is held while the mouse
-    is down (Shift+click holds it until clicked again). Double-click a contact or link arrow to follow it.
+    Click switches, selectors and plant outputs on the drawing (outlined in orange). A push button is held while the mouse is
+    down (Shift+click holds it until clicked again). Plant inputs turn green when they see what's expected, red when they
+    don't. Double-click a contact or link arrow to follow it.
   </p>
 
+  {#if devices.length}
+    <div class="sub">Plant points</div>
+    {#each devices as d (d.item.id)}
+      <div class="dev">{d.item.tag || `${d.item.prefix || "U"}?`} <span class="where">{d.item.description}</span></div>
+      {#each d.points as p (p.ref)}
+        {@const v = viewOf(p.ref)}
+        <div class="row">
+          <span class="box" class:on={p.on} class:ok={p.colour === "ok"} class:bad={p.colour === "bad"} class:wait={p.colour === "wait"}></span>
+          <button class="go" onclick={() => v && editor.goTo(v.el.id)} title={formLabel(p.pt.form)}>{p.pt.name}</button>
+          <span class="where">{formLabel(p.pt.form)}{v ? ` · sh ${v.page.number}` : ""}</span>
+          {#if p.clicked}
+            <button class="op" class:on={sim.value(p.ref) === 1} onclick={() => sim.operate(p.ref)}>{sim.value(p.ref) ? "On" : "Off"}</button>
+          {/if}
+        </div>
+      {/each}
+    {/each}
+  {/if}
+
   <div class="sub">Inputs</div>
-  {#each sim.circuit.inputs as i (i.el)}
-    {@const x = byId.get(i.el) ?? plantViewOf(i.el)}
-    {#if x}
-      <div class="row">
-        <button class="go" onclick={() => editor.goTo(x.el.id)} title="Show on the drawing">{byId.has(i.el) ? name(x.el) : (sim.circuit.names.get(i.el) ?? i.label)}</button>
-        <span class="where">sh {x.page.number}</span>
-        {#if i.kind === "press"}
-          <button
-            class="op"
-            class:on={sim.value(i.el) === 1}
-            title="Held while the mouse button is down; Shift+click to hold it on"
-            onpointerdown={(e) => sim.hold(i.el, e.shiftKey ? sim.value(i.el) !== 1 : true)}
-            onpointerup={(e) => !e.shiftKey && sim.hold(i.el, false)}
-            onpointerleave={(e) => e.buttons && !e.shiftKey && sim.hold(i.el, false)}
-          >
-            {sim.value(i.el) === 1 ? "Held" : "Press"}
-          </button>
-        {:else}
-          <button class="op" class:on={sim.value(i.el) === 1} onclick={() => sim.operate(i.el)}>
-            {i.kind === "select" ? (i.positions?.[sim.value(i.el)] ?? `Pos ${sim.value(i.el) + 1}`) : sim.value(i.el) ? "On" : "Off"}
-          </button>
-        {/if}
-      </div>
-    {/if}
+  {#each sim.circuit.inputs.filter((i) => byId.has(i.el)) as i (i.el)}
+    {@const x = byId.get(i.el)!}
+    <div class="row">
+      <button class="go" onclick={() => editor.goTo(x.el.id)} title="Show on the drawing">{name(x.el)}</button>
+      <span class="where">sh {x.page.number}</span>
+      {#if i.kind === "press"}
+        <button
+          class="op"
+          class:on={sim.value(i.el) === 1}
+          title="Held while the mouse button is down; Shift+click to hold it on"
+          onpointerdown={(e) => sim.hold(i.el, e.shiftKey ? sim.value(i.el) !== 1 : true)}
+          onpointerup={(e) => !e.shiftKey && sim.hold(i.el, false)}
+          onpointerleave={(e) => e.buttons && !e.shiftKey && sim.hold(i.el, false)}
+        >
+          {sim.value(i.el) === 1 ? "Held" : "Press"}
+        </button>
+      {:else}
+        <button class="op" class:on={sim.value(i.el) === 1} onclick={() => sim.operate(i.el)}>
+          {i.kind === "select" ? (i.positions?.[sim.value(i.el)] ?? `Pos ${sim.value(i.el) + 1}`) : sim.value(i.el) ? "On" : "Off"}
+        </button>
+      {/if}
+    </div>
   {/each}
 
   <div class="sub">Coils and lamps</div>
@@ -91,41 +133,16 @@
     </div>
   {/each}
 
-  <div class="sub">Rules</div>
-  <p class="hint">Ferrule tries every sequence of operations (and waiting for timers) to find one that breaks a rule.</p>
-  {#each editor.project.rules as r (r.id)}
-    {@const a = byId.get(r.a)}
-    {@const b = r.b ? byId.get(r.b) : undefined}
+  <div class="sub">Expectations</div>
+  <p class="hint">What the drawing should do. <em>Check logic</em> tries every sequence of operations, plant outputs and timers to find one that breaks an expectation.</p>
+  {#each exps as e (e.id)}
+    {@const j = judged.get(e.id)}
     <div class="row rule">
-      <span>{r.kind === "never" ? "Never" : "Never both"}: {a ? name(a.el) : "?"}{b ? ` + ${name(b.el)}` : ""}</span>
-      <button class="danger small" onclick={() => editor.apply((p) => deleteRule(p, r.id))}>✕</button>
+      <span class="box" class:ok={j === "ok"} class:bad={j === "bad"} class:wait={j === "wait"}></span>
+      <span>{describeExpectation(editor.project, e, list)}</span>
     </div>
   {/each}
-  <div class="add">
-    <select bind:value={ruleKind}>
-      <option value="never-both">Never both on</option>
-      <option value="never">Never on</option>
-    </select>
-    <select bind:value={ruleA}>
-      <option value="">…</option>
-      {#each loads as { el } (el.id)}<option value={el.id}>{name(el)}</option>{/each}
-    </select>
-    {#if ruleKind === "never-both"}
-      <select bind:value={ruleB}>
-        <option value="">…</option>
-        {#each loads as { el } (el.id)}<option value={el.id}>{name(el)}</option>{/each}
-      </select>
-    {/if}
-    <button
-      onclick={() => {
-        const [k, a, b] = [ruleKind, ruleA, ruleB];
-        if (editor.apply((p) => addRule(p, k, a, k === "never-both" ? b : undefined))) {
-          ruleA = "";
-          ruleB = "";
-        }
-      }}>Add</button
-    >
-  </div>
+  {#if onexpectations}<button class="small" onclick={onexpectations}>Expectations…</button>{/if}
   <label class="inc"><input type="checkbox" bind:checked={sim.includeIsolators} /> Also try opening isolators and breakers</label>
   <button onclick={() => sim.check(editor.project)} disabled={sim.searching}>
     {sim.searching ? "Searching…" : "Check logic"}
@@ -137,14 +154,13 @@
         Explored {r.states} states{r.truncated ? " (stopped at the limit; not every sequence was tried)" : ""}.
       </div>
       {#if r.violations.length === 0 && r.faults.length === 0}
-        <div class="ok">No rule broken{r.truncated ? " in the sequences tried" : ""}, no shorts, no chatter.</div>
+        <div class="ok">{exps.length ? "Every expectation held" : "No expectations to check"}{r.truncated ? " in the sequences tried" : ""}, no shorts, no chatter.</div>
       {/if}
       {#each r.violations as v (v.rule.id)}
-        {@const a = byId.get(v.rule.a)}
-        {@const b = v.rule.b ? byId.get(v.rule.b) : undefined}
         <div class="bad">
-          Broken: {a ? name(a.el) : "?"}{b ? ` and ${name(b.el)}` : ""} on together after:
+          {v.rule.kind === "never" ? "Happens" : "Fails"}: {describeExpectation(editor.project, v.rule, list)}, after:
           <ol>{#each v.path as act, i (i)}<li>{sim.describe(act)}</li>{/each}</ol>
+          {#if !v.path.length}<div>(from the start)</div>{/if}
           <button class="small" onclick={() => sim.replay(v.path)}>Replay</button>
         </div>
       {/each}
@@ -220,6 +236,37 @@
     border: 1px solid #889;
     flex: none;
   }
+  .box {
+    width: 10px;
+    height: 10px;
+    border: 1px solid #889;
+    flex: none;
+  }
+  .box.on {
+    background: #8a94a6;
+  }
+  .box.ok {
+    border-color: #1a8f3a;
+    background: #bfe6c8;
+  }
+  .box.ok.on {
+    background: #1a8f3a;
+  }
+  .box.bad {
+    border-color: #c62828;
+    background: #f5c2c2;
+  }
+  .box.bad.on {
+    background: #c62828;
+  }
+  .box.wait {
+    border-style: dashed;
+  }
+  .dev {
+    font-size: 12px;
+    font-weight: 600;
+    margin-top: 2px;
+  }
   .dot.on {
     background: #1a8f3a;
     border-color: #1a8f3a;
@@ -267,5 +314,9 @@
   }
   .rule {
     font-size: 12px;
+    align-items: flex-start;
+  }
+  .rule .box {
+    margin-top: 2px;
   }
 </style>
