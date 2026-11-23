@@ -4,14 +4,14 @@
  * this format. There's no upgrading before 1.0: an older file is refused
  * with a plain message rather than half-opened.
  */
-import { PLANT_VIEW_KEYS } from "./ops";
+import { PLANT_VIEW_KEYS, labelWidthFor } from "./ops";
 import { parseProjectDevices } from "./devices";
 import { AREA_UNITS } from "./geometry";
 import { DISTRIBUTION_KINDS, type DistributionKind, POINT_FORMS, type Condition, type Controller, type ControllerSlot, type ModuleInfo, type ModuleType, type PlantItem, type Expectation, type IoPoint, type PinInfo, type PointForm, FORMAT, FORMAT_VERSION, type GaDim, type GaDimPoint, type GaItem, type Page, type Project, emptyInfo } from "./model";
 import { defaultParams, getSymbol } from "./symbols";
 import { gaToSheet } from "./ga";
 import { MODULE_TYPES } from "./modules";
-import { colourCode, knownColour } from "./wirecolours";
+import { colourCode, knownColour, lampColour } from "./wirecolours";
 
 export class ProjectFormatError extends Error {}
 
@@ -97,6 +97,13 @@ export function parseProject(input: unknown): Project {
     for (const el of pg.elements) {
       // Plant view settings belong to plant views only.
       if (el.symbol !== "plant-view") for (const k of PLANT_VIEW_KEYS) delete el.params[k];
+      // Every lamp has a colour: none and clear are white (v0.2.1 note 4).
+      if (el.symbol === "lamp") el.params.colour = lampColour(String(el.params.colour ?? ""));
+      // Labels are one line, wrapped by their width (note 18); Text keeps its lines.
+      if (el.symbol !== "text" && el.label.includes("\n")) {
+        if (!(typeof el.params.labelWidth === "number" && el.params.labelWidth > 0)) el.params.labelWidth = labelWidthFor(el.label, project);
+        el.label = el.label.replace(/\s*\n\s*/g, " ");
+      }
       // Terminals on a panel boundary are cells of its terminal block.
       if (el.symbol !== "terminal") continue;
       if (pg.boundaryY !== null && el.pos[1] === pg.boundaryY && (el.rot === 0 || el.rot === 180)) el.params.onBlock = true;
@@ -471,6 +478,20 @@ function parseConductors(v: unknown): Project["conductors"] {
  * period only: remove when 0.2.0 is released.
  */
 function preRelease(input: Record<string, unknown>): void {
+  // Annotate label plates became boxes: label plates are a GA item now (v0.2.1 note 3).
+  // A cable screen's drain on the left is its E2 now; it has points both sides (note 13).
+  for (const pg of arr(input.pages).filter(isObj)) {
+    const renamed = new Set<string>();
+    for (const el of arr(pg.elements).filter(isObj)) {
+      const params = isObj(el.params) ? el.params : {};
+      if (el.symbol === "plate") {
+        el.symbol = "box";
+        el.params = { w: params.w ?? 20, h: params.h ?? 5 };
+      } else if (el.symbol === "screen" && params.drain === "left" && typeof el.id === "string") renamed.add(el.id);
+    }
+    for (const s of arr(pg.segments).filter(isObj))
+      for (const r of [s.from, s.to]) if (Array.isArray(r) && renamed.has(r[0]) && r[1] === "E") r[1] = "E2";
+  }
   // Plant groups became points, and logic rules expectations (step 8a).
   for (const pl of arr(input.plant).filter(isObj)) {
     if (!Array.isArray(pl.groups) || pl.points) continue;

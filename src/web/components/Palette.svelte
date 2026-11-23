@@ -39,7 +39,6 @@
       { key: "tool:section", name: "Section", group: "Drawing", icon: "section", tool: "section" },
       { key: "tool:cloud", name: "Revision cloud", group: "Drawing", icon: "cloud", tool: "cloud" },
       ...parts,
-      { key: "logo", name: "Logo", group: "Drawing", symbol: "image", icon: "picture", params: { asset: "@logo" } },
     ];
   });
   /** Shown by name first: the name says what a part is; the small picture is a reminder. */
@@ -55,7 +54,7 @@
 
   function isActive(it: Item): boolean {
     if (it.tool) return editor.tool === it.tool;
-    return editor.tool === "place" && editor.placeSymbol === it.symbol && (editor.placeParams.asset === "@logo") === (it.key === "logo");
+    return editor.tool === "place" && editor.placeSymbol === it.symbol;
   }
 
   function pick(it: Item) {

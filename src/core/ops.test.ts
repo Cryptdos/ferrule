@@ -14,7 +14,7 @@ describe("element operations", () => {
     const { p, pg } = setup();
     const e = addElement(p, pg, "lamp", [10.4, 19.6]);
     expect(e.pos).toEqual([10, 20]);
-    expect(e.params.colour).toBe("");
+    expect(e.params.colour).toBe("Wh");
     expect(p.pages[0]!.elements).toHaveLength(1);
   });
 

@@ -82,6 +82,8 @@
   const condById = $derived(new Map(project.conductors.map((c) => [c.id, c])));
   /** Which wires print their number: once per conductor per sheet, none on field or earth wires by default (15, 24). */
   const numbered = $derived(numberedSegments(page, earthConductors(project), (s) => routes?.get(s.id) ?? routeOf(page, s)));
+  /** Terminal strip lines are drawn over the terminals they cross (v0.2.1 note 1). */
+  const drawOrder = $derived([...page.elements.filter((e) => e.symbol !== "strip-line"), ...page.elements.filter((e) => e.symbol === "strip-line")]);
 </script>
 
 <rect class="paper" x="0" y="0" width={SHEET_MM.w} height={SHEET_MM.h} />
@@ -138,7 +140,7 @@
     {/each}
   </g>
   {#if page.ga}<GaLayer {project} {page} preview={gaPreview} />{/if}
-  {#each page.elements as el (el.id)}
+  {#each drawOrder as el (el.id)}
     {@const o = offset?.(el.id)}
     <g class:dim={focus && benchOf(el) !== focus}>
       <ElementView el={ops?.[el.id] ? { ...el, params: { ...el.params, __op: true } } : el} {project} dx={o?.[0] ?? 0} dy={o?.[1] ?? 0} />

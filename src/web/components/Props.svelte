@@ -235,15 +235,13 @@
         <p class="hint">Plant views no longer have their own label: what it says belongs in the plant's information (Plant) or a Text annotation. Clear it to remove it.</p>
       {/if}
       <label>
-        {one.symbol === "plate" ? "Text" : "Label"}
+        Label
         <FieldInput
           {editor}
           value={one.label}
-          multiline={one.symbol === "plate"}
           onchange={(v) => patch({ label: v })}
         />
       </label>
-      {#if one.symbol !== "plate"}
         <!-- Longer labels wrap onto more lines at this width (28); shown before there's a label, so it's found. -->
         <label>
           Label width (units, 0: one line)
@@ -256,7 +254,6 @@
             onchange={(e) => setParam("labelWidth", Math.max(0, Math.min(150, Number(e.currentTarget.value) || 0)))}
           />
         </label>
-      {/if}
     {/if}
     {#if one.symbol === "ctrlmap"}
       <label>

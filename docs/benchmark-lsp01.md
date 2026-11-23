@@ -90,7 +90,7 @@ It was built from this sanitised description alone. The original drawings stayed
 |---|---|
 | 1. All 12 sheets, same layout and readability | 12 sheets in the original order, A4. Readability judged on the exported PDF. Needs a side-by-side look against the original. |
 | 2. Every tag, wire number, terminal number and cross-reference generated | Yes. Nothing is typed; renumbering again changes nothing (tested). |
-| 3. Section titles, motor labels, door labels from plant tags | Yes. Every plant name on every sheet is a `{plant:…}` field (tested: no literal plant tags in any label, title or section). |
+| 3. Section titles, motor labels, door labels from plant tags | Yes. Every plant name on every sheet is a `{plant:…}` field (tested: no literal plant tags in any label, title or section). Since v0.2.1 label plates are GA items only, so the door label sheets 11–12 aren't drawn as sheets: the door GA carries the plates (the panel name, the danger warning, the section heading), and the door devices are tagged from the schematic. |
 | 4. Sheets 3–6 from one template, 8–9 from one | Yes ("Fan starter section", "Fans duty/standby controls"). Cross-sheet links (CCT/0V feeds, enable loops, run signals, the fire alarm relay's contacts) are made after stamping. |
 | 5. Simulator runs the logic and exposes faults | Yes (milestone 10). Duty/standby, airflow proving, the 10 s fail timer and the fans-fail latch run as drawn across sheets 3–9 (tested). The search proves SF-01 and SF-02 are never enabled together. It also exposes a fault: see below. |
 | 6. Clean A4 PDF, title block from project data | Yes, including revision B with a cloud on sheet 8. |

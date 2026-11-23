@@ -24,6 +24,7 @@ import { localGeometry, paramApplies, plantViewLayout, requireSymbol, terminalNa
 import { textUnits } from "./geometry";
 import { textWidth } from "./textwidth";
 import { parseProject } from "./validate";
+import { displayTag } from "./tags";
 import { contactTable, linkedTarget } from "./xref";
 
 function sheet() {
@@ -177,18 +178,20 @@ describe("off-page arrows", () => {
 });
 
 describe("cable screen", () => {
-  test("a rounded rectangle across its cores, the drain out to the side, and no body for wires to route round (25)", () => {
-    const { add } = sheet();
+  test("a rounded rectangle across its cores, a point for its drain at each end, no tail, no tag, no body for wires to route round (v0.2.1 notes 13, 25)", () => {
+    const { p, add } = sheet();
     const s = add("screen", 10, 10, { span: 6 });
     const g = localGeometry(s, "W1");
     expect(g.body.w).toBe(0);
-    expect(g.terminals.map((t) => t.name)).toEqual(["E"]);
-    // The drain leaves sideways, level with the screen.
-    expect(g.terminals[0]!.dir).toBe("right");
-    expect(g.terminals[0]!.at[1]).toBe(0);
-    const outline = g.prims.find((x) => x.t === "line" && x.pts.length > 10);
-    expect(outline && outline.t === "line" ? Math.max(...outline.pts.map((v) => v[0])) - Math.min(...outline.pts.map((v) => v[0])) : 0).toBeGreaterThan(7);
-    expect(terminalNames(add("screen", 30, 10, { drain: "none" }))).toEqual([]);
+    expect(g.terminals.map((t) => [t.name, t.dir, t.at[1]])).toEqual([
+      ["E", "right", 0],
+      ["E2", "left", 0],
+    ]);
+    // On whole units, at the ends of the outline: no tail.
+    expect(g.terminals.map((t) => t.at[0])).toEqual([7, -1]);
+    expect(g.prims.filter((x) => x.t === "line")).toHaveLength(1);
+    expect(g.prims.some((x) => x.t === "text" && x.text === "W1")).toBe(false);
+    expect(displayTag(s, p)).toBe("");
   });
 });
 
@@ -223,8 +226,8 @@ describe("plant pins and points (quick entry)", () => {
     expect(texts).toContain("MODEL X");
     expect(texts).toContain("7.5kW");
     expect(g.prims.some((x) => x.t === "text" && x.text === "ENABLE")).toBe(true);
-    // Every plant box is the same height.
-    expect(g.body.h).toBe(6);
+    // Every plant box is the same height: room for a 5-character pin name (v0.2.1 note 36).
+    expect(g.body.h).toBe(6.5);
   });
 
   test("the same terminal names in two points are told apart: R1: C NO NC | R2: C NO NC", () => {

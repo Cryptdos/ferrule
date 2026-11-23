@@ -16,6 +16,7 @@
   } from "../../core/geometry";
   import {
     addElement,
+    flipElements,
     addSection,
     addCloud,
     moveElements,
@@ -226,7 +227,7 @@
   function resizable(): { el: Element; size: Vec; corner: Vec } | null {
     if (sim || editor.selection.length !== 1) return null;
     const el = page.elements.find((e) => e.id === editor.selection[0]);
-    if (!el || !["image", "box", "plate", "highlight"].includes(el.symbol) || el.rot !== 0) return null;
+    if (!el || !["image", "box", "highlight"].includes(el.symbol) || el.rot !== 0) return null;
     const size: Vec = [Number(el.params.w) || 20, Number(el.params.h) || 10];
     return { el, size, corner: [el.pos[0] + size[0], el.pos[1] + size[1]] };
   }
@@ -664,7 +665,8 @@
         id =
           symbol === "plant-view"
             ? placePlantView(p, editor.pageId, String(params.plant), at, String(params.show ?? "").split(",").filter(Boolean)).id
-            : addElement(p, editor.pageId, symbol, at, { params }).id;
+            : addElement(p, editor.pageId, symbol, at, { params, rot: editor.placeRot }).id;
+        if (editor.placeFlip && symbol !== "plant-view") flipElements(p, editor.pageId, [id]);
       });
       if (id) editor.selection = [id];
       // Place one, then back to Select (note 72), unless the setting says keep placing.
@@ -1230,6 +1232,13 @@
     return new Map(tmp.segments.map((s) => [s.id, s.points]));
   });
 
+  // A new part to place starts upright (R and F turn and flip it before it's placed).
+  $effect(() => {
+    void editor.placeSymbol;
+    editor.placeRot = 0;
+    editor.placeFlip = false;
+  });
+
   const ghost = $derived.by((): Element | null => {
     if (editor.tool !== "place" || !editor.placeSymbol || !pointer) return null;
     return {
@@ -1238,7 +1247,8 @@
       tag: "",
       label: "",
       pos: clampToArea(snapVec(pointer)),
-      rot: 0,
+      rot: editor.placeRot,
+      ...(editor.placeFlip ? { flip: true } : {}),
       zone: "internal",
       params: { ...defaultParams(editor.placeSymbol), ...editor.placeParams },
       links: [],
@@ -1273,8 +1283,8 @@
     return out;
   });
   function lampColour(c: unknown): string {
-    // White and clear lamps glow a warm white, so they show on white paper.
-    return { Gn: "#3cc85a", Rd: "#ff4a4a", Wh: "#ffe9a8", Cl: "#fff1c2", Bu: "#4a8cff", Ye: "#ffd21f" }[String(c)] ?? "#ffd21f";
+    // White lamps glow a warm white, so they show on white paper.
+    return { Gn: "#3cc85a", Rd: "#ff4a4a", Wh: "#ffe9a8", Bu: "#4a8cff", Ye: "#ffd21f" }[String(c)] ?? "#ffe9a8";
   }
 
   const cursorClass = $derived(

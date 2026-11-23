@@ -35,6 +35,9 @@ export class Editor {
     $state(null);
   /** Extra settings for the symbol being placed (e.g. which plant item a view shows). */
   placeParams: Record<string, string | number | boolean> = $state({});
+  /** The part being placed, turned and flipped with R and F before it's placed (35). */
+  placeRot: 0 | 90 | 180 | 270 = $state(0);
+  placeFlip: boolean = $state(false);
   saveState: SaveState = $state("saved");
   message: string = $state("");
   /** A schematic device (or terminal strip) being placed on a GA sheet. */

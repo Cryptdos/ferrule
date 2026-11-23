@@ -80,6 +80,8 @@ Split view and tiling windows (9), alignment tools (5), icon-only buttons (11). 
 
 ## 9. Changed during build
 
+**Step 2 split:** step 2 is two PRs: 2a (lamps, call-outs, logo and label plate out, one-line labels, R/F while placing, plant minimum height, strip lines on top, cable screen, PE earth, incoming supply flip, the logo) and 2b (Markdown text, push button poles, selector positions, Colour check).
+
 **Step 1 (windows and top bar)**
 
 - **Esc on the drawing** cancels what's in progress first (a wire being drawn, a part being placed, a link being made), then closes the window on top, then clears what's picked. With the focus in a window, `Esc` closes that window, as before.
@@ -87,3 +89,13 @@ Split view and tiling windows (9), alignment tools (5), icon-only buttons (11). 
 - **Select and Wire** sit after Fit and Split on every workbench (Select only, outside Draft).
 - **Dark theme:** the interface is turned dark and its contrast toned down, so white becomes a dark grey (about #1f) and black text a soft white. Pictures and previews inside are turned back as they were.
 - **Icons:** Text, Symbol legend and Controller map are drawn as small pictures of what they are; Box and Terminal strip line are drawn at a small size so their lines show.
+
+**Step 2a (parts and Annotate, first half)**
+
+- **Call-outs** already numbered by hand open with *Auto* ticked, so they renumber in the order they were placed; untick *Auto* to keep a number.
+- **One-line labels:** a label written on two lines (in a file, or from MCP) becomes one line with a *Label width* set to its widest line, so it still wraps where it did, near enough. The example's two-line labels do the same.
+- **Label plates:** the example's two door label sheets are gone; their plates are on its door GA (with a warning plate and section headings), and the not-to-scale GA's door labels are boxes. The example is 14 sheets. Plates in files become boxes, keeping their size and text.
+- **Cable screen:** a drain wired on the left in a file moves to the new left point (`E2`).
+- **Plant minimum height:** the boxes are tall enough for a name like `BAT+5`; most plant views grow half a unit.
+- **PE earth:** the stem runs in from the top of the circle to bars just below its middle, so the sign sits centred.
+- **The logo** without its cable is scaled up a little and centred on its tile; the exe icon is redrawn at every size from the three drawings.
