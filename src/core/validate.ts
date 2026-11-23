@@ -1,12 +1,15 @@
 /**
- * Loading project files. Checks the shape, fills in fields added since
- * the file was written, and rejects anything that isn't a Ferrule project.
+ * Loading project files. Checks the shape (files can be hand-edited or
+ * written over MCP) and rejects anything that isn't a Ferrule project of
+ * this format. There's no upgrading before 1.0: an older file is refused
+ * with a plain message rather than half-opened.
  */
 import { PLANT_VIEW_KEYS } from "./ops";
 import { parseProjectDevices } from "./devices";
+import { AREA_UNITS } from "./geometry";
 import { FORMAT, FORMAT_VERSION, type GaItem, type Page, type Project, emptyInfo } from "./model";
 import { getSymbol } from "./symbols";
-import { colourCode, lampColour } from "./wirecolours";
+import { colourCode } from "./wirecolours";
 
 export class ProjectFormatError extends Error {}
 
@@ -22,8 +25,11 @@ export function parseProject(input: unknown): Project {
   const version = typeof input.version === "number" ? input.version : 0;
   if (version > FORMAT_VERSION) {
     throw new ProjectFormatError(
-      `Project was saved by a newer Ferrule (format ${version}); this build reads up to ${FORMAT_VERSION}`,
+      `Project was saved by a newer Ferrule (format ${version}); this build reads format ${FORMAT_VERSION}`,
     );
+  }
+  if (version < FORMAT_VERSION) {
+    throw new ProjectFormatError("This project was made with Ferrule 0.1; this version can't open it. Projects from 0.1 need redrawing.");
   }
   if (typeof input.id !== "string" || !input.id) throw new ProjectFormatError("Project has no id");
 
@@ -90,11 +96,11 @@ export function parseProject(input: unknown): Project {
       ...(typeof r.note === "string" ? { note: r.note } : {}),
     }));
   project.assets = parseAssets(input.assets);
-  // Terminals on a panel boundary are cells of its terminal block (older files didn't say).
   for (const pg of project.pages) {
     for (const el of pg.elements) {
-      // Plant view settings picked up by other parts (a placement bug in 0.1) are dropped.
+      // Plant view settings belong to plant views only.
       if (el.symbol !== "plant-view") for (const k of PLANT_VIEW_KEYS) delete el.params[k];
+      // Terminals on a panel boundary are cells of its terminal block.
       if (el.symbol !== "terminal") continue;
       if (pg.boundaryY !== null && el.pos[1] === pg.boundaryY && (el.rot === 0 || el.rot === 180)) el.params.onBlock = true;
       else delete el.params.onBlock;
@@ -115,8 +121,6 @@ export function parseProject(input: unknown): Project {
   if (devices.length) project.devices = devices;
   if (input.useDeviceLibrary === false) project.useDeviceLibrary = false;
   project.conductors = parseConductors(input.conductors);
-  const lamps = new Set(project.pages.flatMap((pg) => pg.elements.filter((e) => e.symbol === "lamp").map((e) => e.id)));
-  for (const c of project.conductors) c.terminals = c.terminals.map((t) => upgradeRef(t, lamps));
   return project;
 }
 
@@ -137,7 +141,7 @@ export function parseTemplate(t: Record<string, unknown>, i = 0): Project["templ
     size:
       Array.isArray(t.size) && t.size.length === 2 && t.size.every((n) => typeof n === "number")
         ? (t.size as [number, number])
-        : [200, 112],
+        : [AREA_UNITS.w, AREA_UNITS.h - 8],
   };
 }
 
@@ -164,8 +168,7 @@ export function parsePlant(v: unknown): Project["plant"] {
     .map((pl) => ({
       id: pl.id as string,
       tag: strOr(pl.tag),
-      // Plant tags became prefix + position (format 2): the prefix comes from an older typed tag.
-      prefix: strOr(pl.prefix) || /^[A-Za-z]+/.exec(strOr(pl.tag))?.[0]?.toUpperCase() || "U",
+      prefix: strOr(pl.prefix) || "U",
       ...(pl.locked === true ? { locked: true } : {}),
       ...(pl.powerByOthers === true ? { powerByOthers: true } : {}),
       description: strOr(pl.description),
@@ -187,18 +190,6 @@ export function parsePlant(v: unknown): Project["plant"] {
         : {}),
       ...(typeof pl.info === "string" && pl.info ? { info: pl.info } : {}),
     }));
-}
-
-// ---------------------------------------------------------------------------
-// Older files
-
-/** Lamp colours were single letters before the IEC 60757 two-letter codes. */
-const OLD_LAMP_COLOURS: Record<string, string> = { A: "Ye", G: "Gn", R: "Rd", W: "Wh", B: "Bu", Y: "Ye" };
-/** Lamp terminals were L and N before V+ and V- (they're often 24 V DC). */
-const OLD_LAMP_TERMINALS: Record<string, string> = { L: "V+", N: "V-" };
-
-function upgradeRef(ref: [string, string], lamps: Set<string>): [string, string] {
-  return lamps.has(ref[0]) && OLD_LAMP_TERMINALS[ref[1]] ? [ref[0], OLD_LAMP_TERMINALS[ref[1]]!] : ref;
 }
 
 function parsePage(pg: Record<string, unknown>, i: number): Project["pages"][number] {
@@ -253,21 +244,6 @@ function parsePage(pg: Record<string, unknown>, i: number): Project["pages"][num
         sc.rect.every((n) => typeof n === "number"),
     )
     .map((sc) => ({ id: sc.id as string, label: strOr(sc.label), rect: sc.rect as [number, number, number, number] }));
-  const lamps = new Set(elements.filter((e) => e.symbol === "lamp").map((e) => e.id));
-  for (const e of elements) {
-    // Link arrows had a direction (out/in) before the Source tick.
-    if (e.symbol === "offpage" && typeof e.params.direction === "string") {
-      e.params.source = e.params.direction !== "in";
-      delete e.params.direction;
-    }
-    if (e.symbol === "lamp" && typeof e.params.colour === "string") {
-      e.params.colour = OLD_LAMP_COLOURS[e.params.colour] ?? lampColour(e.params.colour);
-    }
-  }
-  for (const s of segments) {
-    s.from = upgradeRef(s.from, lamps);
-    s.to = upgradeRef(s.to, lamps);
-  }
   // A GA sheet: settings and its items in real mm.
   let ga: Page["ga"];
   if (isObj(pg.ga) && isObj(pg.ga.enclosure)) {

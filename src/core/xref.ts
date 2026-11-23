@@ -7,7 +7,7 @@
  * coil shows a table of its contacts and where they are. Off-page arrows
  * link in pairs and show where the other one is.
  */
-import { columnOf, type Rect, type Vec } from "./geometry";
+import { columnOf, lineUnits, textUnits, type Rect, type Vec } from "./geometry";
 import type { Element, Page, Project } from "./model";
 import { isolatorAux, type Prim } from "./symbols";
 
@@ -185,12 +185,12 @@ export function xrefText(project: Project, el: Element, masterTag: string): stri
   return "";
 }
 
-// Contact table layout, in grid units.
-const TABLE_ROW = 1.1;
-const TABLE_TEXT = 0.85;
-const TABLE_W = 7.4;
+// Contact table layout, in grid units, sized for its text (the `detail` style).
+const TABLE_TEXT = textUnits("detail");
+const TABLE_ROW = TABLE_TEXT * 1.3;
+const TABLE_W = TABLE_TEXT * 7.6;
 /** Where the marks column ends and the address column starts. */
-const TABLE_SEP = 4.4;
+const TABLE_SEP = TABLE_TEXT * 4.5;
 
 /**
  * Where a coil's contact table sits, relative to the coil, or wherever it
@@ -216,8 +216,8 @@ export function contactTablePrims(rows: [string, string, string][], at: Vec): Pr
   const [x0, top] = at;
   const sep = x0 + TABLE_SEP;
   const out: Prim[] = [
-    { t: "line", pts: [[x0, top], [x0 + TABLE_W, top]], w: 0.1 },
-    { t: "line", pts: [[sep, top], [sep, top + rows.length * TABLE_ROW + 0.3]], w: 0.1 },
+    { t: "line", pts: [[x0, top], [x0 + TABLE_W, top]], w: lineUnits("thin") },
+    { t: "line", pts: [[sep, top], [sep, top + rows.length * TABLE_ROW + 0.3]], w: lineUnits("thin") },
   ];
   rows.forEach(([type, marks, where], i) => {
     const y = top + (i + 1) * TABLE_ROW - 0.15;

@@ -375,3 +375,14 @@ Each step is one pull request, with a build to test.
 - **ATS-1's N wire (66)** was saved hand-routed with the old bend, so it keeps it. *Reset route* now gives a straight wire.
 - **Transformer polarity (74).** The secondary's live side follows the primary: P1 on the phase makes S1 live; P2 on the phase makes S2 live.
 - **Incoming supply (64).** Names sit beyond each arrow's tail at every rotation. The label goes above the arrows, or below them when they point up.
+
+**Step 2 (grid and text)**
+
+- **Text sizes users pick** (Text, Notes, revision list, legend, label plates) are now the named styles: Detail 1.8, Note 2.5, Heading 3.5, Title 5 mm. Text and Notes default to Note.
+- **Part labels are `tag` style (2.5 mm)**, which made long labels crowd their neighbours at a 10-unit rung pitch. Labels can now be written on two lines (a line break in the label). A label drawn above its tag grows upwards, clear of it.
+- **Contact tables** are sized from their 1.8 mm text and fit between rungs 5 columns apart.
+- **Revision list** columns are set in multiples of the text size, so the table keeps its shape at any size.
+- **Terminal block:** the number stays at 1.8 mm; when one won't fit up a 3-unit cell, every cell in that sheet's block grows by half-unit steps (set when wires are routed).
+- **Plant terminal boxes** are 1 unit apart with the name running up the box, like block cells. They're 3 units tall, taller when a name needs it.
+- **GA sheets:** the enclosure's corner moved to (8, 9) so the same room in millimetres is left for dimensions.
+- **Your test files** (Example Building, ATS-1) are format 2, so this build refuses them with the 0.1 message, as agreed. The LSP-01 example is rebuilt for the new grid.

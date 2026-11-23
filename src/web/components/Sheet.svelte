@@ -1,9 +1,10 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
-  import { AREA_MM, AREA_UNITS, SHEET_MM, UNIT_MM } from "../../core/geometry";
+  import { AREA_MM, AREA_UNITS, SHEET_MM, UNIT_MM, lineUnits, textUnits } from "../../core/geometry";
   import type { Page, Project } from "../../core/model";
   import type { Vec } from "../../core/geometry";
-  import { BLOCK_HALF, BLOCK_INSET, blockLabels, connectionDots, isFieldWire, routeOf, wireTexts } from "../../core/wires";
+  import { blockHalf } from "../../core/blocks";
+  import { BLOCK_INSET, blockLabels, connectionDots, isFieldWire, routeOf, wireTexts } from "../../core/wires";
   import { resolveFields } from "../../core/fields";
   import { cloudsOn } from "../../core/ops";
   import { cloudPath } from "../../core/titleblock";
@@ -50,6 +51,14 @@
     over?: Snippet;
   } = $props();
 
+  // Line weights and text sizes, in grid units, for the styles below.
+  const STYLE_VARS = [
+    `--thin: ${lineUnits("thin")}`,
+    `--thick: ${lineUnits("thick")}`,
+    `--detail: ${textUnits("detail")}px`,
+    `--tag: ${textUnits("tag")}px`,
+    `--heading: ${textUnits("heading")}px`,
+  ].join("; ");
   const dots = $derived(routes ? [] : connectionDots(page));
   const clouds = $derived(cloudsOn(project, page.id));
   const boundaryY = $derived(boundary !== undefined && boundary !== null ? boundary : page.boundaryY);
@@ -73,7 +82,7 @@
 <rect class="paper" x="0" y="0" width={SHEET_MM.w} height={SHEET_MM.h} />
 <Frame />
 <TitleBlock {project} {page} />
-<g transform="translate({AREA_MM.x} {AREA_MM.y}) scale({UNIT_MM})">
+<g transform="translate({AREA_MM.x} {AREA_MM.y}) scale({UNIT_MM})" style={STYLE_VARS}>
   {#if grid}
     <rect class="grid" x="0" y="0" width={AREA_UNITS.w} height={AREA_UNITS.h} fill="url(#ferrule-grid)" />
   {/if}
@@ -88,7 +97,7 @@
   {/each}
   {#if boundaryY !== null}
     <!-- Panel boundary: the terminal block, full width; its terminals are cells in it. -->
-    <rect class="block" x={BLOCK_INSET} y={boundaryY - BLOCK_HALF} width={AREA_UNITS.w - BLOCK_INSET * 2} height={BLOCK_HALF * 2} />
+    <rect class="block" x={BLOCK_INSET} y={boundaryY - blockHalf(page)} width={AREA_UNITS.w - BLOCK_INSET * 2} height={blockHalf(page) * 2} />
     {#each blockLabels(page) as l (l.x)}
       <text class="strip" x={l.x} y={boundaryY + 0.42} text-anchor={l.anchor}>{l.text}</text>
     {/each}
@@ -144,13 +153,13 @@
   .wires polyline {
     fill: none;
     stroke: #000;
-    stroke-width: 0.18;
+    stroke-width: var(--thin);
     stroke-linejoin: miter;
     stroke-linecap: square;
   }
   .wires polyline.live {
     stroke: #d42020;
-    stroke-width: 0.35;
+    stroke-width: var(--thick);
   }
   .wires polyline.field {
     stroke-dasharray: 0.9 0.5;
@@ -158,34 +167,34 @@
   .section rect {
     fill: none;
     stroke: #000;
-    stroke-width: 0.15;
+    stroke-width: var(--thin);
     stroke-dasharray: 1.2 0.6;
   }
   .section text {
     font-family: var(--drawing-font);
-    font-size: 1.5px;
+    font-size: var(--heading);
     fill: #000;
   }
   .cloud path,
   .cloud polygon {
     fill: none;
     stroke: #000;
-    stroke-width: 0.18;
+    stroke-width: var(--thin);
   }
   .cloud text {
     font-family: var(--drawing-font);
-    font-size: 1.5px;
+    font-size: var(--tag);
     fill: #000;
   }
   /* Panel boundary: the terminal block. */
   .block {
     fill: none;
     stroke: #000;
-    stroke-width: 0.25;
+    stroke-width: var(--thick);
   }
   .strip {
     font-family: var(--drawing-font);
-    font-size: 1.15px;
+    font-size: var(--tag);
     fill: #000;
   }
   .wires circle {
@@ -193,7 +202,7 @@
   }
   .wirenum {
     font-family: var(--drawing-font);
-    font-size: 1.05px;
+    font-size: var(--detail);
     fill: #000;
   }
 </style>

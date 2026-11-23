@@ -50,7 +50,7 @@ An open editor tab follows changes Claude makes: it reloads the project and says
 | `check_logic` | Search for any sequence that breaks a rule (e.g. two contactors on together), or shorts the supply |
 | `export_pdf` | Saves the A4 PDF into an `exports` folder beside `projects` |
 
-Coordinates are grid units: x 0–200 across (2 per column), y 0–120 down. Sheets are referred to by number, elements and wires by id.
+Coordinates are grid units: x 0–150 across (2 per column, 75 columns), y 0–90 down. Sheets are referred to by number, elements and wires by id.
 
 ## Security
 

@@ -111,14 +111,24 @@
     <ul>
       {#each projects as p (p.id)}
         <li>
-          <button class="open" onclick={() => onopen(p.id)} title={p.path}>
-            <strong>{p.title}</strong>
-            <span>{p.pages} {p.pages === 1 ? "sheet" : "sheets"} · saved {new Date(p.modified).toLocaleString()}</span>
-            <span class="path">{p.path}</span>
-          </button>
+          {#if p.error}
+            <div class="open refused" title={p.path}>
+              <strong>{p.title}</strong>
+              <span>{p.error}</span>
+              <span class="path">{p.path}</span>
+            </div>
+          {:else}
+            <button class="open" onclick={() => onopen(p.id)} title={p.path}>
+              <strong>{p.title}</strong>
+              <span>{p.pages} {p.pages === 1 ? "sheet" : "sheets"} · saved {new Date(p.modified).toLocaleString()}</span>
+              <span class="path">{p.path}</span>
+            </button>
+          {/if}
           <div class="actions">
-            <button onclick={() => duplicate(p)} title="Make a copy beside it">Duplicate</button>
-            <a class="button" href={`/api/projects/${encodeURIComponent(p.id)}/file`} download title="Download the .ferrule file">Download</a>
+            {#if !p.error}
+              <button onclick={() => duplicate(p)} title="Make a copy beside it">Duplicate</button>
+              <a class="button" href={`/api/projects/${encodeURIComponent(p.id)}/file`} download title="Download the .ferrule file">Download</a>
+            {/if}
             {#if p.where === "elsewhere"}
               <button onclick={() => forget(p)} title="Take it off this list; the file stays where it is">Remove from list</button>
             {/if}
@@ -134,6 +144,10 @@
 {/if}
 
 <style>
+  .refused {
+    opacity: 0.6;
+    cursor: default;
+  }
   .uselib {
     display: flex;
     align-items: center;

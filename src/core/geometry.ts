@@ -4,24 +4,69 @@
  * Everything in the model is in grid units. Millimetres only appear here,
  * where a page is fitted to A4 paper.
  *
- * The drawing area is 100 columns wide, two grid units per column, so a
- * grid unit is 277 mm / 200 = 1.385 mm on paper.
+ * The drawing area is 75 columns wide, two grid units per column, so a
+ * grid unit is 277 mm / 150 ≈ 1.847 mm on paper.
+ *
+ * Text and line weights are set in millimetres, by named style, and turned
+ * into grid units here: changing the grid again never changes a text size.
  */
 
 /** A4 landscape, in millimetres. */
 export const SHEET_MM = { w: 297, h: 210 } as const;
 
-export const COLUMNS = 100;
+export const COLUMNS = 75;
 export const UNITS_PER_COLUMN = 2;
 
 /** Drawing area size in grid units. */
-export const AREA_UNITS = { w: COLUMNS * UNITS_PER_COLUMN, h: 120 } as const;
+export const AREA_UNITS = { w: COLUMNS * UNITS_PER_COLUMN, h: 90 } as const;
 
 /** Drawing area (the frame) on the sheet, in millimetres. */
 export const AREA_MM = { x: 10, y: 8, w: 277 } as const;
 
 /** Millimetres per grid unit. */
 export const UNIT_MM = AREA_MM.w / AREA_UNITS.w;
+
+/**
+ * Text styles (ISO 3098 type B heights, in millimetres). Every piece of text
+ * on a drawing uses one of these; nothing is drawn smaller than `detail`.
+ */
+export const TEXT_MM = {
+  /** Cover sheet title. */
+  title: 5,
+  /** Section box titles, title block main fields. */
+  heading: 3.5,
+  /** Part tags, labels, busbar names, link arrow labels, plant names. */
+  tag: 2.5,
+  /** Terminal and pin numbers, wire numbers, contact tables, cross-references, ratings, captions. */
+  detail: 1.8,
+  /** Notes and text. */
+  note: 2.5,
+} as const;
+
+export type TextStyle = keyof typeof TEXT_MM;
+
+/** The smallest text drawn, in millimetres. */
+export const MIN_TEXT_MM = TEXT_MM.detail;
+
+/** A text style's size in grid units. */
+export function textUnits(style: TextStyle): number {
+  return TEXT_MM[style] / UNIT_MM;
+}
+
+/** Line weights, in millimetres. */
+export const LINE_MM = {
+  /** Symbols and wires. */
+  thin: 0.25,
+  /** Busbars, the terminal block, plant outlines. */
+  thick: 0.5,
+  /** The sheet frame. */
+  frame: 0.7,
+} as const;
+
+/** A line weight in grid units. */
+export function lineUnits(weight: keyof typeof LINE_MM): number {
+  return LINE_MM[weight] / UNIT_MM;
+}
 
 /** Frame height in millimetres. */
 export const AREA_H_MM = AREA_UNITS.h * UNIT_MM;
@@ -38,11 +83,11 @@ export const TITLE_BLOCK_MM = {
 } as const;
 
 /** Unlabelled tick marks down the left and right edges. */
-export const SIDE_TICK_UNITS = 8;
+export const SIDE_TICK_UNITS = 6;
 
 export type Vec = [number, number];
 
-/** Column (1–100) of an x position in grid units. */
+/** Column (1–75) of an x position in grid units. */
 export function columnOf(x: number): number {
   const c = Math.floor(x / UNITS_PER_COLUMN) + 1;
   return Math.min(COLUMNS, Math.max(1, c));

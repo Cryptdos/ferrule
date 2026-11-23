@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { TITLE_BLOCK_MM } from "../../core/geometry";
+  import { LINE_MM, TEXT_MM, TITLE_BLOCK_MM } from "../../core/geometry";
   import type { Page, Project } from "../../core/model";
   import { REVISION_ROWS, titleBlock } from "../../core/titleblock";
 
@@ -13,7 +13,7 @@
   }
 </script>
 
-<g class="tb" transform="translate({TITLE_BLOCK_MM.x} {TITLE_BLOCK_MM.y})">
+<g class="tb" transform="translate({TITLE_BLOCK_MM.x} {TITLE_BLOCK_MM.y})" style="--detail: {TEXT_MM.detail}px; --tag: {TEXT_MM.tag}px; --thin: {LINE_MM.thin}; --frame: {LINE_MM.frame}">
   <rect class="outer" x="0" y="0" width={tb.w} height={tb.h} />
   <rect x={tb.logo.x} y={tb.logo.y} width={tb.logo.w} height={tb.logo.h} />
   {#if project.logo && project.assets?.[project.logo]}
@@ -28,7 +28,7 @@
     />
   {/if}
   {#each tb.cells as c (c.label)}
-    {@const size = c.big ? 3.0 : 2.4}
+    {@const size = c.big ? TEXT_MM.heading : TEXT_MM.tag}
     <rect x={c.x} y={c.y} width={c.w} height={c.h} />
     <text class="label" x={c.x + 0.8} y={c.y + 1.8}>{c.label}</text>
     {#if c.value}
@@ -64,19 +64,19 @@
   line {
     fill: none;
     stroke: #000;
-    stroke-width: 0.25;
+    stroke-width: var(--thin);
   }
   rect.outer {
-    stroke-width: 0.35;
+    stroke-width: var(--frame);
   }
   text {
     font-family: var(--drawing-font);
     fill: #000;
   }
   .label {
-    font-size: 1.5px;
+    font-size: var(--detail);
   }
   .rev {
-    font-size: 2.2px;
+    font-size: var(--tag);
   }
 </style>

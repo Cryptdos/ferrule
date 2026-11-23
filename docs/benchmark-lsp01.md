@@ -82,7 +82,7 @@ Each fan has a local isolator in the field.
 
 ## Status (milestone 9)
 
-The set is rebuilt in [`src/bench/lsp01.ts`](../src/bench/lsp01.ts), using only Ferrule's core operations (the same ones behind the editor and the MCP tools). Open it in Ferrule from the project picker (*add the LSP-01 example*), or write it to a file with `bun scripts/build-lsp01.ts projects/lsp-01.ferrule.json`.
+The set is rebuilt in [`src/bench/lsp01.ts`](../src/bench/lsp01.ts), using only Ferrule's core operations (the same ones behind the editor and the MCP tools). Open it in Ferrule from the project picker (*add the LSP-01 example*), or write it to a file with `bun scripts/build-lsp01.ts projects/lsp-01.ferrule`.
 
 It was built from this sanitised description alone. The original drawings stayed out of the session, so layout matches the description rather than the original sheets.
 

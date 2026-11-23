@@ -20,6 +20,8 @@ import {
 import { refreshConductors } from "./conductors";
 import { compile, initialState, press, advance, stepTimer, timerEvent, toggle } from "./sim";
 import { localGeometry, paramApplies, plantViewLayout, requireSymbol, terminalNames } from "./symbols";
+import { textUnits } from "./geometry";
+import { textWidth } from "./textwidth";
 import { parseProject } from "./validate";
 import { contactTable, linkedTarget } from "./xref";
 
@@ -58,19 +60,6 @@ describe("lamps", () => {
     expect(s.lamps[h.id]).toBe(true);
   });
 
-  test("older files: L/N become V+/V-, single-letter colours become IEC codes", () => {
-    const { p, pg, add } = sheet();
-    const k = add("coil", 10, 10);
-    const h = add("lamp", 10, 30, { colour: "GN" });
-    connect(p, pg, [k.id, "A2"], [h.id, "V+"]);
-    const old = JSON.parse(JSON.stringify(p).replaceAll('"V+"', '"L"').replaceAll('"GN"', '"G"'));
-    old.version = 1;
-    const back = parseProject(old);
-    const lamp = back.pages[0]!.elements.find((e) => e.id === h.id)!;
-    expect(lamp.params.colour).toBe("Gn");
-    expect(back.pages[0]!.segments[0]!.to).toEqual([h.id, "V+"]);
-    expect(back.conductors.flatMap((c) => c.terminals)).toContainEqual([h.id, "V+"]);
-  });
 });
 
 describe("isolators", () => {
@@ -217,10 +206,13 @@ describe("plant terminal groups", () => {
     const lay = plantViewLayout(v);
     const xs = lay.terms.map((t) => t.x);
     expect(xs[0]).toBe(0);
-    for (let i = 1; i < xs.length; i++) expect(xs[i]! - xs[i - 1]!).toBeGreaterThanOrEqual(3);
+    // 1 unit apart within a group, like terminal block cells; more between groups.
+    expect(xs.slice(0, 2)).toEqual([0, 1]);
+    for (let i = 1; i < xs.length; i++) expect(xs[i]! - xs[i - 1]!).toBeGreaterThanOrEqual(1);
     expect(lay.right - lay.left).toBeLessThan(xs.at(-1)! + 8);
     // Group names don't overlap.
-    const spans = lay.groups.map((g) => [(g.x0 + g.x1) / 2 - g.name.length * 0.35, (g.x0 + g.x1) / 2 + g.name.length * 0.35]);
+    const nameW = (n: string) => textWidth(n, textUnits("tag"));
+    const spans = lay.groups.map((g) => [(g.x0 + g.x1) / 2 - nameW(g.name) / 2, (g.x0 + g.x1) / 2 + nameW(g.name) / 2]);
     for (let i = 1; i < spans.length; i++) expect(spans[i]![0]).toBeGreaterThan(spans[i - 1]![1]);
     // Information lines go under the box.
     const g = localGeometry(v, "SF-01");

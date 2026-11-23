@@ -6,6 +6,7 @@
  * can each load the wasm their own way. Without it, routes fall back to a
  * simple one-bend route.
  */
+import { fitBlock } from "./blocks";
 import type { Avoid, ConnRef } from "libavoid-js";
 import type { Rect, Vec } from "./geometry";
 import type { Element, Page, Segment, TerminalRef } from "./model";
@@ -254,6 +255,7 @@ export interface RouteOptions {
  * they can't be kept square).
  */
 export function routePage(avoid: Avoid | null, page: Page, opts: RouteOptions = {}): void {
+  fitBlock(page);
   slideRailTaps(page);
   const auto: { seg: Segment; a: Vec; b: Vec }[] = [];
   for (const seg of page.segments) {

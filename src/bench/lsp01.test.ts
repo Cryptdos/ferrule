@@ -7,7 +7,9 @@ import { AvoidLib } from "libavoid-js";
 import { checkProject } from "../core/checks";
 import { resolveFields } from "../core/fields";
 import { renumber } from "../core/renumber";
-import { displayTag } from "../core/tags";
+import { displayTag, elementTexts } from "../core/tags";
+import { AREA_UNITS, MIN_TEXT_MM, UNIT_MM } from "../core/geometry";
+import { localGeometry } from "../core/symbols";
 import { parseProject } from "../core/validate";
 import { buildLsp01 } from "./lsp01";
 
@@ -15,6 +17,23 @@ await AvoidLib.load();
 const { project: p } = buildLsp01(AvoidLib.getInstance());
 
 describe("LSP-01 benchmark", () => {
+  test("every part, wire and section sits inside the drawing area, and no text is under 1.8 mm", () => {
+    const out: string[] = [];
+    for (const pg of p.pages) {
+      if (pg.ga) continue;
+      for (const e of pg.elements) {
+        const g = localGeometry(e, elementTexts(e, p));
+        const b = g.bbox;
+        const [x0, y0, x1, y1] = [e.pos[0] + b.x, e.pos[1] + b.y, e.pos[0] + b.x + b.w, e.pos[1] + b.y + b.h];
+        if (x0 < -0.01 || y0 < -0.01 || x1 > AREA_UNITS.w + 0.01 || y1 > AREA_UNITS.h + 0.01) out.push(`sheet ${pg.number} ${e.symbol} ${e.tag} [${[x0, y0, x1, y1].map((v) => v.toFixed(1))}]`);
+        for (const t of g.prims) if (t.t === "text" && t.text && t.size * UNIT_MM < MIN_TEXT_MM - 1e-6) out.push(`sheet ${pg.number} ${e.symbol} text "${t.text}" ${(t.size * UNIT_MM).toFixed(2)} mm`);
+      }
+      for (const s of pg.segments) for (const [x, y] of s.points) if (x < 0 || y < 0 || x > AREA_UNITS.w || y > AREA_UNITS.h) out.push(`sheet ${pg.number} wire ${s.id} at ${x},${y}`);
+      for (const s of pg.sections) if (s.rect[0] + s.rect[2] > AREA_UNITS.w || s.rect[1] + s.rect[3] > AREA_UNITS.h) out.push(`sheet ${pg.number} section ${s.label}`);
+    }
+    expect(out).toEqual([]);
+  });
+
   test("1. twelve sheets, in the order of the original set, then a true-scale GA and a notes sheet", () => {
     expect(p.pages.map((pg) => resolveFields(pg.title, p))).toEqual([
       "Cover sheet",
@@ -96,7 +115,8 @@ describe("LSP-01 benchmark", () => {
 describe("LSP-01 simulation (criterion 5)", async () => {
   const { compile, initialState, toggle, press, advance, search } = await import("../core/sim");
   const find = (sheet: number, label: string) => {
-    const el = p.pages[sheet - 1]!.elements.find((e) => resolveFields(e.label, p) === label);
+    // Labels may be written on two lines.
+    const el = p.pages[sheet - 1]!.elements.find((e) => resolveFields(e.label, p).replace(/\n/g, " ") === label);
     if (!el) throw new Error(`No "${label}" on sheet ${sheet}`);
     return el;
   };
@@ -111,7 +131,7 @@ describe("LSP-01 simulation (criterion 5)", async () => {
   const c = compile(p);
   const fa = plantView("FA");
   const fr = find(7, "FIRE ALARM RELAY");
-  const healthy = find(7, "CONTROL CIRCUIT HEALTHY");
+  const healthy = find(7, "CONTROL CCT HEALTHY");
   const en1 = find(8, "SF-01 ENABLE");
   const en2 = find(8, "SF-02 ENABLE");
   const k1 = find(3, "SF-01 CONTACTOR");

@@ -16,9 +16,8 @@ import { type Project, newProject } from "../core/model";
 import { parseProject, parseTemplate, ProjectFormatError } from "../core/validate";
 import type { Template } from "../core/model";
 
-/** The project file extension. Older builds wrote `.ferrule.json`, which still opens. */
+/** The project file extension. */
 export const EXT = ".ferrule";
-const OLD_EXT = ".ferrule.json";
 const ID_RE = /^[a-z0-9][a-z0-9-]{0,80}$/;
 const RECENT_FILE = ".ferrule-recent.json";
 const RECENT_MAX = 30;
@@ -43,6 +42,8 @@ export interface ProjectSummary {
   where: "projects" | "elsewhere";
   /** When it was last opened from elsewhere (recent list). */
   opened?: string;
+  /** Why it can't be opened (a project from an older Ferrule). */
+  error?: string;
 }
 
 export interface FolderListing {
@@ -63,8 +64,8 @@ export function slugify(title: string): string {
   return s || "project";
 }
 
-const isProjectFile = (name: string) => name.endsWith(EXT) || name.endsWith(OLD_EXT);
-const stem = (name: string) => (name.endsWith(OLD_EXT) ? name.slice(0, -OLD_EXT.length) : name.endsWith(EXT) ? name.slice(0, -EXT.length) : name);
+const isProjectFile = (name: string) => name.endsWith(EXT);
+const stem = (name: string) => (name.endsWith(EXT) ? name.slice(0, -EXT.length) : name);
 
 export class Storage {
   private listeners = new Map<string, Set<(version: string) => void>>();
@@ -190,8 +191,7 @@ export class Storage {
     if (!ID_RE.test(id)) throw new StorageError(`Invalid project id "${id}"`);
     const r = this.recent.find((x) => x.id === id);
     if (r) return r.path;
-    const old = join(this.dir, id + OLD_EXT);
-    return existsSync(old) ? old : join(this.dir, id + EXT);
+    return join(this.dir, id + EXT);
   }
 
   async list(): Promise<ProjectSummary[]> {
@@ -201,8 +201,13 @@ export class Storage {
         const p = await this.load(id);
         const st = await stat(file);
         out.push({ id, title: p.project.title, pages: p.pages.length, modified: st.mtime.toISOString(), path: file, where, ...(opened ? { opened } : {}) });
-      } catch {
-        // Skip files we can't read (or that have gone); they stay on disk untouched.
+      } catch (e) {
+        // A project this version can't open is listed with the reason, so it doesn't just vanish.
+        if (e instanceof ProjectFormatError) {
+          const st = await stat(file).catch(() => null);
+          if (st) out.push({ id, title: stem(basename(file)), pages: 0, modified: st.mtime.toISOString(), path: file, where, error: e.message, ...(opened ? { opened } : {}) });
+        }
+        // Anything else (unreadable, gone) is skipped; files stay on disk untouched.
       }
     };
     for (const name of (await readdir(this.dir)).filter(isProjectFile)) {

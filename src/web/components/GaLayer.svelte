@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { GaItem, Page, Project } from "../../core/model";
   import { GA_ORIGIN, mmToUnits } from "../../core/ga";
+  import { textUnits } from "../../core/geometry";
   import { displayTag } from "../../core/tags";
 
   /** A GA sheet's enclosure and items, drawn at its scale (grid units, like the rest of the sheet). */
@@ -36,8 +37,8 @@
    * at that size and knocks the lines behind it out instead.
    */
   const CHAR = 0.62;
-  const BEST = 1.1;
-  const SMALLEST = 0.75;
+  const BEST = textUnits("tag");
+  const SMALLEST = textUnits("detail");
   function fitLabel(text: string, w: number, h: number): { size: number; vertical: boolean; halo: boolean } {
     const n = Math.max(1, text.length);
     const fits = (len: number, across: number) => Math.min(BEST, (len * 0.9) / (n * CHAR), across * 1.15);
@@ -126,7 +127,7 @@
     stroke-width: 0.35;
   }
   .title {
-    font-size: 1.8px;
+    font-size: var(--tag);
   }
   .dim,
   .tick {
@@ -134,7 +135,7 @@
     stroke-width: 0.1;
   }
   .dimtext {
-    font-size: 1.3px;
+    font-size: var(--detail);
   }
   .rail {
     fill: #eef0f2;
@@ -176,6 +177,6 @@
     stroke-width: 0.35;
   }
   .note {
-    font-size: 1.4px;
+    font-size: var(--detail);
   }
 </style>

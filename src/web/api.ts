@@ -16,6 +16,8 @@ export interface ProjectSummary {
   path: string;
   where: "projects" | "elsewhere";
   opened?: string;
+  /** Why it can't be opened (a project from an older Ferrule). */
+  error?: string;
 }
 
 export interface FolderListing {
