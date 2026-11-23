@@ -2,6 +2,7 @@
  * Benchmark LSP-01 pass criteria (docs/benchmark-lsp01.md), as far as code
  * can judge them. Layout and readability are judged by eye on the PDF.
  */
+import { drawnGaItems } from "../core/ga";
 import { describe, expect, test } from "bun:test";
 import { AvoidLib } from "libavoid-js";
 import { checkProject } from "../core/checks";
@@ -34,7 +35,7 @@ describe("LSP-01 benchmark", () => {
     expect(out).toEqual([]);
   });
 
-  test("1. twelve sheets, in the order of the original set, then a true-scale GA and a notes sheet", () => {
+  test("1. twelve sheets, in the order of the original set, then the true-scale GA (backplate, door front and back) and a notes sheet", () => {
     expect(p.pages.map((pg) => resolveFields(pg.title, p))).toEqual([
       "Cover sheet",
       "Main incoming section",
@@ -49,6 +50,8 @@ describe("LSP-01 benchmark", () => {
       "Door labels: power section",
       "Door labels: controls section",
       "General arrangement: controls backplate",
+      "General arrangement: door front",
+      "General arrangement: door back",
       "Notes, revisions and symbols",
     ]);
     // The GA has the relays, timers and terminal strips from the schematic on it.
@@ -91,10 +94,23 @@ describe("LSP-01 benchmark", () => {
     expect(p.templates.map((t) => t.name)).toEqual(["Fan starter section", "Fans duty/standby controls"]);
   });
 
+  test("the door: devices drawn from the schematic on the front, mirrored on the back", () => {
+    const front = p.pages.find((x) => x.ga?.view === "door-front")!;
+    const back = p.pages.find((x) => x.ga?.view === "door-back")!;
+    expect(back.ga!.of).toBe(front.id);
+    const devices = (front.gaItems ?? []).filter((it) => it.kind === "device");
+    expect(devices.length).toBeGreaterThanOrEqual(8);
+    expect(devices.some((it) => it.part === "handle")).toBe(true);
+    expect((front.gaItems ?? []).filter((it) => it.kind === "dim").length).toBe(3);
+    expect(drawnGaItems(p, back).filter((d) => !d.own && d.it.kind === "device").length).toBe(devices.length);
+  });
+
   test("checks are clean: no errors, no warnings", () => {
-    // Only the note that the GA (deliberately) has more devices to place.
+    // Only the note that the GA (deliberately) has more devices to place, and how full its rails are.
     expect(checkProject(p).filter((f) => f.level !== "info")).toEqual([]);
-    expect(checkProject(p).map((f) => f.message)).toEqual([expect.stringMatching(/not on a GA yet/)]);
+    const notes = checkProject(p).map((f) => f.message);
+    expect(notes.filter((m) => !/rail \d+: .* mm used/.test(m))).toEqual([expect.stringMatching(/not on a GA yet/)]);
+    expect(notes.some((m) => /rail \d+: .* mm used/.test(m))).toBe(true);
   });
 
   test("the enable loop runs from each controls sheet to its starter as one circuit", () => {

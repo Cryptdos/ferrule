@@ -12,7 +12,7 @@ import { refreshConductors } from "../core/conductors";
 import { api, ConflictError } from "./api";
 import { getAvoid } from "./avoid";
 
-export type Tool = "select" | "place" | "wire" | "section" | "cloud" | "stamp" | "ga-rail" | "ga-trunking";
+export type Tool = "select" | "place" | "wire" | "section" | "cloud" | "polygon" | "stamp" | "ga-rail" | "ga-trunking" | "ga-dim" | "ga-label";
 export type SaveState = "saved" | "pending" | "saving" | "error";
 
 const HISTORY_LIMIT = 200;
@@ -38,7 +38,9 @@ export class Editor {
   saveState: SaveState = $state("saved");
   message: string = $state("");
   /** A schematic device (or terminal strip) being placed on a GA sheet. */
-  gaPlace: { refs: string[]; w: number; h: number; label: string } | null = $state(null);
+  gaPlace: { refs: string[]; part?: "handle"; w: number; h: number; label: string } | null = $state(null);
+  /** How the Dimension tool measures: the gaps along a run, or each distance from the first point. */
+  gaDimStyle: "chain" | "baseline" = $state("chain");
   /** Sheet settings open in the floating properties box (nothing need be selected). */
   sheetSettings: boolean = $state(false);
   /** An element just jumped to (goTo): ringed until the selection moves on. */

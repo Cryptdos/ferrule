@@ -18,7 +18,12 @@
         stroke-dasharray={p.dash ? "0.6 0.4" : undefined}
       />
     {:else if p.t === "poly"}
-      <polygon points={pts(p.pts)} class:filled={p.fill} />
+      {#if p.tint}
+        <!-- A highlight: a translucent marker band, multiplied so the drawing under it stays black. -->
+        <polygon points={pts(p.pts)} class="tint" style:fill={p.tint} />
+      {:else}
+        <polygon points={pts(p.pts)} class:filled={p.fill} />
+      {/if}
     {:else if p.t === "circle"}
       <circle cx={p.c[0]} cy={p.c[1]} r={p.r} class:filled={p.fill} />
     {:else if p.t === "ellipse"}
@@ -58,6 +63,10 @@
   }
   .filled {
     fill: #000;
+  }
+  polygon.tint {
+    stroke: none;
+    mix-blend-mode: multiply;
   }
   text {
     fill: #000;

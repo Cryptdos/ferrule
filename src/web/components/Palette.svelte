@@ -17,7 +17,7 @@
     symbol?: string;
     icon?: IconName;
     params?: Record<string, string>;
-    tool?: "section" | "cloud";
+    tool?: "section" | "cloud" | "polygon";
   }
 
   /**
@@ -28,7 +28,12 @@
     const annotate = editor.mode === "annotate";
     const parts: Item[] = listSymbols()
       .filter((s) => s.palette && (s.bench ?? "draft") === (annotate ? "annotate" : "draft"))
-      .map((s) => ({ key: s.id, name: s.name, group: s.group, symbol: s.id, icon: s.id === "image" ? "picture" : undefined }));
+      .map((s): Item =>
+        // A polygon is drawn corner by corner with its own tool, not placed in one click.
+        s.id === "polygon"
+          ? { key: "tool:polygon", name: s.name, group: s.group, symbol: s.id, tool: "polygon" }
+          : { key: s.id, name: s.name, group: s.group, symbol: s.id, icon: s.id === "image" ? "picture" : undefined },
+      );
     if (!annotate) return parts;
     return [
       { key: "tool:section", name: "Section", group: "Drawing", icon: "section", tool: "section" },
@@ -60,6 +65,7 @@
     } else if (it.tool) {
       editor.tool = it.tool;
       editor.placeSymbol = null;
+      if (it.tool === "polygon") editor.flash("Click each corner. Click the first corner again, double-click or press Enter to close it.");
     } else {
       editor.tool = "place";
       editor.placeSymbol = it.symbol!;

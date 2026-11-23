@@ -26,20 +26,35 @@
     addAsset,
     addImage,
     addGaItem,
+    addGaDim,
     moveGaItems,
     updateGaItem,
     updateElement,
     updateSection,
+    setPartPoints,
     wire,
     linkArrows,
     linkToNewArrow,
     type WireEnd,
   } from "../../core/ops";
   import { settings } from "../settings.svelte";
-  import { benchOf, localGeometry, defaultParams, plantViewLayout, type Geometry } from "../../core/symbols";
+  import { benchOf, localGeometry, defaultParams, formatPoints, partPoints, plantViewLayout, type Geometry } from "../../core/symbols";
   import { plantInputId } from "../../core/sim";
-  import { GA_ORIGIN, mmToUnits, sheetToGa, snapToRail } from "../../core/ga";
-  import type { GaItem } from "../../core/model";
+  import {
+    GA_ORIGIN,
+    dimLayout,
+    dimTargets,
+    drawnGaItems,
+    gaFrame,
+    gaSize,
+    mmToUnits,
+    nearestDimTarget,
+    sheetTakes,
+    sheetToGa,
+    snapToRail,
+    type DimTarget,
+  } from "../../core/ga";
+  import type { GaDimPoint, GaItem } from "../../core/model";
   import { cloudPath } from "../../core/titleblock";
   import { readImage } from "../images";
   import { elementTexts } from "../../core/tags";
@@ -86,6 +101,7 @@
     | { kind: "secsize"; id: string; start: Vec; rect: Rect4; delta: Vec; edges: string }
     | { kind: "cloudmove"; id: string; start: Vec; rect: Rect4; delta: Vec }
     | { kind: "elsize"; id: string; start: Vec; size: Vec; delta: Vec; keepShape: boolean }
+    | { kind: "point"; id: string; index: number; start: Vec; points: Vec[]; delta: Vec }
     | { kind: "gadrag"; ids: string[]; start: Vec; delta: Vec }
     | { kind: "gasize"; id: string; start: Vec; size: Vec; delta: Vec }
     | { kind: "ganew"; what: "rail" | "trunking"; start: Vec; cur: Vec }
@@ -100,6 +116,9 @@
   /** A tap of Space (down and up, no panning in between) fits the sheet. */
   let spaceAt = 0;
   let spacePanned = false;
+
+  /** A polygon being drawn: its corners so far (sheet units). */
+  let polyDraft: Vec[] = $state([]);
 
   /** A wire being drawn: where it starts. */
   type Pending = { end: WireEnd; at: Vec };
@@ -119,6 +138,8 @@
     void editor.tool;
     void editor.pageId;
     pending = null;
+    polyDraft = [];
+    dimDraft = [];
   });
 
   export function fit(): void {
@@ -132,9 +153,11 @@
 
   /** Cancel a wire in progress or a drag. Returns true if there was one. */
   export function cancel(): boolean {
-    if (pending || gesture) {
+    if (pending || gesture || polyDraft.length || dimDraft.length) {
       pending = null;
       gesture = null;
+      polyDraft = [];
+      dimDraft = [];
       return true;
     }
     return false;
@@ -177,6 +200,13 @@
       const g = geoms.get(el.id);
       if (!g) continue;
       const local: Vec = [pt[0] - el.pos[0], pt[1] - el.pos[1]];
+      const corners = partPoints(el);
+      if (corners) {
+        // Arrows and polygons are picked by their lines, so what's inside a polygon can still be picked.
+        const ring = el.symbol === "polygon" ? [...corners, corners[0]!] : corners;
+        if (distanceToRoute(pt, ring).dist < 0.7) return el;
+        continue;
+      }
       if (el.symbol === "box") {
         // A box is picked by its outline (or its label), so what's inside it can still be picked.
         const b = g.body;
@@ -195,9 +225,40 @@
   function resizable(): { el: Element; size: Vec; corner: Vec } | null {
     if (sim || editor.selection.length !== 1) return null;
     const el = page.elements.find((e) => e.id === editor.selection[0]);
-    if (!el || !["image", "box", "plate"].includes(el.symbol) || el.rot !== 0) return null;
+    if (!el || !["image", "box", "plate", "highlight"].includes(el.symbol) || el.rot !== 0) return null;
     const size: Vec = [Number(el.params.w) || 20, Number(el.params.h) || 10];
     return { el, size, corner: [el.pos[0] + size[0], el.pos[1] + size[1]] };
+  }
+
+  /** The one selected arrow or polygon, with its corners: each has a handle to drag. */
+  function pointed(): { el: Element; points: Vec[] } | null {
+    if (sim || bench !== "annotate" || editor.selection.length !== 1) return null;
+    const el = page.elements.find((e) => e.id === editor.selection[0]);
+    const points = el ? partPoints(el) : null;
+    return el && points ? { el, points } : null;
+  }
+  function hitPoint(pt: Vec): { el: Element; index: number; points: Vec[] } | null {
+    const p = pointed();
+    if (!p) return null;
+    const i = p.points.findIndex((q) => Math.abs(q[0] - pt[0]) < 0.9 && Math.abs(q[1] - pt[1]) < 0.9);
+    return i < 0 ? null : { el: p.el, index: i, points: p.points };
+  }
+
+  /** Finish the polygon being drawn (three corners at least). */
+  function finishPolygon(): void {
+    const pts = polyDraft;
+    polyDraft = [];
+    if (pts.length < 3) {
+      if (pts.length) editor.flash("A polygon needs at least three corners");
+      return;
+    }
+    let id = "";
+    const ok = editor.apply((p) => {
+      const o = pts[0]!;
+      id = addElement(p, editor.pageId, "polygon", o, { params: { pts: formatPoints(pts.slice(1).map((q) => [q[0] - o[0], q[1] - o[1]])) } }).id;
+    });
+    if (ok) editor.selection = [id];
+    if (!settings.keepPlacing) editor.tool = "select";
   }
 
   /** A revision cloud's edge (resize that side) or its revision triangle (move it). Annotate only. */
@@ -301,15 +362,25 @@
   // GA sheets: items in real mm
 
   const ga = $derived(page.ga ?? null);
+  /** What part of the panel this sheet shows (a door leaf, or all of it), in its own mm. */
+  const frame = $derived(page.ga ? gaFrame(editor.project, page) : null);
   /** Snap a real-mm distance: 5 mm, or 1 mm with Shift held. */
   const snapMm = (v: number, fine = false) => Math.round(v / (fine ? 1 : 5)) * (fine ? 1 : 5);
-  const gaRect = (it: GaItem) =>
-    ga ? { x: GA_ORIGIN[0] + mmToUnits(ga, it.x), y: GA_ORIGIN[1] + mmToUnits(ga, it.y), w: mmToUnits(ga, it.w), h: mmToUnits(ga, it.h) } : null;
+  const gaRect = (it: Pick<GaItem, "x" | "y" | "w" | "h"> & { kind?: GaItem["kind"]; dim?: GaItem["dim"]; id?: string }) => {
+    if (!frame) return null;
+    if (it.kind === "dim" && it.dim) return dimLayout(editor.project, page, it as GaItem).box;
+    return { x: GA_ORIGIN[0] + mmToUnits(frame, it.x - frame.x0), y: GA_ORIGIN[1] + mmToUnits(frame, it.y), w: mmToUnits(frame, it.w), h: mmToUnits(frame, it.h) };
+  };
 
   function hitGa(pt: Vec): GaItem | null {
+    // This sheet's own items only: a door's devices drawn from another sheet are edited there.
     const items = page.gaItems ?? [];
-    // Devices and notes over rails and trunking.
-    const order = [...items.filter((i) => i.kind === "device"), ...items.filter((i) => i.kind === "rail" || i.kind === "trunking")];
+    // Dimensions, then devices and label plates, over rails and trunking.
+    const order = [
+      ...items.filter((i) => i.kind === "dim"),
+      ...items.filter((i) => i.kind === "device" || i.kind === "label"),
+      ...items.filter((i) => i.kind === "rail" || i.kind === "trunking"),
+    ];
     for (const it of order) {
       const r = gaRect(it);
       if (r && pointInRect(pt, r, 0.3)) return it;
@@ -317,17 +388,69 @@
     return null;
   }
 
-  /** The one selected GA item's corner handle, for sizing rails, trunking and devices. */
+  /** The one selected GA item's corner handle, for sizing rails, trunking, devices and label plates. */
   function gaCorner(): { it: GaItem; at: Vec } | null {
     if (editor.selection.length !== 1) return null;
     const it = (page.gaItems ?? []).find((x) => x.id === editor.selection[0]);
-    const r = it ? gaRect(it) : null;
+    if (!it || it.kind === "dim") return null;
+    const r = gaRect(it);
     return it && r ? { it, at: [r.x + r.w, r.y + r.h] } : null;
   }
 
+  // Dimensions: click each point (it snaps to the enclosure and to items'
+  // edges and middles), then double-click or Enter where the line goes.
+  type DimClick = { mm: Vec; h: DimTarget | null; v: DimTarget | null };
+  let dimDraft: DimClick[] = $state([]);
+  let lastDimPress = 0;
+  const dimReach = () => (frame ? 1.2 * UNIT_MM * frame.scale : 5);
+  function dimSnap(mm: Vec): DimClick {
+    const drawn = drawnGaItems(editor.project, page);
+    const size = gaSize(editor.project, page);
+    return {
+      mm,
+      h: nearestDimTarget(dimTargets(drawn, size, "h"), mm[0], mm[1], dimReach()),
+      v: nearestDimTarget(dimTargets(drawn, size, "v"), mm[1], mm[0], dimReach()),
+    };
+  }
+  /** The dimension being drawn, with its line at `across` (mm). */
+  function dimFrom(clicks: DimClick[], across: number | null): GaItem | null {
+    if (clicks.length < 2) return null;
+    const a = clicks[0]!.mm;
+    const b = clicks[1]!.mm;
+    const ax = Math.abs((clicks[1]!.h?.v ?? b[0]) - (clicks[0]!.h?.v ?? a[0]));
+    const ay = Math.abs((clicks[1]!.v?.v ?? b[1]) - (clicks[0]!.v?.v ?? a[1]));
+    const axis: "h" | "v" = ax >= ay ? "h" : "v";
+    const points: GaDimPoint[] = clicks.map((c) => {
+      const t = c[axis];
+      return t ? { v: t.v, item: t.item, edge: t.edge } : { v: Math.round((axis === "h" ? c.mm[0] : c.mm[1]) * 2) / 2 };
+    });
+    const at = across ?? (axis === "h" ? Math.min(...clicks.map((c) => c.mm[1])) - 20 : Math.min(...clicks.map((c) => c.mm[0])) - 20);
+    return { id: "dim-draft", kind: "dim", x: 0, y: 0, w: 1, h: 1, dim: { axis, style: editor.gaDimStyle, points, at: Math.round(at * 2) / 2 } };
+  }
+  function finishDim(across: number | null): void {
+    const it = dimFrom(dimDraft, across);
+    dimDraft = [];
+    if (!it) {
+      editor.flash("A dimension needs two points: click them, then double-click where its line goes");
+      return;
+    }
+    let id = "";
+    const ok = editor.apply((p) => (id = addGaDim(p, editor.pageId, it.dim!).id));
+    if (ok) editor.selection = [id];
+  }
+  const dimPreview = $derived.by(() => {
+    if (!dimDraft.length || !pointer || !frame) return null;
+    const mm = sheetToGa(frame, pointer);
+    const clicks = [...dimDraft, dimSnap(mm)];
+    const it = dimFrom(dimDraft.length >= 2 ? dimDraft : clicks, null);
+    if (!it) return { layout: null, snap: clicks[clicks.length - 1]! };
+    if (dimDraft.length >= 2) it.dim!.at = Math.round((it.dim!.axis === "h" ? mm[1] : mm[0]) * 2) / 2;
+    return { layout: dimLayout(editor.project, page, it), snap: clicks[clicks.length - 1]! };
+  });
+
   function gaPointerDown(pt: Vec, e: PointerEvent): void {
-    if (!ga) return;
-    const mm = sheetToGa(ga, pt);
+    if (!frame) return;
+    const mm = sheetToGa(frame, pt);
     const fine = e.shiftKey;
     if (editor.gaPlace) {
       const pl = editor.gaPlace;
@@ -336,15 +459,55 @@
       if (railY !== null) at = [at[0], railY];
       let id = "";
       const ok = editor.apply((p) => {
-        id = addGaItem(p, editor.pageId, { kind: "device", x: at[0], y: at[1], w: pl.w, h: pl.h, refs: pl.refs }).id;
+        id = addGaItem(p, editor.pageId, { kind: "device", x: at[0], y: at[1], w: pl.w, h: pl.h, refs: pl.refs, ...(pl.part ? { part: pl.part } : {}) }).id;
       });
       editor.gaPlace = null;
       if (ok) editor.selection = [id];
       return;
     }
     if (editor.tool === "ga-rail" || editor.tool === "ga-trunking") {
+      const what = editor.tool === "ga-rail" ? "rail" : "trunking";
+      if (!sheetTakes(editor.project, page, what)) {
+        editor.flash(page.ga?.view === "door-front" ? "DIN rail and trunking go on the backplate or the door back" : "Nothing but dimensions goes on this sheet");
+        return;
+      }
       const s: Vec = [snapMm(mm[0], fine), snapMm(mm[1], fine)];
-      gesture = { kind: "ganew", what: editor.tool === "ga-rail" ? "rail" : "trunking", start: s, cur: s };
+      gesture = { kind: "ganew", what, start: s, cur: s };
+      return;
+    }
+    if (editor.tool === "ga-label") {
+      if (!sheetTakes(editor.project, page, "label")) {
+        editor.flash("Label plates go on a door front");
+        return;
+      }
+      let id = "";
+      const w = 60;
+      const h = 15;
+      const ok = editor.apply((p) => {
+        id = addGaItem(p, editor.pageId, { kind: "label", x: snapMm(mm[0] - w / 2, fine), y: snapMm(mm[1] - h / 2, fine), w, h }).id;
+      });
+      if (ok) {
+        editor.selection = [id];
+        editor.tool = "select";
+      }
+      return;
+    }
+    if (editor.tool === "ga-dim") {
+      const last = dimDraft[dimDraft.length - 1];
+      const near = !!last && Math.hypot(last.mm[0] - mm[0], last.mm[1] - mm[1]) < dimReach() * 0.5;
+      // pointerdown carries no click count: a second press soon after, in the same place, is a double-click.
+      const now = performance.now();
+      const double = near && now - lastDimPress < 450;
+      lastDimPress = now;
+      if (double) {
+        // A double-click puts the line here: its first click wasn't a point.
+        const clicks = near ? dimDraft.slice(0, -1) : dimDraft;
+        const it = dimFrom(clicks, null);
+        dimDraft = clicks;
+        finishDim(it ? (it.dim!.axis === "h" ? mm[1] : mm[0]) : null);
+        return;
+      }
+      if (!near) dimDraft = [...dimDraft, dimSnap(mm)];
       return;
     }
     const corner = gaCorner();
@@ -373,6 +536,8 @@
     const items = page.gaItems ?? [];
     if (g.kind === "gadrag" && (g.delta[0] || g.delta[1])) {
       const moved = items.filter((i) => g.ids.includes(i.id)).map((i) => {
+        // A dimension's line moves across its axis; its points stay on what they measure.
+        if (i.dim) return { ...i, dim: { ...i.dim, at: i.dim.at + (i.dim.axis === "h" ? g.delta[1] : g.delta[0]) } };
         const n = { ...i, x: i.x + g.delta[0], y: i.y + g.delta[1] };
         // A lone device snaps onto a rail.
         if (g.ids.length === 1 && n.kind === "device") {
@@ -392,7 +557,7 @@
 
   const gaNew = $derived.by(() => {
     const g = gesture as Gesture;
-    if (g?.kind !== "ganew" || !ga) return null;
+    if (g?.kind !== "ganew" || !frame) return null;
     const x = Math.min(g.start[0], g.cur[0]);
     const y = Math.min(g.start[1], g.cur[1]);
     const r = gaRect({ id: "", kind: "rail", x, y, w: Math.abs(g.cur[0] - g.start[0]), h: Math.abs(g.cur[1] - g.start[1]) });
@@ -499,6 +664,15 @@
       return;
     }
 
+    if (editor.tool === "polygon") {
+      // Each click is a corner; click the first corner again (or double-click, or Enter) to close it.
+      const at = clampToArea(snapVec(pt));
+      const first = polyDraft[0];
+      if (first && polyDraft.length >= 3 && Math.hypot(at[0] - first[0], at[1] - first[1]) < 1) finishPolygon();
+      else if (!polyDraft.some((q) => q[0] === at[0] && q[1] === at[1])) polyDraft = [...polyDraft, at];
+      return;
+    }
+
     if (editor.tool === "section" || editor.tool === "cloud") {
       gesture = { kind: "secnew", start: snapVec(pt), cur: snapVec(pt), cloud: editor.tool === "cloud" };
       return;
@@ -543,6 +717,12 @@
     const table = hitTable(pt);
     if (table) {
       gesture = { kind: "table", coil: table.coil.id, start: pt, at: table.at, delta: [0, 0], row: table.row };
+      return;
+    }
+    // A selected arrow's or polygon's corner handles move that corner.
+    const corner = hitPoint(pt);
+    if (corner) {
+      gesture = { kind: "point", id: corner.el.id, index: corner.index, start: snapVec(pt), points: corner.points, delta: [0, 0] };
       return;
     }
     // The corner handle of a selected picture, box or label plate sizes it.
@@ -618,13 +798,15 @@
     } else if (g.kind === "secmove" || g.kind === "secsize" || g.kind === "cloudmove" || g.kind === "cloudsize") {
       g.delta = snapVec([pointer[0] - g.start[0], pointer[1] - g.start[1]]);
     } else if (g.kind === "gadrag" || g.kind === "gasize") {
-      if (!ga) return;
-      const mm = sheetToGa(ga, pointer);
+      if (!frame) return;
+      const mm = sheetToGa(frame, pointer);
       g.delta = [snapMm(mm[0] - g.start[0], e.shiftKey), snapMm(mm[1] - g.start[1], e.shiftKey)];
     } else if (g.kind === "ganew") {
-      if (!ga) return;
-      const mm = sheetToGa(ga, pointer);
+      if (!frame) return;
+      const mm = sheetToGa(frame, pointer);
       g.cur = [snapMm(mm[0], e.shiftKey), snapMm(mm[1], e.shiftKey)];
+    } else if (g.kind === "point") {
+      g.delta = snapVec([pointer[0] - g.start[0], pointer[1] - g.start[1]]);
     } else if (g.kind === "elsize") {
       let d = snapVec([pointer[0] - g.start[0], pointer[1] - g.start[1]]);
       // A picture keeps its shape (hold Shift to stretch it).
@@ -721,6 +903,9 @@
         }).id;
       });
       if (id) editor.selection = [id];
+    } else if (g.kind === "point" && (g.delta[0] || g.delta[1])) {
+      const pts = pointPreview(g);
+      editor.apply((p) => setPartPoints(p, editor.pageId, g.id, pts));
     } else if (g.kind === "elsize" && (g.delta[0] || g.delta[1])) {
       const w = Math.max(2, g.size[0] + g.delta[0]);
       const h = Math.max(2, g.size[1] + g.delta[1]);
@@ -763,6 +948,20 @@
       editor.selection = g.add ? [...new Set([...editor.selection, ...hits])] : hits;
     }
   }
+
+  function pointPreview(g: { index: number; points: Vec[]; delta: Vec }): Vec[] {
+    return g.points.map((q, i): Vec => (i === g.index ? clampToArea([q[0] + g.delta[0], q[1] + g.delta[1]]) : q));
+  }
+  /** An arrow or polygon while a corner is dragged: drawn from the moved corners. */
+  const pointGhost = $derived.by((): Element | null => {
+    const g = gesture as Gesture;
+    if (g?.kind !== "point") return null;
+    const el = page.elements.find((e) => e.id === g.id);
+    if (!el) return null;
+    const pts = pointPreview(g);
+    const o = pts[0]!;
+    return { ...el, id: "ghost", pos: o, params: { ...el.params, pts: formatPoints(pts.slice(1).map((q) => [q[0] - o[0], q[1] - o[1]])) } };
+  });
 
   function bandRect(a: Vec, b: Vec) {
     return { x: Math.min(a[0], b[0]), y: Math.min(a[1], b[1]), w: Math.abs(a[0] - b[0]), h: Math.abs(a[1] - b[1]) };
@@ -825,6 +1024,12 @@
   }
 
   function onDblClick(e: MouseEvent) {
+    // A dimension is finished by the double-click's second press (gaPointerDown).
+    if (editor.mode === "ga" && editor.tool === "ga-dim") return;
+    if (editor.tool === "polygon") {
+      finishPolygon();
+      return;
+    }
     if (editor.tool !== "select") return;
     const hit = hitElement(toUnits(e));
     if (!hit) return;
@@ -869,7 +1074,8 @@
       return [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2];
     }
     const it = page.ga && page.gaItems?.find((x) => x.id === id);
-    if (it && page.ga) return [GA_ORIGIN[0] + mmToUnits(page.ga, it.x + it.w / 2), GA_ORIGIN[1] + mmToUnits(page.ga, it.y + it.h / 2)];
+    const r = it ? gaRect(it) : null;
+    if (r) return [r.x + r.w / 2, r.y + r.h / 2];
     return null;
   }
 
@@ -899,6 +1105,7 @@
     if (sim || editor.tool !== "select" || !pointer || gesture) return "";
     const sz = resizable();
     if (sz && Math.abs(pointer[0] - sz.corner[0]) < 0.9 && Math.abs(pointer[1] - sz.corner[1]) < 0.9) return "nwse";
+    if (hitPoint(pointer)) return "move";
     if (hitTable(pointer)) return "move";
     const s = hitCloud(pointer) ?? hitSection(pointer);
     if (!s) return "";
@@ -1007,6 +1214,16 @@
 
 <svelte:window
   onkeydown={(e) => {
+    if (e.key === "Enter" && polyDraft.length && !isTyping(e.target)) {
+      e.preventDefault();
+      finishPolygon();
+    }
+    if (e.key === "Enter" && dimDraft.length && !isTyping(e.target)) {
+      e.preventDefault();
+      const it = dimFrom(dimDraft, null);
+      const mm = pointer && frame ? sheetToGa(frame, pointer) : null;
+      finishDim(it && mm ? (it.dim!.axis === "h" ? mm[1] : mm[0]) : null);
+    }
     if (e.code === "Space" && !isTyping(e.target)) {
       if (!spaceDown && !e.repeat) {
         spaceAt = performance.now();
@@ -1182,12 +1399,47 @@
           <rect class="handle corner" x={sz.el.pos[0] + w - 0.6} y={sz.el.pos[1] + h - 0.6} width="1.2" height="1.2" />
         {/if}
       {/if}
+      {#if !gesture || gesture.kind === "point"}
+        {@const pp = pointed()}
+        {#if pp}
+          {#if pointGhost}<g class="ghost"><ElementView el={pointGhost} project={editor.project} /></g>{/if}
+          {#each pointGhost ? partPoints(pointGhost)! : pp.points as q, i (i)}
+            <rect class="handle corner" x={q[0] - 0.6} y={q[1] - 0.6} width="1.2" height="1.2" />
+          {/each}
+        {/if}
+      {/if}
+      {#if polyDraft.length}
+        {@const to = pointer ? clampToArea(snapVec(pointer)) : null}
+        <polyline class="rubber" points={[...polyDraft, ...(to ? [to] : [])].map((q) => q.join(",")).join(" ")} />
+        {#each polyDraft as q, i (i)}
+          <circle class="hover" class:start={i === 0} cx={q[0]} cy={q[1]} r="0.5" />
+        {/each}
+      {/if}
       {#if gaNew}
         <rect class="band" x={gaNew.x} y={gaNew.y} width={Math.max(0.2, gaNew.w)} height={Math.max(0.2, gaNew.h)} />
       {/if}
-      {#if editor.gaPlace && pointer && ga}
+      {#if dimPreview}
+        {#if dimPreview.layout}
+          <g class="dim-ghost">
+            {#each dimPreview.layout.lines as l, i (i)}<line x1={l[0]} y1={l[1]} x2={l[2]} y2={l[3]} />{/each}
+            {#each dimPreview.layout.texts as t, i (i)}
+              <text x={t.at[0]} y={t.at[1]} text-anchor="middle" transform={t.vertical ? `rotate(-90 ${t.at[0]} ${t.at[1]})` : undefined}>{t.text}</text>
+            {/each}
+          </g>
+        {/if}
+        {#if frame}
+          {#each dimDraft as c, i (i)}
+            {@const at = gaRect({ x: c.h?.v ?? c.mm[0], y: c.v?.v ?? c.mm[1], w: 0, h: 0 })}
+            {#if at}<circle class="hover start" cx={at.x} cy={at.y} r="0.5" />{/if}
+          {/each}
+          {@const sn = dimPreview.snap}
+          {@const sp = gaRect({ x: sn.h?.v ?? sn.mm[0], y: sn.v?.v ?? sn.mm[1], w: 0, h: 0 })}
+          {#if sp && (sn.h || sn.v)}<circle class="hover" cx={sp.x} cy={sp.y} r="0.5" />{/if}
+        {/if}
+      {/if}
+      {#if editor.gaPlace && pointer && frame}
         {@const pl = editor.gaPlace}
-        {@const mm = sheetToGa(ga, pointer)}
+        {@const mm = sheetToGa(frame, pointer)}
         {@const r = gaRect({ id: "", kind: "device", x: mm[0] - pl.w / 2, y: mm[1] - pl.h / 2, w: pl.w, h: pl.h })}
         {#if r}<rect class="stamp" x={r.x} y={r.y} width={r.w} height={r.h} />{/if}
       {/if}
@@ -1280,6 +1532,15 @@
   }
   .canvas.nesw {
     cursor: nesw-resize;
+  }
+  .dim-ghost line {
+    stroke: #1e6ee6;
+    stroke-width: 0.1;
+  }
+  .dim-ghost text {
+    fill: #1e6ee6;
+    font-size: var(--detail);
+    font-family: var(--drawing-font);
   }
   .cloud-ghost {
     fill: none;

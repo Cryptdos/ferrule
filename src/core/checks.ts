@@ -2,7 +2,7 @@
  * Rule checks (DESIGN.md §6, §7, §10). Each finding names the elements
  * involved so the UI can jump to them.
  */
-import { changedGaStrips, gaCandidates } from "./ga";
+import { changedGaStrips, doorOwner, gaCandidates, railFill, railNumber } from "./ga";
 import { compile } from "./sim";
 import type { Element, Page, Project } from "./model";
 import { terminalNames } from "./symbols";
@@ -151,6 +151,23 @@ export function checkProject(project: Project): Finding[] {
     for (const c of changedGaStrips(project)) {
       const what = [c.added ? `${c.added} terminal${c.added === 1 ? "" : "s"} added` : "", c.removed ? `${c.removed} removed` : ""].filter(Boolean).join(", ");
       out.push({ level: "info", message: `Sheet ${c.page.number}: terminal strip ${c.it.strip} has changed (${what}); open the GA to check its length`, pageId: c.page.id, ids: [c.it.id] });
+    }
+    // How full each DIN rail is (design-v0.2 §8), and devices that clash on it.
+    for (const page of project.pages) {
+      for (const f of railFill(page)) {
+        const n = railNumber(page, f.rail);
+        const pc = f.length > 0 ? Math.round((f.used / f.length) * 100) : 0;
+        out.push({ level: "info", message: `Sheet ${page.number}, rail ${n}: ${f.used} of ${f.length} mm used (${pc}%), ${f.devices.length} device${f.devices.length === 1 ? "" : "s"}`, pageId: page.id, ids: [f.rail.id] });
+        for (const [a, b] of f.overlaps) {
+          out.push({ level: "warning", message: `Sheet ${page.number}, rail ${n}: two devices overlap`, pageId: page.id, ids: [a.id, b.id] });
+        }
+        for (const d of f.overhang) {
+          out.push({ level: "warning", message: `Sheet ${page.number}, rail ${n}: a device runs off the end of the rail`, pageId: page.id, ids: [d.id] });
+        }
+      }
+      if (page.ga?.view === "door-back" && !doorOwner(project, page)) {
+        out.push({ level: "warning", message: `Sheet ${page.number} is a door back with no door front: pick its door in Sheet settings`, pageId: page.id, ids: [] });
+      }
     }
     const all = new Set(project.pages.flatMap((p) => p.elements.map((e) => e.id)));
     for (const page of project.pages) {

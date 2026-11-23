@@ -5,7 +5,7 @@
  * a copy first.
  */
 import { projectCopy, type DeviceEntry, type ProjectDevice } from "./devices";
-import { AREA_UNITS, type Rotation, type Vec, clampToArea, snapVec } from "./geometry";
+import { AREA_UNITS, type Rotation, type Vec, clampToArea, rotate, snapVec } from "./geometry";
 import { refreshConductors } from "./conductors";
 import {
   type Distribution,
@@ -15,19 +15,22 @@ import {
   type PlantItem,
   type PlantGroup,
   type Asset,
+  type DoorLeaf,
+  type GaDim,
   type GaItem,
   type GaSettings,
+  type GaView,
   type Project,
   type Section,
   type Segment,
   type TerminalRef,
   newId,
 } from "./model";
-import { benchOf, defaultParams, getSymbol, plantTerminalName, poleMates, requireSymbol, terminalPoint } from "./symbols";
+import { benchOf, defaultParams, formatPoints, getSymbol, partPoints, plantTerminalName, poleMates, requireSymbol, terminalPoint } from "./symbols";
 import { isOrthogonal, routeOf, simplifyRoute } from "./wires";
 import { isMaster, isSlave, locate } from "./xref";
 import { colourCode, knownColour, lampColour } from "./wirecolours";
-import { fitScale, itemStrip } from "./ga";
+import { doorOwner, fitScale, itemStrip, sheetTakes, viewTakes } from "./ga";
 
 export class OpError extends Error {}
 
@@ -81,6 +84,10 @@ export function addElement(
     links: [],
   };
   if (symbol !== "plant-view") for (const k of PLANT_VIEW_KEYS) delete el.params[k];
+  // Call-outs are numbered 1, 2, 3… on each sheet, the next one after the highest there.
+  if (symbol === "callout" && opts.params?.n === undefined) {
+    el.params.n = 1 + Math.max(0, ...page.elements.filter((e) => e.symbol === "callout").map((e) => Number(e.params.n) || 0));
+  }
   page.elements.push(el);
   snapToBlock(page, el);
   if (page.boundaryY !== null) updateZones(page);
@@ -104,9 +111,28 @@ export function rotateElements(project: Project, pageId: string, ids: string[]):
   const page = getPage(project, pageId);
   for (const id of ids) {
     const el = getElement(page, id);
+    // Arrows and polygons turn their points, so their handles stay where they're drawn.
+    const pts = partPoints(el);
+    if (pts) {
+      el.params.pts = formatPoints(pts.slice(1).map((q) => rotate([q[0] - el.pos[0], q[1] - el.pos[1]], 90)));
+      continue;
+    }
     el.rot = (((el.rot + 90) % 360) as Rotation);
   }
   updateZones(page);
+}
+
+/** Move the corners of an arrow or polygon (sheet units; the first is its origin). */
+export function setPartPoints(project: Project, pageId: string, id: string, points: Vec[]): void {
+  const el = getElement(getPage(project, pageId), id);
+  if (!partPoints(el)) throw new OpError("Only arrows and polygons have points to move");
+  const need = el.symbol === "arrow" ? 2 : 3;
+  if (points.length < need) throw new OpError(el.symbol === "arrow" ? "An arrow needs two points" : "A polygon needs at least three corners");
+  const pts = points.map((q) => clampToArea(snapVec(q)));
+  const [o, ...rest] = pts;
+  if (el.symbol === "arrow" && rest[0]![0] === o![0] && rest[0]![1] === o![1]) throw new OpError("An arrow needs some length");
+  el.pos = o!;
+  el.params.pts = formatPoints(rest.map((q) => [q[0] - o![0], q[1] - o![1]]));
 }
 
 /** Flip parts top to bottom (F). Flipping twice puts them back. */
@@ -114,6 +140,11 @@ export function flipElements(project: Project, pageId: string, ids: string[]): v
   const page = getPage(project, pageId);
   for (const id of ids) {
     const el = getElement(page, id);
+    const pts = partPoints(el);
+    if (pts) {
+      el.params.pts = formatPoints(pts.slice(1).map((q) => [q[0] - el.pos[0], el.pos[1] - q[1]]));
+      continue;
+    }
     if (el.flip) delete el.flip;
     else el.flip = true;
   }
@@ -506,7 +537,17 @@ export function addPage(project: Project, title = "", afterId?: string): Page {
 export function deletePage(project: Project, pageId: string): void {
   getPage(project, pageId);
   if (project.pages.length === 1) throw new OpError("A project needs at least one page");
+  const gone = project.pages.find((p) => p.id === pageId)!;
   project.pages = project.pages.filter((p) => p.id !== pageId);
+  // Door views of a door that's gone: a front keeps its place as a door of its own; a back is left for Check to flag.
+  for (const p of project.pages) {
+    if (p.ga?.of !== pageId) continue;
+    if (p.ga.view === "door-front") {
+      delete p.ga.of;
+      delete p.ga.leaf;
+    }
+  }
+  detachDims(project, new Set((gone.gaItems ?? []).map((it) => it.id)));
   renumberPages(project);
   refreshConductors(project);
 }
@@ -1130,27 +1171,100 @@ export function deleteRule(project: Project, id: string): void {
 // ---------------------------------------------------------------------------
 // General arrangement (GA) sheets
 
-/** Add a GA sheet: the panel at true scale, backplate or door. */
+const VIEW_TITLES: Record<GaView, string> = {
+  backplate: "General arrangement: backplate",
+  "door-front": "General arrangement: door front",
+  "door-back": "General arrangement: door back",
+};
+
+/**
+ * Add a GA sheet: the panel at true scale, backplate or door. A door back
+ * (or a door front showing one leaf of a door laid out elsewhere) is `of`
+ * a door-front sheet, and takes its door from there.
+ */
 export function addGaPage(project: Project, title: string, ga: GaSettings, afterId?: string): Page {
-  const page = addPage(project, title || (ga.view === "door" ? "General arrangement: door" : "General arrangement: backplate"), afterId);
+  if (ga.of) {
+    const owner = project.pages.find((p) => p.id === ga.of);
+    if (owner?.ga?.view !== "door-front" || owner.ga.of) throw new OpError("A door view must be of a door-front sheet");
+  } else if (ga.view === "door-back") throw new OpError("A door back is the back of a door front: pick its sheet");
+  const page = addPage(project, title || VIEW_TITLES[ga.view], afterId);
   page.ga = { scale: ga.scale, enclosure: { ...ga.enclosure }, view: ga.view };
+  if (ga.of) {
+    page.ga.of = ga.of;
+    page.ga.enclosure = { ...project.pages.find((p) => p.id === ga.of)!.ga!.enclosure };
+  }
+  if (ga.view === "door-front" && !ga.of && ga.leaves?.length) setLeaves(page.ga, ga.leaves);
+  if (ga.leaf !== undefined && ga.view !== "backplate") page.ga.leaf = ga.leaf;
   page.gaItems = [];
   return page;
 }
 
-export function setGaSettings(project: Project, pageId: string, patch: Partial<GaSettings>): void {
+/** One or two leaves; two share the door's width. */
+function setLeaves(ga: GaSettings, leaves: DoorLeaf[]): void {
+  if (leaves.length >= 2) {
+    const a = Math.min(Math.max(50, leaves[0]!.w), ga.enclosure.w - 50);
+    if (!(ga.enclosure.w > 100)) throw new OpError("The door is too narrow for two leaves");
+    ga.leaves = [
+      { w: a, hinge: leaves[0]!.hinge },
+      { w: ga.enclosure.w - a, hinge: leaves[1]!.hinge },
+    ];
+  } else if (leaves.length === 1 && leaves[0]!.hinge === "right") ga.leaves = [{ w: ga.enclosure.w, hinge: "right" }];
+  else delete ga.leaves;
+  if (!ga.leaves || ga.leaves.length < 2) delete ga.leaf;
+}
+
+export function setGaSettings(project: Project, pageId: string, patch: Partial<Omit<GaSettings, "of" | "leaf">> & { of?: string | null; leaf?: 0 | 1 | null }): void {
   const page = getPage(project, pageId);
   if (!page.ga) throw new OpError("That isn't a GA sheet");
+  const ga = page.ga;
   if (patch.scale !== undefined) {
     if (!(patch.scale > 0)) throw new OpError("The scale must be more than 0");
-    page.ga.scale = patch.scale;
+    ga.scale = patch.scale;
+  }
+  if (patch.view && patch.view !== ga.view) {
+    // Only what the new view takes may be on the sheet.
+    const misfit = (page.gaItems ?? []).filter((it) => !viewTakes(patch.view!, it.kind));
+    if (misfit.length) throw new OpError(`A ${patch.view.replace("-", " ")} can't have the ${misfit.length} rail, trunking or label item${misfit.length === 1 ? "" : "s"} on this sheet: delete them first`);
+    if (patch.view === "door-back" && !patch.of && !ga.of) throw new OpError("A door back is the back of a door front: pick its sheet");
+    if (ga.view === "door-front" && project.pages.some((p) => p.ga?.of === page.id)) throw new OpError("Other sheets show this door: change them first");
+    ga.view = patch.view;
+    if (ga.view === "backplate") {
+      delete ga.of;
+      delete ga.leaf;
+    }
+    if (ga.view !== "door-front") delete ga.leaves;
+  }
+  if (patch.of !== undefined) {
+    if (patch.of === null) {
+      if (ga.view === "door-back") throw new OpError("A door back is the back of a door front: pick its sheet");
+      delete ga.of;
+    } else {
+      const owner = project.pages.find((p) => p.id === patch.of);
+      if (owner?.ga?.view !== "door-front" || owner.ga.of || owner.id === page.id) throw new OpError("A door view must be of a door-front sheet");
+      if (ga.view === "door-front" && (page.gaItems ?? []).some((it) => it.kind !== "dim")) throw new OpError("This door front has its own devices: delete them first, or keep it as its own door");
+      ga.of = owner.id;
+      ga.enclosure = { ...owner.ga.enclosure };
+      delete ga.leaves;
+    }
   }
   if (patch.enclosure) {
     const { w, h } = patch.enclosure;
     if (!(w > 0 && h > 0)) throw new OpError("The enclosure needs a width and height");
-    page.ga.enclosure = { w, h };
+    if (ga.of) throw new OpError("This sheet shows another sheet's door: change its size there");
+    ga.enclosure = { w, h };
+    if (ga.leaves) setLeaves(ga, ga.leaves);
+    // Door views of this door take its size too.
+    for (const p of project.pages) if (p.ga?.of === page.id) p.ga.enclosure = { w, h };
   }
-  if (patch.view) page.ga.view = patch.view;
+  if (patch.leaves) {
+    if (ga.view !== "door-front" || ga.of) throw new OpError("Leaves are set on the door front that has the door");
+    setLeaves(ga, patch.leaves);
+    if (!ga.leaves || ga.leaves.length < 2) for (const p of project.pages) if (p.ga?.of === page.id) delete p.ga.leaf;
+  }
+  if (patch.leaf !== undefined) {
+    if (patch.leaf === null) delete ga.leaf;
+    else if (ga.view !== "backplate") ga.leaf = patch.leaf;
+  }
 }
 
 function gaPage(project: Project, pageId: string): Page & { ga: GaSettings; gaItems: GaItem[] } {
@@ -1163,16 +1277,41 @@ function gaPage(project: Project, pageId: string): Page & { ga: GaSettings; gaIt
 /** Put something on a GA sheet. Positions and sizes are real mm, rounded to 0.5 mm. */
 export function addGaItem(project: Project, pageId: string, item: Omit<GaItem, "id">): GaItem {
   const page = gaPage(project, pageId);
+  if (!sheetTakes(project, page, item.kind)) {
+    const what = { rail: "A DIN rail", trunking: "Trunking", device: "A device", label: "A label plate", dim: "A dimension" }[item.kind];
+    const owner = doorOwner(project, page);
+    throw new OpError(
+      owner && owner !== page && page.ga.view === "door-front"
+        ? `This sheet shows the door laid out on sheet ${owner.number}: put it there`
+        : `${what} doesn't go on a ${page.ga.view.replace("-", " ")}`,
+    );
+  }
   const r = (v: number) => Math.round(v * 2) / 2;
   const it: GaItem = { ...item, id: newId("g"), x: r(item.x), y: r(item.y), w: Math.max(1, r(item.w)), h: Math.max(1, r(item.h)) };
-  // A schematic device is on one GA only.
-  if (it.refs?.length) for (const pg of project.pages) for (const other of pg.gaItems ?? []) if (other.refs?.some((x) => it.refs!.includes(x))) throw new OpError("That's already on a GA");
+  // A schematic device (or its door handle) is on one GA only.
+  if (it.refs?.length)
+    for (const pg of project.pages)
+      for (const other of pg.gaItems ?? []) if ((other.part ?? "") === (it.part ?? "") && other.refs?.some((x) => it.refs!.includes(x))) throw new OpError("That's already on a GA");
   // A terminal strip keeps up with the schematic from here on (note 45).
-  const strip = itemStrip(project, it);
+  const strip = it.part ? null : itemStrip(project, it);
   if (strip) {
     it.strip = strip;
     it.seen = [...(it.refs ?? [])];
   }
+  if (it.kind === "label") {
+    it.text ??= "LABEL";
+    it.textMm ??= 5;
+  }
+  page.gaItems.push(it);
+  return it;
+}
+
+/** Put a dimension on a GA sheet: its points along the axis, its line at `at` across it. */
+export function addGaDim(project: Project, pageId: string, dim: GaDim): GaItem {
+  if (dim.points.length < 2) throw new OpError("A dimension needs two points at least");
+  const page = gaPage(project, pageId);
+  if (!sheetTakes(project, page, "dim")) throw new OpError("A dimension doesn't go here");
+  const it: GaItem = { id: newId("g"), kind: "dim", x: 0, y: 0, w: 1, h: 1, dim: { ...dim, points: dim.points.map((p) => ({ ...p })) } };
   page.gaItems.push(it);
   return it;
 }
@@ -1186,12 +1325,23 @@ export function updateGaItem(project: Project, pageId: string, id: string, patch
   if (patch.w !== undefined) it.w = Math.max(1, r(patch.w));
   if (patch.h !== undefined) it.h = Math.max(1, r(patch.h));
   if (patch.text !== undefined) it.text = patch.text;
+  if (patch.cutout !== undefined) {
+    if (patch.cutout.trim()) it.cutout = patch.cutout.trim();
+    else delete it.cutout;
+  }
+  if (patch.textMm !== undefined && patch.textMm > 0) it.textMm = patch.textMm;
+  if (patch.dim !== undefined && it.kind === "dim") it.dim = { ...it.dim!, ...patch.dim };
 }
 
 export function moveGaItems(project: Project, pageId: string, ids: string[], d: Vec): void {
   const page = gaPage(project, pageId);
   for (const it of page.gaItems) {
     if (!ids.includes(it.id)) continue;
+    if (it.dim) {
+      // A dimension moves its line, across its axis; its points stay on what they measure.
+      it.dim.at = Math.round((it.dim.at + (it.dim.axis === "h" ? d[1] : d[0])) * 2) / 2;
+      continue;
+    }
     it.x = Math.round((it.x + d[0]) * 2) / 2;
     it.y = Math.round((it.y + d[1]) * 2) / 2;
   }
@@ -1200,7 +1350,7 @@ export function moveGaItems(project: Project, pageId: string, ids: string[], d: 
 /** Turn items a quarter turn (swap width and height) about their centres. */
 export function rotateGaItems(project: Project, pageId: string, ids: string[]): void {
   for (const it of gaPage(project, pageId).gaItems) {
-    if (!ids.includes(it.id)) continue;
+    if (!ids.includes(it.id) || it.dim) continue;
     const cx = it.x + it.w / 2;
     const cy = it.y + it.h / 2;
     [it.w, it.h] = [it.h, it.w];
@@ -1212,6 +1362,18 @@ export function rotateGaItems(project: Project, pageId: string, ids: string[]): 
 export function deleteGaItems(project: Project, pageId: string, ids: string[]): void {
   const page = gaPage(project, pageId);
   page.gaItems = page.gaItems.filter((x) => !ids.includes(x.id));
+  detachDims(project, new Set(ids));
+}
+
+/** Dimension points on items that have gone stay where they were. */
+function detachDims(project: Project, gone: Set<string>): void {
+  for (const pg of project.pages)
+    for (const it of pg.gaItems ?? [])
+      for (const p of it.dim?.points ?? [])
+        if (p.item && gone.has(p.item)) {
+          delete p.item;
+          delete p.edge;
+        }
 }
 
 /** Change a generic GA size for this project (null: back to the generic one). */

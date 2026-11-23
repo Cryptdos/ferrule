@@ -35,7 +35,7 @@ export type Anchor = "start" | "middle" | "end";
 
 export type Prim =
   | { t: "line"; pts: Vec[]; w?: number; dash?: boolean }
-  | { t: "poly"; pts: Vec[]; fill: boolean }
+  | { t: "poly"; pts: Vec[]; fill: boolean; /** A translucent marker colour instead of black (highlights). */ tint?: string }
   | { t: "circle"; c: Vec; r: number; fill?: boolean; /** Paper-white inside, to sit over a line. */ bg?: boolean }
   | { t: "arc"; from: Vec; to: Vec; r: number; sweep: 0 | 1 }
   | { t: "ellipse"; c: Vec; rx: number; ry: number; dash?: boolean }
@@ -400,6 +400,33 @@ export const LAMP_COLOURS = [
   { code: "Wh", name: "white" },
   { code: "Cl", name: "clear" },
 ];
+
+/** Marker colours for highlights: translucent, so the drawing under them still reads (and prints). */
+export const HIGHLIGHT_COLOURS = [
+  { value: "yellow", label: "Yellow", css: "rgba(255, 221, 0, 0.45)" },
+  { value: "green", label: "Green", css: "rgba(80, 210, 90, 0.38)" },
+  { value: "pink", label: "Pink", css: "rgba(255, 105, 180, 0.35)" },
+  { value: "blue", label: "Blue", css: "rgba(80, 170, 255, 0.35)" },
+];
+
+/** Points kept in a part's params ("x,y x,y"), relative to its origin. */
+export function parsePoints(s: string): Vec[] {
+  const out: Vec[] = [];
+  for (const bit of s.trim().split(/\s+/)) {
+    const [a, b] = bit.split(",").map(Number);
+    if (Number.isFinite(a) && Number.isFinite(b)) out.push([a!, b!]);
+  }
+  return out;
+}
+
+export const formatPoints = (pts: Vec[]) => pts.map((p) => `${Math.round(p[0] * 2) / 2},${Math.round(p[1] * 2) / 2}`).join(" ");
+
+/** Parts drawn through points (arrow, polygon): their corners on the sheet, the origin first. */
+export function partPoints(el: Pick<Element, "symbol" | "pos" | "params">): Vec[] | null {
+  if (el.symbol !== "arrow" && el.symbol !== "polygon") return null;
+  const rel = parsePoints(typeof el.params.pts === "string" ? el.params.pts : "");
+  return [[...el.pos] as Vec, ...(el.symbol === "arrow" ? rel.slice(0, 1) : rel).map((p): Vec => [el.pos[0] + p[0], el.pos[1] + p[1]])];
+}
 
 // ---------------------------------------------------------------------------
 // The library
@@ -1571,6 +1598,127 @@ const SYMBOLS: SymbolDef[] = [
         ],
         terminals: [],
         body: { x: 0, y: 0, w, h },
+      };
+    },
+  },
+  {
+    id: "arrow",
+    bench: "annotate",
+    name: "Arrow",
+    group: "Drawing",
+    palette: true,
+    params: [
+      // Its tip, from where it starts (the part's origin), in units: dragged by its handle.
+      { key: "pts", label: "Points", type: "text", default: "12,0", hidden: true },
+      {
+        key: "heads",
+        label: "Heads",
+        type: "select",
+        default: "end",
+        options: [
+          { value: "end", label: "At the tip" },
+          { value: "both", label: "Both ends" },
+        ],
+      },
+      { key: "dashed", label: "Dashed", type: "bool", default: false },
+      { key: "heavy", label: "Heavy line", type: "bool", default: false },
+    ],
+    kind: () => null,
+    draw(el) {
+      const pts = [[0, 0] as Vec, ...parsePoints(str(el, "pts", "12,0")).slice(0, 1)];
+      const tip = pts[1] ?? [12, 0];
+      const w = bool(el, "heavy", false) ? 0.35 / UNIT_MM : W;
+      const prims: Prim[] = [];
+      const len = Math.hypot(tip[0], tip[1]) || 1;
+      const u: Vec = [tip[0] / len, tip[1] / len];
+      // A filled head 1.4 units long; the shaft stops at its base so a heavy line doesn't blunt it.
+      const head = (at: Vec, dir: Vec): Prim => {
+        const base: Vec = [at[0] - dir[0] * 1.4, at[1] - dir[1] * 1.4];
+        const n: Vec = [-dir[1] * 0.5, dir[0] * 0.5];
+        return { t: "poly", pts: [at, [base[0] + n[0], base[1] + n[1]], [base[0] - n[0], base[1] - n[1]]], fill: true };
+      };
+      const both = str(el, "heads", "end") === "both";
+      const from: Vec = both ? [u[0] * 1.2, u[1] * 1.2] : [0, 0];
+      const to: Vec = [tip[0] - u[0] * 1.2, tip[1] - u[1] * 1.2];
+      prims.push({ t: "line", pts: [from, to], w, dash: bool(el, "dashed", false) }, head(tip, u));
+      if (both) prims.push(head([0, 0], [-u[0], -u[1]]));
+      const x = Math.min(0, tip[0]);
+      const y = Math.min(0, tip[1]);
+      return { prims, terminals: [], body: { x, y, w: Math.abs(tip[0]), h: Math.abs(tip[1]) } };
+    },
+  },
+  {
+    id: "highlight",
+    bench: "annotate",
+    name: "Highlight",
+    group: "Drawing",
+    palette: true,
+    params: [
+      { key: "w", label: "Width (units)", type: "number", min: 1, max: 150, default: 20 },
+      { key: "h", label: "Height (units)", type: "number", min: 1, max: 90, default: 3 },
+      {
+        key: "colour",
+        label: "Colour",
+        type: "select",
+        default: "yellow",
+        options: HIGHLIGHT_COLOURS.map((c) => ({ value: c.value, label: c.label })),
+      },
+    ],
+    kind: () => null,
+    draw(el) {
+      // A translucent marker band: what's under it still reads.
+      const w = num(el, "w", 20, 1, 150);
+      const h = num(el, "h", 3, 1, 90);
+      const tint = HIGHLIGHT_COLOURS.find((c) => c.value === str(el, "colour", "yellow"))?.css ?? HIGHLIGHT_COLOURS[0]!.css;
+      return { prims: [{ t: "poly", pts: [[0, 0], [w, 0], [w, h], [0, h]], fill: true, tint }], terminals: [], body: { x: 0, y: 0, w, h } };
+    },
+  },
+  {
+    id: "callout",
+    bench: "annotate",
+    name: "Call-out",
+    group: "Drawing",
+    palette: true,
+    params: [
+      // Numbered 1, 2, 3… on each sheet as they're placed; can be changed.
+      { key: "n", label: "Number", type: "number", min: 1, max: 999, default: 1 },
+    ],
+    kind: () => null,
+    draw(el) {
+      const n = String(Math.round(num(el, "n", 1, 1, 999)));
+      const r = Math.max(1.6, textWidth(n, TAG) / 2 + 0.6);
+      return {
+        prims: [circle(0, 0, r), text(0, (TAG * CAP_HEIGHT) / 2, n, TAG, "middle", "label")],
+        terminals: [],
+        body: { x: -r, y: -r, w: 2 * r, h: 2 * r },
+      };
+    },
+  },
+  {
+    id: "polygon",
+    bench: "annotate",
+    name: "Polygon",
+    group: "Drawing",
+    // Drawn point by point with its own tool (the palette entry starts it).
+    palette: true,
+    params: [
+      // Its corners after the first (the part's origin), in units.
+      { key: "pts", label: "Points", type: "text", default: "10,0 10,6", hidden: true },
+      { key: "dashed", label: "Dashed", type: "bool", default: false },
+      { key: "heavy", label: "Heavy line", type: "bool", default: false },
+    ],
+    kind: () => null,
+    draw(el) {
+      const pts: Vec[] = [[0, 0], ...parsePoints(str(el, "pts", "10,0 10,6"))];
+      const w = bool(el, "heavy", false) ? 0.35 / UNIT_MM : W;
+      const xs = pts.map((p) => p[0]);
+      const ys = pts.map((p) => p[1]);
+      const x = Math.min(...xs);
+      const y = Math.min(...ys);
+      return {
+        prims: [{ t: "line", pts: [...pts, pts[0]!], w, dash: bool(el, "dashed", false) }],
+        terminals: [],
+        body: { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y },
       };
     },
   },
