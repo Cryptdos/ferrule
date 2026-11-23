@@ -248,8 +248,8 @@ describe("simulating points", () => {
     connect(p, pg, [f.id, "2"], [uv.id, "BAT+"]);
     connect(p, pg, [bv.id, "-"], [uv.id, "BAT-"]);
     // A load on the 24 V DC bus, drawn as busbars on the UPS's distributions.
-    const plus = addElement(p, pg, "busbar", [0, 30], { params: { style: "control", dist: dc.id, length: 60 } });
-    const minus = addElement(p, pg, "busbar", [0, 70], { params: { style: "control", dist: ov.id, length: 60 } });
+    const plus = addElement(p, pg, "rail", [0, 30], { params: { dist: dc.id, length: 60 } });
+    const minus = addElement(p, pg, "rail", [0, 70], { params: { dist: ov.id, length: 60 } });
     const h = addElement(p, pg, "lamp", [30, 50]);
     connect(p, pg, [plus.id, "30"], [h.id, "+V"]);
     connect(p, pg, [h.id, "-V"], [minus.id, "30"]);

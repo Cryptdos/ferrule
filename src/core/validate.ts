@@ -318,10 +318,15 @@ function parsePage(pg: Record<string, unknown>, i: number): Project["pages"][num
       throw new ProjectFormatError(`Element ${j + 1} on page ${i + 1} is malformed`);
     }
     if (!getSymbol(e.symbol)) throw new ProjectFormatError(`Unknown symbol "${e.symbol}" on page ${i + 1}`);
+    // Busbars split in two (v0.3 §1): a control busbar is a control rail, the rest distribution blocks.
+    if (e.symbol === "busbar" && isObj(e.params)) {
+      if (e.params.style === "control") e.symbol = "rail";
+      delete e.params.style;
+    }
     const rot = [0, 90, 180, 270].includes(e.rot as number) ? (e.rot as 0 | 90 | 180 | 270) : 0;
     return {
       id: e.id,
-      symbol: e.symbol,
+      symbol: e.symbol as string,
       tag: strOr(e.tag),
       label: strOr(e.label),
       pos: e.pos,
@@ -580,7 +585,7 @@ function preRelease(input: Record<string, unknown>): void {
       }
       if (e.symbol === "isolator" && params.operator === "push") params.operator = "turn";
       // Busbar colours were free text in the test builds; now one of the wire colours (T4).
-      if (e.symbol === "busbar" && typeof params.colour === "string") params.colour = knownColour(params.colour);
+      if ((e.symbol === "busbar" || e.symbol === "rail") && typeof params.colour === "string") params.colour = knownColour(params.colour);
     }
   }
   if (!terms.size) return;

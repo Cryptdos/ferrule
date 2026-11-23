@@ -28,7 +28,7 @@
   import { controllerName, moduleTitle } from "../../core/modules";
   import { readImage } from "../images";
   import { address, contactMarks, contactType, isMaster, isSlave, masterOf, partnerOf, slavesOf } from "../../core/xref";
-  import { paramApplies, requireSymbol, terminalNames } from "../../core/symbols";
+  import { isBar, paramApplies, requireSymbol, terminalNames } from "../../core/symbols";
   import { WIRE_FUNCTIONS } from "../../core/wirecolours";
   import ColourSelect from "./ColourSelect.svelte";
   import { displayTag, tagPrefix } from "../../core/tags";
@@ -268,11 +268,11 @@
       </label>
       <p class="hint">Its modules in rail order: tag, bus address, maker, model, type and where each is drawn; spare slots dashed. It keeps up by itself.</p>
     {/if}
-    {#if one.symbol === "busbar" || one.symbol === "offpage"}
+    {#if isBar(one) || one.symbol === "offpage"}
       <label>
         Distribution
         <select value={String(one.params.dist ?? "")} onchange={(e) => setParam("dist", e.currentTarget.value)}>
-          <option value="">{one.symbol === "busbar" ? "Local (this busbar alone)" : "None"}</option>
+          <option value="">{isBar(one) ? "Local (this one alone)" : "None"}</option>
           {#each editor.project.distributions as d (d.id)}
             <option value={d.id}>{d.name}{d.voltage ? ` (${d.voltage})` : ""}</option>
           {/each}
@@ -284,7 +284,7 @@
     {:else if one.symbol === "supply"}
       <div class="sub">Distribution each conductor feeds</div>
       <p class="hint">
-        Only when its busbars aren't wired from this supply. Everything on a distribution is joined, so wiring in
+        Only when its blocks and rails aren't wired from this supply. Everything on a distribution is joined, so wiring in
         between (a main isolator, say) would be bypassed. Check warns when that happens.
       </p>
       {#each terminalNames(one) as t (t)}

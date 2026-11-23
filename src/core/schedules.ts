@@ -7,6 +7,7 @@ import { address, partnerOf } from "./xref";
 import { gaSizes, sizeKey } from "./ga";
 import { controllerName, controllerOfModule, controllersInOrder, moduleTypeName, pointLabel, viewsOf } from "./modules";
 import { formLabel, printedPin } from "./points";
+import { isBar } from "./symbols";
 
 export interface TerminalRow {
   strip: string;
@@ -31,7 +32,7 @@ function endName(project: Project, el: Element | undefined, term: string): strin
   if (el.symbol === "junction") return "(junction)";
   const tag = displayTag(el, project);
   if (el.symbol === "terminal") return `${el.params.strip ?? "X1"}:${tag}`;
-  if (el.symbol === "busbar") return elementTexts(el, project).name || tag || "busbar";
+  if (isBar(el)) return elementTexts(el, project).name || tag || (el.symbol === "rail" ? "rail" : "busbar");
   return `${tag || el.symbol}:${term}`;
 }
 
@@ -250,8 +251,8 @@ export function wiredTo(project: Project, item: PlantItem, point: IoPoint): stri
           push(`via link ${address(pg, e.pos)}${partner ? ` → ${address(partner.page, partner.el.pos)}` : ""}`);
         } else if (e.symbol === "terminal") {
           push(`${e.params.strip ?? "X1"}:${displayTag(e, project)}`);
-        } else if (e.symbol === "busbar") {
-          push(elementTexts(e, project).name || displayTag(e, project) || "busbar");
+        } else if (isBar(e)) {
+          push(elementTexts(e, project).name || displayTag(e, project) || (e.symbol === "rail" ? "rail" : "busbar"));
         } else {
           push(`${displayTag(e, project) || e.symbol}:${t}`);
         }

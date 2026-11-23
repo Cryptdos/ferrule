@@ -27,7 +27,7 @@
 
   const update = (id: string, patch: Parameters<typeof updateDistribution>[2]) => editor.apply((p) => updateDistribution(p, id, patch));
 
-  /** Sheets with a busbar, arrow or supply on this distribution. */
+  /** Sheets with a block, rail, arrow or supply on this distribution. */
   const usedOn = (id: string) =>
     editor.project.pages
       .filter((pg) => pg.elements.some((e) => distParamKeys(e).some((k) => e.params[k] === id)))
@@ -36,9 +36,9 @@
 
 <Modal title="Distribution" {onclose} wide>
   <p class="hint">
-    The supplies this project distributes. Busbars, link arrows and the incoming supply pick one from this list, so
-    everything on the same distribution is joined on every sheet. A busbar on no distribution is <strong>local</strong>
-    and joins nothing else. Busbars take their colour and function from here unless they say otherwise.
+    The supplies this project distributes. Distribution blocks, control rails, link arrows and the incoming supply pick
+    one from this list, so everything on the same distribution is joined on every sheet. A block or rail on no distribution
+    is <strong>local</strong> and joins nothing else. Wires drawn from them take their colour and function from here unless they say otherwise.
   </p>
   {#if editor.project.distributions.length}
     <table>
@@ -61,9 +61,9 @@
             <td>
               <button
                 class="danger"
-                title="Delete it: busbars on it become local"
+                title="Delete it: blocks and rails on it become local"
                 onclick={() => {
-                  if (confirm(`Delete ${d.name}? Busbars on it become local.`)) editor.apply((p) => deleteDistribution(p, d.id));
+                  if (confirm(`Delete ${d.name}? Blocks and rails on it become local.`)) editor.apply((p) => deleteDistribution(p, d.id));
                 }}>✕</button
               >
             </td>

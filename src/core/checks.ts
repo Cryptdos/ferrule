@@ -7,7 +7,7 @@ import { compile, pinNode } from "./sim";
 import { controllerName, modulesOf, moduleTypeName, slotAddress, viewsOf } from "./modules";
 import { contactPins, isAnalogueForm, isInputForm, missingRefs, describeExpectation, things } from "./points";
 import type { Element, Page, Project } from "./model";
-import { terminalNames } from "./symbols";
+import { isBar, terminalNames } from "./symbols";
 import { displayTag } from "./tags";
 import { isMaster, isSlave, masterOf, partnerOf, slavesOf } from "./xref";
 
@@ -19,7 +19,7 @@ export interface Finding {
   ids: string[];
 }
 
-const NO_TERMINAL_CHECK = new Set(["busbar", "junction", "plant-view", "isolator", "transformer", "motor", "socket"]);
+const NO_TERMINAL_CHECK = new Set(["busbar", "rail", "junction", "plant-view", "isolator", "transformer", "motor", "socket"]);
 
 function wiredTerminals(page: Page): Map<string, Set<string>> {
   const out = new Map<string, Set<string>>();
@@ -308,7 +308,7 @@ export function supplyBypasses(project: Project): Finding[] {
       const reached = project.pages.some((pg) =>
         pg.elements.some(
           (b) =>
-            b.symbol === "busbar" &&
+            isBar(b) &&
             b.params.dist === v &&
             project.conductors.some((cd) => cd.terminals.some(([id]) => id === b.id) && find(cd.id) === from),
         ),

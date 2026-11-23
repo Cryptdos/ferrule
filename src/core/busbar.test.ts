@@ -23,7 +23,7 @@ describe("distributions (design-v0.2 §2)", () => {
     expect(l1.colour).toBe("Bn");
     const a = addElement(p, pg, "busbar", [10, 10], { params: { dist: l1.id, length: 30 } });
     const b = addElement(p, pg, "busbar", [10, 20], { params: { name: "La", length: 30 } });
-    const c = addElement(p, pg, "busbar", [10, 30], { params: { style: "control", name: "LT", length: 30, bothEnds: true } });
+    const c = addElement(p, pg, "rail", [10, 30], { params: { name: "LT", length: 30, bothEnds: true } });
     renumber(p);
     expect(elementTexts(a, p).name).toBe("L1");
     expect(elementTexts(b, p).name).toBe("La");
@@ -82,7 +82,7 @@ describe("distributions (design-v0.2 §2)", () => {
   test("a template carries its distributions into another project, matched by name", () => {
     const { p, pg } = project();
     const cct = addDistribution(p, { name: "CCT", kind: "dc+", voltage: "24 V DC" });
-    addElement(p, pg, "busbar", [0, 10], { params: { style: "control", dist: cct.id, length: 100 } });
+    addElement(p, pg, "rail", [0, 10], { params: { dist: cct.id, length: 100 } });
     const t = saveSheetTemplate(p, pg, "Controls");
     expect(t.distributions?.map((d) => d.name)).toEqual(["CCT"]);
     // Into a project that has no CCT: it's added.
@@ -146,8 +146,8 @@ describe("simulating without an Incoming supply", () => {
     const { p, pg } = project();
     const cct = addDistribution(p, { name: "CCT", kind: "line", voltage: "24 V AC" });
     const ov = addDistribution(p, { name: "0V", kind: "neutral" });
-    const c = addElement(p, pg, "busbar", [0, 30], { params: { style: "control", dist: cct.id, length: 100 } });
-    const o = addElement(p, pg, "busbar", [0, 80], { params: { style: "control", dist: ov.id, length: 100 } });
+    const c = addElement(p, pg, "rail", [0, 30], { params: { dist: cct.id, length: 100 } });
+    const o = addElement(p, pg, "rail", [0, 80], { params: { dist: ov.id, length: 100 } });
     const t = addElement(p, pg, "transformer", [10, 15]);
     connect(p, pg, [t.id, "S1"], [c.id, "10"]);
     connect(p, pg, [t.id, "S2"], [o.id, "13"]);

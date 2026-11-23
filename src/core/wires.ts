@@ -6,7 +6,7 @@
 import { BLOCK_INSET } from "./blocks";
 import { textUnits, type Vec } from "./geometry";
 import type { Element, Page, Project, Segment, TerminalRef } from "./model";
-import { terminalDir, terminalPoint } from "./symbols";
+import { isBar, terminalDir, terminalPoint } from "./symbols";
 import { textWidth } from "./textwidth";
 
 const eq = (a: Vec, b: Vec) => a[0] === b[0] && a[1] === b[1];
@@ -161,9 +161,9 @@ export function connectionDots(page: Page): Vec[] {
       const at = terminalPoint(el, ref[1]);
       if (!at) continue;
       const key = `${ref[0]}:${ref[1]}`;
-      const isBar = el.symbol === "busbar";
+      const bar = isBar(el);
       const len = typeof el.params.length === "number" ? el.params.length : 0;
-      const tap = isBar && ref[1] !== "0" && ref[1] !== String(len);
+      const tap = bar && ref[1] !== "0" && ref[1] !== String(len);
       const cur = count.get(key) ?? { n: 0, at, tap };
       cur.n += 1;
       count.set(key, cur);

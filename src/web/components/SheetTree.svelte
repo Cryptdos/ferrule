@@ -2,7 +2,7 @@
   import { addPage, addSparePage, deletePage, duplicatePage, movePage } from "../../core/ops";
   import { columnOf } from "../../core/geometry";
   import { resolveFields } from "../../core/fields";
-  import { benchOf, requireSymbol } from "../../core/symbols";
+  import { benchOf, isBar, requireSymbol } from "../../core/symbols";
   import { displayTag, elementTexts } from "../../core/tags";
   import type { Page } from "../../core/model";
   import type { Editor } from "../editor.svelte";
@@ -47,7 +47,7 @@
         tag: displayTag(e, p),
         text:
           resolveFields(e.label, p) ||
-          (e.symbol === "busbar" ? (elementTexts(e, p).name ?? "") : "") ||
+          (isBar(e) ? (elementTexts(e, p).name ?? "") : "") ||
           requireSymbol(e.symbol).name,
         col: columnOf(e.pos[0]),
         y: e.pos[1],
