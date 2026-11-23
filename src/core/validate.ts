@@ -9,7 +9,7 @@ import { parseProjectDevices } from "./devices";
 import { AREA_UNITS } from "./geometry";
 import { DISTRIBUTION_KINDS, type DistributionKind, FORMAT, FORMAT_VERSION, type GaItem, type Page, type Project, emptyInfo } from "./model";
 import { getSymbol } from "./symbols";
-import { colourCode } from "./wirecolours";
+import { colourCode, knownColour } from "./wirecolours";
 
 export class ProjectFormatError extends Error {}
 
@@ -349,6 +349,8 @@ function preRelease(input: Record<string, unknown>): void {
         terms.set(id, { "+": "+V", "-": "-V" });
       }
       if (e.symbol === "isolator" && params.operator === "push") params.operator = "turn";
+      // Busbar colours were free text in the test builds; now one of the wire colours (T4).
+      if (e.symbol === "busbar" && typeof params.colour === "string") params.colour = knownColour(params.colour);
     }
   }
   if (!terms.size) return;

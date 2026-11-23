@@ -31,6 +31,8 @@
     updateElement,
     updateSection,
     wire,
+    linkArrows,
+    linkToNewArrow,
     type WireEnd,
   } from "../../core/ops";
   import { benchOf, localGeometry, defaultParams, plantViewLayout, type Geometry } from "../../core/symbols";
@@ -162,10 +164,15 @@
   // Hit testing
 
   function hitElement(pt: Vec): Element | null {
+    // A terminal strip line runs over its terminals: they're picked first, the line only where it's clear of them.
+    return hitElementIn(pt, false) ?? hitElementIn(pt, true);
+  }
+
+  function hitElementIn(pt: Vec, stripLines: boolean): Element | null {
     const els = page.elements;
     for (let i = els.length - 1; i >= 0; i--) {
       const el = els[i]!;
-      if (el.symbol === "junction" || benchOf(el) !== bench) continue;
+      if (el.symbol === "junction" || benchOf(el) !== bench || (el.symbol === "strip-line") !== stripLines) continue;
       const g = geoms.get(el.id);
       if (!g) continue;
       const local: Vec = [pt[0] - el.pos[0], pt[1] - el.pos[1]];
@@ -444,6 +451,28 @@
     }
     if (page.ga && editor.mode === "draft") {
       editor.flash("This is a GA sheet: lay it out in the GA workbench.");
+      return;
+    }
+
+    if (editor.linking) {
+      // Linking a link arrow (controller.md §5): click the arrow to pair with, or where the new one goes.
+      const { from, mode } = editor.linking;
+      if (mode === "new") {
+        let id = "";
+        if (editor.apply((p) => (id = linkToNewArrow(p, from, editor.pageId, clampToArea(snapVec(pt))).id))) {
+          editor.linking = null;
+          editor.selection = [id];
+        }
+        return;
+      }
+      const hit = hitElement(pt);
+      if (hit?.symbol === "offpage" && hit.id !== from) {
+        const to = hit.id;
+        if (editor.apply((p) => linkArrows(p, from, to))) {
+          editor.linking = null;
+          editor.selection = [to];
+        }
+      } else editor.flash("Click the link arrow to link to (Esc cancels)");
       return;
     }
 

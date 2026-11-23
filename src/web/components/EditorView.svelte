@@ -262,6 +262,10 @@
     } else if (e.key === "r" || e.key === "R") {
       if (ids.length) editor.apply((p) => rotateElements(p, pageId, ids));
     } else if (e.key === "Escape") {
+      if (editor.linking) {
+        editor.linking = null;
+        return;
+      }
       if (canvas?.cancel()) return;
       editor.stamp = null;
       editor.tool = "select";
@@ -433,6 +437,15 @@
           </div>
         </FloatBox>
       {/if}
+    {/if}
+    {#if editor.linking}
+      <div class="linkbar">
+        {editor.linking.mode === "new"
+          ? `New arrow linked from ${editor.linking.address}: click where it goes, on any sheet.`
+          : `Linking from ${editor.linking.address}: click the arrow to link to, on any sheet.`}
+        Esc cancels.
+        <button onclick={() => (editor.linking = null)}>Cancel</button>
+      </div>
     {/if}
     {#if editor.message}<div class="toast">{editor.message}</div>{/if}
   </main>
@@ -618,6 +631,22 @@
     border-radius: 3px;
     padding: 0 3px;
     background: #f6f7f8;
+  }
+  .linkbar {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #fff6d6;
+    border: 1px solid #d9b84a;
+    color: #332;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 13px;
+    z-index: 30;
+    display: flex;
+    gap: 10px;
+    align-items: center;
   }
   .toast {
     position: absolute;

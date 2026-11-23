@@ -42,8 +42,9 @@ export function locate(project: Project, id: string): Located | null {
  * Where something is: sheet-column, e.g. 8-34. Seen from the same sheet
  * just the column, e.g. 34, as on a manufacturer's drawing.
  */
-export function address(page: Page, pos: Vec, from?: Page | null): string {
-  return from && from.id === page.id ? `${columnOf(pos[0])}` : `${page.number}-${columnOf(pos[0])}`;
+/** Sheet-column, e.g. 11-06: always in full, on the same sheet too (testing note 21). */
+export function address(page: Page, pos: Vec, _from?: Page | null): string {
+  return `${page.number}-${columnOf(pos[0])}`;
 }
 
 export function masterOf(project: Project, el: Element): Located | null {
@@ -195,21 +196,23 @@ const TABLE_SEP = TABLE_TEXT * 5.1;
  */
 export function contactTableAt(el: Element, body: Rect, rows: number): Vec {
   const dx = typeof el.params.xrefDx === "number" ? el.params.xrefDx : Math.max(1.9, body.x + body.w + 0.3);
-  const dy = typeof el.params.xrefDy === "number" ? el.params.xrefDy : body.y - 0.2 - contactTableRect(rows, [0, 0]).h;
+  const dy = typeof el.params.xrefDy === "number" ? el.params.xrefDy : body.y - 0.2 - (rows * TABLE_ROW + 0.4);
   return [dx, dy];
 }
 
-/** The table's outline, relative to the coil, for picking it up. */
+/** The table's outline, relative to the coil, for picking it up: the coil's tag above it included. */
 export function contactTableRect(rows: number, at: Vec): Rect {
-  return { x: at[0], y: at[1], w: TABLE_W, h: rows * TABLE_ROW + 0.4 };
+  return { x: at[0], y: at[1] - TABLE_ROW, w: TABLE_W, h: (rows + 1) * TABLE_ROW + 0.4 };
 }
 
 /** The contact table drawn beside a coil, one row per contact, in the coil's coordinates. */
-export function contactTablePrims(rows: [string, string, string][], at: Vec): Prim[] {
+export function contactTablePrims(rows: [string, string, string][], at: Vec, coilTag = ""): Prim[] {
   if (!rows.length) return [];
   const [x0, top] = at;
   const sep = x0 + TABLE_SEP;
   const out: Prim[] = [
+    // The coil's tag over the table, so a table moved away from its coil still says whose it is (29).
+    ...(coilTag ? [{ t: "text", at: [x0 + TABLE_W / 2, top - 0.3], text: coilTag, size: TABLE_TEXT, anchor: "middle", role: "xref" } as Prim] : []),
     { t: "line", pts: [[x0, top], [x0 + TABLE_W, top]], w: lineUnits("thin") },
     { t: "line", pts: [[sep, top], [sep, top + rows.length * TABLE_ROW + 0.3]], w: lineUnits("thin") },
   ];

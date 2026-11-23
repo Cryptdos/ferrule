@@ -419,3 +419,16 @@ Each step is one pull request, with a build to test.
 - **Contact tables** are a little wider (the marks column), so "15-16/18" doesn't run into "CO".
 - **Drawings from the 0.2 test builds** still open: timer contacts, push buttons NO/NC, Notes, the old selector changeover and lamp/DC-supply terminal names are mapped on load. That mapping is for the test period and comes out at release.
 - Not in this step: note 26 (wires to a cable screen drawn dashed) goes with the wire work in step 5.
+
+**Step 5 (wires, labels and terminals)**
+
+- **Wire text order:** colour, function, number, in that order from the source end, the colour nearest the terminal (as the colour was before). The function no longer prints at both ends.
+- **Short wires (T6):** a number on a wire shorter than its text is centred on it, except where the wire lands on a busbar: there it runs away from the bar instead of across it. Wires under 3 units used to print no number; they now always do.
+- **Once per sheet (15):** the number prints on the conductor's longest run on each sheet. Ticking *Show number* on another branch moves it there; unticking it on the printed one moves it to the next longest. The checkbox says why a branch has none.
+- **Earth wires (24):** a conductor is an earth wire when it reaches an earth symbol or an Earth terminal anywhere in the project, so every branch of it goes unnumbered by default.
+- **Earth terminal (9, 27):** the earth sign is drawn as lines (three bars) rather than the ⏚ character, so it prints the same everywhere. In the block it sits at the top of the cell and the cell grows to fit it and the number. Off the block it hangs from the terminal's lower left, clear of its leads and of a strip line through it. On the GA its slice of the strip is striped green-yellow.
+- **Terminal strip line (55):** a part in Connection. A terminal keeps the strip a line gave it after the line moves away; only a line crossing it changes it again. Terminals are picked before the line where they overlap.
+- **Busbar colour (T4)** is the wire colour list plus *From its distribution*. Colours typed in the test builds ("blue", "BU") become codes on load.
+- **In-line colour (T5)** covers fuses, contacts, isolator and breaker poles (and their auxiliaries), terminals, push buttons and selectors. A busbar's colour wins if the wire also lands on one.
+- **Label width (28):** any part with a label has *Label width* in its properties (0: one line). The incoming supply's label is centred on its arrows when upright and grows upwards from above the conductor names; turned sideways it stays where it was.
+- **Link arrows (71):** on a vertical wire the label starts just right of the tip, with the reference after its first line; on a horizontal wire both go under the arrow, running on the way it points. A destination with *Same label as its source* ticked shows the source's label instead of its own. *Link to a new arrow* points the new one the opposite way to the source, so a wire leaving down the page arrives from the top of the next.

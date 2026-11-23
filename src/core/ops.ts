@@ -23,10 +23,10 @@ import {
   type TerminalRef,
   newId,
 } from "./model";
-import { benchOf, defaultParams, getSymbol, plantTerminalName, requireSymbol, terminalPoint } from "./symbols";
+import { benchOf, defaultParams, getSymbol, plantTerminalName, poleMates, requireSymbol, terminalPoint } from "./symbols";
 import { isOrthogonal, routeOf, simplifyRoute } from "./wires";
 import { isMaster, isSlave, locate } from "./xref";
-import { colourCode, lampColour } from "./wirecolours";
+import { colourCode, knownColour, lampColour } from "./wirecolours";
 
 export class OpError extends Error {}
 
@@ -53,6 +53,7 @@ export interface AddElementOptions {
 /** Lamp colours written the usual way whatever the case they came in ("GN" → "Gn"). */
 function normaliseParams(symbol: string, params: Record<string, ParamValue>): Record<string, ParamValue> {
   if (symbol === "lamp" && typeof params.colour === "string") params.colour = lampColour(params.colour);
+  if (symbol === "busbar" && typeof params.colour === "string") params.colour = knownColour(params.colour);
   return params;
 }
 
@@ -245,9 +246,11 @@ export function connect(project: Project, pageId: string, from: TerminalRef, to:
 }
 
 /**
- * A wire drawn from a busbar takes the busbar's core colour, if its
- * conductor has none yet. It's copied once, when the wire is drawn, so it
- * can be changed afterwards like any other wire's colour.
+ * A new wire with no colour takes one, once, when it's drawn (a drafting
+ * aid; it can be changed afterwards like any other wire's colour):
+ * - from a busbar, the busbar's core colour;
+ * - from one side of an in-line part (fuse, contact, isolator pole,
+ *   terminal…), the colour of the wire on the other side of that pole (T5).
  */
 function inheritBusbarColour(project: Project, page: Page, seg: Segment): void {
   const c = project.conductors.find((x) => x.id === seg.conductor);
@@ -259,6 +262,17 @@ function inheritBusbarColour(project: Project, page: Page, seg: Segment): void {
     if (colour) {
       c.colour = colourCode(colour);
       return;
+    }
+  }
+  for (const ref of [seg.from, seg.to]) {
+    const el = page.elements.find((e) => e.id === ref[0]);
+    if (!el) continue;
+    for (const mate of poleMates(el, ref[1])) {
+      const other = project.conductors.find((x) => x.id !== c.id && x.colour && x.terminals.some((t) => t[0] === el.id && t[1] === mate));
+      if (other) {
+        c.colour = other.colour;
+        return;
+      }
     }
   }
 }
@@ -622,6 +636,32 @@ export function linkOffpage(project: Project, aId: string, bId: string | null): 
     if (src(a.el) === src(b.el)) b.el.params.source = !src(a.el);
   }
   refreshConductors(project);
+}
+
+/**
+ * Pair a link arrow with another (Link… in its properties): the first is the
+ * source, the one clicked becomes its destination (controller.md §5).
+ */
+export function linkArrows(project: Project, sourceId: string, targetId: string): void {
+  linkOffpage(project, sourceId, targetId);
+  locate(project, sourceId)!.el.params.source = true;
+  locate(project, targetId)!.el.params.source = false;
+}
+
+/**
+ * Link to a new arrow: a destination dropped at `at` on a sheet, already
+ * paired with the source, pointing back into a wire that carries on the
+ * same way. Returns the new arrow.
+ */
+export function linkToNewArrow(project: Project, sourceId: string, pageId: string, at: Vec): Element {
+  const a = locate(project, sourceId);
+  if (!a || a.el.symbol !== "offpage") throw new OpError("That isn't an off-page arrow");
+  const rot = ((a.el.rot + 180) % 360) as Element["rot"];
+  const params: Record<string, ParamValue> = { source: false };
+  if (a.el.params.dist) params.dist = a.el.params.dist;
+  const b = addElement(project, pageId, "offpage", at, { rot, params });
+  linkArrows(project, a.el.id, b.id);
+  return b;
 }
 
 /** Set a wire number by hand. Locked numbers survive renumbering. */

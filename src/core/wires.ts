@@ -4,9 +4,10 @@
  * These helpers are pure so the UI, the router and tests share them.
  */
 import { BLOCK_INSET } from "./blocks";
-import type { Vec } from "./geometry";
-import type { Element, Page, Segment, TerminalRef } from "./model";
+import { textUnits, type Vec } from "./geometry";
+import type { Element, Page, Project, Segment, TerminalRef } from "./model";
 import { terminalDir, terminalPoint } from "./symbols";
+import { textWidth } from "./textwidth";
 
 const eq = (a: Vec, b: Vec) => a[0] === b[0] && a[1] === b[1];
 
@@ -202,6 +203,60 @@ export function isFieldWire(page: Page, seg: Segment): boolean {
   return ext(seg.from[0]) || ext(seg.to[0]);
 }
 
+/** Is this part an earth: the earth symbol, or a terminal of the Earth type (9, 24)? */
+export function isEarthPart(el: Element | undefined): boolean {
+  return !!el && (el.symbol === "earth" || (el.symbol === "terminal" && el.params.function === "earth"));
+}
+
+/** Earth conductors: those that reach an earth symbol or an earth terminal anywhere in the project (24). */
+export function earthConductors(project: Project): Set<string> {
+  const els = new Map<string, Element>();
+  for (const pg of project.pages) for (const el of pg.elements) els.set(el.id, el);
+  const out = new Set<string>();
+  for (const c of project.conductors) if (c.terminals.some((t) => isEarthPart(els.get(t[0])))) out.add(c.id);
+  return out;
+}
+
+/** A wire from a cable screen's drain, drawn dashed like the screen (26). */
+export function isScreenWire(page: Page, seg: Segment): boolean {
+  const scr = (id: string) => page.elements.find((e) => e.id === id)?.symbol === "screen";
+  return scr(seg.from[0]) || scr(seg.to[0]);
+}
+
+/**
+ * Whether a wire prints its number unless told otherwise: not on field wires
+ * (out to plant) or earth wires (24).
+ */
+export function numberByDefault(page: Page, seg: Segment, earth: Set<string>): boolean {
+  return !isFieldWire(page, seg) && !earth.has(seg.conductor);
+}
+
+/**
+ * The wires on a sheet that print their conductor's number: once per
+ * conductor, on its longest run, not on every branch at a junction (15).
+ * A wire set to show its number always does; one set not to never does.
+ */
+export function numberedSegments(page: Page, earth: Set<string>, route: (seg: Segment) => Vec[]): Set<string> {
+  const out = new Set<string>();
+  const best = new Map<string, { id: string; len: number }>();
+  const longestLeg = (pts: Vec[]) => {
+    let m = 0;
+    for (let i = 0; i < pts.length - 1; i++) m = Math.max(m, Math.abs(pts[i]![0] - pts[i + 1]![0]) + Math.abs(pts[i]![1] - pts[i + 1]![1]));
+    return m;
+  };
+  for (const seg of page.segments) {
+    if (seg.showNumber === true) out.add(seg.id);
+    if (seg.showNumber !== undefined || !numberByDefault(page, seg, earth)) continue;
+    const len = longestLeg(route(seg));
+    const b = best.get(seg.conductor);
+    if (!b || len > b.len) best.set(seg.conductor, { id: seg.id, len });
+  }
+  // A conductor already numbered by hand on this sheet doesn't get a second one.
+  const byHand = new Set(page.segments.filter((s) => s.showNumber === true).map((s) => s.conductor));
+  for (const [cond, b] of best) if (!byHand.has(cond)) out.add(b.id);
+  return out;
+}
+
 export interface WireText {
   text: string;
   at: Vec;
@@ -211,21 +266,32 @@ export interface WireText {
   role: "number" | "colour" | "function";
 }
 
-/** Rough width of wire text in grid units (osifont is about half an em per character). */
-const WIRE_TEXT = 1.05;
-const textLen = (s: string) => s.length * WIRE_TEXT * 0.55;
+/** Wire text is the detail size. */
+const WIRE_TEXT = textUnits("detail");
+const textLen = (s: string) => textWidth(s, WIRE_TEXT);
+/** Gap between the pieces of a wire's text, and its inset from the source terminal (67). */
+const TEXT_GAP = 0.8;
+const SOURCE_INSET = 2;
 
 /**
  * Everything printed along a wire, as on a manufacturer's drawing:
- * - the core colour at the source end (the end the wire was drawn from),
- *   with the wire number just after it, beside the first leg;
- * - the function (0V, 24V…) across the wire at each end that lands on a
- *   terminal;
- * - with no colour, the number sits beside the middle of the longest leg.
+ * - colour, function and number together, running along the wire at the
+ *   source end (the end it was drawn from), inset about 2 units from the
+ *   terminal (67);
+ * - if the first leg can't take them, on the longest leg, centred;
+ * - a number on its own sits at the middle of the longest leg;
+ * - on a wire no longer than its text, everything is centred on it (T6).
  */
 export function wireTexts(
   points: Vec[],
-  info: { number?: string; colour?: string; func?: string; labelFrom?: boolean; labelTo?: boolean },
+  info: {
+    number?: string;
+    colour?: string;
+    func?: string;
+    /** Ends on a busbar: text too long for a short wire runs away from the bar instead of across it. */
+    railFrom?: boolean;
+    railTo?: boolean;
+  },
 ): WireText[] {
   const out: WireText[] = [];
   if (points.length < 2) return out;
@@ -235,47 +301,38 @@ export function wireTexts(
   };
   const legLen = (a: Vec, b: Vec) => Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]);
   const beside = (p: Vec, vertical: boolean): Vec => (vertical ? [p[0] - 0.35, p[1]] : [p[0], p[1] - 0.35]);
+  const parts: { text: string; role: WireText["role"] }[] = [];
+  if (info.colour) parts.push({ text: info.colour, role: "colour" });
+  if (info.func) parts.push({ text: info.func, role: "function" });
+  if (info.number) parts.push({ text: info.number, role: "number" });
+  if (!parts.length) return out;
+  const need = parts.reduce((s, p) => s + textLen(p.text), 0) + TEXT_GAP * (parts.length - 1);
 
-  if (info.colour) {
-    // Colour then number, from the source end along the first leg (or the longest, if the first is too short).
-    const parts = [info.colour, info.number].filter((s): s is string => !!s);
-    const need = 1 + parts.reduce((s, p) => s + textLen(p) + 0.8, 0);
-    let i = 0;
-    if (legLen(points[0]!, points[1]!) < need) {
-      let best = 0;
-      for (let k = 0; k < points.length - 1; k++) if (legLen(points[k]!, points[k + 1]!) > legLen(points[best]!, points[best + 1]!)) best = k;
-      i = best;
-    }
-    const a = points[i]!;
-    const b = points[i + 1]!;
-    const vertical = a[0] === b[0];
-    let d = i === 0 ? 1 : Math.max(0.6, (legLen(a, b) - need) / 2 + 0.6);
-    for (const [k, p] of parts.entries()) {
-      const w = textLen(p);
-      out.push({ text: p, at: beside(along(a, b, d + w / 2), vertical), vertical, anchor: "middle", role: k === 0 ? "colour" : "number" });
-      d += w + 0.8;
-    }
-  } else if (info.number) {
-    const spot = wireLabelSpot(points);
-    if (spot) out.push({ text: info.number, at: spot.at, vertical: spot.vertical, anchor: "middle", role: "number" });
+  let longest = 0;
+  for (let k = 0; k < points.length - 1; k++) if (legLen(points[k]!, points[k + 1]!) > legLen(points[longest]!, points[longest + 1]!)) longest = k;
+  const onlyNumber = parts.length === 1 && parts[0]!.role === "number";
+  // At the source: the first leg, if the text fits after the inset with a little to spare.
+  const atSource = !onlyNumber && legLen(points[0]!, points[1]!) >= SOURCE_INSET + need + 0.5;
+  const i = atSource ? 0 : longest;
+  const a = points[i]!;
+  const b = points[i + 1]!;
+  if (legLen(a, b) === 0) return out;
+  const vertical = a[0] === b[0];
+  // Start of the group along the leg: the inset at the source, else centred (even if it overhangs),
+  // except that an overhang doesn't cross a busbar the wire lands on.
+  const len = legLen(a, b);
+  let d = atSource ? SOURCE_INSET : (len - need) / 2;
+  if (!atSource && need > len) {
+    const railA = i === 0 && !!info.railFrom;
+    const railB = i === points.length - 2 && !!info.railTo;
+    if (railA && !railB) d = 0.3;
+    else if (railB && !railA) d = len - 0.3 - need;
   }
-
-  if (info.func) {
-    // Across the wire at each terminal end, like "0V" printed beside a terminal.
-    const ends: [Vec, Vec, boolean | undefined][] = [
-      [points[0]!, points[1]!, info.labelFrom],
-      [points[points.length - 1]!, points[points.length - 2]!, info.labelTo],
-    ];
-    for (const [e, next, show] of ends) {
-      if (show === false || legLen(e, next) < 2.5) continue;
-      const vertical = e[0] === next[0];
-      const p = along(e, next, vertical ? 1.5 : 0.7 + textLen(info.func) / 2);
-      out.push(
-        vertical
-          ? { text: info.func, at: [p[0] + 0.4, p[1] + 0.35], vertical: false, anchor: "start", role: "function" }
-          : { text: info.func, at: [p[0], p[1] - 0.35], vertical: false, anchor: "middle", role: "function" },
-      );
-    }
+  // Colour nearest the source, as before.
+  for (const p of parts) {
+    const w = textLen(p.text);
+    out.push({ text: p.text, at: beside(along(a, b, d + w / 2), vertical), vertical, anchor: "middle", role: p.role });
+    d += w + TEXT_GAP;
   }
   return out;
 }

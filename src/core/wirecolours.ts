@@ -32,6 +32,22 @@ export function colourCode(s: string): string {
   return pairs.map((p) => p[0]!.toUpperCase() + p[1]).join("");
 }
 
+/**
+ * A colour typed in words or letters, as one of the listed codes if it is
+ * one ("blue", "BU", "green-yellow" → Bu, Bu, GnYe); otherwise as typed.
+ */
+export function knownColour(s: string): string {
+  const t = s.trim().toLowerCase();
+  if (!t) return "";
+  const byName = WIRE_COLOURS.find((c) => c.name.split(" ")[0] === t || c.name === t);
+  if (byName) return byName.code;
+  if (t === "green/yellow" || t === "green and yellow") return "GnYe";
+  return colourCode(s);
+}
+
+/** A busbar's core colour choices: from its distribution, or one of the listed colours (T4). */
+export const BUSBAR_COLOUR_OPTIONS = [{ value: "", label: "From its distribution" }, ...WIRE_COLOURS.map((c) => ({ value: c.code, label: `${c.code}, ${c.name}` }))];
+
 /** A lamp colour as we write it. Amber isn't an IEC colour: yellow is used for it. */
 export function lampColour(s: string): string {
   const c = colourCode(s);

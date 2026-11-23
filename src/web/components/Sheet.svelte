@@ -4,7 +4,7 @@
   import type { Page, Project } from "../../core/model";
   import type { Vec } from "../../core/geometry";
   import { blockHalf } from "../../core/blocks";
-  import { BLOCK_INSET, blockLabels, connectionDots, isFieldWire, routeOf, wireTexts } from "../../core/wires";
+  import { BLOCK_INSET, blockLabels, connectionDots, earthConductors, isFieldWire, isScreenWire, numberedSegments, routeOf, wireTexts } from "../../core/wires";
   import { resolveFields } from "../../core/fields";
   import { cloudsOn } from "../../core/ops";
   import { cloudPath } from "../../core/titleblock";
@@ -66,12 +66,13 @@
   /** Field wires (out to plant) are drawn dashed and don't print their number unless asked to. */
   const field = $derived(new Set(page.segments.filter((s) => isFieldWire(page, s)).map((s) => s.id)));
 
+  const onBusbar = (ref: [string, string]) => page.elements.find((e) => e.id === ref[0])?.symbol === "busbar";
+  /** Wires from a cable screen are dashed like the screen (26). */
+  const screen = $derived(new Set(page.segments.filter((s) => isScreenWire(page, s)).map((s) => s.id)));
+
   const condById = $derived(new Map(project.conductors.map((c) => [c.id, c])));
-  /** Ends that land on a symbol's terminal (not a busbar or junction) get the wire's function. */
-  const terminalEnd = (ref: [string, string]) => {
-    const el = page.elements.find((e) => e.id === ref[0]);
-    return !!el && el.symbol !== "busbar" && el.symbol !== "junction";
-  };
+  /** Which wires print their number: once per conductor per sheet, none on field or earth wires by default (15, 24). */
+  const numbered = $derived(numberedSegments(page, earthConductors(project), (s) => routes?.get(s.id) ?? routeOf(page, s)));
 </script>
 
 <rect class="paper" x="0" y="0" width={SHEET_MM.w} height={SHEET_MM.h} />
@@ -103,15 +104,15 @@
       {@const pts = routes?.get(seg.id) ?? routeOf(page, seg)}
       {@const c = condById.get(seg.conductor)}
       <!-- Live wires are red, whatever their core colour: a black or grey core would hide it. -->
-      <polyline class:field={field.has(seg.id)} class:live={!!live?.has(seg.conductor)} points={pts.map((p) => p.join(",")).join(" ")} />
+      <polyline class:field={field.has(seg.id)} class:screen={screen.has(seg.id)} class:live={!!live?.has(seg.conductor)} points={pts.map((p) => p.join(",")).join(" ")} />
       {#if c}
         {#each wireTexts(pts, {
-          // Shown by the usual rules (numbers off on field wires), unless the wire says otherwise.
-          number: (seg.showNumber ?? !field.has(seg.id)) ? c.number : "",
+          // Shown by the usual rules, unless the wire says otherwise.
+          number: numbered.has(seg.id) ? c.number : "",
           colour: seg.showColour === false ? undefined : c.colour,
           func: c.function,
-          labelFrom: terminalEnd(seg.from),
-          labelTo: terminalEnd(seg.to),
+          railFrom: onBusbar(seg.from),
+          railTo: onBusbar(seg.to),
         }) as t, i (i)}
           <text
             class="wirenum"
@@ -160,6 +161,9 @@
   }
   .wires polyline.field {
     stroke-dasharray: 0.9 0.5;
+  }
+  .wires polyline.screen {
+    stroke-dasharray: 0.6 0.4;
   }
   .section rect {
     fill: none;

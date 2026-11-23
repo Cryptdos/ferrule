@@ -46,7 +46,14 @@ export function elementTexts(el: Element, project: Project): GeometryText {
     // On a distribution: a busbar is named after it, an unlabelled arrow says which it carries.
     const d = typeof el.params.dist === "string" && el.params.dist ? project.distributions.find((x) => x.id === el.params.dist) : undefined;
     if (el.symbol === "busbar") t.name = d?.name ?? String(el.params.name ?? "");
-    else if (d && !t.label) t.label = d.name;
+    else {
+      // A linked destination says what its source says, unless told not to (70).
+      if (el.params.source === false && el.params.sameLabel !== false && el.links[0]) {
+        const src = project.pages.flatMap((pg) => pg.elements).find((e) => e.id === el.links[0]);
+        if (src?.label) t.label = resolveFields(src.label, project);
+      }
+      if (d && !t.label) t.label = d.name;
+    }
   }
   return t;
 }

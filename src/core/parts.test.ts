@@ -265,29 +265,45 @@ describe("wire colour and function", () => {
 });
 
 describe("wire text placement", () => {
-  test("colour at the source end, number just after it, function at both terminal ends", () => {
+  test("colour, function and number together at the source end, inset along the wire (67)", () => {
     const { wireTexts } = require("./wires") as typeof import("./wires");
     const pts: [number, number][] = [
       [10, 10],
       [10, 40],
     ];
-    const t = wireTexts(pts, { number: "17-38", colour: "Bu", func: "0V", labelFrom: true, labelTo: true });
-    const colour = t.find((x) => x.role === "colour")!;
-    const num = t.find((x) => x.role === "number")!;
+    const t = wireTexts(pts, { number: "17-38", colour: "Bu", func: "0V" });
+    expect(t.map((x) => x.role)).toEqual(["colour", "function", "number"]);
+    const [colour, fn, num] = t as [any, any, any];
     expect(colour.text).toBe("Bu");
-    expect(colour.vertical).toBe(true);
-    // Colour nearer the source (top), number after it, both beside the wire.
-    expect(colour.at[1]).toBeLessThan(num.at[1]);
-    expect(colour.at[1]).toBeLessThan(14);
-    const fn = t.filter((x) => x.role === "function");
-    expect(fn.map((x) => x.text)).toEqual(["0V", "0V"]);
-    expect(fn[0]!.at[1]).toBeLessThan(15);
-    expect(fn[1]!.at[1]).toBeGreaterThan(35);
-    // No function at a rail or junction end.
-    expect(wireTexts(pts, { func: "0V", labelFrom: false, labelTo: true }).length).toBe(1);
+    expect(t.every((x) => x.vertical)).toBe(true);
+    // Inset about 2 from the source terminal, in order, all beside the wire.
+    expect(colour.at[1]).toBeGreaterThan(11.9);
+    expect(colour.at[1]).toBeLessThan(fn.at[1]);
+    expect(fn.at[1]).toBeLessThan(num.at[1]);
+    expect(num.at[1]).toBeLessThan(25);
+    expect(new Set(t.map((x) => x.at[0]))).toEqual(new Set([9.65]));
     // No colour: the number goes mid-wire as before.
     const plain = wireTexts(pts, { number: "17-38" });
     expect(plain[0]!.at[1]).toBe(25);
+  });
+
+  test("on a wire no longer than its text, the text is centred on it (T6)", () => {
+    const { wireTexts } = require("./wires") as typeof import("./wires");
+    const short: [number, number][] = [
+      [10, 10],
+      [13, 10],
+    ];
+    const t = wireTexts(short, { number: "1-24", colour: "Bk" });
+    const lo = Math.min(...t.map((x) => x.at[0]));
+    const hi = Math.max(...t.map((x) => x.at[0]));
+    expect(Math.abs((lo + hi) / 2 - 11.5)).toBeLessThan(0.6);
+    // A number on its own on a very short wire still prints, centred.
+    const n = wireTexts([[10, 10], [11.5, 10]], { number: "1-24" });
+    expect(n.length).toBe(1);
+    expect(n[0]!.at[0]).toBe(10.75);
+    // A first leg too short for the text: the longest leg, centred.
+    const bend = wireTexts([[10, 10], [10, 11], [30, 11]], { number: "1-24", colour: "Bk" });
+    expect(bend.every((x) => !x.vertical && x.at[0] > 15 && x.at[0] < 25)).toBe(true);
   });
 
   test("colour codes are written with a capital first letter", () => {
