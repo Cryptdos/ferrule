@@ -317,23 +317,25 @@ export function resetRoute(project: Project, pageId: string, ids: string[]): voi
 
 /**
  * Field or panel wire. `field`: true/false to fix it, null to go back to
- * deciding by the panel boundary. `showNumber`: print the number on a field wire.
+ * deciding by the panel boundary. `showNumber` / `showColour`: print the
+ * wire's number or colour here (true/false), or null for the usual rule
+ * (numbers on panel wires, not field wires; colour whenever there is one).
  */
 export function setWireKind(
   project: Project,
   pageId: string,
   ids: string[],
-  opts: { field?: boolean | null; showNumber?: boolean },
+  opts: { field?: boolean | null; showNumber?: boolean | null; showColour?: boolean | null },
 ): void {
   const page = getPage(project, pageId);
   for (const id of ids) {
     const seg = getSegment(page, id);
     if (opts.field === null) delete seg.field;
     else if (opts.field !== undefined) seg.field = opts.field;
-    if (opts.showNumber !== undefined) {
-      if (opts.showNumber) seg.showNumber = true;
-      else delete seg.showNumber;
-    }
+    if (opts.showNumber === null) delete seg.showNumber;
+    else if (opts.showNumber !== undefined) seg.showNumber = opts.showNumber;
+    if (opts.showColour === null || opts.showColour === true) delete seg.showColour;
+    else if (opts.showColour === false) seg.showColour = false;
   }
 }
 

@@ -418,18 +418,32 @@
           <option value="field">Field wire (dashed, out to plant)</option>
         </select>
       </label>
-      {#if isField}
+      <!-- Shown by the usual rules; the drafter can hide either to cut clutter. -->
+      <label class="check">
+        <input
+          type="checkbox"
+          checked={seg.showNumber ?? !isField}
+          onchange={(e) => {
+            const v = e.currentTarget.checked;
+            const id = seg.id;
+            // Back to the usual rule when it matches it.
+            editor.apply((p) => setWireKind(p, editor.pageId, [id], { showNumber: v === !isField ? null : v }));
+          }}
+        />
+        Show number{isField ? " (field wires don't, usually)" : ""}
+      </label>
+      {#if cond.colour}
         <label class="check">
           <input
             type="checkbox"
-            checked={seg.showNumber === true}
+            checked={seg.showColour !== false}
             onchange={(e) => {
               const v = e.currentTarget.checked;
               const id = seg.id;
-              editor.apply((p) => setWireKind(p, editor.pageId, [id], { showNumber: v }));
+              editor.apply((p) => setWireKind(p, editor.pageId, [id], { showColour: v }));
             }}
           />
-          Print the wire number on this field wire
+          Show colour
         </label>
       {/if}
       {#if cond.colour}

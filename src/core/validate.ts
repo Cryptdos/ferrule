@@ -248,7 +248,8 @@ function parsePage(pg: Record<string, unknown>, i: number): Project["pages"][num
         route: s.route === "manual" ? ("manual" as const) : ("auto" as const),
         points: arr(s.points).filter(isVec),
         ...(typeof s.field === "boolean" ? { field: s.field } : {}),
-        ...(s.showNumber === true ? { showNumber: true } : {}),
+        ...(typeof s.showNumber === "boolean" ? { showNumber: s.showNumber } : {}),
+        ...(s.showColour === false ? { showColour: false } : {}),
       };
     });
   const sections = arr(pg.sections)

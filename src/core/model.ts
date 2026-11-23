@@ -58,8 +58,14 @@ export interface Segment {
    * whether it has an end outside the panel boundary.
    */
   field?: boolean;
-  /** Print the wire number on this field wire too (field wires don't, by default). */
+  /**
+   * Print the wire number here. Unset: the usual rule (printed, except on
+   * field wires). The drafter can turn it off to cut clutter, or on for a
+   * field wire.
+   */
   showNumber?: boolean;
+  /** Print the core colour here. Unset: printed when the conductor has one. */
+  showColour?: boolean;
 }
 
 export interface Conductor {

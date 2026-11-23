@@ -5,8 +5,7 @@
  */
 import { BLOCK_INSET } from "./blocks";
 import type { Vec } from "./geometry";
-import type { Element, Page, Project, Segment, TerminalRef } from "./model";
-import { colourCode } from "./wirecolours";
+import type { Element, Page, Segment, TerminalRef } from "./model";
 import { terminalDir, terminalPoint } from "./symbols";
 
 const eq = (a: Vec, b: Vec) => a[0] === b[0] && a[1] === b[1];
@@ -365,25 +364,3 @@ export function removeLoops(points: Vec[]): Vec[] {
   return simplifyRoute(pts);
 }
 
-/**
- * Conductors whose colour isn't printed: those wired to a busbar and of the
- * busbar's own colour (or its distribution's), unless the busbar is set to
- * show it. A busbar isn't a cable; its colour is for drawing wires from it
- * and for simulating. A wire given a different colour still prints it.
- */
-export function hiddenColours(project: Project): Set<string> {
-  const out = new Set<string>();
-  const bars = new Map(project.pages.flatMap((pg) => pg.elements).filter((e) => e.symbol === "busbar").map((e) => [e.id, e]));
-  if (!bars.size) return out;
-  for (const c of project.conductors) {
-    if (!c.colour) continue;
-    for (const [id] of c.terminals) {
-      const bar = bars.get(id);
-      if (!bar || bar.params.showColour === true) continue;
-      const d = project.distributions.find((x) => x.id === bar.params.dist);
-      const colour = String(bar.params.colour || d?.colour || "");
-      if (colour && colourCode(colour) === c.colour) out.add(c.id);
-    }
-  }
-  return out;
-}
