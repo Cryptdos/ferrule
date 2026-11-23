@@ -31,6 +31,11 @@ export class Editor {
   open: Record<string, boolean> = $state({});
   /** Selected element ids on the current page. */
   selection: string[] = $state([]);
+  /** The selection as a box last picked it: while it's unchanged, it has no first item to align to. */
+  boxPicked: string[] = $state([]);
+  get pickedByBox(): boolean {
+    return this.boxPicked.length > 0 && this.boxPicked.length === this.selection.length && this.boxPicked.every((id, i) => this.selection[i] === id);
+  }
   tool: Tool = $state("select");
   /** Workbench (DESIGN.md §9): drafting, or simulating the logic as drawn. */
   /** Workbench: drafting the electrics, annotating, the panel GA, or simulating. */

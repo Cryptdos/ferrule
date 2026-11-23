@@ -60,6 +60,15 @@ export const ICONS = {
   place: '<rect x="4" y="12" width="16" height="8" rx="1"/><path d="M12 3v8M8.5 7.5L12 11l3.5-3.5"/>',
   devices: '<path d="M5 4h11a2 2 0 0 1 2 2v14H7a2 2 0 0 1-2-2z"/><path d="M5 18a2 2 0 0 1 2-2h11"/><path d="M9 8h5"/>',
   project: '<path d="M4 4h16v16H4z"/><path d="M4 15h16M11 15v5M15 15v5"/>',
+  // Alignment (design-v0.3 §5): the line aligned to, and two bodies of different sizes.
+  alignLeft: '<path d="M4 3v18"/><rect x="7" y="6" width="12" height="4"/><rect x="7" y="14" width="7" height="4"/>',
+  alignCentre: '<path d="M12 3v18" stroke-dasharray="2 2"/><rect x="5" y="6" width="14" height="4"/><rect x="8" y="14" width="8" height="4"/>',
+  alignRight: '<path d="M20 3v18"/><rect x="5" y="6" width="12" height="4"/><rect x="10" y="14" width="7" height="4"/>',
+  alignTop: '<path d="M3 4h18"/><rect x="6" y="7" width="4" height="12"/><rect x="14" y="7" width="4" height="7"/>',
+  alignMiddle: '<path d="M3 12h18" stroke-dasharray="2 2"/><rect x="6" y="5" width="4" height="14"/><rect x="14" y="8" width="4" height="8"/>',
+  alignBottom: '<path d="M3 20h18"/><rect x="6" y="5" width="4" height="12"/><rect x="14" y="10" width="4" height="7"/>',
+  distributeAcross: '<path d="M3 4v16M21 4v16"/><rect x="6" y="8" width="3" height="8"/><rect x="11" y="6" width="3" height="12"/><rect x="16" y="9" width="2" height="6"/>',
+  distributeDown: '<path d="M4 3h16M4 21h16"/><rect x="8" y="6" width="8" height="3"/><rect x="6" y="11" width="12" height="3"/><rect x="9" y="16" width="6" height="2"/>',
 } as const;
 
 export type IconName = keyof typeof ICONS;

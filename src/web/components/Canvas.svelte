@@ -1037,6 +1037,8 @@
           : [];
       const hits = [...hitEls, ...hitSegs, ...hitBoxes];
       editor.selection = g.add ? [...new Set([...editor.selection, ...hits])] : hits;
+      // Picked with a box: there's no first one to align to (design-v0.3 §5).
+      editor.boxPicked = [...editor.selection];
     }
   }
 
@@ -1505,12 +1507,13 @@
       {/if}
       {#if highlighted}
         {@const { el, g } = highlighted}
+        <!-- Round the part's body, as the alignment tools see its edges (design-v0.3 §5). -->
         <rect
           class="jumped"
-          x={el.pos[0] + g.bbox.x - 1.2}
-          y={el.pos[1] + g.bbox.y - 1.2}
-          width={g.bbox.w + 2.4}
-          height={g.bbox.h + 2.4}
+          x={el.pos[0] + g.body.x - 1.2}
+          y={el.pos[1] + g.body.y - 1.2}
+          width={g.body.w + 2.4}
+          height={g.body.h + 2.4}
           rx="1"
         />
       {/if}

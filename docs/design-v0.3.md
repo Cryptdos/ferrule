@@ -223,6 +223,13 @@ Each step is one PR with a build, `ferrule-windows-v0.3.0-pre.zip`. The working 
 - **Project…** is in the list and gets an icon too, as the design names it with the menus. The Wire tool keeps its icon and name together under every setting: it's a tool beside Select, which is already an icon.
 - **The icons:** a pencil (Draft), a T over lines (Annotate), a door with lamps (GA), play (Simulate), # (Renumber), stacked sheets (Templates), a fan (Plant), a module with terminals (Controllers), a busbar with taps (Distribution), the table (Table), a tick in a circle (Check), a checklist (Expectations…), a list on a sheet (Schedules), a part going down onto the plate (Place parts…), a catalogue (Device table…), a sheet with its title block (Project…).
 
+**Step 8 (alignment tools)**
+
+- **The jump ring** (double-click a reference) is now drawn round the part's body, not round its tag and label too, so it shows exactly the edges alignment uses, as the review asked ("the same bounds").
+- **What aligns:** in Draft and Annotate, the workbench's own parts (not wires, section boxes or revision clouds); on a GA, its items except dimensions, which follow what they measure.
+- **The first picked** is the first in the selection: click it first, then Shift+click the rest. A box selection stays "a box" until the selection changes.
+- **The buttons** sit after the tools (Select, Wire), before the menus. Their hover text says what they'll align to: the sheet, the first picked, or the outline.
+
 ## 11. Director notes, as written (23/11/26)
 
 **On tiling (§7):**

@@ -22,6 +22,7 @@
   import GaProps from "./GaProps.svelte";
   import PlacePartsDialog from "./PlacePartsDialog.svelte";
   import { deleteGaItems, moveGaItems, rotateGaItems } from "../../core/ops";
+  import { alignElements, alignGaItems, distributeElements, distributeGaItems, type AlignHow, type DistributeHow } from "../../core/align";
   import { isTyping } from "../typing";
   import type { Editor } from "../editor.svelte";
   import Props from "./Props.svelte";
@@ -148,6 +149,37 @@
     // It's narrower now: fit its sheet to it again.
     setTimeout(() => canvases.get(id)?.fit(), 60);
   }
+  /** What the alignment tools act on (design-v0.3 §5): this workbench's parts, or the GA's items. */
+  const alignable = $derived.by(() => {
+    if (editor.mode === "simulate") return [];
+    if (editor.mode === "ga") {
+      const items = editor.page.gaItems ?? [];
+      return editor.selection.filter((id) => items.some((i) => i.id === id && !i.dim));
+    }
+    const bench = editor.mode === "annotate" ? "annotate" : "draft";
+    return editor.selection.filter((id) => editor.page.elements.some((e) => e.id === id && e.symbol !== "junction" && benchOf(e) === bench));
+  });
+  const ALIGN: { how: AlignHow; name: string; icon: "alignLeft" | "alignCentre" | "alignRight" | "alignTop" | "alignMiddle" | "alignBottom" }[] = [
+    { how: "left", name: "Align left", icon: "alignLeft" },
+    { how: "centre", name: "Align centre", icon: "alignCentre" },
+    { how: "right", name: "Align right", icon: "alignRight" },
+    { how: "top", name: "Align top", icon: "alignTop" },
+    { how: "middle", name: "Align middle", icon: "alignMiddle" },
+    { how: "bottom", name: "Align bottom", icon: "alignBottom" },
+  ];
+  const alignHint = $derived(
+    alignable.length === 1 ? "to the sheet (inside the border, above the title block)" : editor.pickedByBox ? "to the outline around them" : "to the first one picked",
+  );
+  function align(how: AlignHow) {
+    const ids = [...alignable];
+    const box = editor.pickedByBox;
+    editor.apply((p) => (editor.mode === "ga" ? alignGaItems(p, editor.pageId, ids, how, box) : alignElements(p, editor.pageId, ids, how, box)));
+  }
+  function distribute(how: DistributeHow) {
+    const ids = [...alignable];
+    editor.apply((p) => (editor.mode === "ga" ? distributeGaItems(p, editor.pageId, ids, how) : distributeElements(p, editor.pageId, ids, how)));
+  }
+
   let exporting = $state(false);
 
   async function exportPdf() {
@@ -398,6 +430,15 @@
             <Icon name="wire" /> Wire
           </button>
         {/if}
+      {/if}
+      {#if editor.mode !== "simulate"}
+        <!-- Align and distribute (design-v0.3 §5): always icons, the name on hover. -->
+        <span class="sep"></span>
+        {#each ALIGN as a (a.how)}
+          <button class="icon" disabled={!alignable.length} onclick={() => align(a.how)} title="{a.name}: {alignHint}"><Icon name={a.icon} /></button>
+        {/each}
+        <button class="icon" disabled={alignable.length < 3} onclick={() => distribute("across")} title="Distribute across: equal gaps between them, the outer two staying put (three or more)"><Icon name="distributeAcross" /></button>
+        <button class="icon" disabled={alignable.length < 3} onclick={() => distribute("down")} title="Distribute down: equal gaps between them, the outer two staying put (three or more)"><Icon name="distributeDown" /></button>
       {/if}
       {#if editor.mode === "simulate"}
         <span class="sep"></span>
