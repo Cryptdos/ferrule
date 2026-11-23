@@ -174,6 +174,14 @@ Each step is one PR with a build, `ferrule-windows-v0.3.0-pre.zip`. The working 
 - **MCP:** `add_element` takes `rail` for a control rail; a `busbar` given `style: "control"` from MCP is a distribution block (the param is gone), so the MCP help says which is which.
 - **Local:** a block or rail on no distribution reads *Local (this one alone)* in Properties.
 
+**Step 3 (terminals)**
+
+- **Spacing, not position:** terminals in the block are kept at least 2 units apart; they aren't moved to column middles. Snapping to column middles would pull terminals off the wires above them (a 3-pole isolator's poles are 3 apart), so a column each is guaranteed by the spacing alone (two points 2 units apart are always in different columns). A terminal dropped too close to another moves to the nearest free place; terminals moved together keep their spacing.
+- **Cells** are a column wide (2 units) and centred on the terminal, so neighbours 2 apart share a wall, as before at 1.
+- **Wire text:** the number is 2.5 mm; the colour and function printed with it stay 1.8 mm, as the design names only numbers. A number that doesn't fit its leg still overhangs as before; on the example's crowded controls sheets some now run over a contact's pin number, which is tidying by hand.
+- **Pin ids** (C, NO, ⊥) in plant and module views stay 1.8 mm: they're names, not numbers.
+- **The example** has its terminal and plant pins redrawn 2 apart (sheets 7 and 8). It has no controller, so the module view was checked on a scratch sheet.
+
 ## 11. Director notes, as written (23/11/26)
 
 **On tiling (§7):**

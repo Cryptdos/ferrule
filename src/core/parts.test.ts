@@ -212,9 +212,9 @@ describe("plant pins and points (quick entry)", () => {
     const lay = plantViewLayout(v);
     const xs = lay.terms.map((t) => t.x);
     expect(xs[0]).toBe(0);
-    // 1 unit apart within a group, like terminal block cells; more between groups.
-    expect(xs.slice(0, 2)).toEqual([0, 1]);
-    for (let i = 1; i < xs.length; i++) expect(xs[i]! - xs[i - 1]!).toBeGreaterThanOrEqual(1);
+    // 2 units apart within a group, like terminal block cells (v0.3 §2); more between groups.
+    expect(xs.slice(0, 2)).toEqual([0, 2]);
+    for (let i = 1; i < xs.length; i++) expect(xs[i]! - xs[i - 1]!).toBeGreaterThanOrEqual(2);
     expect(lay.right - lay.left).toBeLessThan(xs.at(-1)! + 8);
     // Group names don't overlap.
     const nameW = (n: string) => textWidth(n, textUnits("tag"));
@@ -226,8 +226,8 @@ describe("plant pins and points (quick entry)", () => {
     expect(texts).toContain("MODEL X");
     expect(texts).toContain("7.5kW");
     expect(g.prims.some((x) => x.t === "text" && x.text === "ENABLE")).toBe(true);
-    // Every plant box is the same height: room for a 5-character pin name (v0.2.1 note 36).
-    expect(g.body.h).toBe(6.5);
+    // Every plant box is the same height: room for a 5-character pin name (v0.2.1 note 36), at 2.5 mm (v0.3 §2).
+    expect(g.body.h).toBe(7.5);
   });
 
   test("the same terminal names in two points are told apart: R1: C NO NC | R2: C NO NC", () => {

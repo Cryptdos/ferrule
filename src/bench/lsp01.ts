@@ -274,7 +274,7 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
   w(tap(cct, 48), [hHealthy, "+V"]);
   w([hHealthy, "-V"], tap(ov, 48));
   const faView = placePlantView(p, page.id, FA.id, [56, 76]);
-  const xFa = [56, 57].map((x) => add("terminal", x, 70));
+  const xFa = [56, 58].map((x) => add("terminal", x, 70));
   const fr = add("coil", 70, 58, { label: "FIRE ALARM\nRELAY" });
   w(tap(cct, 56), [xFa[0]!, "1"]);
   w([xFa[0]!, "2"], [faView, "1"]);
@@ -358,7 +358,7 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
   const rr2 = runRelay(55, tag(SF2.id));
   // Volt-free running signals to the fire alarm system, below the enable loops.
   const fam = placePlantView(p, page.id, FAM_SF.id, [31, 76]);
-  const xm = [31, 32, 33, 34].map((x) => add("terminal", x, 70));
+  const xm = [31, 33, 35, 37].map((x) => add("terminal", x, 70));
   xm.forEach((t, i) => w([t, "2"], [fam, String(i + 1)]));
   const monitor = (x: number, rr: Element, xa: Element, xb: Element) => {
     const k = add("contact-no", x, 56);
@@ -372,7 +372,7 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
   const proving = (x: number, er: Element, dps: string, fanTag: string) => {
     const k1 = add("contact-no", x, 13);
     const xa = add("terminal", x, 70);
-    const xb = add("terminal", x + 1, 70);
+    const xb = add("terminal", x + 2, 70);
     const view = placePlantView(p, page.id, dps, [x, 76]);
     const pr = add("coil", x + 7, 56, { label: `${fanTag}\nPROVEN` });
     w(tap(c, x), [k1, "13"]);

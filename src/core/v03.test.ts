@@ -77,3 +77,81 @@ describe("busbars split in two (v0.3 §1)", () => {
     expect(d!.params.style).toBeUndefined();
   });
 });
+
+describe("terminals a column apart (v0.3 §2)", () => {
+  test("files: terminals 1 unit apart in the block spread to 2, keeping their order; tags no longer share a column", async () => {
+    const { setBoundary } = await import("./ops");
+    const { p, pg } = project();
+    setBoundary(p, pg, 70);
+    const a = addElement(p, pg, "terminal", [30, 70]);
+    const b = addElement(p, pg, "terminal", [34, 70]);
+    const json = JSON.parse(JSON.stringify(p));
+    // As a 0.2 build saved them: one unit apart.
+    json.pages[0].elements[0].pos = [30, 70];
+    json.pages[0].elements[1].pos = [31, 70];
+    const q = parseProject(json);
+    const [qa, qb] = q.pages[0]!.elements;
+    expect(qa!.pos[0]).toBe(30);
+    expect(qb!.pos[0]).toBe(32);
+    renumber(q);
+    expect(qa!.tag).not.toBe(qb!.tag);
+    expect(qb!.tag.endsWith("A")).toBe(false);
+    void a;
+    void b;
+  });
+
+  test("a terminal dropped next to another in the block keeps a column clear of it", () => {
+    const { p, pg } = project();
+    const page = p.pages[0]!;
+    page.boundaryY = 70;
+    const a = addElement(p, pg, "terminal", [30, 70]);
+    const b = addElement(p, pg, "terminal", [31, 70]);
+    expect(Math.abs(b.pos[0] - a.pos[0])).toBeGreaterThanOrEqual(2);
+  });
+
+  test("terminal, pin and wire numbers are 2.5 mm; cells are a column wide", async () => {
+    const { textUnits } = await import("./geometry");
+    const { wireTexts } = await import("./wires");
+    const { p, pg } = project();
+    const page = p.pages[0]!;
+    page.boundaryY = 70;
+    const t = addElement(p, pg, "terminal", [30, 70]);
+    const free = addElement(p, pg, "terminal", [30, 20]);
+    const sizeOf = (el: typeof t) => {
+      const x = localGeometry(el, "7-30").prims.find((q) => q.t === "text" && q.role === "tag");
+      return x && x.t === "text" ? x.size : 0;
+    };
+    expect(sizeOf(t)).toBeCloseTo(textUnits("tag"));
+    expect(sizeOf(free)).toBeCloseTo(textUnits("tag"));
+    expect(localGeometry(t, "7-30").body.w).toBe(2);
+    const w = wireTexts(
+      [
+        [0, 0],
+        [0, 30],
+      ],
+      { number: "7-30", colour: "Bu", func: "0V" },
+    );
+    expect(w.find((x) => x.role === "number")!.size).toBe("tag");
+    expect(w.find((x) => x.role === "colour")!.size).toBe("detail");
+  });
+});
+
+describe("terminal order on the GA (v0.3 §2, 28)", () => {
+  test("a strip lists its terminals by sheet, then left to right, earth terminals in their place", async () => {
+    const { addPage } = await import("./ops");
+    const { p, pg } = project();
+    const page = p.pages[0]!;
+    page.boundaryY = 70;
+    const c = addElement(p, pg, "terminal", [50, 70]);
+    const a = addElement(p, pg, "terminal", [20, 70]);
+    const e = addElement(p, pg, "terminal", [30, 70], { params: { function: "earth" } });
+    const pg2 = addPage(p, "two");
+    pg2.boundaryY = 70;
+    const d = addElement(p, pg2.id, "terminal", [10, 70]);
+    renumber(p);
+    const strip = gaCandidates(p, (el) => el.tag).find((x) => x.refs.length > 1)!;
+    expect(strip.refs).toEqual([a.id, e.id, c.id, d.id]);
+    // The earth terminal keeps its hidden address for schedules and the GA.
+    expect(e.tag).not.toBe("");
+  });
+});

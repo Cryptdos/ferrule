@@ -55,7 +55,7 @@ export interface ModulePattern {
   first: number;
   /** Group and point name, # for the channel: "DI#" → DI1, DI2… */
   group: string;
-  /** The first channel's number (Siemens-style numbering per controller starts later on later modules). */
+  /** The first channel's number (numbering per controller can start later on later modules). */
   start?: number;
   /** Ids of pins shared by several channels, e.g. "⊥". */
   shared?: string;

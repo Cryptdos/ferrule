@@ -5,21 +5,55 @@ import { textWidth } from "./textwidth";
 
 /**
  * Half a cell's height, at its smallest: cells are 3 units tall. A terminal
- * number is written up the cell in the `detail` style and never smaller; a
- * number that won't fit makes every cell in the block taller instead.
+ * number is written up the cell in the `tag` style (2.5 mm, v0.3 §2) and
+ * never smaller; a number that won't fit makes every cell in the block
+ * taller instead.
  */
 export const BLOCK_HALF = 1.5;
 /** White space left clear at each end of the sheet. */
 export const BLOCK_INSET = 2;
 
-/** Room an earth terminal's cell keeps for its earth sign (matches symbols.ts). */
-const EARTH_ROOM = 1.3;
-
-/** Half the cell height that fits every one of these numbers up a cell (earth cells also fit their sign). */
+/** Half the cell height that fits every one of these numbers up a cell (earth cells print none: their sign is centred). */
 export function cellHalfFor(numbers: string[], earth: boolean[] = []): number {
-  const longest = Math.max(0, ...numbers.map((n, i) => textWidth(n, textUnits("detail")) + (earth[i] ? EARTH_ROOM : 0)));
+  const longest = Math.max(0, ...numbers.map((n, i) => (earth[i] ? 0 : textWidth(n, textUnits("tag")))));
   // 0.2 clear at each end, in half-unit steps.
   return Math.max(BLOCK_HALF, Math.ceil(longest + 0.4) / 2);
+}
+
+/** Terminals in the block are at least this far apart: a cell is a column wide, so each has its own (v0.3 §2). */
+export const CELL_PITCH = 2;
+
+/**
+ * Terminals in the block at least a column apart (v0.3 §2): one closer than
+ * that to the one before it moves along, keeping their order. Their wires
+ * follow (they're rerouted). Returns whether anything moved.
+ */
+export function spreadBlock(page: Page): boolean {
+  const cs = cells(page).sort((a, b) => a.pos[0] - b.pos[0]);
+  let prev = -Infinity;
+  let moved = false;
+  for (const e of cs) {
+    const x = Math.max(e.pos[0], prev + CELL_PITCH);
+    if (x !== e.pos[0]) {
+      e.pos = [x, e.pos[1]];
+      moved = true;
+    }
+    prev = x;
+  }
+  return moved;
+}
+
+/** The nearest x to this one with no other terminal in the block closer than a column. */
+export function freeCellX(page: Page, x: number, skip: Set<string>): number {
+  const others = cells(page)
+    .filter((e) => !skip.has(e.id))
+    .map((e) => e.pos[0]);
+  const free = (v: number) => others.every((o) => Math.abs(o - v) >= CELL_PITCH);
+  for (let d = 0; d <= 150; d++) {
+    if (free(x + d)) return x + d;
+    if (free(x - d)) return x - d;
+  }
+  return x;
 }
 
 /** The terminals in a page's terminal block. */
@@ -67,7 +101,7 @@ export function applyStripLines(page: Page): void {
     for (const t of page.elements) {
       if (t.symbol !== "terminal") continue;
       // The line crosses the terminal's circle (or its cell in the block).
-      const reach = t.params.onBlock === true ? 0.5 : 0.45;
+      const reach = t.params.onBlock === true ? 1 : 0.45;
       const [x, y] = t.pos;
       const crosses = dy === 0 ? Math.abs(y - a[1]) <= reach && x >= x0 - reach && x <= x1 + reach : Math.abs(x - a[0]) <= reach && y >= y0 - reach && y <= y1 + reach;
       if (crosses) t.params.strip = name;

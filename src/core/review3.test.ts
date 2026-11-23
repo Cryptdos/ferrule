@@ -187,7 +187,7 @@ describe("terminal block on the panel boundary", () => {
     expect(t.pos[1]).toBe(80); // dropped near it: snapped in
     expect(t.params.onBlock).toBe(true);
     const g = localGeometry(t, elementTexts(t, p));
-    expect(g.body).toEqual({ x: -0.5, y: -1.5, w: 1, h: 3 });
+    expect(g.body).toEqual({ x: -1, y: -1.5, w: 2, h: 3 });
     setBoundary(p, pg, 90);
     expect(t.pos[1]).toBe(90);
     moveElements(p, pg, [t.id], [0, -10]);
