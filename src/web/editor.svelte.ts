@@ -38,6 +38,8 @@ export class Editor {
   /** The part being placed, turned and flipped with R and F before it's placed (35). */
   placeRot: 0 | 90 | 180 | 270 = $state(0);
   placeFlip: boolean = $state(false);
+  /** Colour check: every wire and busbar drawn in its core colour (v0.2.1 note 31). */
+  colourCheck: boolean = $state(false);
   saveState: SaveState = $state("saved");
   message: string = $state("");
   /** A schematic device (or terminal strip) being placed on a GA sheet. */

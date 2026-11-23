@@ -111,8 +111,9 @@ describe("selector (33, 35, 75)", () => {
     const { add } = ladder();
     const s = add("selector", 20, 30, { positions: "3", pole1: "co" });
     const g = localGeometry(s, "S1");
-    const legend = g.prims.find((x) => x.t === "text" && x.text === "I 0 II");
-    const twelve = g.prims.find((x) => x.t === "text" && x.text === "12");
+    // The legend is the position names, I – 0 – II; a 3-position changeover is numbered 3, 2 (common), 1.
+    const legend = g.prims.find((x) => x.t === "text" && x.text === "II");
+    const twelve = g.prims.find((x) => x.t === "text" && x.text === "3");
     expect(legend && legend.t === "text" && twelve && twelve.t === "text" ? legend.at[1] - twelve.at[1] : 0).toBeGreaterThan(3);
   });
 });
@@ -172,7 +173,7 @@ describe("drawings from the 0.2 test builds", () => {
     });
     const els = p.pages[0]!.elements;
     expect(els.map((e) => e.symbol)).toEqual(["contact-no", "lamp", "pushbutton", "text"]);
-    expect(els[2]!.params.contact).toBe("nc");
+    expect([els[2]!.params.poles, els[2]!.params.pole1]).toEqual([1, "nc"]);
     expect(p.pages[0]!.segments[0]!.from).toEqual(["a", "14"]);
     expect(p.pages[0]!.segments[0]!.to).toEqual(["b", "+V"]);
   });

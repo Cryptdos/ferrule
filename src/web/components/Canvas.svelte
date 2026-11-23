@@ -1269,6 +1269,13 @@
 
   const simLive = $derived(sim ? new Set(sim.state.live) : null);
   const simOps = $derived(sim ? sim.ops : null);
+  /** Each selector's position, so its legend boxes the one it's in (v0.2.1 note 23). */
+  const simPositions = $derived.by(() => {
+    if (!sim) return null;
+    const out: Record<string, number> = {};
+    for (const el of page.elements) if (el.symbol === "selector") out[el.id] = sim.state.inputs[el.id] ?? 0;
+    return out;
+  });
   /** Busbars on a live conductor, drawn red like live wires. */
   const liveRails = $derived.by(() => {
     if (!sim || !simLive) return [];
@@ -1363,6 +1370,8 @@
     boundary={boundaryPreview}
     live={simLive}
     ops={simOps}
+    positions={simPositions}
+    colourCheck={editor.colourCheck && editor.mode === "draft" && !sim}
     {gaPreview}
     focus={sim || page.ga ? null : bench}
   >

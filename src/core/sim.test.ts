@@ -22,11 +22,11 @@ describe("relay logic", () => {
     const start = add("pushbutton", 20, 35);
     const hold = add("contact-no", 30, 35);
     const k = add("coil", 20, 70);
-    w(top(20), [stop.id, "21"]);
-    w([stop.id, "22"], [start.id, "13"]);
+    w(top(20), [stop.id, "11"]);
+    w([stop.id, "12"], [start.id, "13"]);
     w([start.id, "14"], [k.id, "A1"]);
     w([k.id, "A2"], bottom(20));
-    w([stop.id, "22"], [hold.id, "13"]);
+    w([stop.id, "12"], [hold.id, "13"]);
     w([hold.id, "14"], [k.id, "A1"]);
     linkContact(p, hold.id, k.id);
     const kl = add("contact-no", 50, 30);

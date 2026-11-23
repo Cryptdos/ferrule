@@ -19,6 +19,30 @@ export const WIRE_COLOURS = [
   { code: "GnYe", name: "green-yellow (earth)" },
 ];
 
+/** How each core colour is drawn in Colour check (v0.2.1 note 31). */
+export const CORE_CSS: Record<string, string> = {
+  Bk: "#1a1a1a",
+  Bn: "#8b4a1c",
+  Rd: "#e02020",
+  Og: "#f08a00",
+  Ye: "#f2c400",
+  Gn: "#1f9d3a",
+  Bu: "#1e5fd6",
+  Vt: "#8a3fc8",
+  Gy: "#8c8c8c",
+  Wh: "#ffffff",
+  Pk: "#f07ab8",
+  Tq: "#1fb5b0",
+};
+
+/** A core colour as drawn: one CSS colour, or two (green-yellow and the like). Unknown or unset: none. */
+export function coreCss(code: string | undefined): string[] {
+  if (!code) return [];
+  const pairs = code.match(/[A-Z][a-z]/g) ?? [];
+  const css = pairs.map((p) => CORE_CSS[p]).filter((c): c is string => !!c);
+  return css.length === pairs.length ? css : [];
+}
+
 /**
  * A colour code as we write it: each two-letter colour with a capital
  * first letter ("BU" → "Bu", "gnye" → "GnYe"). Anything that isn't made of
