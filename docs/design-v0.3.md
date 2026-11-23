@@ -164,6 +164,10 @@ Each step is one PR with a build, `ferrule-windows-v0.3.0-pre.zip`. The working 
 
 (Small judgement calls made while building, step by step, go here.)
 
+**Step 1 (start, distribution colour)**
+
+- **One colour select** (`ColourSelect.svelte`) for a distribution and a wire's core colour, so they can't drift apart. Its empty choice reads *None* in both (the wire's said "–"), and each colour shows its code and name (`Bu blue`). The add row's colour is the same select.
+
 ## 11. Director notes, as written (23/11/26)
 
 **On tiling (§7):**

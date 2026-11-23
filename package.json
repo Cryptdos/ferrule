@@ -1,6 +1,6 @@
 {
   "name": "ferrule",
-  "version": "0.2.1-pre",
+  "version": "0.3.0-pre",
   "private": true,
   "type": "module",
   "scripts": {

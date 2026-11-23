@@ -102,7 +102,7 @@ Every push to `main` and every pull request runs the type checks, the tests and 
 
 1. Set the version in `package.json` (e.g. `0.1.0-pre`). The exe prints it when it starts.
 2. Merge to `main` and let CI pass.
-3. Build the exe (`bun run build:exe`, or download the CI artifact from the merge) and zip it as `ferrule-windows-v<version>.zip`, e.g. `ferrule-windows-v0.2.1-pre.zip`, matching the release tag.
+3. Build the exe (`bun run build:exe`, or download the CI artifact from the merge) and zip it as `ferrule-windows-v<version>.zip`, e.g. `ferrule-windows-v0.3.0-pre.zip`, matching the release tag.
 4. On GitHub: *Releases → Draft a new release*, tag `v` plus the version on `main`, attach the zip, publish.
 
 ## If something goes wrong
