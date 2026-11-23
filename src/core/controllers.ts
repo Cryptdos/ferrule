@@ -1,0 +1,175 @@
+/**
+ * Controller operations (controller.md §4): a controller is its modules in
+ * rail order, with any spare slots. Each module is a plant item with
+ * `module` set, so it's tagged by where its first view is (A3-23), wired,
+ * scheduled and simulated like plant.
+ */
+import type { Controller, ModuleInfo, ModuleType, PlantItem, Project } from "./model";
+import { newId } from "./model";
+import { OpError, addPlant, deletePlant, getPlant, syncPlantViews } from "./ops";
+import { defaultPattern, generatePins, moduleType, type ModulePattern } from "./modules";
+import { cleanPoints } from "./points";
+
+export function getController(project: Project, id: string): Controller {
+  const c = project.controllers?.find((x) => x.id === id);
+  if (!c) throw new OpError(`No controller "${id}"`);
+  return c;
+}
+
+const prefixOrA = (p: string | undefined) => (p ?? "").trim().toUpperCase().replace(/[^A-Z]/g, "") || "A";
+
+export function addController(project: Project, description = "", prefix = "A"): Controller {
+  const c: Controller = { id: newId("ctl"), description: description.trim(), prefix: prefixOrA(prefix), slots: [] };
+  (project.controllers ??= []).push(c);
+  return c;
+}
+
+export function updateController(project: Project, id: string, patch: { description?: string; prefix?: string }): void {
+  const c = getController(project, id);
+  if (patch.description !== undefined) c.description = patch.description.trim();
+  if (patch.prefix !== undefined) {
+    c.prefix = prefixOrA(patch.prefix);
+    // Its modules' tags start with it.
+    for (const s of c.slots) {
+      const it = s.module ? project.plant.find((p) => p.id === s.module) : undefined;
+      if (it) it.prefix = c.prefix;
+    }
+  }
+  syncPlantViews(project);
+}
+
+/** Remove a controller, its modules and every view of them. */
+export function deleteController(project: Project, id: string): void {
+  const c = getController(project, id);
+  for (const s of [...c.slots]) if (s.module && project.plant.some((p) => p.id === s.module)) deletePlant(project, s.module);
+  project.controllers = (project.controllers ?? []).filter((x) => x.id !== id);
+  if (!project.controllers.length) delete project.controllers;
+}
+
+export interface NewModule {
+  type: ModuleType;
+  channels?: number;
+  maker?: string;
+  model?: string;
+  /** Pins from a pattern (default: the type's usual one). Pass `null` for a module with no pins yet. */
+  pattern?: Partial<ModulePattern> | null;
+  /** Where on the rail (slot index); default: the end. */
+  at?: number;
+}
+
+const channelsOf = (type: ModuleType, n: number | undefined) => (moduleType(type).channels ? Math.max(1, Math.min(64, Math.floor(n ?? 8))) : undefined);
+
+/** Add a module to a controller's rail, with its pins generated from a pattern. */
+export function addModule(project: Project, controllerId: string, m: NewModule): PlantItem {
+  const c = getController(project, controllerId);
+  const channels = channelsOf(m.type, m.channels);
+  const item = addPlant(project, "", moduleType(m.type).label, [], { prefix: c.prefix });
+  const info: ModuleInfo = { controller: c.id, type: m.type };
+  if (channels) info.channels = channels;
+  if (m.maker?.trim()) info.maker = m.maker.trim();
+  if (m.model?.trim()) info.model = m.model.trim();
+  item.module = info;
+  const slot = { module: item.id };
+  const at = m.at === undefined ? c.slots.length : Math.max(0, Math.min(c.slots.length, Math.floor(m.at)));
+  // Filling a spare slot takes its place.
+  if (c.slots[at]?.spare) c.slots[at] = slot;
+  else c.slots.splice(at, 0, slot);
+  if (m.pattern !== null) generateModule(project, item.id, { ...defaultPattern(m.type, channels), ...(m.pattern ?? {}) });
+  return item;
+}
+
+/** Change a module's type, channel count, maker, model or bus address. */
+export function updateModule(
+  project: Project,
+  plantId: string,
+  patch: { type?: ModuleType; channels?: number; maker?: string; model?: string; address?: number | null; description?: string },
+): void {
+  const item = getPlant(project, plantId);
+  const m = item.module;
+  if (!m) throw new OpError(`${item.tag || "That"} isn't a controller's module`);
+  if (patch.type) m.type = patch.type;
+  if (patch.channels !== undefined || patch.type) {
+    const n = channelsOf(m.type, patch.channels ?? m.channels);
+    if (n) m.channels = n;
+    else delete m.channels;
+  }
+  for (const k of ["maker", "model"] as const) {
+    const v = patch[k];
+    if (v === undefined) continue;
+    if (v.trim()) m[k] = v.trim();
+    else delete m[k];
+  }
+  if (patch.address !== undefined) {
+    if (patch.address && patch.address >= 1) m.address = Math.min(255, Math.floor(patch.address));
+    else delete m.address;
+  }
+  if (patch.description !== undefined) item.description = patch.description.trim();
+  syncPlantViews(project);
+}
+
+/**
+ * Fill a module's pins table from a pattern (controller.md §4), replacing
+ * what it had. Points that keep their name keep their form, label and
+ * what they follow; wires on pins that went away are dropped.
+ */
+export function generateModule(project: Project, plantId: string, pattern: ModulePattern): void {
+  const item = getPlant(project, plantId);
+  if (!item.module) throw new OpError(`${item.tag || "That"} isn't a controller's module`);
+  const g = generatePins(pattern);
+  const before = item.points ?? [];
+  const points = g.points.map((p) => {
+    const old = before.find((b) => b.name === p.name);
+    return old ? { ...old, pins: p.pins, form: old.form } : p;
+  });
+  // Views that showed every pin go on showing every pin.
+  for (const page of project.pages) {
+    for (const el of page.elements) {
+      if (el.symbol !== "plant-view" || el.params.plant !== item.id) continue;
+      const shown = String(el.params.show ?? "").split(",").filter(Boolean);
+      if (item.terminals.every((t) => shown.includes(t))) el.params.show = g.terminals.join(",");
+    }
+  }
+  item.terminals = g.terminals;
+  item.pins = Object.keys(g.pins).length ? g.pins : undefined;
+  if (!item.pins) delete item.pins;
+  const clean = cleanPoints(points, item.terminals);
+  if (clean.length) item.points = clean;
+  else delete item.points;
+  if (pattern.channels && moduleType(item.module.type).channels) item.module.channels = pattern.channels;
+  syncPlantViews(project);
+}
+
+/** Add a spare slot (Spare I/O) to a controller's rail. */
+export function addSpareSlot(project: Project, controllerId: string, at?: number): void {
+  const c = getController(project, controllerId);
+  const i = at === undefined ? c.slots.length : Math.max(0, Math.min(c.slots.length, Math.floor(at)));
+  c.slots.splice(i, 0, { spare: true });
+}
+
+/** Take a slot off the rail: a spare goes; a module is deleted with its views. */
+export function removeSlot(project: Project, controllerId: string, index: number): void {
+  const c = getController(project, controllerId);
+  const s = c.slots[index];
+  if (!s) throw new OpError(`No slot ${index + 1}`);
+  if (s.module && project.plant.some((p) => p.id === s.module)) deletePlant(project, s.module);
+  else c.slots.splice(index, 1);
+}
+
+/** Move a slot along the rail (its bus address follows unless set by hand). */
+export function moveSlot(project: Project, controllerId: string, from: number, to: number): void {
+  const c = getController(project, controllerId);
+  if (!c.slots[from]) throw new OpError(`No slot ${from + 1}`);
+  const [s] = c.slots.splice(from, 1);
+  c.slots.splice(Math.max(0, Math.min(c.slots.length, to)), 0, s!);
+  syncPlantViews(project);
+}
+
+/** A spare slot's bus address, set by hand (null: from rail order). */
+export function setSlotAddress(project: Project, controllerId: string, index: number, address: number | null): void {
+  const c = getController(project, controllerId);
+  const s = c.slots[index];
+  if (!s) throw new OpError(`No slot ${index + 1}`);
+  if (s.module) return updateModule(project, s.module, { address });
+  if (address && address >= 1) s.address = Math.min(255, Math.floor(address));
+  else delete s.address;
+}

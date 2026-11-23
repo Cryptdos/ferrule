@@ -490,6 +490,21 @@ Each step is one pull request, with a build to test.
 - **Analogue against digital** compares signal pins only: an analogue 0 V sharing a DI common is normal and isn't flagged.
 - **Files from the test builds:** plant groups become points (inputs, outputs and their follows), and logic rules become *never* statements, on load (with the rest of `preRelease()`, removed at release).
 
+**Step 8b1 (controllers: [controller.md](controller.md) phase 3, first half)**
+
+- **Split:** 8b is two PRs. 8b1: controllers and modules, the generator, module views at the top of the sheet, references, and their MCP tools. 8b2: the controller map, the IO schedule with the plant points schedule, GA placement, library models, the controller checks.
+- **A module is plant underneath:** a plant item marked as a controller's module, so everything plant already does (pins and points, views, wiring, Renumber, simulation, the field IO checks, expectations) works for modules with nothing new. The controller holds the rail order and spare slots. Plant lists only plant; modules are under **Controllers…**.
+- **Prefix:** set per controller (A unless changed), rather than as a designation override, since overrides may not use A. Changing it retags that controller's modules at the next Renumber.
+- **Shared pins:** a pin can now be in more than one point, so a common shared by two channels is one pin, drawn once (in the first channel's run). A point counts as wired by its own pins, so DI2 isn't taken as wired because DI1 is wired to their common.
+- **Generator defaults** are a starting point only, always matched to the datasheet: DI and AI `I C` with the common shared by two; DO `C NO`; UIO `IO C`, shared by two; AO `VO RET`; power supply `L N`; a host has no pins until generated or typed. Regenerating keeps what points of the same name had (form, label, what they follow).
+- **Contacts by pin id:** a contact point finds its C, NO and NC by the pins' ids where they have them, so a DO's pins can be numbered 11, 12 and still switch the right way.
+- **Labels** go just left of the point's first wire, in the gap between channels, reading along it: centred between a point's two wires 1 unit apart they ran into them.
+- **Title row:** the first view of a module says what it's part of; the controller's own head module (its host) gives just the description. A continuation gives the channels it shows and where it carries on from, as agreed.
+- **Splitting a view** is done by ticking channels in its properties, not pins: a channel's shared common comes with it.
+- **Renumber fix:** plant addresses were taken across prefixes, so a fan drawn under a module in the same column became `SF-1-23A`. Now each prefix numbers on its own.
+- **Templates** leave module views out (a template carries plant, not controllers).
+- **Not in 8b1:** the controller map, IO schedule, GA placement, library models and the controller checks are 8b2. Points are referred to as `A3-23:DI2` in expectations, conditions, the simulation panel and Check; the IO schedule follows in 8b2.
+
 **Step 8c (logo; done before 8b, which is the largest piece left)**
 
 - **Chosen from sketches (23/11/26):** a crimp ferrule on the diagonal, which fills a square icon better than a flat side view; a red collar, as on a 1 mm² ferrule, red being the one colour the app uses (live in Simulate); straight-walled collar with a shoulder down to the sleeve, about 40% of the length, as on a real ferrule; copper at the tip; a black cable cut at a slant, its cut face a lighter sliver with the copper core in it, with no outline round the face. Set aside: a side view (plainest), a ferrule going into a terminal (too busy at 16 px), a flared collar, a grey cable, a break-line cable end.

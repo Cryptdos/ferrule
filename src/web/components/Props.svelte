@@ -23,7 +23,9 @@
     type ElementPatch,
     plantLabel,
     addAsset,
+    updatePoint,
   } from "../../core/ops";
+  import { moduleTitle } from "../../core/modules";
   import { readImage } from "../images";
   import { address, contactMarks, contactType, isMaster, isSlave, masterOf, partnerOf, slavesOf } from "../../core/xref";
   import { paramApplies, requireSymbol, terminalNames } from "../../core/symbols";
@@ -362,8 +364,48 @@
     {#if one.symbol === "plant-view"}
       {@const item = editor.project.plant.find((x) => x.id === one.params.plant)}
       {@const shown = new Set(String(one.params.show ?? "").split(",").filter(Boolean))}
-      <div class="sub">{item ? `${plantLabel(item)} ${item.description}` : "Plant item missing"}</div>
-      {#if item}
+      <div class="sub">{item ? (item.module ? moduleTitle(editor.project, one) : `${plantLabel(item)} ${item.description}`) : "Plant item missing"}</div>
+      {#if item?.module}
+        <!-- A module's view shows chosen channels (controller.md §5); split it across sheets as needed. -->
+        <div class="sub">Channels shown on this sheet</div>
+        <div class="ticks">
+          {#each item.points ?? [] as pt (pt.name)}
+            <label class="check">
+              <input
+                type="checkbox"
+                checked={pt.pins.some((t) => shown.has(t))}
+                onchange={(e) => {
+                  const on = e.currentTarget.checked;
+                  const keepPts = (item.points ?? []).filter((q) => (q === pt ? on : q.pins.some((t) => shown.has(t))));
+                  const pins = new Set(keepPts.flatMap((q) => q.pins));
+                  // Pins in no point (a host's spare terminals) stay as they were.
+                  const next = item.terminals.filter((t) => pins.has(t) || (!item.points?.some((q) => q.pins.includes(t)) && shown.has(t)));
+                  const id = one.id;
+                  editor.apply((p) => setPlantViewTerminals(p, editor.pageId, id, next));
+                }}
+              />
+              {pt.name}
+            </label>
+          {/each}
+        </div>
+        <p class="hint">A view that leaves channels out has a break at that edge. The module keeps one tag, from its first view; points drawn on a later view are referred to with where they are, e.g. <code>A3-23:DO5 (4-10)</code>.</p>
+        <div class="sub">Labels</div>
+        {#each (item.points ?? []).filter((q) => q.pins.some((t) => shown.has(t))) as pt (pt.name)}
+          <label class="joblabel">
+            {pt.name}
+            <input
+              value={pt.label ?? ""}
+              placeholder="What it does on this job"
+              onchange={(e) => {
+                const v = e.currentTarget.value;
+                const name = pt.name;
+                const pid = item.id;
+                editor.apply((p) => updatePoint(p, pid, name, { label: v }));
+              }}
+            />
+          </label>
+        {/each}
+      {:else if item}
         <div class="sub">Terminals shown on this sheet</div>
         <div class="ticks">
           {#each item.terminals as t (t)}
@@ -684,6 +726,14 @@
 </div>
 
 <style>
+  .joblabel {
+    display: grid;
+    grid-template-columns: 44px 1fr;
+    gap: 4px;
+    align-items: center;
+    font-size: 12px;
+    margin: 2px 0;
+  }
   .point {
     font-size: 12px;
     margin-bottom: 3px;

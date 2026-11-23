@@ -30,6 +30,7 @@ import {
   newId,
 } from "./model";
 import { benchOf, defaultParams, formatPoints, getSymbol, partPoints, poleMates, requireSymbol, terminalPoint } from "./symbols";
+import { moduleType, moduleTypeName } from "./modules";
 import { cleanPoints, formatQuickEntry, mergePoints, isInputForm, missingRefs, parseQuickEntry, pointOfPin, printedPin } from "./points";
 import { isOrthogonal, routeOf, simplifyRoute } from "./wires";
 import { isMaster, isSlave, locate } from "./xref";
@@ -781,13 +782,23 @@ const cleanTerminals = (list: string[]) => [...new Set(list.map((t) => t.trim())
  */
 export function plantPinsParam(item: PlantItem): string {
   const pointOf = pointOfPin(item);
+  const labelOf = new Map((item.points ?? []).map((p) => [p.name, p.label ?? ""]));
   return JSON.stringify(
     item.terminals.map((t) => {
       const point = pointOf.get(t) ?? "";
       const info = item.pins?.[t];
-      return [t, printedPin(t, point), info?.id ?? "", info?.group || point];
+      const row = [t, printedPin(t, point), info?.id ?? "", info?.group || point];
+      // A module also prints each point's job label along its wire: [.., point, label].
+      if (item.module) row.push(point, labelOf.get(point) ?? "");
+      return row;
     }),
   );
+}
+
+/** What a module view draws besides its pins: its type and heading. JSON. */
+export function moduleParam(item: PlantItem): string {
+  if (!item.module) return "";
+  return JSON.stringify({ type: moduleTypeName(item.module), heading: moduleType(item.module.type).heading.toUpperCase() });
 }
 
 /** Kept for callers of the old name: quick entry, "L N E | ENABLE: 1 2 | R1: C NO NC". */
@@ -939,6 +950,8 @@ export function updatePoint(
     join?: "and" | "or";
     delay?: number;
     dists?: Record<string, string>;
+    /** What it does on this job, printed along its wire under a module's terminals. */
+    label?: string;
   },
 ): void {
   const item = getPlant(project, plantId);
@@ -965,6 +978,10 @@ export function updatePoint(
     else delete p.delay;
   }
   if (patch.dists !== undefined) p.dists = patch.dists;
+  if (patch.label !== undefined) {
+    if (patch.label.trim()) p.label = patch.label.trim();
+    else delete p.label;
+  }
   updatePlant(project, plantId, {});
 }
 
@@ -1062,6 +1079,8 @@ function renamePin(project: Project, item: PlantItem, from: string, to: string):
 export function deletePlant(project: Project, id: string): void {
   getPlant(project, id);
   project.plant = project.plant.filter((p) => p.id !== id);
+  // A module leaves its controller's rail.
+  for (const c of project.controllers ?? []) c.slots = c.slots.filter((s) => s.module !== id);
   for (const page of project.pages) {
     const views = page.elements.filter((e) => e.symbol === "plant-view" && e.params.plant === id).map((e) => e.id);
     if (views.length) deleteElements(project, page.id, views);
@@ -1073,7 +1092,7 @@ export function placePlantView(project: Project, pageId: string, plantId: string
   const item = getPlant(project, plantId);
   const shown = (show ?? item.terminals).filter((t) => item.terminals.includes(t));
   const el = addElement(project, pageId, "plant-view", pos, {
-    zone: "external",
+    zone: item.module ? "internal" : "external",
     params: { plant: plantId, show: shown.join(",") },
   });
   syncPlantViews(project);
@@ -1090,7 +1109,7 @@ export function setPlantViewTerminals(project: Project, pageId: string, elId: st
 
 /** Copy plant data into its views (they draw from their own params) and drop wires on terminals that went away. */
 /** Settings that belong to plant views only; any other part carrying them picked them up by mistake. */
-export const PLANT_VIEW_KEYS = ["plant", "show", "terms", "pdesc", "pinfo", "ppins", "pgroups", "pbo"];
+export const PLANT_VIEW_KEYS = ["plant", "show", "terms", "pdesc", "pinfo", "ppins", "pgroups", "pbo", "pmod"];
 
 export function syncPlantViews(project: Project): void {
   for (const page of project.pages) {
@@ -1106,6 +1125,11 @@ export function syncPlantViews(project: Project): void {
       el.params.ppins = item ? plantPinsParam(item) : "[]";
       delete el.params.pgroups;
       el.params.pbo = item?.powerByOthers === true;
+      // A controller's module is drawn at the top of the sheet, terminals underneath (controller.md §5).
+      if (item?.module) {
+        el.params.pmod = moduleParam(item);
+        el.zone = "internal";
+      } else delete el.params.pmod;
       const keep = new Set(show);
       page.segments = page.segments.filter(
         (s) => !((s.from[0] === el.id && !keep.has(s.from[1])) || (s.to[0] === el.id && !keep.has(s.to[1]))),

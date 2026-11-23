@@ -7,9 +7,10 @@
 import { PLANT_VIEW_KEYS } from "./ops";
 import { parseProjectDevices } from "./devices";
 import { AREA_UNITS } from "./geometry";
-import { DISTRIBUTION_KINDS, type DistributionKind, POINT_FORMS, type Condition, type Expectation, type IoPoint, type PinInfo, type PointForm, FORMAT, FORMAT_VERSION, type GaDim, type GaDimPoint, type GaItem, type Page, type Project, emptyInfo } from "./model";
+import { DISTRIBUTION_KINDS, type DistributionKind, POINT_FORMS, type Condition, type Controller, type ControllerSlot, type ModuleInfo, type ModuleType, type PlantItem, type Expectation, type IoPoint, type PinInfo, type PointForm, FORMAT, FORMAT_VERSION, type GaDim, type GaDimPoint, type GaItem, type Page, type Project, emptyInfo } from "./model";
 import { defaultParams, getSymbol } from "./symbols";
 import { gaToSheet } from "./ga";
+import { MODULE_TYPES } from "./modules";
 import { colourCode, knownColour } from "./wirecolours";
 
 export class ProjectFormatError extends Error {}
@@ -89,6 +90,8 @@ export function parseProject(input: unknown): Project {
     .map((t, i) => parseTemplate(t, i));
 
   project.expectations = parseExpectations(input.expectations);
+  const controllers = parseControllers(input.controllers, project.plant);
+  if (controllers) project.controllers = controllers;
   project.assets = parseAssets(input.assets);
   for (const pg of project.pages) {
     for (const el of pg.elements) {
@@ -185,7 +188,52 @@ export function parsePlant(v: unknown): Project["plant"] {
       terminals: arr(pl.terminals).filter((t): t is string => typeof t === "string"),
       ...parsePoints(pl.points, pl.pins),
       ...(typeof pl.info === "string" && pl.info ? { info: pl.info } : {}),
+      ...parseModule(pl.module),
     }));
+}
+
+const MODULE_TYPE_SET = new Set<string>(MODULE_TYPES.map((t) => t.value));
+
+function parseModule(v: unknown): { module?: ModuleInfo } {
+  if (!isObj(v) || typeof v.controller !== "string" || !v.controller) return {};
+  const type = (MODULE_TYPE_SET.has(v.type as string) ? v.type : "host") as ModuleType;
+  const whole = (x: unknown, max: number) => (typeof x === "number" && Number.isFinite(x) && x >= 1 ? Math.min(max, Math.floor(x)) : undefined);
+  const channels = whole(v.channels, 64);
+  const address = whole(v.address, 255);
+  return {
+    module: {
+      controller: v.controller,
+      type,
+      ...(channels ? { channels } : {}),
+      ...(typeof v.maker === "string" && v.maker ? { maker: v.maker } : {}),
+      ...(typeof v.model === "string" && v.model ? { model: v.model } : {}),
+      ...(address ? { address } : {}),
+    },
+  };
+}
+
+/** Controllers, kept in step with the modules that name them. */
+function parseControllers(v: unknown, plant: PlantItem[]): Controller[] | undefined {
+  const out: Controller[] = [];
+  for (const c of arr(v).filter(isObj)) {
+    if (typeof c.id !== "string" || !c.id || out.some((x) => x.id === c.id)) continue;
+    const id = c.id;
+    const slots: ControllerSlot[] = [];
+    for (const s of arr(c.slots).filter(isObj)) {
+      if (s.spare === true) {
+        slots.push({ spare: true, ...(typeof s.address === "number" && s.address >= 1 ? { address: Math.floor(s.address) } : {}) });
+        continue;
+      }
+      const it = typeof s.module === "string" ? plant.find((p) => p.id === s.module) : undefined;
+      if (it?.module?.controller === id && !slots.some((x) => x.module === it.id)) slots.push({ module: it.id });
+    }
+    // A module its controller doesn't list goes on the end of its rail.
+    for (const it of plant) if (it.module?.controller === id && !slots.some((x) => x.module === it.id)) slots.push({ module: it.id });
+    out.push({ id, description: strOr(c.description), prefix: strOr(c.prefix) || "A", slots });
+  }
+  // A module whose controller has gone is plain plant.
+  for (const it of plant) if (it.module && !out.some((c) => c.id === it.module!.controller)) delete it.module;
+  return out.length ? out : undefined;
 }
 
 const FORMS = new Set(POINT_FORMS.map((f) => f.value));
@@ -216,6 +264,7 @@ function parsePoints(points: unknown, pins: unknown): { points?: IoPoint[]; pins
         ...(follows.length > 1 && (p.join === "or" || p.join === "and") ? { join: p.join } : {}),
         ...(typeof p.delay === "number" && p.delay > 0 ? { delay: p.delay } : {}),
         ...(dists && Object.keys(dists).length ? { dists } : {}),
+        ...(typeof p.label === "string" && p.label.trim() ? { label: p.label.trim() } : {}),
       };
       return q;
     })

@@ -230,22 +230,25 @@ export function pointChecks(project: Project): Finding[] {
   const kinds = new Map<string, Set<"a" | "d">>();
   for (const item of project.plant) {
     const tag = item.tag || `${item.prefix || "U"}?`;
+    const lead = item.module ? `Module ${tag}` : `Plant ${tag}`;
     for (const pt of item.points ?? []) {
-      const any = pt.pins.some((t) => pinWired(item.id, t));
+      // A shared common (wired for its neighbour) doesn't make a point wired: its own pins do.
+      const own = pt.pins.filter((t) => !(item.points ?? []).some((q) => q !== pt && q.pins.includes(t)));
+      const any = (own.length ? own : pt.pins).some((t) => pinWired(item.id, t));
       const fed = pt.form === "supply-out" && Object.values(pt.dists ?? {}).some(Boolean);
       if (!any && !fed) {
         if (isInputForm(pt.form) && pt.form !== "supply-in") {
-          out.push({ level: "warning", message: `Plant ${tag}: input ${pt.name} isn't wired to anything`, ids: viewIds(item.id) });
+          out.push({ level: "warning", message: `${lead}: input ${pt.name} isn't wired to anything`, ids: viewIds(item.id) });
         } else if (pt.form === "contact" || pt.form === "powered-out") {
-          out.push({ level: "info", message: `Plant ${tag}: output ${pt.name} isn't wired to anything (spare)`, ids: viewIds(item.id) });
+          out.push({ level: "info", message: `${lead}: output ${pt.name} isn't wired to anything (spare)`, ids: viewIds(item.id) });
         }
       }
       if (pt.form === "dry-in" && pt.pins.some((t) => pinWired(item.id, t) && live.has(find(pinNode(item.id, t))))) {
-        out.push({ level: "error", message: `Plant ${tag}: dry input ${pt.name} is wired to a live conductor (a voltage onto a volt-free input)`, ids: viewIds(item.id) });
+        out.push({ level: "error", message: `${lead}: dry input ${pt.name} is wired to a live conductor (a voltage onto a volt-free input)`, ids: viewIds(item.id) });
       }
       // Signal pins only: commons are often shared (an analogue 0 V with a DI common) and that's fine.
       if (pt.form === "comms" || pt.form === "supply-in" || pt.form === "supply-out") continue;
-      const signals = pt.form === "contact" ? [contactPins(pt).no, contactPins(pt).nc].filter((x): x is string => !!x) : pt.pins.slice(0, 1);
+      const signals = pt.form === "contact" ? [contactPins(pt, item.pins).no, contactPins(pt, item.pins).nc].filter((x): x is string => !!x) : pt.pins.slice(0, 1);
       for (const t of signals) {
         if (!pinWired(item.id, t)) continue;
         const r = find(pinNode(item.id, t));

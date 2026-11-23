@@ -20,7 +20,9 @@ import { saveSectionTemplate, saveSheetTemplate, stampTemplate, type PlantMappin
 import { contactTable, isMaster, masterOf, partnerOf } from "../core/xref";
 import { advance, compile, describeAction, initialState, judge, press, search, toggle, type Action, type Circuit, type SimState } from "../core/sim";
 import { describeExpectation, findThing, parseQuickEntry, pointRef, things } from "../core/points";
-import { POINT_FORMS, type Condition, type IoPoint, type PinInfo, type PointForm } from "../core/model";
+import { POINT_FORMS, type Condition, type Controller, type IoPoint, type ModuleType, type PinInfo, type PlantItem, type PointForm } from "../core/model";
+import { addController, addModule, addSpareSlot, deleteController, generateModule, moveSlot, removeSlot, updateController, updateModule } from "../core/controllers";
+import { MODULE_TYPES, controllerById, controllerTag, defaultPattern, moduleTypeName, pointLabel, slotAddress, viewsOf, type ModulePattern } from "../core/modules";
 import type { Library, Storage } from "./storage";
 
 export interface ToolContext {
@@ -98,6 +100,7 @@ function pointsArg(p: Project, v: unknown, own?: { id: string; points: IoPoint[]
     const form = String(o.form ?? "contact") as PointForm;
     if (!forms.has(form)) throw new ArgError(`Point form must be one of ${[...forms].join(", ")}`);
     const pt: IoPoint = { name: String(o.name ?? ""), form, pins: Array.isArray(o.pins) ? o.pins.map(String) : [] };
+    if (typeof o.label === "string" && o.label.trim()) pt.label = o.label.trim();
     if (Array.isArray(o.follows) && o.follows.length) {
       // A point of the same device can be named by its name alone.
       const list = (o.follows as Record<string, unknown>[]).map((f) => {
@@ -202,9 +205,68 @@ function projectInfo(p: Project) {
       elements: pg.elements.length,
       wires: pg.segments.length,
     })),
-    plant: p.plant.map((x) => ({ id: x.id, tag: x.tag, description: x.description, terminals: x.terminals })),
+    plant: p.plant.filter((x) => !x.module).map((x) => ({ id: x.id, tag: x.tag, description: x.description, terminals: x.terminals })),
+    controllers: (p.controllers ?? []).map((c) => describeController(p, c)),
     templates: p.templates.map((t) => ({ id: t.id, name: t.name, kind: t.kind, plant: t.plant.map((x) => x.tag) })),
     revisions: p.revisions.map((r) => ({ rev: r.rev, date: r.date, drawnBy: r.drawnBy, description: r.description })),
+  };
+}
+
+/** A controller and its rail: each slot's address, and each module's tag, type, points and where it's drawn. */
+function describeController(p: Project, c: Controller) {
+  return {
+    id: c.id,
+    tag: controllerTag(p, c),
+    description: c.description,
+    prefix: c.prefix,
+    slots: c.slots.map((s, i) => {
+      const item = s.module ? p.plant.find((x) => x.id === s.module) : undefined;
+      if (!item?.module) return { slot: i, address: slotAddress(p, c, i), spare: true };
+      return {
+        slot: i,
+        address: slotAddress(p, c, i),
+        module: item.id,
+        tag: item.tag || `${item.prefix || "A"}?`,
+        type: moduleTypeName(item.module),
+        maker: item.module.maker,
+        model: item.module.model,
+        drawn: viewsOf(p, item.id).map((v) => v.address),
+        points: (item.points ?? []).map((pt) => ({
+          name: pt.name,
+          ref: pointLabel(p, item, pt),
+          form: pt.form,
+          pins: pt.pins.map((t) => (item.pins?.[t]?.id ? `${t} (${item.pins[t]!.id})` : t)),
+          ...(pt.label ? { label: pt.label } : {}),
+        })),
+      };
+    }),
+  };
+}
+
+function controllerByRef(p: Project, ref: string): Controller {
+  const list = p.controllers ?? [];
+  const c = list.find((x) => x.id === ref) ?? list.find((x) => controllerTag(p, x) === ref) ?? list.find((x) => x.description === ref);
+  if (!c) throw new ArgError(`No controller "${ref}"`);
+  return c;
+}
+
+function patternArg(type: ModuleType, channels: number | undefined, v: unknown): ModulePattern {
+  const base = defaultPattern(type, channels ?? 8);
+  if (!v || typeof v !== "object") return base;
+  const o = v as Record<string, unknown>;
+  const n = (k: string) => (typeof o[k] === "number" ? (o[k] as number) : undefined);
+  const forms = new Set(POINT_FORMS.map((f) => f.value));
+  if (o.form !== undefined && !forms.has(o.form as PointForm)) throw new ArgError(`Pattern form must be one of ${[...forms].join(", ")}`);
+  return {
+    ...base,
+    ...(n("channels") !== undefined ? { channels: n("channels")! } : {}),
+    ...(typeof o.ids === "string" ? { ids: o.ids } : {}),
+    ...(n("first") !== undefined ? { first: n("first")! } : {}),
+    ...(typeof o.group === "string" ? { group: o.group } : {}),
+    ...(n("start") !== undefined ? { start: n("start")! } : {}),
+    ...(typeof o.shared === "string" ? { shared: o.shared } : {}),
+    ...(n("shareBy") !== undefined ? { shareBy: n("shareBy")! } : {}),
+    ...(o.form !== undefined ? { form: o.form as PointForm } : {}),
   };
 }
 
@@ -616,6 +678,114 @@ export const TOOLS: Tool[] = [
       }),
   },
   {
+    name: "controller",
+    description:
+      "Controllers (controller.md §4): an outstation or PLC is its modules in rail order, with any spare slots. With no other arguments, lists them (each module's tag, type, points as A3-23:DI2, and where it's drawn). Give description (and prefix, default A) to add one; give 'controller' (id, tag or description) to update it, or with delete: true to remove it with its modules and views. Add modules with add_module.",
+    inputSchema: obj(
+      {
+        project,
+        controller: { type: "string", description: "Existing controller: id, tag (its host module's, e.g. A2-5) or description" },
+        description: { type: "string", description: "e.g. AHU-1 outstation" },
+        prefix: { type: "string", description: "Letters its modules' tags start with (default A)" },
+        delete: { type: "boolean" },
+      },
+      ["project"],
+    ),
+    run: async (a, ctx) =>
+      edit(ctx, str(a, "project"), (p) => {
+        const s = (k: string) => (typeof a[k] === "string" ? (a[k] as string) : undefined);
+        if (typeof a.controller === "string") {
+          const c = controllerByRef(p, a.controller);
+          if (a.delete === true) {
+            deleteController(p, c.id);
+            return { deleted: c.id, controllers: (p.controllers ?? []).map((x) => describeController(p, x)) };
+          }
+          updateController(p, c.id, { description: s("description"), prefix: s("prefix") });
+          return describeController(p, c);
+        }
+        if (s("description") !== undefined || s("prefix") !== undefined) {
+          const c = addController(p, s("description") ?? "", s("prefix") ?? "A");
+          return describeController(p, c);
+        }
+        return (p.controllers ?? []).map((x) => describeController(p, x));
+      }),
+  },
+  {
+    name: "add_module",
+    description:
+      "Add a module to a controller's rail, or change one (give 'module': its tag or id). type: psu, host, di, do, uio, ai, ao; channels is its count (a DI-8 is type di, channels 8). Its pins are generated from pattern {channels, ids, first, group, start, shared, shareBy, form} (default: the type's usual one): ids are each channel's pin ids in order ('VO RET CO', 'IO C', 'Y ⊥'), first the first pin number, group the name pattern ('DI#' → DI1, DI2…), start the first channel's number (for numbering across a controller), shared ids shared by shareBy channels (a common), form each channel's point form. Giving pattern to an existing module regenerates its pins (points that keep their name keep their form and label). labels sets what each point does on this job: {DI1: 'SF-01 running'}, printed along its wire. spare: true adds a spare slot instead. Fine-tune pins with add_plant (plant: the module's tag) and its pins/points. Place its views with place_plant_view, near the top of a sheet: a module view's terminals are along its bottom edge.",
+    inputSchema: obj(
+      {
+        project,
+        controller: { type: "string", description: "Controller id, tag or description (for a new module or spare slot)" },
+        module: { type: "string", description: "Existing module's tag or id, to change" },
+        type: { type: "string", enum: MODULE_TYPES.map((t) => t.value) },
+        channels: { type: "number" },
+        maker: { type: "string" },
+        model: { type: "string" },
+        address: { type: ["number", "null"], description: "Bus address set by hand (DIP switches); null: from rail order" },
+        at: { type: "number", description: "Slot index on the rail (0 is first); a spare slot there is filled. Default: the end" },
+        pattern: { type: "object", description: "How to generate its pins (see above)" },
+        labels: { type: "object", description: "Point name → its job label" },
+        spare: { type: "boolean", description: "Add a spare slot (Spare I/O) at 'at' instead of a module" },
+        move: { type: "number", description: "With module: move it to this slot index" },
+        delete: { type: "boolean", description: "With module: delete it and its views" },
+      },
+      ["project"],
+    ),
+    run: async (a, ctx) =>
+      edit(ctx, str(a, "project"), (p) => {
+        const n = (k: string) => (typeof a[k] === "number" ? (a[k] as number) : undefined);
+        const s = (k: string) => (typeof a[k] === "string" ? (a[k] as string) : undefined);
+        const types = new Set(MODULE_TYPES.map((t) => t.value as string));
+        const type = s("type");
+        if (type !== undefined && !types.has(type)) throw new ArgError(`type must be one of ${[...types].join(", ")}`);
+        let item: PlantItem;
+        if (typeof a.module === "string") {
+          item = plantByRef(p, a.module);
+          if (!item.module) throw new ArgError(`${a.module} isn't a controller's module`);
+          const c = controllerById(p, item.module.controller)!;
+          if (a.delete === true) {
+            removeSlot(p, c.id, c.slots.findIndex((x) => x.module === item.id));
+            return describeController(p, c);
+          }
+          updateModule(p, item.id, {
+            type: type as ModuleType | undefined,
+            channels: n("channels"),
+            maker: s("maker"),
+            model: s("model"),
+            ...(a.address !== undefined ? { address: typeof a.address === "number" ? a.address : null } : {}),
+          });
+          if (a.pattern !== undefined) generateModule(p, item.id, patternArg(item.module.type, item.module.channels, a.pattern));
+          if (n("move") !== undefined) moveSlot(p, c.id, c.slots.findIndex((x) => x.module === item.id), n("move")!);
+        } else {
+          const c = controllerByRef(p, str(a, "controller"));
+          if (a.spare === true) {
+            addSpareSlot(p, c.id, n("at"));
+            return describeController(p, c);
+          }
+          if (!type) throw new ArgError("Give the module's type");
+          const t = type as ModuleType;
+          item = addModule(p, c.id, {
+            type: t,
+            channels: n("channels"),
+            maker: s("maker"),
+            model: s("model"),
+            at: n("at"),
+            pattern: a.pattern !== undefined ? patternArg(t, n("channels"), a.pattern) : t === "host" ? null : undefined,
+          });
+          if (typeof a.address === "number") updateModule(p, item.id, { address: a.address });
+        }
+        if (a.labels && typeof a.labels === "object") {
+          for (const [name, label] of Object.entries(a.labels as Record<string, unknown>)) {
+            if (!item.points?.some((x) => x.name === name)) throw new ArgError(`${item.tag || "The module"} has no point ${name}`);
+            op.updatePoint(p, item.id, name, { label: String(label ?? "") });
+          }
+        }
+        return describeController(p, controllerById(p, item.module!.controller)!);
+      }),
+  },
+  {
     name: "label_wire",
     description:
       "Set what's printed along a wire's conductor: its number (locked so Renumber keeps it), core colour (IEC 60757 code, e.g. Bu, Bn, GnYe) and function (e.g. 0V, 24V AC). Empty strings clear.",
@@ -645,7 +815,7 @@ export const TOOLS: Tool[] = [
   {
     name: "place_plant_view",
     description:
-      "Place a view of a plant item showing some of its terminals (default all). Terminals sit along the top, 3 units apart.",
+      "Place a view of a plant item or a controller's module showing some of its terminals (default all), x, y being its first terminal. Plant's terminals are along the top of its box, 1 unit apart; a module's are along the bottom (its view goes near the top of the sheet, wires dropping from it). Split a module across views and sheets by giving each view some channels' pins.",
     inputSchema: obj(
       {
         project,
@@ -935,7 +1105,7 @@ export const INSTRUCTIONS = `Ferrule drafts control panel schematics on A4 lands
 
 Coordinates are grid units: x 0–${AREA_UNITS.w} across (${AREA_UNITS.w / 2} columns, 2 units each), y 0–${AREA_UNITS.h} down. Every terminal sits on a whole unit. Symbols are vertical by default (current flows top to bottom), so a ladder rung is a column of symbols between a CCT busbar at the top and a 0V busbar at the bottom (control style, each on its distribution): wire terminal to terminal down the column.
 
-Typical flow: create_project or pick one from list_projects → add_distribution (CCT, 0V…) → add_element (busbars with params.dist, contacts, coils, lamps, terminals) → connect → link contacts to their coils → add_plant / place_plant_view for field equipment below a panel boundary (update_page boundaryY), with terminals on the boundary → renumber → check → view_page to look at the result → export_pdf.
+Typical flow: create_project or pick one from list_projects → add_distribution (CCT, 0V…) → add_element (busbars with params.dist, contacts, coils, lamps, terminals) → connect → link contacts to their coils → add_plant / place_plant_view for field equipment below a panel boundary (update_page boundaryY), with terminals on the boundary → controller / add_module for an outstation or PLC, its module views placed at the top of a sheet and every one of a module's connections wired there (outputs that switch panel circuits go out through link arrows) → renumber → check → view_page to look at the result → export_pdf.
 
 Never type tags or wire numbers: renumber generates them from position (e.g. K3-16 = sheet 3, column 16). Labels can use fields such as {plant:SF-01.tag} so they follow the plant. Use templates (save_template / apply_template) for repeated sheets such as one starter per fan.`;
 

@@ -142,7 +142,9 @@ export function renumber(project: Project): RenumberResult {
     }
     if (first) plantItems.push(first);
   }
-  for (const [id, address] of assign(plantItems, scheme, 1, new Set(), (_it, n) => n)) {
+  // Addresses are only taken within a prefix: SF-1-23 and A1-23 can share a column.
+  for (const [id, keyed] of assign(plantItems, scheme, 1, new Set(), (it, n) => `${it.group}:${n}`)) {
+    const address = keyed.slice(keyed.indexOf(":") + 1);
     const item = project.plant.find((p) => p.id === id)!;
     let tag = plantTag(item.prefix || "U", address);
     for (let k = 1; takenTags.has(tag); k++) tag = plantTag(item.prefix || "U", `${address}${collisionSuffix(k)}`);

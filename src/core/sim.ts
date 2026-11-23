@@ -22,6 +22,7 @@
  */
 import type { Condition, Element, Expectation, Project } from "./model";
 import { contactPins, isAnalogueForm, pointRef, signalPins } from "./points";
+import { pointLabel, viewsOf } from "./modules";
 import { isolatorAux, selectorPoles } from "./symbols";
 import { masterOf } from "./xref";
 import { netJoins } from "./conductors";
@@ -317,9 +318,11 @@ export function compile(project: Project): Circuit {
   for (const item of project.plant) {
     const tag = item.tag || `${item.prefix || "U"}?`;
     const pn = (t: string) => pinNode(item.id, t);
+    const views = viewsOf(project, item.id);
     for (const pt of item.points ?? []) {
       const key = pointRef(item.id, pt.name);
-      names.set(key, `${tag} ${pt.name}`);
+      const said = pointLabel(project, item, pt, views);
+      names.set(key, said);
       points.set(key, { form: pt.form, plant: item.id, name: pt.name });
       if (isAnalogueForm(pt.form) || pt.form === "comms") continue;
       if (pt.form === "dry-in" || pt.form === "powered-in" || pt.form === "supply-in") {
@@ -337,10 +340,10 @@ export function compile(project: Project): Circuit {
         followers.push({ id: key, when: pt.follows, join: pt.join ?? "and" });
         timers.set(`${key}:f`, { delay: pt.delay ?? 0, mode: "on-off" });
       } else {
-        inputs.push({ el: key, kind: "toggle", label: `${tag} ${pt.name}`, initial: 0 });
+        inputs.push({ el: key, kind: "toggle", label: said, initial: 0 });
       }
       if (pt.form === "contact") {
-        const { c, no, nc } = contactPins(pt);
+        const { c, no, nc } = contactPins(pt, item.pins);
         if (c && no) links.push({ a: pn(c), b: pn(no), el: key, src: key, closed: on });
         if (c && nc) links.push({ a: pn(c), b: pn(nc), el: key, src: key, closed: (s) => !on(s) });
       } else {

@@ -27,6 +27,7 @@
   import Props from "./Props.svelte";
   import ProjectDialog from "./ProjectDialog.svelte";
   import PlantDialog from "./PlantDialog.svelte";
+  import ControllersDialog from "./ControllersDialog.svelte";
   import DistributionDialog from "./DistributionDialog.svelte";
   import ExpectationsDialog from "./ExpectationsDialog.svelte";
   import ChecksDialog from "./ChecksDialog.svelte";
@@ -95,7 +96,7 @@
   });
   let showProject = $state(false);
   /** Open windows: they don't block the drawing, and several can be open at once. */
-  type DialogName = "expectations" | "plant" | "distribution" | "checks" | "schedules" | "templates" | "renumber" | "devices" | "settings" | "place";
+  type DialogName = "expectations" | "plant" | "controllers" | "distribution" | "checks" | "schedules" | "templates" | "renumber" | "devices" | "settings" | "place";
   let open: Partial<Record<DialogName, boolean>> = $state({});
   /** Export PDF failed: what went wrong, with the Print way round it. */
   let pdfError = $state("");
@@ -396,6 +397,7 @@
         <button onclick={doRenumber} title="See what Renumber would change to tags, terminal and wire numbers, then apply">Renumber</button>
         <button onclick={() => (open.templates = true)} title="Save and stamp sheet and section templates">Templates</button>
         <button onclick={() => (open.plant = true)} title="Field equipment: define plant and place views">Plant</button>
+        <button onclick={() => (open.controllers = true)} title="Outstations and PLCs: their modules, in rail order, and module views">Controllers</button>
         <button onclick={() => (open.distribution = true)} title="The supplies busbars, link arrows and the incoming supply pick from">Distribution</button>
         <button onclick={() => (open.checks = true)} title="Check the drawing for problems">Check</button>
         <button onclick={() => (open.expectations = true)} title="What the drawing should do: checked live in Simulate, and by Check logic">Expectations…</button>
@@ -493,6 +495,9 @@
 {/if}
 {#if open.plant}
   <PlantDialog {editor} onclose={() => (open.plant = false)} onexpectations={() => (open.expectations = true)} />
+{/if}
+{#if open.controllers}
+  <ControllersDialog {editor} onclose={() => (open.controllers = false)} onexpectations={() => (open.expectations = true)} />
 {/if}
 {#if open.expectations}
   <ExpectationsDialog {editor} onclose={() => (open.expectations = false)} />

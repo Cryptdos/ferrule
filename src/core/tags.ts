@@ -3,6 +3,7 @@ import type { Element, Project } from "./model";
 import { requireSymbol, type GeometryText } from "./symbols";
 import { isTimed, masterOf, xrefText } from "./xref";
 import { resolveFields } from "./fields";
+import { moduleTitle } from "./modules";
 import { legendEntries, revisionRows } from "./annotations";
 
 /** Tag prefix for an element under the project's designation standard. */
@@ -40,6 +41,8 @@ export function elementTexts(el: Element, project: Project): GeometryText {
     const coil = masterOf(project, el)!.el;
     t.timed = typeof coil.params.mode === "string" ? coil.params.mode : "on";
   }
+  // A module view's title row: A3-23 · DI-8 · part of A2-5, AHU-1 outstation (controller.md §5).
+  if (el.symbol === "plant-view" && el.params.pmod) t.xref = moduleTitle(project, el);
   if (el.symbol === "revtable") t.rows = revisionRows(project);
   else if (el.symbol === "legend") t.legend = legendEntries(project);
   else if (el.symbol === "busbar" || el.symbol === "offpage") {

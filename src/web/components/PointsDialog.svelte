@@ -83,6 +83,17 @@
               <span class="pins">{pt.pins.map((t) => printedPin(t, pt.name)).join(" ")}</span>
             </div>
             <div class="what">{POINT_FORMS.find((f) => f.value === pt.form)?.hint}</div>
+            {#if item.module}
+              <label class="joblabel">
+                Label
+                <input
+                  value={pt.label ?? ""}
+                  placeholder="What it does on this job, e.g. SF-01 running"
+                  title="Printed along its wire under the module's terminals, and in the IO schedule"
+                  onchange={(e) => point(pt.name, { label: e.currentTarget.value })}
+                />
+              </label>
+            {/if}
             {#if isOutputForm(pt.form)}
               <div class="sim">
                 <label>
@@ -150,6 +161,17 @@
 {/if}
 
 <style>
+  .joblabel {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    font-size: 12px;
+    color: #445;
+    margin: 2px 0 4px;
+  }
+  .joblabel input {
+    flex: 1;
+  }
   .cols {
     display: grid;
     grid-template-columns: 300px 1fr;
