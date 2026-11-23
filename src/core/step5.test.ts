@@ -93,7 +93,7 @@ describe("pre-release files", () => {
 });
 
 describe("terminals", () => {
-  test("an earth terminal: the earth sign at the top of its cell, the cell taller to fit (9, 27)", () => {
+  test("an earth terminal in the block prints no number; its earth sign is centred in the cell (27, 13; v0.3 §2)", () => {
     const { localGeometry } = require("./symbols") as typeof import("./symbols");
     const { fitBlock, BLOCK_HALF } = require("./blocks") as typeof import("./blocks");
     const { p, pg, page } = project();
@@ -102,10 +102,13 @@ describe("terminals", () => {
     t.params.onBlock = true;
     fitBlock(page);
     const half = typeof t.params.cellHalf === "number" ? t.params.cellHalf : BLOCK_HALF;
+    expect(half).toBe(BLOCK_HALF);
     const g = localGeometry(t, "PE1");
-    // The number is pushed down below the sign, and its terminals are at the cell's ends (no fuse lead).
-    const num = g.prims.find((x) => x.t === "text" && x.role === "tag") as { at: [number, number] };
-    expect(num.at[1]).toBeGreaterThan(0);
+    expect(g.prims.some((x) => x.t === "text" && x.role === "tag")).toBe(false);
+    // The sign's lines are centred on the cell, across and up and down.
+    const pts = g.prims.filter((x) => x.t === "line").flatMap((x) => (x.t === "line" ? x.pts : [])).filter(([, y]) => Math.abs(y) < half);
+    const ys = pts.map(([, y]) => y);
+    expect(Math.abs((Math.min(...ys) + Math.max(...ys)) / 2)).toBeLessThan(0.05);
     expect(g.terminals.find((x) => x.name === "1")!.at[1]).toBe(-half);
     // Off the block, the earth sign hangs off the terminal's side.
     t.params.onBlock = false;

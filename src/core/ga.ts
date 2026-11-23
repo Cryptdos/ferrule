@@ -343,7 +343,9 @@ export function gaCandidates(project: Project, tagOf: (el: Element) => string): 
   const strips = new Map<string, { refs: string[]; sheet: number }>();
   for (const pg of project.pages) {
     if (pg.ga) continue;
-    for (const el of pg.elements) {
+    // Left to right across the sheet, so a strip's terminals are in the order they're built in (v0.3 §2).
+    const across = [...pg.elements].sort((a, b) => a.pos[0] - b.pos[0] || a.pos[1] - b.pos[1]);
+    for (const el of across) {
       if (placed.has(el.id) || !sizeKey(project, el)) continue;
       if (el.symbol === "terminal") {
         const strip = String(el.params.strip ?? "X1");
@@ -456,9 +458,8 @@ export function syncGaStrips(project: Project): boolean {
   for (const { it, strip } of stripItems) {
     const now = (byStrip.get(strip) ?? []).filter((id) => !taken.has(id));
     now.forEach((id) => taken.add(id));
-    // Keep the order the strip had, new terminals after.
-    const kept = (it.refs ?? []).filter((r) => now.includes(r));
-    const refs = [...kept, ...now.filter((r) => !kept.includes(r))];
+    // By sheet, then left to right along the boundary: always the order it's built in (v0.3 §2, 28).
+    const refs = now;
     if (!it.strip) {
       it.strip = strip;
       changed = true;

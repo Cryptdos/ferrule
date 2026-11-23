@@ -164,6 +164,7 @@
         }) as t, i (i)}
           <text
             class="wirenum"
+            class:tagsize={t.size === "tag"}
             x={t.at[0]}
             y={t.at[1]}
             text-anchor={t.anchor}
@@ -295,5 +296,8 @@
     font-family: var(--drawing-font);
     font-size: var(--detail);
     fill: #000;
+  }
+  .wirenum.tagsize {
+    font-size: var(--tag);
   }
 </style>

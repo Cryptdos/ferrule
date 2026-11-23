@@ -4,6 +4,7 @@
  * this format. There's no upgrading before 1.0: an older file is refused
  * with a plain message rather than half-opened.
  */
+import { spreadBlock } from "./blocks";
 import { PLANT_VIEW_KEYS, labelWidthFor, legendToPositions } from "./ops";
 import { parseProjectDevices } from "./devices";
 import { AREA_UNITS } from "./geometry";
@@ -109,6 +110,8 @@ export function parseProject(input: unknown): Project {
       if (pg.boundaryY !== null && el.pos[1] === pg.boundaryY && (el.rot === 0 || el.rot === 180)) el.params.onBlock = true;
       else delete el.params.onBlock;
     }
+    // A column each (v0.3 §2): terminals 1 unit apart in files move apart, keeping their order.
+    spreadBlock(pg);
   }
   if (isObj(input.gaSizes)) {
     project.gaSizes = {};

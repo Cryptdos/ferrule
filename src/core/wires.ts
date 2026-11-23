@@ -264,11 +264,13 @@ export interface WireText {
   vertical: boolean;
   anchor: "start" | "middle" | "end";
   role: "number" | "colour" | "function";
+  /** The number is at the tag size (2.5 mm, v0.3 §2); colour and function at the detail size. */
+  size: "tag" | "detail";
 }
 
-/** Wire text is the detail size. */
-const WIRE_TEXT = textUnits("detail");
-const textLen = (s: string) => textWidth(s, WIRE_TEXT);
+const WIRE_TEXT = { tag: textUnits("tag"), detail: textUnits("detail") };
+const sizeOf = (role: WireText["role"]): WireText["size"] => (role === "number" ? "tag" : "detail");
+const textLen = (s: string, role: WireText["role"]) => textWidth(s, WIRE_TEXT[sizeOf(role)]);
 /** Gap between the pieces of a wire's text, and its inset from the source terminal (67). */
 const TEXT_GAP = 0.8;
 const SOURCE_INSET = 2;
@@ -306,7 +308,7 @@ export function wireTexts(
   if (info.func) parts.push({ text: info.func, role: "function" });
   if (info.number) parts.push({ text: info.number, role: "number" });
   if (!parts.length) return out;
-  const need = parts.reduce((s, p) => s + textLen(p.text), 0) + TEXT_GAP * (parts.length - 1);
+  const need = parts.reduce((s, p) => s + textLen(p.text, p.role), 0) + TEXT_GAP * (parts.length - 1);
 
   let longest = 0;
   for (let k = 0; k < points.length - 1; k++) if (legLen(points[k]!, points[k + 1]!) > legLen(points[longest]!, points[longest + 1]!)) longest = k;
@@ -330,8 +332,8 @@ export function wireTexts(
   }
   // Colour nearest the source, as before.
   for (const p of parts) {
-    const w = textLen(p.text);
-    out.push({ text: p.text, at: beside(along(a, b, d + w / 2), vertical), vertical, anchor: "middle", role: p.role });
+    const w = textLen(p.text, p.role);
+    out.push({ text: p.text, at: beside(along(a, b, d + w / 2), vertical), vertical, anchor: "middle", role: p.role, size: sizeOf(p.role) });
     d += w + TEXT_GAP;
   }
   return out;
@@ -353,7 +355,7 @@ export function blockLabels(page: Page): { x: number; text: string; anchor: "sta
   for (const t of terms) {
     const strip = String(t.params.strip ?? "X1").trim() || "X1";
     if (strip === last) continue;
-    out.push(out.length === 0 ? { x: BLOCK_INSET + 0.6, text: strip, anchor: "start" } : { x: t.pos[0] - 0.8, text: strip, anchor: "end" });
+    out.push(out.length === 0 ? { x: BLOCK_INSET + 0.6, text: strip, anchor: "start" } : { x: t.pos[0] - 1.3, text: strip, anchor: "end" });
     last = strip;
   }
   return out;

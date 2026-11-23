@@ -4,6 +4,7 @@
  * §3, §12). They change the project in place; callers that want undo take
  * a copy first.
  */
+import { freeCellX, spreadBlock } from "./blocks";
 import { projectCopy, type DeviceEntry, type ProjectDevice } from "./devices";
 import { resolveFields } from "./fields";
 import { textWidth } from "./textwidth";
@@ -117,11 +118,13 @@ export function addElement(
 export function moveElements(project: Project, pageId: string, ids: string[], delta: Vec): void {
   const page = getPage(project, pageId);
   const d = snapVec(delta);
+  const moving = new Set(ids);
   for (const id of ids) {
     const el = getElement(page, id);
     el.pos = clampToArea([el.pos[0] + d[0], el.pos[1] + d[1]]);
-    snapToBlock(page, el);
   }
+  // Moved together, terminals keep their spacing; each is kept a column from the ones staying put.
+  for (const id of ids) snapToBlock(page, getElement(page, id), moving);
   if (page.boundaryY !== null) updateZones(page);
 }
 
@@ -1181,12 +1184,15 @@ export function setBoundary(project: Project, pageId: string, y: number | null):
     for (const el of page.elements) if (el.params.onBlock === true) el.pos = [el.pos[0], page.boundaryY];
   }
   updateZones(page);
+  spreadBlock(page);
 }
 
 /** A terminal dropped on or next to the boundary's terminal block goes into it. */
-function snapToBlock(page: Page, el: Element): void {
+function snapToBlock(page: Page, el: Element, moving?: Set<string>): void {
   if (page.boundaryY === null || el.symbol !== "terminal" || (el.rot !== 0 && el.rot !== 180)) return;
-  if (Math.abs(el.pos[1] - page.boundaryY) <= 1.5) el.pos = [el.pos[0], page.boundaryY];
+  if (Math.abs(el.pos[1] - page.boundaryY) > 1.5) return;
+  // A column from any other terminal in the block, so each has its own (v0.3 §2).
+  el.pos = [freeCellX(page, el.pos[0], moving ?? new Set([el.id])), page.boundaryY];
 }
 
 /** Elements below the boundary are field equipment; on or above it, panel internals. */

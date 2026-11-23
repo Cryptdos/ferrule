@@ -35,9 +35,9 @@ export const TEXT_MM = {
   title: 5,
   /** Section box titles, title block main fields. */
   heading: 3.5,
-  /** Part tags, labels, busbar names, link arrow labels, plant names. */
+  /** Part tags, labels, busbar names, link arrow labels, plant names; terminal, pin and wire numbers (v0.3 §2). */
   tag: 2.5,
-  /** Terminal and pin numbers, wire numbers, contact tables, cross-references, ratings, captions. */
+  /** Contact tables, cross-references, pin ids, wire colours and functions, ratings, captions. */
   detail: 1.8,
   /** Notes and text. */
   note: 2.5,

@@ -146,7 +146,8 @@ const line = (...pts: Vec[]): Prim => ({ t: "line", pts });
 const dashed = (...pts: Vec[]): Prim => ({ t: "line", pts, dash: true });
 const heavy = (w: number, ...pts: Vec[]): Prim => ({ t: "line", pts, w });
 /** Room an earth terminal's cell keeps at the top for its earth sign. */
-export const EARTH_CELL = 1.3;
+/** Half a terminal block cell's width: a column, so each terminal has its own (v0.3 §2). */
+export const CELL_HALF_W = 1;
 /**
  * The earth sign (three bars, widest first) hanging down from `at`; `w` is
  * the widest bar.
@@ -1040,31 +1041,30 @@ const SYMBOLS: SymbolDef[] = [
       }
       const earth = fn === "earth";
       if (onBlock) {
-        // A cell of the boundary's terminal block, its number written up the cell.
-        // An earth terminal has the earth sign at the top of its cell, upright (9, 27).
-        if (earth) prims.push(...earthSign([0, -half + 0.25], 0.8));
-        prims.push(
-          line([-0.5, -half], [0.5, -half], [0.5, half], [-0.5, half], [-0.5, -half]),
-          // Always the detail size: a long number makes the cells taller instead.
-          {
+        // A cell of the boundary's terminal block, a column wide (v0.3 §2), its number written up the cell.
+        // An earth terminal prints no number: its earth sign is centred in the cell (27, 13).
+        prims.push(line([-CELL_HALF_W, -half], [CELL_HALF_W, -half], [CELL_HALF_W, half], [-CELL_HALF_W, half], [-CELL_HALF_W, -half]));
+        if (earth) prims.push(...earthSign([0, -0.4], 1.1));
+        else
+          prims.push({
             t: "text",
             // Centred across the cell: the capitals sit either side of the middle.
-            at: [DETAIL * CAP_HEIGHT * 0.5, earth ? EARTH_CELL / 2 : 0],
+            // Always the tag size: a long number makes the cells taller instead.
+            at: [TAG * CAP_HEIGHT * 0.5, 0],
             text: "{tag}",
-            size: DETAIL,
+            size: TAG,
             anchor: "middle",
             role: "tag",
             vertical: true,
-          },
-          ...(el.label ? [text(0.65, half + 1, "{label}", DETAIL, "start", "label")] : []),
-        );
+          });
+        if (el.label) prims.push(text(CELL_HALF_W + 0.15, half + 1, "{label}", DETAIL, "start", "label"));
         return {
           prims,
           terminals: [
             { name: "1", at: [0, top], dir: "up" },
             { name: "2", at: [0, half], dir: "down" },
           ],
-          body: { x: -0.5, y: -half, w: 1, h: half * 2 },
+          body: { x: -CELL_HALF_W, y: -half, w: CELL_HALF_W * 2, h: half * 2 },
         };
       }
       const strip = el.params.showStrip === true ? String(el.params.strip ?? "").trim() : "";
@@ -1077,7 +1077,7 @@ const SYMBOLS: SymbolDef[] = [
         // clear of its leads and of a strip line through it.
         ...(earth ? [line([-0.32, 0.32], [-0.9, 0.9]), ...earthSign([-0.9, 0.9], 0.9)] : []),
         // The terminal's number sits beside it, across the wire, so it doesn't read as a wire number.
-        text(0.6, -0.15, "{tag}", DETAIL, "start", "tag"),
+        text(0.6, 0.1, "{tag}", TAG, "start", "tag"),
         // Its strip on the other side, when asked for.
         ...(strip ? [text(-0.6, -0.15, strip, DETAIL, "end", "note")] : []),
         ...(el.label ? [text(0.65, 1.0, "{label}", DETAIL, "start", "label")] : []),
@@ -1444,9 +1444,9 @@ const SYMBOLS: SymbolDef[] = [
       for (const t of lay.terms) {
         prims.push(rect(t.x - half, 0, PLANT.pitch, lay.termH), {
           t: "text",
-          at: [t.x + DETAIL * CAP_HEIGHT * 0.5, lay.termH / 2],
+          at: [t.x + TAG * CAP_HEIGHT * 0.5, lay.termH / 2],
           text: t.name,
-          size: DETAIL,
+          size: TAG,
           anchor: "middle",
           role: "term",
           vertical: true,
@@ -2066,9 +2066,9 @@ function drawModuleView(el: Element, t?: GeometryText): { prims: Prim[]; termina
   for (const tm of lay.terms) {
     prims.push(rect(tm.x - half, -lay.termH, PLANT.pitch, lay.termH), {
       t: "text",
-      at: [tm.x + DETAIL * CAP_HEIGHT * 0.5, -lay.termH / 2],
+      at: [tm.x + TAG * CAP_HEIGHT * 0.5, -lay.termH / 2],
       text: tm.name,
-      size: DETAIL,
+      size: TAG,
       anchor: "middle",
       role: "term",
       vertical: true,
@@ -2104,8 +2104,8 @@ function drawModuleView(el: Element, t?: GeometryText): { prims: Prim[]; termina
 
 /** Plant view sizes, grid units. */
 export const PLANT = {
-  /** Terminal boxes along the top inside edge: 1 unit apart, like terminal block cells. */
-  pitch: 1,
+  /** Terminal boxes along the top inside edge: 2 units apart (a column each), like terminal block cells (v0.3 §2). */
+  pitch: 2,
   /** Terminal boxes are at least this tall (as tall as a terminal block cell); a long name makes them taller. */
   termH: 3,
   /** The name every terminal box is tall enough for, at least: 5 characters. */
@@ -2168,11 +2168,12 @@ export function plantViewLayout(el: Element): {
   const left = Math.min(-1.5, ...groups.map((g) => nameEdge(g, -1) - 1));
   const right = Math.max(lastX + 1.5, left + 6, ...groups.map((g) => nameEdge(g, 1) + 1));
   // Boxes tall enough for the longest name written up them, in half-unit steps.
-  const tall = (names: string[], min: number) => Math.max(min, Math.ceil((Math.max(0, ...names.map((n) => textWidth(n, DETAIL))) + 0.4) * 2) / 2);
+  const tall = (names: string[], min: number, size: number) => Math.max(min, Math.ceil((Math.max(0, ...names.map((n) => textWidth(n, size))) + 0.4) * 2) / 2);
   // Every plant's boxes are at least tall enough for a 5-character name, so plant views line up (v0.2.1 note 36).
-  const termH = tall([...terms.map((t) => t.name), PLANT.minName], PLANT.termH);
+  // Pin numbers are at the tag size (v0.3 §2); ids stay at the detail size.
+  const termH = tall([...terms.map((t) => t.name), PLANT.minName], PLANT.termH, TAG);
   const ids = terms.map((t) => t.pinId).filter(Boolean);
-  const idH = ids.length ? tall(ids, PLANT.idH) : 0;
+  const idH = ids.length ? tall(ids, PLANT.idH, DETAIL) : 0;
   return { terms, groups, left, right, h: termH + idH + PLANT.below, termH, idH, partial: shown.length < all.length };
 }
 
