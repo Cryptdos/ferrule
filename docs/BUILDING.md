@@ -53,7 +53,7 @@ This downloads the libraries into `node_modules` (about 50 packages, a few secon
 bun run build:exe
 ```
 
-This builds the browser UI (Vite) into `dist/web`, then compiles the server, the UI and the wire router into one file, `dist/ferrule.exe` (about 115 MB; zipped, about 55 MB). It builds the Windows exe whatever system you're on, so a Mac or Linux machine can build it too. For a build that runs on the machine you're on, for testing:
+This builds the browser UI (Vite) into `dist/web`, then compiles the server, the UI and the wire router into one file, `dist/ferrule.exe` (about 115 MB; zipped, about 55 MB). It builds the Windows exe whatever system you're on, so a Mac or Linux machine can build it too. Only a build made on Windows gets the Ferrule icon (`src/web/logo/ferrule.ico`): Bun can only set an exe's icon there. CI builds on Windows, so its exe has it; built elsewhere, the exe works the same with Bun's default icon. For a build that runs on the machine you're on, for testing:
 
 ```sh
 bun scripts/build-exe.ts --target linux   # → dist/ferrule-linux

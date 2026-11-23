@@ -56,5 +56,11 @@ files.forEach((f, i) => {
 lines.push(`await start({ compiled: true, assets: embeddedAssets({\n${map.join("\n")}\n}) });`);
 await writeFile(entry, lines.join("\n") + "\n");
 
-await run(["bun", "build", "--compile", "--minify", `--target=${target.bun}`, entry, "--outfile", target.out]);
+// The exe carries the logo as its icon (src/web/logo/ferrule.ico, every size drawn for itself).
+// Bun can only set it when building on Windows (as CI does); built elsewhere it has Bun's own.
+const windows = (targetArg ?? "windows") === "windows";
+const onWindows = process.platform === "win32";
+const icon = windows && onWindows ? [`--windows-icon=${join(root, "src", "web", "logo", "ferrule.ico")}`, "--windows-title=Ferrule"] : [];
+if (windows && !onWindows) console.log("Not on Windows: the exe gets no icon (CI builds it on Windows, with the icon).");
+await run(["bun", "build", "--compile", "--minify", `--target=${target.bun}`, ...icon, entry, "--outfile", target.out]);
 console.log(`Built ${target.out}`);

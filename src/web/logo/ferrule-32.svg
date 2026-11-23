@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="32" height="32">
+  <title>Ferrule</title>
+  <!-- The same ferrule simplified for 24-32 px: one crimp mark, no shoulder line. -->
+  <rect width="64" height="64" rx="12" fill="#FAF8F3"/>
+  <g transform="rotate(-35 32 32)">
+    <ellipse cx="3" cy="32" rx="2.2" ry="5.6" transform="rotate(20 3 32)" fill="#5a6068"/>
+    <path d="M10.5 26.5 L5 26.5 L1 37.5 L10.5 37.5 Z" fill="#23262b"/>
+    <ellipse cx="2.6" cy="32.2" rx="1.1" ry="2.6" transform="rotate(20 2.6 32.2)" fill="#c87a3c"/>
+    <path d="M10 21.5 L29 21.5 L33 25.5 L33 38.5 L29 42.5 L10 42.5 Z" fill="#d32f2f" stroke="#7f1a1a" stroke-width="1"/>
+    <rect x="33" y="28" width="20" height="8" fill="#bcc3cb" stroke="#4d545c" stroke-width="1"/>
+    <line x1="43" y1="29" x2="43" y2="35" stroke="#7d858e" stroke-width="1.4"/>
+    <rect x="53" y="28.8" width="5" height="6.4" fill="#c87a3c"/>
+  </g>
+</svg>

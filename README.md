@@ -1,4 +1,4 @@
-# Ferrule
+# <img src="src/web/logo/ferrule.svg" alt="" width="40" height="40" align="top" /> Ferrule
 
 **Control panel schematics, drafted fast.** Ferrule is a lightweight drawing tool for electrical control panels: drop in parts, wire them up, and it numbers everything, cross-references every contact to its coil, draws the title block and exports an A4 PDF set. Then it lets you *run* the drawing to check the logic, lay the panel out at true scale, and hand the lot to Claude to draft for you.
 
