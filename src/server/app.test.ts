@@ -232,3 +232,28 @@ describe("projects from Ferrule 0.1", () => {
     }
   });
 });
+
+describe("status page", () => {
+  test("says what's running, whether Claude is connected, and can quit", async () => {
+    const { McpServer } = await import("./mcp");
+    const storage = new Storage(dir);
+    const mcp = new McpServer({ storage } as never, "9.9.9");
+    let quit = 0;
+    const a = createApp({ storage, mcp, version: "9.9.9", selfUrl: () => "http://127.0.0.1:4810", command: { command: "ferrule.exe", args: ["--mcp"] }, quit: () => quit++ });
+    let s = await (await a.request("/api/status")).json();
+    expect(s.version).toBe("9.9.9");
+    expect(s.projects).toBe(dir);
+    expect(s.mcpUrl).toBe("http://127.0.0.1:4810/mcp");
+    expect(s.mcp.connectedAt).toBeUndefined();
+    await a.request("/mcp", json({ jsonrpc: "2.0", id: 1, method: "initialize", params: { clientInfo: { name: "claude-ai" } } }));
+    await a.request("/mcp", json({ jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "list_projects", arguments: {} } }));
+    s = await (await a.request("/api/status")).json();
+    expect(s.mcp.client).toBe("claude-ai");
+    expect(s.mcp.lastTool).toBe("list_projects");
+    expect(s.command.args).toEqual(["--mcp"]);
+    expect((await a.request("/api/quit", { method: "POST", headers: { origin: "http://evil.example" } })).status).toBe(403);
+    expect((await a.request("/api/quit", { method: "POST" })).status).toBe(200);
+    await new Promise((r) => setTimeout(r, 300));
+    expect(quit).toBe(1);
+  });
+});

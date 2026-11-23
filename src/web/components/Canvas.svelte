@@ -35,6 +35,7 @@
     linkToNewArrow,
     type WireEnd,
   } from "../../core/ops";
+  import { settings } from "../settings.svelte";
   import { benchOf, localGeometry, defaultParams, plantViewLayout, type Geometry } from "../../core/symbols";
   import { plantInputId } from "../../core/sim";
   import { GA_ORIGIN, mmToUnits, sheetToGa, snapToRail } from "../../core/ga";
@@ -488,8 +489,9 @@
             : addElement(p, editor.pageId, symbol, at, { params }).id;
       });
       if (id) editor.selection = [id];
-      // A plant view is placed once; other symbols can be placed again and again.
-      if (symbol === "plant-view") {
+      // Place one, then back to Select (note 72), unless the setting says keep placing.
+      // A plant view is always placed once.
+      if (symbol === "plant-view" || !settings.keepPlacing) {
         editor.tool = "select";
         editor.placeSymbol = null;
         editor.placeParams = {};
@@ -1061,6 +1063,7 @@
     live={simLive}
     ops={simOps}
     {gaPreview}
+    focus={sim || page.ga ? null : bench}
   >
     {#snippet under()}
       {#if sim}
@@ -1231,7 +1234,14 @@
   </Sheet>
 </svg>
 {#if atlas}
-  <Atlas project={editor.project} {page} {view} {viewH} onmove={(x, y) => (view = { ...view, x, y })} />
+  <Atlas
+    project={editor.project}
+    {page}
+    {view}
+    {viewH}
+    sheet="{editor.pageIndex + 1} / {editor.project.pages.length}"
+    onmove={(x, y) => (view = { ...view, x, y })}
+  />
 {/if}
 </div>
 
@@ -1242,6 +1252,8 @@
     height: 100%;
   }
   .canvas {
+    /* On screen the sheet is a warm off-white (note 63); print and PDF stay white. */
+    --paper: #faf8f3;
     width: 100%;
     height: 100%;
     display: block;
@@ -1289,7 +1301,7 @@
     }
   }
   .desk {
-    fill: #d8dcdf;
+    fill: var(--desk, #d8dcdf);
   }
   .sel {
     fill: rgba(30, 110, 230, 0.08);

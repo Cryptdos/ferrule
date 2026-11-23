@@ -52,7 +52,19 @@ export class ApiError extends Error {
   }
 }
 
+export interface Status {
+  version: string;
+  projects: string;
+  address: string;
+  mcpUrl: string;
+  mcp: { client?: string; connectedAt?: number; lastTool?: string; lastAt?: number } | null;
+  command: { command: string; args: string[] } | null;
+  canQuit: boolean;
+}
+
 export const api = {
+  status: () => call<Status>("/api/status"),
+  quit: () => call<{ ok: true }>("/api/quit", { method: "POST" }),
   library: () => call<LibraryEntry[]>("/api/library"),
   libraryLoad: (file: string) => call<Template>(`/api/library/${encodeURIComponent(file)}`),
   librarySave: (t: Template) => call<{ file: string }>("/api/library", { method: "POST", body: JSON.stringify(t) }),

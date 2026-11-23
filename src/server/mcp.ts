@@ -24,7 +24,18 @@ export type Reply = {
   error?: { code: number; message: string };
 };
 
+/** What the Status page shows about Claude's connection. */
+export interface McpActivity {
+  /** The client that last said hello (initialize), e.g. "claude-ai". */
+  client?: string;
+  connectedAt?: number;
+  lastTool?: string;
+  lastAt?: number;
+}
+
 export class McpServer {
+  readonly activity: McpActivity = {};
+
   constructor(
     private ctx: ToolContext,
     private version: string,
@@ -58,6 +69,9 @@ export class McpServer {
     switch (method) {
       case "initialize": {
         const asked = String(params.protocolVersion ?? "");
+        const info = params.clientInfo as { name?: unknown; title?: unknown } | undefined;
+        this.activity.client = String(info?.title ?? info?.name ?? "an MCP client");
+        this.activity.connectedAt = Date.now();
         return {
           protocolVersion: PROTOCOL_VERSIONS.includes(asked) ? asked : PROTOCOL_VERSIONS[0],
           capabilities: { tools: { listChanged: false } },
@@ -70,6 +84,8 @@ export class McpServer {
       case "tools/list":
         return { tools: TOOLS.map((t) => ({ name: t.name, description: t.description, inputSchema: t.inputSchema })) };
       case "tools/call":
+        this.activity.lastTool = String(params.name ?? "");
+        this.activity.lastAt = Date.now();
         return this.call(String(params.name ?? ""), (params.arguments as Record<string, unknown>) ?? {});
       default:
         if (method.startsWith("notifications/")) return {};

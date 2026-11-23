@@ -4,6 +4,8 @@ Ferrule exposes its drawing operations as MCP tools, so Claude can draft and edi
 
 ## Connecting
 
+**Settings → Status** in Ferrule shows the exact settings for the Ferrule you're running, ready to copy, and whether Claude is connected (and the last tool it used).
+
 **Claude Code** (or any client that speaks streamable HTTP), with Ferrule running:
 
 ```sh

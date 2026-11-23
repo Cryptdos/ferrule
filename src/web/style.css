@@ -60,3 +60,18 @@ select {
   border-radius: 4px;
   background: #fff;
 }
+
+/* Dark interface (Settings): the chrome is turned dark; the sheet keeps its
+   paper colour and black drawing (design-v0.2 §10). Pictures, previews and
+   symbol icons inside the chrome are turned back so they show as they are. */
+html[data-theme="dark"],
+html[data-theme="dark"] body {
+  background: #16181b;
+  --desk: #2a2e34;
+}
+html[data-theme="dark"] :is(.editor > header, .browser, .float, .window, .split > .bar, .divider, .picker, .table-view, .atlas, .linkbar, .toast) {
+  filter: invert(1) hue-rotate(180deg);
+}
+html[data-theme="dark"] :is(.editor > header, .browser, .float, .window, .split > .bar, .picker, .table-view, .atlas) :is(img, .atlas svg, .preview) {
+  filter: invert(1) hue-rotate(180deg);
+}

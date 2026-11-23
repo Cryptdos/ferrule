@@ -130,7 +130,16 @@ export async function start(opts: StartOptions = {}): Promise<void> {
     VERSION,
   );
   const examples = { "lsp-01": async () => buildLsp01(await loadServerAvoid()).project };
-  const app = createApp({ storage, library, devices, assets, version: VERSION, pdf, selfUrl, mcp, examples });
+  // How Claude Desktop would start this Ferrule: the exe, or bun with this script.
+  const command = opts.compiled
+    ? { command: process.execPath, args: ["--mcp"] }
+    : { command: process.execPath, args: [resolve(import.meta.dir, "main.ts"), "--mcp"] };
+  const quit = () => {
+    console.log("Ferrule stopped (Quit Ferrule on the Status page).");
+    server?.stop(true);
+    process.exit(0);
+  };
+  const app = createApp({ storage, library, devices, assets, version: VERSION, pdf, selfUrl, mcp, examples, command, quit });
   for (let port = args.port; port < args.port + 20 && !server; port++) {
     try {
       server = Bun.serve({ port, hostname: args.host, fetch: app.fetch, idleTimeout: 120 });

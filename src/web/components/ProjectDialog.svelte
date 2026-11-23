@@ -3,6 +3,7 @@
   import { readImage } from "../images";
   import type { ProjectInfo, Revision } from "../../core/model";
   import type { Editor } from "../editor.svelte";
+  import Modal from "./Modal.svelte";
 
   let { editor, onclose }: { editor: Editor; onclose: () => void } = $props();
 
@@ -47,9 +48,7 @@
   }}
 />
 
-<div class="backdrop" role="presentation" onclick={(e) => e.target === e.currentTarget && onclose()}>
-  <div class="dialog" role="dialog" aria-label="Project details">
-    <h2>Project details</h2>
+<Modal title="Project details" {onclose}>
     <p class="hint">These fill the title block on every sheet. Sheet titles are set per sheet.</p>
     <div class="grid">
       {#each fields as f (f.key)}
@@ -163,10 +162,8 @@
         >Add revision</button
       >
       <span class="hint">The latest four show in the title block, newest at the bottom.</span>
-      <button class="close" onclick={onclose}>Done</button>
     </div>
-  </div>
-</div>
+</Modal>
 
 <style>
   .logo {
@@ -193,27 +190,6 @@
     padding: 3px 8px;
     cursor: pointer;
     font-size: 13px;
-  }
-  .backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(20, 24, 30, 0.35);
-    display: grid;
-    place-items: center;
-    z-index: 10;
-  }
-  .dialog {
-    background: #fff;
-    border-radius: 6px;
-    padding: 16px 20px;
-    width: min(720px, 94vw);
-    max-height: 90vh;
-    overflow-y: auto;
-    box-shadow: 0 6px 30px rgba(0, 0, 0, 0.25);
-  }
-  h2 {
-    margin: 0 0 4px;
-    font-size: 17px;
   }
   h3 {
     font-size: 14px;
@@ -249,9 +225,6 @@
     align-items: center;
     gap: 10px;
     margin-top: 8px;
-  }
-  .close {
-    margin-left: auto;
   }
   .hint {
     font-size: 12px;
