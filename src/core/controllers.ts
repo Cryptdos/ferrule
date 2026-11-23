@@ -6,7 +6,10 @@
  */
 import type { Controller, ModuleInfo, ModuleType, PlantItem, Project } from "./model";
 import { newId } from "./model";
-import { OpError, addPlant, deletePlant, getPlant, syncPlantViews } from "./ops";
+import { OpError, addGaItem, addPlant, addProjectDevice, deletePlant, getPlant, syncPlantViews, useLibraryDevice } from "./ops";
+import type { DeviceEntry, ModuleTemplate, ProjectDevice } from "./devices";
+import { moduleGaSize, snapToRail } from "./ga";
+import type { GaItem } from "./model";
 import { defaultPattern, generatePins, moduleType, type ModulePattern } from "./modules";
 import { cleanPoints } from "./points";
 
@@ -172,4 +175,96 @@ export function setSlotAddress(project: Project, controllerId: string, index: nu
   if (s.module) return updateModule(project, s.module, { address });
   if (address && address >= 1) s.address = Math.min(255, Math.floor(address));
   else delete s.address;
+}
+
+// ---------------------------------------------------------------------------
+// Library models (controller.md §4) and the GA (§8)
+
+/** A module's model as it stands: type, channels and pins table, for the device table. */
+export function moduleTemplate(item: PlantItem): ModuleTemplate {
+  const m = item.module;
+  if (!m) throw new OpError(`${item.tag || "That"} isn't a controller's module`);
+  return {
+    type: m.type,
+    ...(m.channels ? { channels: m.channels } : {}),
+    terminals: [...item.terminals],
+    ...(item.pins ? { pins: structuredClone(item.pins) } : {}),
+    ...(item.points?.length ? { points: item.points.map((p) => ({ name: p.name, form: p.form, pins: [...p.pins] })) } : {}),
+  };
+}
+
+/**
+ * Save a module as a model in the project's device table (from there it can
+ * go to the shared library with its datasheet), named by its maker and
+ * model. The module is then that device: its size on the GA comes from it.
+ */
+export function saveModuleDevice(project: Project, plantId: string, size?: { w: number; h: number }): ProjectDevice {
+  const item = getPlant(project, plantId);
+  const m = item.module;
+  if (!m) throw new OpError(`${item.tag || "That"} isn't a controller's module`);
+  const s = size ?? moduleGaSize(project, item);
+  const name = [m.maker, m.model].filter(Boolean).join(" ") || `${moduleType(m.type).label} module`;
+  const dev = addProjectDevice(project, { name, maker: m.maker ?? "", part: m.model ?? "", kind: "module", w: s.w, h: s.h, d: 0, module: moduleTemplate(item) });
+  m.device = dev.id;
+  return dev;
+}
+
+/**
+ * Add a module made from a model in the device table (or the shared
+ * library, which brings a copy into the project): its type, channels and
+ * pins as entered from the datasheet.
+ */
+export function addModuleFromDevice(project: Project, controllerId: string, device: ProjectDevice | DeviceEntry, at?: number): PlantItem {
+  if (!device.module) throw new OpError(`${device.name} isn't a controller module`);
+  const dev = "library" in device ? device : useLibraryDevice(project, device);
+  const t = dev.module!;
+  const item = addModule(project, controllerId, { type: t.type, channels: t.channels, maker: dev.maker, model: dev.part, at, pattern: null });
+  item.terminals = [...t.terminals];
+  if (t.pins) item.pins = structuredClone(t.pins);
+  if (t.points?.length) item.points = cleanPoints(structuredClone(t.points), item.terminals);
+  item.module!.device = dev.id;
+  syncPlantViews(project);
+  return item;
+}
+
+/** Which model from the device table a module is (null: none). */
+export function setModuleDevice(project: Project, plantId: string, deviceId: string | null): void {
+  const item = getPlant(project, plantId);
+  if (!item.module) throw new OpError(`${item.tag || "That"} isn't a controller's module`);
+  if (deviceId) {
+    if (!project.devices?.some((d) => d.id === deviceId)) throw new OpError(`No device "${deviceId}" in this project`);
+    item.module.device = deviceId;
+  } else delete item.module.device;
+  // On the GA it takes that size.
+  const s = moduleGaSize(project, item);
+  for (const pg of project.pages)
+    for (const it of pg.gaItems ?? []) {
+      if (it.module !== item.id) continue;
+      it.w = s.w;
+      it.h = s.h;
+      if (deviceId) it.device = deviceId;
+      else delete it.device;
+    }
+}
+
+/**
+ * Place modules on a GA side by side from `at` (their left end, mm), in
+ * rail order: a controller as one item (controller.md §8). Snaps onto a DIN
+ * rail where they sit across one.
+ */
+export function placeModulesOnGa(project: Project, pageId: string, moduleIds: string[], at: [number, number]): GaItem[] {
+  const items = moduleIds.map((id) => getPlant(project, id));
+  const sizes = items.map((it) => moduleGaSize(project, it));
+  const h = Math.max(...sizes.map((s) => s.h));
+  const page = project.pages.find((p) => p.id === pageId);
+  const railY = page ? snapToRail(page, { x: at[0], y: at[1], w: sizes.reduce((a, s) => a + s.w, 0), h }) : null;
+  let x = at[0];
+  return items.map((it, i) => {
+    const s = sizes[i]!;
+    // Lined up by their middles on the rail.
+    const y = (railY ?? at[1]) + (h - s.h) / 2;
+    const g = addGaItem(project, pageId, { kind: "device", x, y, w: s.w, h: s.h, module: it.id, ...(it.module?.device ? { device: it.module.device } : {}) });
+    x += s.w;
+    return g;
+  });
 }

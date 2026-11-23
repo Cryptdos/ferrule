@@ -38,7 +38,7 @@ export class Editor {
   saveState: SaveState = $state("saved");
   message: string = $state("");
   /** A schematic device (or terminal strip) being placed on a GA sheet. */
-  gaPlace: { refs: string[]; part?: "handle"; w: number; h: number; label: string } | null = $state(null);
+  gaPlace: { refs: string[]; part?: "handle"; modules?: { id: string; w: number; h: number }[]; w: number; h: number; label: string } | null = $state(null);
   /** How the Dimension tool measures: the gaps along a run, or each distance from the first point. */
   gaDimStyle: "chain" | "baseline" = $state("chain");
   /** Sheet settings open in the floating properties box (nothing need be selected). */

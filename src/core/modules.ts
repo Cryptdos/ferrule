@@ -265,3 +265,27 @@ export function moduleTitle(project: Project, el: Element): string {
   }
   return parts.join(" · ");
 }
+
+/** Controllers with their modules, in the order they're listed. */
+export function controllersInOrder(project: Project): { ctrl: Controller; modules: (PlantItem & { module: ModuleInfo })[] }[] {
+  return (project.controllers ?? []).map((ctrl) => ({ ctrl, modules: modulesOf(project, ctrl) }));
+}
+
+/** A controller map's boxes (controller.md §5): its rail, the first controller's when none is named. */
+export function controllerMapEntries(project: Project, ctrlId: string): import("./symbols").MapEntry[] {
+  const ctrl = controllerById(project, ctrlId) ?? project.controllers?.[0];
+  if (!ctrl) return [];
+  return ctrl.slots.map((s, i) => {
+    const address = slotAddress(project, ctrl, i);
+    const it = s.module ? project.plant.find((p) => p.id === s.module) : undefined;
+    if (!isModule(it)) return { tag: "", address, maker: "", model: "", type: "", where: "", spare: true };
+    return {
+      tag: it.tag || `${it.prefix || "A"}?`,
+      address,
+      maker: it.module.maker ?? "",
+      model: it.module.model ?? "",
+      type: moduleTypeName(it.module),
+      where: viewsOf(project, it.id).map((v) => v.address).join(", "),
+    };
+  });
+}

@@ -13,7 +13,7 @@ import type { Element, Page, ParamValue, Project } from "../core/model";
 import * as op from "../core/ops";
 import { renumber } from "../core/renumber";
 import { routePage } from "../core/routing";
-import { cableSchedule, terminalSchedule } from "../core/schedules";
+import { billOfMaterials, cableSchedule, ioSchedule, plantPointsSchedule, terminalSchedule } from "../core/schedules";
 import { listSymbols, localGeometry } from "../core/symbols";
 import { displayTag, elementTexts } from "../core/tags";
 import { saveSectionTemplate, saveSheetTemplate, stampTemplate, type PlantMapping } from "../core/templates";
@@ -21,8 +21,8 @@ import { contactTable, isMaster, masterOf, partnerOf } from "../core/xref";
 import { advance, compile, describeAction, initialState, judge, press, search, toggle, type Action, type Circuit, type SimState } from "../core/sim";
 import { describeExpectation, findThing, parseQuickEntry, pointRef, things } from "../core/points";
 import { POINT_FORMS, type Condition, type Controller, type IoPoint, type ModuleType, type PinInfo, type PlantItem, type PointForm } from "../core/model";
-import { addController, addModule, addSpareSlot, deleteController, generateModule, moveSlot, removeSlot, updateController, updateModule } from "../core/controllers";
-import { MODULE_TYPES, controllerById, controllerTag, defaultPattern, moduleTypeName, pointLabel, slotAddress, viewsOf, type ModulePattern } from "../core/modules";
+import { addModuleFromDevice, placeModulesOnGa, saveModuleDevice, addController, addModule, addSpareSlot, deleteController, generateModule, moveSlot, removeSlot, updateController, updateModule } from "../core/controllers";
+import { MODULE_TYPES, modulesOf, controllerById, controllerTag, defaultPattern, moduleTypeName, pointLabel, slotAddress, viewsOf, type ModulePattern } from "../core/modules";
 import type { Library, Storage } from "./storage";
 
 export interface ToolContext {
@@ -425,9 +425,10 @@ export const TOOLS: Tool[] = [
   },
   {
     name: "update_page",
-    description: "Rename a sheet, move it, set/remove its panel boundary (boundaryY: null removes it), or mark it spare (annotations only).",
+    description:
+      "Rename a sheet, move it, set/remove its panel boundary (boundaryY: null removes it), mark it spare (annotations only), or set its type (schematic, spare, or ga: an empty sheet becomes a GA backplate).",
     inputSchema: obj(
-      { project, sheet, title: { type: "string" }, moveTo: sheet, boundaryY: { type: ["number", "null"] }, spare: { type: "boolean" } },
+      { project, sheet, title: { type: "string" }, moveTo: sheet, boundaryY: { type: ["number", "null"] }, spare: { type: "boolean" }, type: { type: "string", enum: ["schematic", "spare", "ga"] } },
       ["project", "sheet"],
     ),
     run: async (a, ctx) =>
@@ -437,6 +438,7 @@ export const TOOLS: Tool[] = [
         if ("boundaryY" in a) op.setBoundary(p, page.id, typeof a.boundaryY === "number" ? a.boundaryY : null);
         if (typeof a.moveTo === "number") op.movePage(p, page.id, a.moveTo - 1);
         if (typeof a.spare === "boolean") op.setPageSpare(p, page.id, a.spare);
+        if (a.type === "schematic" || a.type === "spare" || a.type === "ga") op.setPageType(p, page.id, a.type);
         return { sheet: page.number, title: page.title, boundaryY: page.boundaryY };
       }),
   },
@@ -680,7 +682,7 @@ export const TOOLS: Tool[] = [
   {
     name: "controller",
     description:
-      "Controllers (controller.md §4): an outstation or PLC is its modules in rail order, with any spare slots. With no other arguments, lists them (each module's tag, type, points as A3-23:DI2, and where it's drawn). Give description (and prefix, default A) to add one; give 'controller' (id, tag or description) to update it, or with delete: true to remove it with its modules and views. Add modules with add_module.",
+      "Controllers (controller.md §4): an outstation or PLC is its modules in rail order, with any spare slots. With no other arguments, lists them (each module's tag, type, points as A3-23:DI2, and where it's drawn). Give description (and prefix, default A) to add one; give 'controller' (id, tag or description) to update it, or with delete: true to remove it with its modules and views. Add modules with add_module. Draw a controller map (its modules in rail order with tag, bus address, maker, model, type and where each is drawn) with add_element symbol 'ctrlmap', params {ctrl: <controller id>}. place_controller lays its modules out on a GA sheet.",
     inputSchema: obj(
       {
         project,
@@ -728,6 +730,8 @@ export const TOOLS: Tool[] = [
         pattern: { type: "object", description: "How to generate its pins (see above)" },
         labels: { type: "object", description: "Point name → its job label" },
         spare: { type: "boolean", description: "Add a spare slot (Spare I/O) at 'at' instead of a module" },
+        device: { type: "string", description: "Add the module from a saved model in the project's device table (its name or id): type, channels and pins as entered" },
+        saveModel: { type: "boolean", description: "With module: save it as a model in the device table (pins and all), sized for the GA" },
         move: { type: "number", description: "With module: move it to this slot index" },
         delete: { type: "boolean", description: "With module: delete it and its views" },
       },
@@ -758,10 +762,17 @@ export const TOOLS: Tool[] = [
           });
           if (a.pattern !== undefined) generateModule(p, item.id, patternArg(item.module.type, item.module.channels, a.pattern));
           if (n("move") !== undefined) moveSlot(p, c.id, c.slots.findIndex((x) => x.module === item.id), n("move")!);
+          if (a.saveModel === true && !item.module.device) saveModuleDevice(p, item.id);
         } else {
           const c = controllerByRef(p, str(a, "controller"));
           if (a.spare === true) {
             addSpareSlot(p, c.id, n("at"));
+            return describeController(p, c);
+          }
+          if (typeof a.device === "string") {
+            const dev = p.devices?.find((d) => d.id === a.device || d.name === a.device);
+            if (!dev?.module) throw new ArgError(`No controller module model "${a.device}" in the device table`);
+            addModuleFromDevice(p, c.id, dev, n("at"));
             return describeController(p, c);
           }
           if (!type) throw new ArgError("Give the module's type");
@@ -783,6 +794,24 @@ export const TOOLS: Tool[] = [
           }
         }
         return describeController(p, controllerById(p, item.module!.controller)!);
+      }),
+  },
+  {
+    name: "place_controller",
+    description:
+      "Lay a controller's modules out on a GA sheet (backplate or door back), side by side in rail order from x, y (mm from the enclosure's top-left corner: the left end and top), snapped onto a DIN rail they sit across. Each is sized by its model from the device table, else generically by type and channels. Modules already on a GA are left where they are.",
+    inputSchema: obj(
+      { project, sheet, controller: { type: "string", description: "Controller id, tag or description" }, x: { type: "number" }, y: { type: "number" } },
+      ["project", "sheet", "controller", "x", "y"],
+    ),
+    run: async (a, ctx) =>
+      edit(ctx, str(a, "project"), (p) => {
+        const page = pageByNumber(p, a.sheet);
+        const c = controllerByRef(p, str(a, "controller"));
+        const placed = new Set(p.pages.flatMap((pg) => (pg.gaItems ?? []).map((it) => it.module).filter(Boolean)));
+        const ids = modulesOf(p, c).filter((m) => !placed.has(m.id)).map((m) => m.id);
+        if (!ids.length) throw new ArgError("All its modules are on a GA already");
+        return placeModulesOnGa(p, page.id, ids, [num(a, "x"), num(a, "y")]).map((it) => ({ id: it.id, module: p.plant.find((x) => x.id === it.module)?.tag, x: it.x, y: it.y, w: it.w, h: it.h }));
       }),
   },
   {
@@ -932,11 +961,23 @@ export const TOOLS: Tool[] = [
   },
   {
     name: "schedules",
-    description: "Terminal schedule and field cable schedule, generated from the drawing.",
-    inputSchema: obj({ project, kind: { type: "string", enum: ["terminals", "cables"] } }, ["project", "kind"]),
+    description:
+      "Schedules generated from the drawing: terminals, field cables, io (every controller's points: controller, module, point (with where it's drawn if on a continuation), form, pins, label, wired to), plant (plant's points and what they're wired to), or bom (bill of materials from the GA sheets).",
+    inputSchema: obj({ project, kind: { type: "string", enum: ["terminals", "cables", "io", "plant", "bom"] } }, ["project", "kind"]),
     run: async (a, ctx) => {
       const p = await ctx.storage.load(str(a, "project"));
-      return a.kind === "cables" ? cableSchedule(p) : terminalSchedule(p);
+      switch (a.kind) {
+        case "cables":
+          return cableSchedule(p);
+        case "io":
+          return ioSchedule(p);
+        case "plant":
+          return plantPointsSchedule(p);
+        case "bom":
+          return billOfMaterials(p);
+        default:
+          return terminalSchedule(p);
+      }
     },
   },
   {

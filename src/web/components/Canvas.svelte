@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { placeModulesOnGa } from "../../core/controllers";
   import { untrack } from "svelte";
   import Atlas from "./Atlas.svelte";
   import {
@@ -454,6 +455,18 @@
     const fine = e.shiftKey;
     if (editor.gaPlace) {
       const pl = editor.gaPlace;
+      // A controller: its modules side by side, in rail order.
+      if (pl.modules?.length) {
+        const at: [number, number] = [snapMm(mm[0] - pl.w / 2, fine), snapMm(mm[1] - pl.h / 2, fine)];
+        let ids: string[] = [];
+        const ids0 = pl.modules.map((m) => m.id);
+        const ok = editor.apply((p) => {
+          ids = placeModulesOnGa(p, editor.pageId, ids0, at).map((g) => g.id);
+        });
+        editor.gaPlace = null;
+        if (ok) editor.selection = ids;
+        return;
+      }
       let at: Vec = [snapMm(mm[0] - pl.w / 2, fine), snapMm(mm[1] - pl.h / 2, fine)];
       const railY = snapToRail(page, { x: at[0], y: at[1], w: pl.w, h: pl.h });
       if (railY !== null) at = [at[0], railY];

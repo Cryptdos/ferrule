@@ -1450,6 +1450,8 @@ export function addGaItem(project: Project, pageId: string, item: Omit<GaItem, "
   }
   const r = (v: number) => Math.round(v * 2) / 2;
   const it: GaItem = { ...item, id: newId("g"), x: r(item.x), y: r(item.y), w: Math.max(1, r(item.w)), h: Math.max(1, r(item.h)) };
+  // A controller's module is on one GA only.
+  if (it.module && project.pages.some((pg) => (pg.gaItems ?? []).some((o) => o.module === it.module))) throw new OpError("That module's already on a GA");
   // A schematic device (or its door handle) is on one GA only.
   if (it.refs?.length)
     for (const pg of project.pages)
@@ -1601,6 +1603,7 @@ export function updateProjectDevice(project: Project, id: string, patch: Partial
 export function removeProjectDevice(project: Project, id: string): void {
   project.devices = devicesOf(project).filter((d) => d.id !== id);
   for (const page of project.pages) for (const it of page.gaItems ?? []) if (it.device === id) delete it.device;
+  for (const it of project.plant) if (it.module?.device === id) delete it.module.device;
 }
 
 /** Items of a device that had its old size (not sized by hand) get the new one, turned the same way. */

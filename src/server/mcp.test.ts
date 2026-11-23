@@ -199,6 +199,17 @@ describe("MCP controller tools", () => {
     expect(list[0].slots[1].tag).toBe("A1-23");
     expect(list[0].slots[1].drawn).toEqual(["1-23"]);
     expect(list[0].slots[1].points[0].ref).toBe("A1-23:DO1");
+    const io = (await call("schedules", { project: proj.id, kind: "io" })).data;
+    expect(io[0]).toMatchObject({ controller: "A? AHU-1 outstation", module: "A1-23 (DO-4)", point: "DO1", label: "SF-01 enable" });
+    // Saved as a model, the next one comes from it.
+    await call("add_module", { project: proj.id, module: "A1-23", saveModel: true });
+    const again = (await call("add_module", { project: proj.id, controller: c.id, device: "Digital outputs module" })).data;
+    expect(again.slots.at(-1).type).toBe("DO-4");
+    await call("add_page", { project: proj.id, title: "GA" });
+    await call("update_page", { project: proj.id, sheet: 2, type: "ga" });
+    const ga = await call("place_controller", { project: proj.id, sheet: 2, controller: c.id, x: 50, y: 100 });
+    expect(ga.error).toBe(false);
+    expect(ga.data.length).toBe(3);
     const bad = await call("add_module", { project: proj.id, controller: c.id, type: "xx" });
     expect(bad.error).toBe(true);
     const gone = (await call("controller", { project: proj.id, controller: c.id, delete: true })).data;

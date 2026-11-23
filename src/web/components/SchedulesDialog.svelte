@@ -1,15 +1,19 @@
 <script lang="ts">
   import { untrack } from "svelte";
-  import { billOfMaterials, cableSchedule, terminalSchedule, toCsv } from "../../core/schedules";
+  import { billOfMaterials, cableSchedule, ioSchedule, plantPointsSchedule, terminalSchedule, toCsv } from "../../core/schedules";
   import type { Editor } from "../editor.svelte";
   import Modal from "./Modal.svelte";
 
   let { editor, onclose }: { editor: Editor; onclose: () => void } = $props();
 
-  let tab: "terminals" | "cables" | "bom" = $state(untrack(() => (editor.mode === "ga" ? "bom" : "terminals")));
+  let tab: "terminals" | "cables" | "io" | "plant" | "bom" = $state(untrack(() => (editor.mode === "ga" ? "bom" : "terminals")));
   const bom = $derived(billOfMaterials(editor.project));
   const terms = $derived(terminalSchedule(editor.project));
   const cables = $derived(cableSchedule(editor.project));
+  const io = $derived(ioSchedule(editor.project));
+  const plantPts = $derived(plantPointsSchedule(editor.project));
+  const IO_COLS: [keyof (typeof io)[number], string][] = [["controller", "Controller"], ["module", "Module"], ["point", "Point"], ["form", "Form"], ["pins", "Pins"], ["label", "Label"], ["wiredTo", "Wired to"]];
+  const PLANT_COLS: [keyof (typeof plantPts)[number], string][] = [["device", "Device"], ["description", "Description"], ["point", "Point"], ["form", "Form"], ["pins", "Pins"], ["wiredTo", "Wired to"]];
 
   function download(name: string, text: string) {
     const a = document.createElement("a");
@@ -25,6 +29,8 @@
   <div class="tabs">
     <button class:active={tab === "terminals"} onclick={() => (tab = "terminals")}>Terminals ({terms.length})</button>
     <button class:active={tab === "cables"} onclick={() => (tab = "cables")}>Field cables ({cables.length})</button>
+    <button class:active={tab === "io"} onclick={() => (tab = "io")} title="Every controller's points: the job's points list">IO points ({io.length})</button>
+    <button class:active={tab === "plant"} onclick={() => (tab = "plant")} title="Plant's points and what they're wired to">Plant points ({plantPts.length})</button>
     <button class:active={tab === "bom"} onclick={() => (tab = "bom")} title="From the GA sheets and the device table">Bill of materials ({bom.length})</button>
     <span class="grow"></span>
     {#if tab === "terminals"}
@@ -35,6 +41,10 @@
             toCsv(terms, [["strip", "Strip"], ["terminal", "Terminal"], ["where", "Sheet-col"], ["wire", "Wire"], ["internal", "Internal"], ["external", "External"]]),
           )}>Download CSV</button
       >
+    {:else if tab === "io"}
+      <button onclick={() => download(`${base} IO schedule.csv`, toCsv(io, IO_COLS))}>Download CSV</button>
+    {:else if tab === "plant"}
+      <button onclick={() => download(`${base} plant points.csv`, toCsv(plantPts, PLANT_COLS))}>Download CSV</button>
     {:else if tab === "bom"}
       <button
         onclick={() =>
@@ -66,6 +76,28 @@
       <tbody>
         {#each terms as r, i (i)}
           <tr><td>{r.strip}</td><td>{r.terminal}</td><td>{r.where}</td><td>{r.wire}</td><td>{r.internal}</td><td>{r.external}</td></tr>
+        {/each}
+      </tbody>
+    </table>
+  {:else if tab === "io"}
+    <table>
+      <thead><tr>{#each IO_COLS as [, h] (h)}<th>{h}</th>{/each}</tr></thead>
+      <tbody>
+        {#each io as r, i (i)}
+          <tr>{#each IO_COLS as [k] (k)}<td>{r[k]}</td>{/each}</tr>
+        {:else}
+          <tr><td colspan="7" class="hint">No controllers yet (Controllers… in Draft).</td></tr>
+        {/each}
+      </tbody>
+    </table>
+  {:else if tab === "plant"}
+    <table>
+      <thead><tr>{#each PLANT_COLS as [, h] (h)}<th>{h}</th>{/each}</tr></thead>
+      <tbody>
+        {#each plantPts as r, i (i)}
+          <tr>{#each PLANT_COLS as [k] (k)}<td>{r[k]}</td>{/each}</tr>
+        {:else}
+          <tr><td colspan="6" class="hint">No plant with points yet.</td></tr>
         {/each}
       </tbody>
     </table>

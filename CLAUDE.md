@@ -7,7 +7,8 @@ Read this first. The design record is `docs/DESIGN.md`; the plan being built is 
 v0.2 sprint, version `0.2.0-pre`. Steps 1–7 (7a and 7b) are merged. Step 8 is split:
 
 - **8a**: IO points for plant and expectations (controller.md phases 1–2). Merged (PR 39).
-- **8b**: controllers (controller.md phase 3), in two PRs. **8b1** (controllers and modules, generator, module views, references, MCP `controller`/`add_module`): this PR. **8b2** next: controller map (Annotate table), IO schedule with the plant points schedule (CSV), GA placement (a controller places all its modules on a rail), library models (module patterns in the device library with GA size), controller checks, their MCP tools.
+- **8b**: controllers (controller.md phase 3), in two PRs: **8b1** (PR 41: controllers and modules, generator, module views, references, MCP `controller`/`add_module`) and **8b2** (controller map, IO and plant points schedules, GA placement, library models, controller checks, MCP `place_controller`).
+- Step 8 is complete with 8b2. What's next is the user's call: testing the 0.2 builds, then the 0.2.0 release (remove `preRelease()`, below). Network drawings (controller.md §9) are for later.
 - **8c**: the logo (design-v0.2 §11), done before 8b.
 - Modules are plant items with `module` set (`src/core/modules.ts` helpers, `src/core/controllers.ts` ops); a module view is a `plant-view` with `params.pmod`.
 - Builds made off Windows have no exe icon (Bun sets it only on Windows); CI's exe job runs on Windows and its artifact has it.

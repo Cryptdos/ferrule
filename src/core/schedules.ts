@@ -1,10 +1,12 @@
 /**
  * Terminal and cable schedules, generated from the drawing (DESIGN.md §7).
  */
-import type { Element, Page, Project, Segment } from "./model";
+import type { Element, IoPoint, Page, PlantItem, Project, Segment } from "./model";
 import { displayTag, elementTexts } from "./tags";
-import { address } from "./xref";
+import { address, partnerOf } from "./xref";
 import { gaSizes, sizeKey } from "./ga";
+import { controllerName, controllerOfModule, controllersInOrder, moduleTypeName, pointLabel, viewsOf } from "./modules";
+import { formLabel, printedPin } from "./points";
 
 export interface TerminalRow {
   strip: string;
@@ -154,11 +156,19 @@ export function billOfMaterials(project: Project): BomRow[] {
         const refs = (it.refs ?? []).map((r) => els.get(r)).filter((e): e is Element => !!e);
         const first = refs[0];
         const strip = first?.symbol === "terminal" && !it.part;
-        const tags = strip ? [`${it.strip ?? first.params.strip ?? "X1"}`] : refs.map((e) => displayTag(e, project) + (it.part === "handle" ? " handle" : ""));
+        const modTag = it.module ? (project.plant.find((x) => x.id === it.module)?.tag ?? "") : "";
+        const tags = it.module ? [modTag] : strip ? [`${it.strip ?? first.params.strip ?? "X1"}`] : refs.map((e) => displayTag(e, project) + (it.part === "handle" ? " handle" : ""));
         const qty = strip ? refs.length : 1;
         const dev = it.device ? project.devices?.find((d) => d.id === it.device) : undefined;
         if (dev) {
           add(`dev:${dev.id}`, { item: dev.name, maker: dev.maker, part: dev.part, quantity: qty, unit: "each" }, tags);
+          continue;
+        }
+        // A controller's module: by its type until a model's picked.
+        if (it.module) {
+          const m = project.plant.find((x) => x.id === it.module);
+          const type = m?.module ? moduleTypeName(m.module) : "module";
+          add(`mod:${type}`, { item: `Controller module ${type} (no device picked)`, maker: "", part: "", quantity: 1, unit: "each" }, [m?.tag ?? ""]);
           continue;
         }
         // No device picked: counted by its generic size, so what's still to choose shows.
@@ -178,4 +188,121 @@ export function billOfMaterials(project: Project): BomRow[] {
 function terminalKind(el: Element): string {
   const fn = el.params.function;
   return fn === "fuse" || fn === "fuse-disconnect" ? "fuseTerminal" : fn === "disconnect" ? "disconnectTerminal" : "terminal";
+}
+
+// ---------------------------------------------------------------------------
+// Points lists (controller.md §7)
+
+export interface IoRow {
+  controller: string;
+  module: string;
+  /** The point, with where it's drawn when that's on a continuation: DO5 (4-10). */
+  point: string;
+  form: string;
+  pins: string;
+  label: string;
+  wiredTo: string;
+}
+
+export interface PlantPointRow {
+  device: string;
+  description: string;
+  point: string;
+  form: string;
+  pins: string;
+  wiredTo: string;
+}
+
+/**
+ * What a point's pins are wired to, by conductor: other devices' points
+ * (with where they're drawn), link arrows (where they go), terminals and
+ * parts. Its own device's pins are left out.
+ */
+export function wiredTo(project: Project, item: PlantItem, point: IoPoint): string {
+  const els = new Map(project.pages.flatMap((pg) => pg.elements.map((e) => [e.id, { e, pg }])));
+  const own = new Set(viewsOf(project, item.id).map((v) => v.el.id));
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const push = (s: string) => {
+    if (!seen.has(s)) {
+      seen.add(s);
+      out.push(s);
+    }
+  };
+  // A common shared with other channels is theirs too: what it's wired to is said by the point's own pins.
+  const own_ = point.pins.filter((t) => !(item.points ?? []).some((q) => q !== point && q.pins.includes(t)));
+  for (const pin of own_.length ? own_ : point.pins) {
+    const conds = project.conductors.filter((c) => c.terminals.some(([id, t]) => own.has(id) && t === pin));
+    for (const c of conds) {
+      for (const [id, t] of c.terminals) {
+        if (own.has(id)) continue;
+        const x = els.get(id);
+        if (!x) continue;
+        const { e, pg } = x;
+        if (e.symbol === "junction") continue;
+        if (e.symbol === "plant-view") {
+          const other = project.plant.find((p) => p.id === e.params.plant);
+          const pt = other?.points?.find((q) => q.pins.includes(t));
+          const where = address(pg, e.pos);
+          push(other && pt ? `${pointLabel(project, other, pt)}${other.module ? "" : ` (${where})`}` : `${other?.tag ?? "?"}:${t} (${where})`);
+        } else if (e.symbol === "offpage") {
+          const partner = partnerOf(project, e);
+          push(`via link ${address(pg, e.pos)}${partner ? ` → ${address(partner.page, partner.el.pos)}` : ""}`);
+        } else if (e.symbol === "terminal") {
+          push(`${e.params.strip ?? "X1"}:${displayTag(e, project)}`);
+        } else if (e.symbol === "busbar") {
+          push(elementTexts(e, project).name || displayTag(e, project) || "busbar");
+        } else {
+          push(`${displayTag(e, project) || e.symbol}:${t}`);
+        }
+      }
+    }
+  }
+  return out.join(", ");
+}
+
+const pinsText = (item: PlantItem, p: IoPoint) => p.pins.map((t) => printedPin(t, p.name)).join(", ");
+
+/** The job's points list: every controller's points, module by module in rail order. */
+export function ioSchedule(project: Project): IoRow[] {
+  const rows: IoRow[] = [];
+  for (const { ctrl, modules } of controllersInOrder(project)) {
+    const cname = controllerName(project, ctrl);
+    for (const m of modules) {
+      const views = viewsOf(project, m.id);
+      const tag = m.tag || `${m.prefix || "A"}?`;
+      for (const p of m.points ?? []) {
+        const said = pointLabel(project, m, p, views);
+        rows.push({
+          controller: cname,
+          module: `${tag} (${moduleTypeName(m.module)})`,
+          point: said.slice(said.indexOf(":") + 1),
+          form: formLabel(p.form),
+          pins: pinsText(m, p),
+          label: p.label ?? "",
+          wiredTo: wiredTo(project, m, p),
+        });
+      }
+    }
+  }
+  return rows;
+}
+
+/** Plant's points: device, point, pins and what they're wired to. */
+export function plantPointsSchedule(project: Project): PlantPointRow[] {
+  const rows: PlantPointRow[] = [];
+  const plant = project.plant.filter((p) => !p.module && !controllerOfModule(project, p));
+  for (const item of [...plant].sort((a, b) => natural(a.tag, b.tag))) {
+    for (const p of item.points ?? []) {
+      rows.push({
+        device: item.tag || `${item.prefix || "U"}?`,
+        description: item.description,
+        point: p.name,
+        form: formLabel(p.form),
+        pins: pinsText(item, p),
+        wiredTo: wiredTo(project, item, p),
+      });
+    }
+  }
+  return rows;
 }
