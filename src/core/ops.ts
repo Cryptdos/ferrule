@@ -5,7 +5,9 @@
  * a copy first.
  */
 import { projectCopy, type DeviceEntry, type ProjectDevice } from "./devices";
-import { AREA_UNITS, type Rotation, type Vec, clampToArea, rotate, snapVec } from "./geometry";
+import { resolveFields } from "./fields";
+import { textWidth } from "./textwidth";
+import { AREA_UNITS, textUnits, type Rotation, type Vec, clampToArea, rotate, snapVec } from "./geometry";
 import { refreshConductors } from "./conductors";
 import {
   type Distribution,
@@ -81,7 +83,7 @@ export function addElement(
     id: newId("e"),
     symbol,
     tag: opts.tag ?? "",
-    label: opts.label ?? (symbol === "text" ? "Text" : ""),
+    label: symbol === "text" ? (opts.label ?? "Text") : (opts.label ?? "").replace(/\s*\n\s*/g, " "),
     pos: clampToArea(snapVec(pos)),
     rot: opts.rot ?? 0,
     zone: opts.zone ?? "internal",
@@ -89,6 +91,8 @@ export function addElement(
     links: [],
   };
   if (symbol !== "plant-view") for (const k of PLANT_VIEW_KEYS) delete el.params[k];
+  // A label written on lines wraps at its widest line instead (v0.2.1 note 18).
+  if (symbol !== "text" && opts.label?.includes("\n") && opts.params?.labelWidth === undefined) el.params.labelWidth = labelWidthFor(opts.label, project);
   // Call-outs are numbered 1, 2, 3… on each sheet, the next one after the highest there.
   if (symbol === "callout" && opts.params?.n === undefined) {
     el.params.n = 1 + Math.max(0, ...page.elements.filter((e) => e.symbol === "callout").map((e) => Number(e.params.n) || 0));
@@ -213,10 +217,17 @@ export interface ElementPatch {
   params?: Record<string, ParamValue>;
 }
 
+/** The width a label written on several lines wraps at to keep those lines: its widest line, in whole units. */
+export function labelWidthFor(label: string, project?: Pick<Project, "plant" | "project" | "pages" | "revisions">): number {
+  const lines = (project ? resolveFields(label, project as Project) : label).split("\n");
+  return Math.ceil(Math.max(...lines.map((l) => textWidth(l.trim(), textUnits("tag")))) + 0.5);
+}
+
 export function updateElement(project: Project, pageId: string, id: string, patch: ElementPatch): void {
   const el = getElement(getPage(project, pageId), id);
   if (patch.tag !== undefined) el.tag = patch.tag.trim();
-  if (patch.label !== undefined) el.label = patch.label;
+  // A label is one line, wrapped by its width (v0.2.1 note 18); Text keeps its lines.
+  if (patch.label !== undefined) el.label = el.symbol === "text" ? patch.label : patch.label.replace(/\s*\n\s*/g, " ");
   if (patch.zone !== undefined) el.zone = patch.zone;
   if (patch.rot !== undefined) el.rot = patch.rot;
   if (patch.params) el.params = normaliseParams(el.symbol, { ...el.params, ...patch.params });

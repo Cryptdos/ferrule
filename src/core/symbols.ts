@@ -398,7 +398,6 @@ export const LAMP_COLOURS = [
   { code: "Gn", name: "green" },
   { code: "Bu", name: "blue" },
   { code: "Wh", name: "white" },
-  { code: "Cl", name: "clear" },
 ];
 
 /** Marker colours for highlights: translucent, so the drawing under them still reads (and prints). */
@@ -871,8 +870,9 @@ const SYMBOLS: SymbolDef[] = [
         key: "colour",
         label: "Colour",
         type: "select",
-        options: [{ value: "", label: "None" }, ...LAMP_COLOURS.map((c) => ({ value: c.code, label: `${c.code} ${c.name}` }))],
-        default: "",
+        // Every lamp has a colour; white covers a clear lens (4).
+        options: LAMP_COLOURS.map((c) => ({ value: c.code, label: `${c.code} ${c.name}` })),
+        default: "Wh",
       },
       { key: "testPin", label: "Lamp test terminal (T)", type: "bool", default: false },
     ],
@@ -880,7 +880,7 @@ const SYMBOLS: SymbolDef[] = [
     draw(el) {
       const r = 1.3;
       const d = r * Math.SQRT1_2;
-      const colour = str(el, "colour", "");
+      const colour = str(el, "colour", "Wh");
       const test = bool(el, "testPin", false);
       const prims: Prim[] = [
         line([0, -3], [0, -r]),
@@ -1210,8 +1210,10 @@ const SYMBOLS: SymbolDef[] = [
       let body: Rect = { x: -1.2, y: 0, w: 2.4, h: 1 };
       if (type === "protective") {
         // In a circle.
-        prims = [line([0, -2], [0, -1.3]), line([0, -1.3], [0, -0.4]), ...bars.map((b) => shift(b, 0, -0.4)), circle(0, 0.1, 1.5)];
-        body = { x: -1.5, y: -1.4, w: 3, h: 3 };
+        // The earth sign centred in its circle: the stem runs in from the top, the bars sit just below the middle (26).
+        const pe: Prim[] = [line([-1, -0.25], [1, -0.25]), line([-0.65, 0.3], [0.65, 0.3]), line([-0.3, 0.85], [0.3, 0.85])];
+        prims = [line([0, -2], [0, -0.25]), ...pe, circle(0, 0, 1.5)];
+        body = { x: -1.5, y: -1.5, w: 3, h: 3 };
       } else if (type === "functional") {
         // In a cup: an arc under the bars.
         prims = [line([0, -2], [0, -0.3]), ...bars.map((b) => shift(b, 0, -0.3)), { t: "arc", from: [-1.5, -0.3], to: [1.5, -0.3], r: 1.5, sweep: 0 }];
@@ -1326,29 +1328,19 @@ const SYMBOLS: SymbolDef[] = [
     palette: true,
     params: [
       { key: "span", label: "Width across the cores (units)", type: "number", min: 1, max: 60, default: 3 },
-      {
-        key: "drain",
-        label: "Drain wire (E)",
-        type: "select",
-        default: "right",
-        options: [
-          { value: "right", label: "Drain on the right" },
-          { value: "left", label: "Drain on the left" },
-          { value: "none", label: "No drain (not terminated here)" },
-        ],
-      },
       { key: "dashed", label: "Dashed", type: "bool", default: false },
     ],
-    kind: () => "cable",
+    // Not a part of its own: no tag (v0.2.1 note 25).
+    kind: () => null,
+    // Its two points are the one screen.
+    bridged: () => [["E", "E2"]],
     draw(el) {
-      // A rounded rectangle drawn across the cores of a screened cable, the
-      // screen (drain) taken off one end, out to the side, so its wire can be
-      // routed sideways to earth. Origin on the first core.
+      // A rounded rectangle drawn across the cores of a screened cable, with a
+      // point at each end for its drain (screen) wire, left or right: no tail
+      // (v0.2.1 note 13). Origin on the first core.
       const span = num(el, "span", 3, 1, 60);
-      const drain = str(el, "drain", "right");
-      const hw = span / 2 + 0.9;
       const cx = span / 2;
-      const [x0, x1, y0, y1, r] = [cx - hw, cx + hw, -0.7, 0.7, 0.5];
+      const [x0, x1, y0, y1, r] = [-1, span + 1, -0.7, 0.7, 0.5];
       // The outline as one line, corners rounded in short steps, so a dash runs round it evenly.
       const corner = (ox: number, oy: number, a0: number): Vec[] =>
         [0, 1, 2, 3, 4].map((i) => {
@@ -1363,18 +1355,11 @@ const SYMBOLS: SymbolDef[] = [
       ];
       outline.push(outline[0]!);
       const prims: Prim[] = [{ t: "line", pts: outline, ...(bool(el, "dashed", false) ? { dash: true } : {}) }];
-      const terminals: TerminalDef[] = [];
-      if (drain !== "none") {
-        const side = drain === "left" ? -1 : 1;
-        const ex = side === 1 ? x1 : x0;
-        const tx = side === 1 ? Math.ceil(ex + 1) : Math.floor(ex - 1);
-        prims.push(line([ex, 0], [tx, 0]));
-        terminals.push({ name: "E", at: [tx, 0], dir: side === 1 ? "right" : "left" });
-      }
-      const lx = drain === "left" ? x1 + 0.5 : x0 - 0.5;
-      const anchor: Anchor = drain === "left" ? "start" : "end";
-      prims.push(text(lx, -0.4, "{tag}", TAG, anchor, "tag"));
-      if (el.label) prims.push(text(lx, 0.95, "{label}", TAG, anchor, "label"));
+      const terminals: TerminalDef[] = [
+        { name: "E", at: [x1, 0], dir: "right" },
+        { name: "E2", at: [x0, 0], dir: "left" },
+      ];
+      if (el.label) prims.push(text(x0 - 0.5, 0.45, "{label}", TAG, "end", "label"));
       // No body: the wires pass through the screen.
       return { prims, terminals, body: { x: cx, y: 0, w: 0, h: 0 } };
     },
@@ -1597,42 +1582,6 @@ const SYMBOLS: SymbolDef[] = [
     },
   },
   {
-    id: "plate",
-    bench: "annotate",
-    name: "Label plate",
-    group: "Drawing",
-    palette: true,
-    params: [
-      { key: "w", label: "Width (units)", type: "number", min: 4, max: 200, default: 20 },
-      { key: "h", label: "Height (units)", type: "number", min: 2, max: 60, default: 5 },
-      {
-        key: "size",
-        label: "Text size",
-        type: "select",
-        default: "note",
-        options: TEXT_SIZE_OPTIONS,
-      },
-    ],
-    kind: () => null,
-    draw(el) {
-      const w = num(el, "w", 20, 4, 200);
-      const h = num(el, "h", 5, 2, 60);
-      const size = TEXT_SIZES[str(el, "size", "note")] ?? TEXT_SIZES.note!;
-      const lines = (el.label || "LABEL").split("\n");
-      const lh = size * 1.3;
-      const top = h / 2 - ((lines.length - 1) * lh) / 2 + size * 0.35;
-      return {
-        prims: [
-          { t: "poly", pts: [[0, 0], [w, 0], [w, h], [0, h]], fill: false },
-          { t: "poly", pts: [[0.4, 0.4], [w - 0.4, 0.4], [w - 0.4, h - 0.4], [0.4, h - 0.4]], fill: false },
-          ...lines.map((l, i) => text(w / 2, top + i * lh, `{line${i}}`, size, "middle", "label")),
-        ],
-        terminals: [],
-        body: { x: 0, y: 0, w, h },
-      };
-    },
-  },
-  {
     id: "arrow",
     bench: "annotate",
     name: "Arrow",
@@ -1711,12 +1660,13 @@ const SYMBOLS: SymbolDef[] = [
     group: "Drawing",
     palette: true,
     params: [
-      // Numbered 1, 2, 3… on each sheet as they're placed; can be changed.
-      { key: "n", label: "Number", type: "number", min: 1, max: 999, default: 1 },
+      // Auto: numbered 1, 2, 3… on its sheet in the order they were placed, skipping numbers set by hand (6).
+      { key: "auto", label: "Auto (numbered in order on the sheet)", type: "bool", default: true },
+      { key: "n", label: "Number", type: "number", min: 1, max: 999, default: 1, when: (el) => el.params.auto === false, fixed: "Numbered automatically" },
     ],
     kind: () => null,
-    draw(el) {
-      const n = String(Math.round(num(el, "n", 1, 1, 999)));
+    draw(el, t) {
+      const n = el.params.auto !== false && t?.name ? t.name : String(Math.round(num(el, "n", 1, 1, 999)));
       const r = Math.max(1.6, textWidth(n, TAG) / 2 + 0.6);
       return {
         prims: [circle(0, 0, r), text(0, (TAG * CAP_HEIGHT) / 2, n, TAG, "middle", "label")],
@@ -1801,23 +1751,31 @@ const SYMBOLS: SymbolDef[] = [
       const prims: Prim[] = [];
       const terminals: TerminalDef[] = [];
       // Text stays upright, so the names and label are placed for the way the
-      // arrows point: each name just beyond its arrow's tail, the label clear
-      // of the names (above them, or below when the arrows point up).
-      const rot = el.rot;
+      // arrows point once turned and flipped: each name just beyond its arrow's
+      // tail, the label clear of the names (above them, or below when the arrows
+      // point up). Placed where they'll be drawn, so a flip doesn't move them
+      // onto the arrows (v0.2.1 note 30).
+      const tf = (v: Vec): Vec => rotate(el.flip ? [v[0], -v[1]] : v, el.rot);
+      const d = tf([0, 1]);
+      const way = d[1] > 0 ? "down" : d[1] < 0 ? "up" : d[0] < 0 ? "left" : "right";
       const gap = 0.4;
       const cap = (size: number) => size * CAP_HEIGHT;
       const placed = (at: Vec, s: string, size: number, anchor: Anchor, role: TextRole): Prim => ({ t: "text", at, text: s, size, anchor, role, placed: true });
+      const tails: Vec[] = [];
+      const heads: Vec[] = [];
       names.forEach((name, i) => {
         const x = i * 3;
         prims.push(line([x, -2.6], [x, 0]), { t: "poly", pts: [[x - 0.45, -1.5], [x + 0.45, -1.5], [x, -0.6]], fill: true });
-        const [tx, ty] = rotate([x, -2.6], rot);
+        const [tx, ty] = tf([x, -2.6]);
+        tails.push([tx, ty]);
+        heads.push(tf([x, 0]));
         const mid = ty + cap(DETAIL) / 2;
         prims.push(
-          rot === 0
+          way === "down"
             ? placed([tx, ty - gap], name, DETAIL, "middle", "term")
-            : rot === 180
+            : way === "up"
               ? placed([tx, ty + gap + cap(DETAIL)], name, DETAIL, "middle", "term")
-              : rot === 90
+              : way === "left"
                 ? placed([tx + gap, mid], name, DETAIL, "start", "term")
                 : placed([tx - gap, mid], name, DETAIL, "end", "term"),
         );
@@ -1825,15 +1783,18 @@ const SYMBOLS: SymbolDef[] = [
       });
       if (el.label) {
         // Centred on the arrows (65); with a width it wraps, growing away from the names.
-        const last = (names.length - 1) * 3;
+        const xs = tails.map((t) => t[0]);
+        const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+        const top = Math.min(...heads.map((h) => h[1]));
+        const tailY = tails[0]![1];
         const label =
-          rot === 0
-            ? { ...placed([last / 2, -4.4], "{label}", TAG, "middle", "label"), up: true }
-            : rot === 180
-              ? placed([-last / 2, 2.6 + 2 * gap + cap(DETAIL) + cap(TAG)], "{label}", TAG, "middle", "label")
-              : rot === 90
-                ? placed([-0.6, -0.9], "{label}", TAG, "start", "label")
-                : placed([0.6, -last - 0.9], "{label}", TAG, "end", "label");
+          way === "down"
+            ? { ...placed([cx, tailY - 1.8], "{label}", TAG, "middle", "label"), up: true }
+            : way === "up"
+              ? placed([cx, tailY + 2 * gap + cap(DETAIL) + cap(TAG)], "{label}", TAG, "middle", "label")
+              : way === "left"
+                ? placed([heads[0]![0] - 0.6, top - 0.9], "{label}", TAG, "start", "label")
+                : placed([heads[0]![0] + 0.6, top - 0.9], "{label}", TAG, "end", "label");
         prims.push(label);
       }
       return { prims, terminals, body: { x: -0.5, y: -2.6, w: (names.length - 1) * 3 + 1, h: 2.6 } };
@@ -2067,6 +2028,8 @@ export const PLANT = {
   pitch: 1,
   /** Terminal boxes are at least this tall (as tall as a terminal block cell); a long name makes them taller. */
   termH: 3,
+  /** The name every terminal box is tall enough for, at least: 5 characters. */
+  minName: "BAT+5",
   /** Room under the boxes for the group names. */
   below: 3,
   /** Pin ids, in a row of boxes under the numbers, as tall as their longest id. */
@@ -2126,7 +2089,8 @@ export function plantViewLayout(el: Element): {
   const right = Math.max(lastX + 1.5, left + 6, ...groups.map((g) => nameEdge(g, 1) + 1));
   // Boxes tall enough for the longest name written up them, in half-unit steps.
   const tall = (names: string[], min: number) => Math.max(min, Math.ceil((Math.max(0, ...names.map((n) => textWidth(n, DETAIL))) + 0.4) * 2) / 2);
-  const termH = tall(terms.map((t) => t.name), PLANT.termH);
+  // Every plant's boxes are at least tall enough for a 5-character name, so plant views line up (v0.2.1 note 36).
+  const termH = tall([...terms.map((t) => t.name), PLANT.minName], PLANT.termH);
   const ids = terms.map((t) => t.pinId).filter(Boolean);
   const idH = ids.length ? tall(ids, PLANT.idH) : 0;
   return { terms, groups, left, right, h: termH + idH + PLANT.below, termH, idH, partial: shown.length < all.length };

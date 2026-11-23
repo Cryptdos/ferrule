@@ -1,11 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
   <title>Ferrule</title>
-  <!-- A crimp ferrule on a cut cable: the red collar of a 1 mm² ferrule, the crimped sleeve and copper tip. Full detail, for 48 px and up. -->
+  <!-- A crimp ferrule: the red collar of a 1 mm² ferrule, the crimped sleeve and copper tip. Full detail, for 48 px and up. -->
   <rect width="64" height="64" rx="12" fill="#FAF8F3"/>
-  <g transform="rotate(-35 32 32)">
-    <ellipse cx="3" cy="32" rx="2.2" ry="5.6" transform="rotate(20 3 32)" fill="#5a6068"/>
-    <path d="M10.5 26.5 L5 26.5 L1 37.5 L10.5 37.5 Z" fill="#23262b"/>
-    <ellipse cx="2.6" cy="32.2" rx="0.9" ry="2.3" transform="rotate(20 2.6 32.2)" fill="#c87a3c"/>
+  <g transform="translate(0 -2.5) rotate(-35 32 32) translate(32 32) scale(1.2) translate(-32 -31)">
     <path d="M11 21.5 Q10 21.5 10 22.5 L10 41.5 Q10 42.5 11 42.5 L29 42.5 L33 38.5 L33 25.5 L29 21.5 Z" fill="#d32f2f" stroke="#7f1a1a" stroke-width="1" stroke-linejoin="round"/>
     <line x1="29" y1="22" x2="29" y2="42" stroke="#a82424" stroke-width="0.9"/>
     <rect x="33" y="28" width="20" height="8" fill="#bcc3cb" stroke="#4d545c" stroke-width="1"/>

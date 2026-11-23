@@ -35,7 +35,7 @@ describe("LSP-01 benchmark", () => {
     expect(out).toEqual([]);
   });
 
-  test("1. twelve sheets, in the order of the original set, then the true-scale GA (backplate, door front and back) and a notes sheet", () => {
+  test("1. the original set in its order (its two door label sheets are label plates on the door GA, v0.2.1), then the true-scale GA (backplate, door front and back) and a notes sheet", () => {
     expect(p.pages.map((pg) => resolveFields(pg.title, p))).toEqual([
       "Cover sheet",
       "Main incoming section",
@@ -47,15 +47,13 @@ describe("LSP-01 benchmark", () => {
       "Controls section: SF-01/SF-02 duty/standby",
       "Controls section: EF-01/EF-02 duty/standby",
       "General arrangement",
-      "Door labels: power section",
-      "Door labels: controls section",
       "General arrangement: controls backplate",
       "General arrangement: door front",
       "General arrangement: door back",
       "Notes, revisions and symbols",
     ]);
     // The GA has the relays, timers and terminal strips from the schematic on it.
-    const ga = p.pages[12]!;
+    const ga = p.pages.find((pg) => pg.ga?.view === "backplate")!;
     expect(ga.ga?.enclosure).toEqual({ w: 1000, h: 1600 });
     expect(ga.gaItems!.filter((i) => i.kind === "device").length).toBeGreaterThan(10);
   });

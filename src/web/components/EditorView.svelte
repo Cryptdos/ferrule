@@ -288,6 +288,11 @@
         deleteElements(p, pageId, ids);
       });
       editor.selection = [];
+    } else if ((e.key === "r" || e.key === "R") && editor.tool === "place" && editor.placeSymbol && editor.placeSymbol !== "plant-view") {
+      // Turn the part before it's placed (35).
+      editor.placeRot = ((editor.placeRot + 90) % 360) as 0 | 90 | 180 | 270;
+    } else if ((e.key === "f" || e.key === "F") && editor.tool === "place" && editor.placeSymbol && editor.placeSymbol !== "plant-view") {
+      editor.placeFlip = !editor.placeFlip;
     } else if (e.key === "r" || e.key === "R") {
       if (ids.length) editor.apply((p) => rotateElements(p, pageId, ids));
     } else if (e.key === "Escape") {

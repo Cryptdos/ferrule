@@ -43,6 +43,7 @@ export function elementTexts(el: Element, project: Project): GeometryText {
   }
   // A module view's title row: A3-23 · DI-8 · part of A2-5, AHU-1 outstation (controller.md §5).
   if (el.symbol === "plant-view" && el.params.pmod) t.xref = moduleTitle(project, el);
+  if (el.symbol === "callout" && el.params.auto !== false) t.name = String(calloutNumber(project, el));
   if (el.symbol === "ctrlmap") t.modules = controllerMapEntries(project, String(el.params.ctrl ?? ""));
   if (el.symbol === "revtable") t.rows = revisionRows(project);
   else if (el.symbol === "legend") t.legend = legendEntries(project);
@@ -60,4 +61,22 @@ export function elementTexts(el: Element, project: Project): GeometryText {
     }
   }
   return t;
+}
+
+/**
+ * An Auto call-out's number (v0.2.1 note 6): its place among the Auto
+ * call-outs on its sheet, in the order they were placed, skipping numbers
+ * that call-outs numbered by hand have taken.
+ */
+export function calloutNumber(project: Project, el: Element): number {
+  const page = project.pages.find((p) => p.elements.includes(el)) ?? project.pages.find((p) => p.elements.some((e) => e.id === el.id));
+  const all = (page?.elements ?? []).filter((e) => e.symbol === "callout");
+  const taken = new Set(all.filter((e) => e.params.auto === false).map((e) => Math.round(Number(e.params.n) || 1)));
+  let n = 0;
+  for (const e of all.filter((x) => x.params.auto !== false)) {
+    do n++;
+    while (taken.has(n));
+    if (e.id === el.id) return n;
+  }
+  return 1;
 }

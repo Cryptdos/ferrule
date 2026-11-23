@@ -129,8 +129,9 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
     add("text", x, y, { label: s, params: { size, align } });
   const box = (x: number, y: number, bw: number, bh: number, label = "", dashed = false) =>
     add("box", x, y, { label, params: { w: bw, h: bh, dashed } });
-  const plate = (x: number, y: number, bw: number, bh: number, label: string, size = "note") =>
-    add("plate", x, y, { label, params: { w: bw, h: bh, size } });
+  // Door labels on the not-to-scale GA are boxes named for them; real label plates go on the door GA.
+  const plate = (x: number, y: number, bw: number, bh: number, label: string) =>
+    add("box", x, y, { label: label.replace(/\n/g, " "), params: { w: bw, h: bh, labelWidth: bw - 1 } });
   const at = (pg: Page, symbol: string, x: number, y: number) => {
     const el = pg.elements.find((e) => e.symbol === symbol && e.pos[0] === x && e.pos[1] === y);
     if (!el) throw new Error(`Nothing (${symbol}) at ${x},${y} on sheet ${pg.number}`);
@@ -512,34 +513,7 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
   text(7, 83, "OVERALL PANEL DEPTH 800 mm. DIMENSIONS IN mm.");
 
   // ===========================================================================
-  // Sheet 11: door labels, power section
-  page = addPage(p, "Door labels: power section", page.id);
-  text(8, 5, "DOOR LABELS — POWER SECTION", "heading");
-  plate(8, 11, 68, 8, "{project:panelName}", "title");
-  plate(8, 22, 45, 6, "POWER SECTION", "heading");
-  plate(8, 31, 68, 10, "DANGER 400V\nISOLATE ELSEWHERE BEFORE OPENING DOOR", "heading");
-  plate(8, 44, 22, 5, "POWER ON");
-  [SF1, SF2, EF1, EF2].forEach((f, i) => plate(8 + i * 26, 53, 22, 6, `${tag(f.id)}\nRUNNING`));
-
-  // ===========================================================================
-  // Sheet 12: door labels, controls section
-  page = addPage(p, "Door labels: controls section", page.id);
-  text(8, 5, "DOOR LABELS — CONTROLS SECTION", "heading");
-  plate(8, 11, 37, 5, "CONTROL CIRCUIT HEALTHY");
-  plate(48, 11, 22, 5, "LAMP TEST");
-  plate(73, 11, 33, 5, "FIRE ALARM ACTIVATED");
-  [[SF1, SF2], [EF1, EF2]].forEach(([a, b], i) => {
-    const y = 25 + i * 26;
-    text(8, y, `${tag(a!.id)} / ${tag(b!.id)}`, "heading");
-    plate(8, y + 3, 30, 7, "AUTO / TEST");
-    plate(41, y + 3, 30, 7, `DUTY SELECTOR\n${tag(a!.id)}   ${tag(b!.id)}`);
-    plate(74, y + 3, 22, 7, `${tag(a!.id)}\nTRIPPED`);
-    plate(99, y + 3, 22, 7, `${tag(b!.id)}\nTRIPPED`);
-    plate(124, y + 3, 22, 7, "FANS TRIP\nRESET");
-  });
-
-  // ===========================================================================
-  // Sheet 13: general arrangement of the controls backplate, at true scale.
+  // Sheet 11: general arrangement of the controls backplate, at true scale.
   // DIN rails and trunking, and the relays, timers and terminals from the
   // schematic sized from the generic library; the rest wait in the GA
   // workbench's list to be placed.
@@ -622,6 +596,9 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
     let handleId = "";
     if (handle) handleId = addGaItem(p, front.id, { kind: "device", x: 720, y: 300, w: handle.w, h: handle.h, refs: handle.refs, part: "handle", cutout: "22.5" }).id;
     addGaItem(p, front.id, { kind: "label", x: 100, y: 150, w: 300, h: 60, text: "LSP-01\nLIFE SAFETY PANEL", textMm: 12 });
+    // The door's label plates (label plates are GA items: v0.2.1 note 3).
+    addGaItem(p, front.id, { kind: "label", x: 540, y: 120, w: 420, h: 50, text: "DANGER 400V\nISOLATE BEFORE OPENING", textMm: 6 });
+    addGaItem(p, front.id, { kind: "label", x: 640, y: 210, w: 220, h: 30, text: "POWER SECTION", textMm: 8 });
     // Dimensions: the columns across the top row from the door's edge, and the rows from its top.
     const top = (p.pages.find((x) => x.id === front.id)!.gaItems ?? []).filter((it) => placed.includes(it.id) && it.y === rows[0]);
     addGaDim(p, front.id, {
@@ -655,7 +632,7 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
   addRevision(p, { date: "21/11/26", drawnBy: "FERRULE", description: "Airflow proving revised" });
   addCloud(p, controlsSheet.id, [63, 10, 55, 52]);
 
-  // --- Sheet 14: notes, revisions and the symbol legend (annotations only) ---
+  // --- Sheet 14 (after the door GA sheets 12 and 13): notes, revisions and the symbol legend (annotations only) ---
   {
     const notes = addSparePage(p, p.pages[p.pages.length - 1]!.id);
     notes.title = "Notes, revisions and symbols";
