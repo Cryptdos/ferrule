@@ -4,6 +4,12 @@
  * uses one, so a project file always has the sizes it needs.
  */
 
+/** "door" (all door devices) from before "suits" listed schematic parts: now any part. */
+const suitsFrom = (k: unknown) => {
+  const v = typeof k === "string" ? k : "";
+  return v === "door" ? "" : v;
+};
+
 export interface DeviceFile {
   /** File name as stored, e.g. "drm-datasheet.pdf". */
   name: string;
@@ -18,7 +24,7 @@ export interface DeviceEntry {
   name: string;
   maker: string;
   part: string;
-  /** Which kind of schematic part it suits (a GA size key: relay, contactor, mcb…), or "" for any. */
+  /** Which kind of schematic part it suits (ga.ts SUITS: relay, contactor, lamp…), or "" for any. */
   kind: string;
   /** Width × height as seen on the backplate, and depth, in mm. */
   w: number;
@@ -62,7 +68,7 @@ export function parseDeviceEntry(v: unknown, id?: string): DeviceEntry {
     name,
     maker: str(o.maker),
     part: str(o.part),
-    kind: str(o.kind),
+    kind: suitsFrom(o.kind),
     w: mm(o.w, 18),
     h: mm(o.h, 90),
     d: typeof o.d === "number" && o.d > 0 ? mm(o.d, 0) : 0,
@@ -85,7 +91,7 @@ export function parseProjectDevices(v: unknown): ProjectDevice[] {
       name,
       maker: str(o.maker),
       part: str(o.part),
-      kind: str(o.kind),
+      kind: suitsFrom(o.kind),
       w: mm(o.w, 18),
       h: mm(o.h, 90),
       d: typeof o.d === "number" && o.d > 0 ? mm(o.d, 0) : 0,

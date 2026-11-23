@@ -7,6 +7,7 @@ import type { Project } from "../core/model";
 import { OpError } from "../core/ops";
 import { routePage } from "../core/routing";
 import { routesStale } from "../core/wires";
+import { markGaSeen, syncGaStrips } from "../core/ga";
 import { refreshConductors } from "../core/conductors";
 import { api, ConflictError } from "./api";
 import { getAvoid } from "./avoid";
@@ -72,6 +73,16 @@ export class Editor {
     for (const page of this.project.pages) {
       if (routesStale(page)) routePage(getAvoid(), page);
     }
+    syncGaStrips(this.project);
+    this.markSeen();
+  }
+
+  /**
+   * Looking at a GA sheet: its strips are now as seen, so Check stops
+   * reporting their changes. Not an undo step; just saved.
+   */
+  private markSeen(): void {
+    if (markGaSeen(this.page)) this.scheduleSave();
   }
 
   get page() {
@@ -115,6 +126,8 @@ export class Editor {
       // Keep every wire on the current page attached and routed.
       routePage(getAvoid(), this.page);
       refreshConductors(this.project);
+      // Placed terminal strips follow the schematic (note 45).
+      syncGaStrips(this.project);
     } catch (e) {
       // Roll back anything the operation changed before it failed.
       this.project = JSON.parse(before);
@@ -174,6 +187,7 @@ export class Editor {
     if (id === this.pageId) return;
     this.pageId = id;
     this.selection = [];
+    this.markSeen();
   }
 
   /** Swap the two halves of the split view. */

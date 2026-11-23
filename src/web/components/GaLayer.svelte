@@ -127,8 +127,6 @@
         dominant-baseline="central"
         transform={fit.vertical ? `rotate(-90 ${x + w / 2} ${y + h / 2})` : undefined}>{text}</text
       >
-    {:else if it.kind === "note"}
-      <text class="note" {x} y={y + h * 0.8}>{it.text ?? ""}</text>
     {/if}
   {/each}
 </g>
@@ -197,8 +195,5 @@
   }
   .tag.halo {
     stroke-width: 0.35;
-  }
-  .note {
-    font-size: var(--detail);
   }
 </style>

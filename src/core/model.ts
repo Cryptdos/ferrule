@@ -120,17 +120,21 @@ export interface GaSettings {
 /** Something on a GA sheet, in real mm from the enclosure's top-left corner. */
 export interface GaItem {
   id: string;
-  kind: "rail" | "trunking" | "device" | "note";
+  kind: "rail" | "trunking" | "device";
   x: number;
   y: number;
   w: number;
   h: number;
   /** Schematic elements this is (a device, or every terminal of a strip). */
   refs?: string[];
-  /** A note's text, or a label for a device that isn't on the schematic. */
+  /** A label for a device, instead of its tag. */
   text?: string;
   /** The device from the project's device table it is (its size came from there). */
   device?: string;
+  /** A terminal strip: its name. The strip keeps up with the schematic (refs and length follow it). */
+  strip?: string;
+  /** A strip's terminals when its GA sheet was last open: Check reports a strip that has changed since. */
+  seen?: string[];
 }
 
 /** A piece of field equipment, defined once with all its terminals (DESIGN.md §6). */

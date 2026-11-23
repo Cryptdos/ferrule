@@ -8,7 +8,8 @@ import { PLANT_VIEW_KEYS } from "./ops";
 import { parseProjectDevices } from "./devices";
 import { AREA_UNITS } from "./geometry";
 import { DISTRIBUTION_KINDS, type DistributionKind, FORMAT, FORMAT_VERSION, type GaItem, type Page, type Project, emptyInfo } from "./model";
-import { getSymbol } from "./symbols";
+import { defaultParams, getSymbol } from "./symbols";
+import { gaToSheet } from "./ga";
 import { colourCode, knownColour } from "./wirecolours";
 
 export class ProjectFormatError extends Error {}
@@ -274,9 +275,25 @@ function parsePage(pg: Record<string, unknown>, i: number): Project["pages"][num
       view: pg.ga.view === "door" ? "door" : "backplate",
     };
   }
+  // GA notes are gone (note 46): one from a test build becomes a Text annotation where it was.
+  for (const it of arr(pg.gaItems).filter(isObj)) {
+    if (it.kind !== "note" || !ga || typeof it.id !== "string") continue;
+    const at = gaToSheet(ga, [typeof it.x === "number" ? it.x : 0, typeof it.y === "number" ? it.y : 0]);
+    elements.push({
+      id: it.id,
+      symbol: "text",
+      tag: "",
+      label: strOr(it.text) || "Note",
+      pos: [Math.round(at[0]), Math.round(at[1])],
+      rot: 0,
+      zone: "internal",
+      params: defaultParams("text"),
+      links: [],
+    });
+  }
   const gaItems = arr(pg.gaItems)
     .filter(isObj)
-    .filter((it) => typeof it.id === "string" && ["rail", "trunking", "device", "note"].includes(String(it.kind)))
+    .filter((it) => typeof it.id === "string" && ["rail", "trunking", "device"].includes(String(it.kind)))
     .map((it) => ({
       id: it.id as string,
       kind: it.kind as GaItem["kind"],
@@ -287,6 +304,8 @@ function parsePage(pg: Record<string, unknown>, i: number): Project["pages"][num
       ...(Array.isArray(it.refs) ? { refs: it.refs.filter((r): r is string => typeof r === "string") } : {}),
       ...(typeof it.text === "string" ? { text: it.text } : {}),
       ...(typeof it.device === "string" && it.device ? { device: it.device } : {}),
+      ...(typeof it.strip === "string" && it.strip ? { strip: it.strip } : {}),
+      ...(Array.isArray(it.seen) ? { seen: it.seen.filter((r): r is string => typeof r === "string") } : {}),
     }));
   const boundaryY = typeof pg.boundaryY === "number" && Number.isFinite(pg.boundaryY) ? pg.boundaryY : null;
   return {

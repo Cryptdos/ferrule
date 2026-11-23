@@ -3,6 +3,7 @@
  * operations as the UI, re-routes wires, saves, and reports back. Pages are
  * named by sheet number; elements and wires by id (get_page lists them).
  */
+import { syncGaStrips } from "../core/ga";
 import type { Avoid } from "libavoid-js";
 import { checkProject } from "../core/checks";
 import { refreshConductors } from "../core/conductors";
@@ -162,6 +163,8 @@ async function edit<T>(ctx: ToolContext, projectId: string, fn: (p: Project) => 
       if (before.get(pg.id) !== JSON.stringify([pg.elements, pg.segments])) routePage(avoid, pg);
     }
     refreshConductors(p);
+    // Placed terminal strips follow the schematic.
+    syncGaStrips(p);
     return out;
   });
 }
