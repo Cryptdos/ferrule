@@ -1,6 +1,6 @@
 <script lang="ts">
   import { addGaPage } from "../../core/ops";
-  import { doorLeaves, fitScale, gaCandidates, GA_SCALES, sheetTakes, VIEW_NAMES } from "../../core/ga";
+  import { allDetails, doorLeaves, fitScale, frameOf, gaCandidates, GA_SCALES, sheetTakes, VIEW_NAMES } from "../../core/ga";
   import type { GaItem, GaSettings, GaView } from "../../core/model";
   import { displayTag } from "../../core/tags";
   import type { Editor } from "../editor.svelte";
@@ -15,13 +15,15 @@
 
   const page = $derived(editor.page);
   const left = $derived(gaCandidates(editor.project, (el) => displayTag(el, editor.project)).length);
+  const unshown = $derived(allDetails(editor.project).filter((d) => !frameOf(editor.project, d.it.id)).length);
 
-  type ToolKey = "ga-rail" | "ga-trunking" | "ga-dim" | "ga-label";
-  const TOOLS: { tool: ToolKey; kind: GaItem["kind"]; name: string; icon: "rail" | "trunking" | "dimension" | "plate"; how: string }[] = [
+  type ToolKey = "ga-rail" | "ga-trunking" | "ga-dim" | "ga-label" | "ga-detail";
+  const TOOLS: { tool: ToolKey; kind: GaItem["kind"]; name: string; icon: "rail" | "trunking" | "dimension" | "plate" | "detail"; how: string }[] = [
     { tool: "ga-rail", kind: "rail", name: "DIN rail", icon: "rail", how: "Drag along where it goes (35 mm)." },
     { tool: "ga-trunking", kind: "trunking", name: "Trunking", icon: "trunking", how: "Drag out its size." },
     { tool: "ga-dim", kind: "dim", name: "Dimension", icon: "dimension", how: "Click each point (it snaps to edges and middles), then double-click where the line goes." },
     { tool: "ga-label", kind: "label", name: "Label plate", icon: "plate", how: "Click where it goes on the door; set its text and size in its properties." },
+    { tool: "ga-detail", kind: "detail", name: "Detail", icon: "detail", how: "Drag a box round an area to show it larger on a detail sheet; give it a title in its properties." },
   ];
   const active = $derived(TOOLS.find((t) => t.tool === editor.tool));
 
@@ -49,7 +51,7 @@
   function create(e: SubmitEvent) {
     e.preventDefault();
     let id = "";
-    const settings: GaSettings = { scale: scale || autoScale, enclosure: { ...size }, view };
+    const settings: GaSettings = { scale: view === "detail" ? 1 : scale || autoScale, enclosure: { ...size }, view };
     if (view !== "backplate" && of) settings.of = of;
     if (view === "door-front" && !of && leaves === 2)
       settings.leaves = [
@@ -75,7 +77,9 @@
           {#each Object.entries(VIEW_NAMES) as [v, name] (v)}<option value={v}>{name}</option>{/each}
         </select>
       </label>
-      {#if view !== "backplate"}
+      {#if view === "detail"}
+        <p class="hint">Frames showing details drawn on other GA sheets, each at its own scale. No enclosure and no scale of its own.</p>
+      {:else if view !== "backplate"}
         <label>
           Door
           <select bind:value={of}>
@@ -85,7 +89,7 @@
         </label>
         {#if view === "door-back" && !doorFronts.length}<p class="hint warn">Add the door front first: the back is drawn from it.</p>{/if}
       {/if}
-      {#if !owner}
+      {#if !owner && view !== "detail"}
         <label>Width (mm) <input type="number" min="50" step="10" bind:value={w} /></label>
         <label>Height (mm) <input type="number" min="50" step="10" bind:value={h} /></label>
       {/if}
@@ -108,11 +112,13 @@
           </select>
         </label>
       {/if}
+      {#if view !== "detail"}
       <label>
         Scale 1: (empty: the largest that fits, 1:{autoScale})
         <input type="number" min="0.5" step="0.5" list="ferrule-new-ga-scales" placeholder={String(autoScale)} bind:value={scale} />
         <datalist id="ferrule-new-ga-scales">{#each GA_SCALES as s (s)}<option value={s}></option>{/each}</datalist>
       </label>
+      {/if}
       <button type="submit" disabled={view === "door-back" && !of}>Add GA sheet after this one</button>
     </form>
   {:else}
@@ -122,7 +128,7 @@
         class="tool"
         class:active={editor.tool === t.tool}
         disabled={!ok}
-        title={ok ? t.how : t.kind === "label" ? "Label plates go on a door front" : t.kind === "dim" ? "" : "Rail and trunking go on the backplate or the door back"}
+        title={ok ? t.how : page.ga?.view === "detail" ? "A detail sheet holds frames: Place detail…" : t.kind === "label" ? "Label plates go on a door front" : t.kind === "dim" ? "" : "Rail and trunking go on the backplate or the door back"}
         onclick={() => {
           editor.gaPlace = null;
           editor.tool = editor.tool === t.tool ? "select" : t.tool;
@@ -138,11 +144,19 @@
       {/if}
     {/each}
     {#if active}<p class="hint">{active.how} Esc stops.</p>{/if}
+    {#if page.ga.view === "detail"}
+      <div class="title">Details</div>
+      <p class="hint">
+        {#if unshown}{unshown} detail{unshown === 1 ? "" : "s"} not shown yet.{:else}Every detail is shown.{/if}
+        <button class="link-btn" onclick={() => onplace?.()}>Place detail…</button>
+      </p>
+    {:else}
     <div class="title">From the schematic</div>
     <p class="hint">
       {#if left}{left} part{left === 1 ? "" : "s"} not on a GA yet.{:else}Everything from the schematic is on a GA.{/if}
       <button class="link-btn" onclick={() => onplace?.()}>Place parts…</button>
     </p>
+    {/if}
   {/if}
 </div>
 

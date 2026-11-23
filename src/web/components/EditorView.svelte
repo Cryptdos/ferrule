@@ -459,7 +459,7 @@
         <span class="sep"></span>
         <LabelButton icon="check" label="Check" active={!!open.checks} onclick={() => toggle("checks")} title="Check the drawing for problems, with how full each DIN rail is" />
         <LabelButton icon="schedules" label="Schedules" active={!!open.schedules} onclick={() => toggle("schedules")} title="Terminal and cable schedules, and the bill of materials" />
-        <LabelButton icon="place" label="Place parts…" active={!!open.place} onclick={() => (open.place = !open.place)} title="Parts from the schematic not on a GA yet: pick one, then click on the sheet" />
+        <LabelButton icon="place" label={editor.page.ga?.view === "detail" ? "Place detail…" : "Place parts…"} active={!!open.place} onclick={() => (open.place = !open.place)} title="Parts from the schematic not on a GA yet: pick one, then click on the sheet" />
         <LabelButton icon="devices" label="Device table…" active={!!open.devices} onclick={() => toggle("devices")} title="Real devices with their sizes, datasheets and pictures" />
       {/if}
     </div>

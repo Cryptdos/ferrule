@@ -18,6 +18,11 @@
     sheetLeaves,
     stripSize,
     suitsKey,
+    DETAIL_ZOOMS,
+    detailOf,
+    frameCaption,
+    frameOf,
+    zoomText,
   } from "../../core/ga";
   import type { DoorLeaf, GaView } from "../../core/model";
   import { deviceLabel } from "../../core/devices";
@@ -107,7 +112,29 @@
     <h3>GA workbench</h3>
     <p class="hint">Pick a GA sheet from the list, or add one on the left.</p>
   {:else if one}
-    <h3>{one.kind === "rail" ? `DIN rail ${railNumber(page, one)}` : one.kind === "trunking" ? "Trunking" : one.kind === "label" ? "Label plate" : one.kind === "dim" ? "Dimension" : one.part === "handle" ? "Door handle" : "Device"}</h3>
+    <h3>{one.kind === "rail" ? `DIN rail ${railNumber(page, one)}` : one.kind === "trunking" ? "Trunking" : one.kind === "label" ? "Label plate" : one.kind === "dim" ? "Dimension" : one.kind === "detail" ? `Detail ${one.letter ?? ""}` : one.kind === "frame" ? "Detail frame" : one.part === "handle" ? "Door handle" : "Device"}</h3>
+    {#if one.kind === "detail"}
+      {@const f = frameOf(editor.project, one.id)}
+      <div class="grid">
+        <label>Letter<input value={one.letter ?? ""} onchange={(e) => editor.apply((p) => updateGaItem(p, editor.pageId, one.id, { letter: e.currentTarget.value }))} /></label>
+        <label>Title<input placeholder="e.g. SUPPLY FAN" value={one.text ?? ""} onchange={(e) => editor.apply((p) => updateGaItem(p, editor.pageId, one.id, { text: e.currentTarget.value }))} /></label>
+      </div>
+      <p class="hint">
+        {#if f}Shown on sheet {f.page.number} at {zoomText(f.it.zoom ?? 1)}. <button class="link-btn" onclick={() => editor.goTo(f.it.id)}>Show it →</button>
+        {:else}Not shown yet: add a detail sheet and use Place detail… there.{/if}
+      </p>
+    {/if}
+    {#if one.kind === "frame"}
+      {@const d = detailOf(editor.project, one)}
+      <p class="hint">{frameCaption(editor.project, one)}</p>
+      <label>
+        Scale
+        <select value={String(one.zoom ?? 1)} onchange={(e) => editor.apply((p) => updateGaItem(p, editor.pageId, one.id, { zoom: Number(e.currentTarget.value) }))}>
+          {#each DETAIL_ZOOMS as k (k)}<option value={String(k)}>{zoomText(k)}</option>{/each}
+        </select>
+      </label>
+      {#if d}<button class="link-btn" onclick={() => editor.goTo(d.it.id)}>Show detail {d.it.letter} on sheet {d.page.number} →</button>{/if}
+    {/if}
     {#if fill}
       <p class="fill" class:over={fill.overlaps.length || fill.overhang.length}>
         Fill: {fill.used} of {fill.length} mm ({pct(fill.used, fill.length)}%), {fill.devices.length} device{fill.devices.length === 1 ? "" : "s"}.
@@ -200,14 +227,19 @@
     {/if}
     {#if one.kind !== "dim"}
     <div class="grid">
+      {#if one.kind === "frame"}
+        <label>X (mm)<input type="number" step="5" value={one.x} onchange={(e) => editor.apply((p) => updateGaItem(p, editor.pageId, one.id, { x: num(e.currentTarget.value) }))} /></label>
+        <label>Y (mm)<input type="number" step="5" value={one.y} onchange={(e) => editor.apply((p) => updateGaItem(p, editor.pageId, one.id, { y: num(e.currentTarget.value) }))} /></label>
+      {:else}
       <label>X (mm)<input type="number" step="5" value={one.x} onchange={(e) => editor.apply((p) => updateGaItem(p, editor.pageId, one.id, { x: num(e.currentTarget.value) }))} /></label>
       <label>Y (mm)<input type="number" step="5" value={one.y} onchange={(e) => editor.apply((p) => updateGaItem(p, editor.pageId, one.id, { y: num(e.currentTarget.value) }))} /></label>
       <label>Width (mm)<input type="number" step="5" value={one.w} onchange={(e) => editor.apply((p) => updateGaItem(p, editor.pageId, one.id, { w: num(e.currentTarget.value) }))} /></label>
       <label>Height (mm)<input type="number" step="5" value={one.h} onchange={(e) => editor.apply((p) => updateGaItem(p, editor.pageId, one.id, { h: num(e.currentTarget.value) }))} /></label>
+      {/if}
     </div>
     {/if}
     <div class="buttons">
-      {#if one.kind !== "dim"}<button onclick={() => editor.apply((p) => rotateGaItems(p, editor.pageId, [one.id]))} title="R">Rotate</button>{/if}
+      {#if one.kind !== "dim" && one.kind !== "frame" && one.kind !== "detail"}<button onclick={() => editor.apply((p) => rotateGaItems(p, editor.pageId, [one.id]))} title="R">Rotate</button>{/if}
       <button
         class="danger"
         onclick={() => {
@@ -216,7 +248,8 @@
         }}>Delete</button
       >
     </div>
-    {#if one.kind !== "dim"}<p class="hint">Drag to move (5 mm steps, Shift for 1 mm); drag the corner square to size it.</p>{/if}
+    {#if one.kind === "frame"}<p class="hint">Drag to move (5 mm steps, Shift for 1 mm). Its size is its detail's at its scale.</p>
+    {:else if one.kind !== "dim"}<p class="hint">Drag to move (5 mm steps, Shift for 1 mm); drag the corner square to size it.</p>{/if}
   {:else if items.length > 1}
     <h3>{items.length} items</h3>
     <div class="buttons">
@@ -236,10 +269,12 @@
         View
         <select value={page.ga.view} onchange={(e) => editor.apply((p) => setGaSettings(p, editor.pageId, { view: e.currentTarget.value as GaView }))}>
           {#each Object.entries(VIEW_NAMES) as [v, name] (v)}
-            <option value={v} disabled={v === "door-back" && !page.ga.of && !doorFronts.length}>{name}</option>
+            <!-- A detail sheet is its own kind: it's added as one, and stays one. -->
+            <option value={v} disabled={(v === "door-back" && !page.ga.of && !doorFronts.length) || (v === "detail") !== (page.ga.view === "detail")}>{name}</option>
           {/each}
         </select>
       </label>
+      {#if page.ga.view !== "detail"}
       <label>
         Scale
         <span class="scale">
@@ -255,8 +290,11 @@
         </span>
         <datalist id="ferrule-ga-scales">{#each GA_SCALES as s (s)}<option value={s}></option>{/each}</datalist>
       </label>
+      {/if}
     </div>
-    {#if page.ga.view !== "backplate"}
+    {#if page.ga.view === "detail"}
+      <p class="hint">Frames showing details drawn on other GA sheets, each at its own scale (Place detail…). No enclosure and no scale of its own.</p>
+    {:else if page.ga.view !== "backplate"}
       <label>
         Door
         <select
@@ -271,7 +309,7 @@
         </select>
       </label>
     {/if}
-    {#if !page.ga.of}
+    {#if !page.ga.of && page.ga.view !== "detail"}
       <div class="grid">
         <label>Width (mm)<input type="number" step="10" value={page.ga.enclosure.w} onchange={(e) => editor.apply((p) => setGaSettings(p, editor.pageId, { enclosure: { w: num(e.currentTarget.value), h: page.ga!.enclosure.h } }))} /></label>
         <label>Height (mm)<input type="number" step="10" value={page.ga.enclosure.h} onchange={(e) => editor.apply((p) => setGaSettings(p, editor.pageId, { enclosure: { w: page.ga!.enclosure.w, h: num(e.currentTarget.value) } }))} /></label>

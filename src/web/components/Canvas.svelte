@@ -44,6 +44,8 @@
   import { isInputForm, parsePointRef, pointRef } from "../../core/points";
   import {
     GA_ORIGIN,
+    CAPTION_MM,
+    detailSpace,
     dimLayout,
     dimTargets,
     drawnGaItems,
@@ -112,7 +114,7 @@
     | { kind: "point"; id: string; index: number; start: Vec; points: Vec[]; delta: Vec }
     | { kind: "gadrag"; ids: string[]; start: Vec; delta: Vec }
     | { kind: "gasize"; id: string; start: Vec; size: Vec; delta: Vec }
-    | { kind: "ganew"; what: "rail" | "trunking"; start: Vec; cur: Vec }
+    | { kind: "ganew"; what: "rail" | "trunking" | "detail"; start: Vec; cur: Vec }
     | { kind: "cloudsize"; id: string; start: Vec; rect: Rect4; delta: Vec; edges: string }
     | { kind: "table"; coil: string; start: Vec; at: Vec; delta: Vec; row: number }
     | { kind: "boundary"; y: number }
@@ -394,12 +396,16 @@
     // Dimensions, then devices and label plates, over rails and trunking.
     const order = [
       ...items.filter((i) => i.kind === "dim"),
-      ...items.filter((i) => i.kind === "device" || i.kind === "label"),
+      ...items.filter((i) => i.kind === "device" || i.kind === "label" || i.kind === "frame"),
       ...items.filter((i) => i.kind === "rail" || i.kind === "trunking"),
+      // A detail's dashed box is picked by its outline, so what's inside it can still be picked.
+      ...items.filter((i) => i.kind === "detail"),
     ];
     for (const it of order) {
       const r = gaRect(it);
-      if (r && pointInRect(pt, r, 0.3)) return it;
+      if (!r || !pointInRect(pt, r, 0.3)) continue;
+      if (it.kind === "detail" && pointInRect(pt, { x: r.x + 0.6, y: r.y + 0.6, w: r.w - 1.2, h: r.h - 1.2 }, 0)) continue;
+      return it;
     }
     return null;
   }
@@ -408,7 +414,8 @@
   function gaCorner(): { it: GaItem; at: Vec } | null {
     if (editor.selection.length !== 1) return null;
     const it = (page.gaItems ?? []).find((x) => x.id === editor.selection[0]);
-    if (!it || it.kind === "dim") return null;
+    // A frame's size comes from its detail and its scale.
+    if (!it || it.kind === "dim" || it.kind === "frame") return null;
     const r = gaRect(it);
     return it && r ? { it, at: [r.x + r.w, r.y + r.h] } : null;
   }
@@ -470,6 +477,21 @@
     const fine = e.shiftKey;
     if (editor.gaPlace) {
       const pl = editor.gaPlace;
+      // A detail's frame, centred where you click (design-v0.3 §6).
+      if (pl.detail) {
+        let id = "";
+        const det = pl.detail;
+        // Kept on the sheet, with room under it for its caption, where it fits.
+        const sp = detailSpace();
+        const fx = Math.min(Math.max(mm[0] - pl.w / 2, sp.x + 5), sp.x + sp.w - 5 - pl.w);
+        const fy = Math.min(Math.max(mm[1] - pl.h / 2, sp.y + 5), sp.y + sp.h - 5 - CAPTION_MM - pl.h);
+        const ok = editor.apply((p) => {
+          id = addGaItem(p, editor.pageId, { kind: "frame", detail: det, x: snapMm(Math.max(sp.x + 5, fx), true), y: snapMm(Math.max(sp.y + 5, fy), true), w: pl.w, h: pl.h }).id;
+        });
+        editor.gaPlace = null;
+        if (ok) editor.selection = [id];
+        return;
+      }
       // A controller: its modules side by side, in rail order.
       if (pl.modules?.length) {
         const at: [number, number] = [snapMm(mm[0] - pl.w / 2, fine), snapMm(mm[1] - pl.h / 2, fine)];
@@ -491,6 +513,15 @@
       });
       editor.gaPlace = null;
       if (ok) editor.selection = [id];
+      return;
+    }
+    if (editor.tool === "ga-detail") {
+      if (!sheetTakes(editor.project, page, "detail")) {
+        editor.flash("A detail is drawn on a backplate or door sheet, and shown on a detail sheet");
+        return;
+      }
+      const s: Vec = [snapMm(mm[0], fine), snapMm(mm[1], fine)];
+      gesture = { kind: "ganew", what: "detail", start: s, cur: s };
       return;
     }
     if (editor.tool === "ga-rail" || editor.tool === "ga-trunking") {
@@ -975,21 +1006,34 @@
       const w = Math.max(5, g.size[0] + g.delta[0]);
       const h = Math.max(5, g.size[1] + g.delta[1]);
       editor.apply((p) => updateGaItem(p, editor.pageId, g.id, { w, h }));
+    } else if (g.kind === "ganew" && g.what === "detail") {
+      // A detail: the dashed box as dragged, lettered (design-v0.3 §6).
+      const x = Math.min(g.start[0], g.cur[0]);
+      const y = Math.min(g.start[1], g.cur[1]);
+      const w = Math.max(10, Math.abs(g.cur[0] - g.start[0]));
+      const h = Math.max(10, Math.abs(g.cur[1] - g.start[1]));
+      let id = "";
+      editor.apply((p) => (id = addGaItem(p, editor.pageId, { kind: "detail", x, y, w, h, text: "" }).id));
+      if (id) {
+        editor.selection = [id];
+        editor.tool = "select";
+      }
     } else if (g.kind === "ganew") {
+      const what = g.what as "rail" | "trunking";
       const x = Math.min(g.start[0], g.cur[0]);
       const y = Math.min(g.start[1], g.cur[1]);
       const dx = Math.abs(g.cur[0] - g.start[0]);
       const dy = Math.abs(g.cur[1] - g.start[1]);
       // A rail is 35 mm across; trunking as drawn (or 40 mm across if just a line).
       const horizontal = dx >= dy;
-      const across = g.what === "rail" ? 35 : Math.max(40, horizontal ? dy : dx);
+      const across = what === "rail" ? 35 : Math.max(40, horizontal ? dy : dx);
       const len = Math.max(20, horizontal ? dx : dy);
       let id = "";
       editor.apply((p) => {
         id = addGaItem(p, editor.pageId, {
-          kind: g.what,
-          x: horizontal ? x : x - (g.what === "rail" ? across / 2 : 0),
-          y: horizontal ? y - (g.what === "rail" ? across / 2 : 0) : y,
+          kind: what,
+          x: horizontal ? x : x - (what === "rail" ? across / 2 : 0),
+          y: horizontal ? y - (what === "rail" ? across / 2 : 0) : y,
           w: horizontal ? len : across,
           h: horizontal ? across : len,
         }).id;

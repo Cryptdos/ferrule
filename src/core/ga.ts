@@ -51,7 +51,7 @@ export function sheetToGa(ga: Pick<GaFrame, "scale"> & { x0?: number }, p: Vec):
 // ---------------------------------------------------------------------------
 // Doors: front and back views, one or two leaves
 
-export const VIEW_NAMES: Record<GaView, string> = { backplate: "Backplate", "door-front": "Door front", "door-back": "Door back" };
+export const VIEW_NAMES: Record<GaView, string> = { backplate: "Backplate", "door-front": "Door front", "door-back": "Door back", detail: "Detail" };
 export const isDoorView = (v: GaView | undefined) => v === "door-front" || v === "door-back";
 
 /** The door-front sheet that owns the door a sheet shows: itself, or the sheet it's a view of. Null for a backplate. */
@@ -109,6 +109,10 @@ export function gaFrame(project: Project, page: Page): GaFrame {
 
 /** Which kinds of GA item go on a view. */
 export function viewTakes(view: GaView, kind: GaItem["kind"]): boolean {
+  // A detail sheet holds frames, and nothing else; a detail rectangle goes on any other GA sheet (design-v0.3 §6).
+  if (view === "detail") return kind === "frame";
+  if (kind === "frame") return false;
+  if (kind === "detail") return true;
   if (kind === "dim") return true;
   if (kind === "label") return view === "door-front";
   if (kind === "rail" || kind === "trunking") return view !== "door-front";
@@ -118,7 +122,7 @@ export function viewTakes(view: GaView, kind: GaItem["kind"]): boolean {
 /** What can be laid out on this sheet: a view of another sheet's door front takes dimensions only (its devices are on that sheet). */
 export function sheetTakes(project: Project, page: Page, kind: GaItem["kind"]): boolean {
   if (!page.ga) return false;
-  if (page.ga.view === "door-front" && doorOwner(project, page) !== page) return kind === "dim";
+  if (page.ga.view === "door-front" && doorOwner(project, page) !== page) return kind === "dim" || kind === "detail";
   return viewTakes(page.ga.view, kind);
 }
 
@@ -138,7 +142,8 @@ export interface DrawnGaItem {
 export function drawnGaItems(project: Project, page: Page): DrawnGaItem[] {
   const out: DrawnGaItem[] = [];
   const frame = gaFrame(project, page);
-  const inFrame = (it: GaItem) => it.kind === "dim" || (it.x + it.w / 2 >= frame.x0 - 0.01 && it.x + it.w / 2 <= frame.x0 + frame.w + 0.01);
+  const inFrame = (it: GaItem) =>
+    it.kind === "dim" || page.ga!.view === "detail" || (it.x + it.w / 2 >= frame.x0 - 0.01 && it.x + it.w / 2 <= frame.x0 + frame.w + 0.01);
   const owner = doorOwner(project, page);
   if (owner && owner !== page) {
     const back = page.ga!.view === "door-back";
@@ -543,7 +548,7 @@ export function dimTargets(drawn: DrawnGaItem[], size: { w: number; h: number },
     { v: full, item: ENCL, edge: "end", cross: crossAll },
   );
   for (const { it } of drawn) {
-    if (it.kind === "dim") continue;
+    if (it.kind === "dim" || it.kind === "detail") continue;
     const { a, len } = along(it, axis);
     const c = axis === "h" ? [it.y, it.y + it.h] : [it.x, it.x + it.w];
     const cross = c as [number, number];
@@ -729,4 +734,92 @@ export function cutoutText(s: string | undefined): string {
   // Cut-outs are given to a tenth of a millimetre (22.3), not rounded like dimensions.
   const t = (n: number) => String(Math.round(n * 10) / 10);
   return "d" in c ? `Ø${t(c.d)}` : `${t(c.w)} × ${t(c.h)}`;
+}
+
+// ---------------------------------------------------------------------------
+// Detail sheets (design-v0.3 §6)
+
+/** The scales a frame can be: paper mm per real mm (2:1, 1:1, 1:2, 1:5). */
+export const DETAIL_ZOOMS = [2, 1, 0.5, 0.2];
+
+/** A frame's scale as it's written: 2:1, 1:1, 1:5. */
+export const zoomText = (k: number) => (k >= 1 ? `${Number(k.toFixed(2))}:1` : `1:${Number((1 / k).toFixed(2))}`);
+
+/** Room under a frame for its caption, paper mm. */
+export const CAPTION_MM = 7;
+
+/**
+ * A detail sheet's usable space for frames, in its own mm (paper mm, with
+ * the sheet's GA origin at 0): the drawing area inside the border, above
+ * the title block.
+ */
+export function detailSpace(): { x: number; y: number; w: number; h: number } {
+  const x = -GA_ORIGIN[0] * UNIT_MM;
+  const y = -GA_ORIGIN[1] * UNIT_MM;
+  return { x, y, w: AREA_UNITS.w * UNIT_MM, h: AREA_UNITS.h * UNIT_MM };
+}
+
+/** The largest frame scale that fits a detail of this size on a detail sheet; the smallest if none does. */
+export function fitZoom(w: number, h: number): number {
+  const s = detailSpace();
+  return DETAIL_ZOOMS.find((k) => w * k <= s.w - 10 && h * k + CAPTION_MM <= s.h - 10) ?? DETAIL_ZOOMS[DETAIL_ZOOMS.length - 1]!;
+}
+
+/** Every detail rectangle in the project, with its sheet. */
+export function allDetails(project: Project): { page: Page; it: GaItem }[] {
+  return project.pages.flatMap((page) => (page.gaItems ?? []).filter((it) => it.kind === "detail").map((it) => ({ page, it })));
+}
+
+/** Every frame in the project, with its sheet. */
+export function allFrames(project: Project): { page: Page; it: GaItem }[] {
+  return project.pages.flatMap((page) => (page.gaItems ?? []).filter((it) => it.kind === "frame").map((it) => ({ page, it })));
+}
+
+/** The next free detail letter: A…Z, then AA, AB… */
+export function nextDetailLetter(project: Project): string {
+  const taken = new Set(allDetails(project).map((d) => d.it.letter));
+  const name = (n: number): string => (n < 26 ? String.fromCharCode(65 + n) : name(Math.floor(n / 26) - 1) + String.fromCharCode(65 + (n % 26)));
+  for (let n = 0; ; n++) if (!taken.has(name(n))) return name(n);
+}
+
+/** Where a detail is shown: its frame and that frame's sheet, if it's placed. */
+export function frameOf(project: Project, detailId: string): { page: Page; it: GaItem } | null {
+  return allFrames(project).find((f) => f.it.detail === detailId) ?? null;
+}
+
+/** The detail a frame shows, and its sheet. */
+export function detailOf(project: Project, frame: GaItem): { page: Page; it: GaItem } | null {
+  return allDetails(project).find((d) => d.it.id === frame.detail) ?? null;
+}
+
+/** A frame's caption: DETAIL A: SAFETY EXTRACT FAN, 1:1 (8), the bracket being the sheet the detail is drawn on. */
+export function frameCaption(project: Project, frame: GaItem): string {
+  const d = detailOf(project, frame);
+  if (!d) return "DETAIL (deleted)";
+  const title = d.it.text?.trim();
+  return `DETAIL ${d.it.letter ?? "?"}${title ? `: ${title.toUpperCase()}` : ""}, ${zoomText(frame.zoom ?? 1)} (${d.page.number})`;
+}
+
+/** A detail rectangle's label on its own sheet: A (12), the bracket being where it's shown. */
+export function detailLabel(project: Project, detail: GaItem): string {
+  const f = frameOf(project, detail.id);
+  return `${detail.letter ?? "?"}${f ? ` (${f.page.number})` : ""}`;
+}
+
+/** Frames keep the size of their detail at their scale. Returns whether anything changed. */
+export function syncDetailFrames(project: Project): boolean {
+  let changed = false;
+  for (const { it } of allFrames(project)) {
+    const d = detailOf(project, it);
+    if (!d) continue;
+    const k = it.zoom ?? 1;
+    const w = Math.round(d.it.w * k * 2) / 2;
+    const h = Math.round(d.it.h * k * 2) / 2;
+    if (w !== it.w || h !== it.h) {
+      it.w = w;
+      it.h = h;
+      changed = true;
+    }
+  }
+  return changed;
 }

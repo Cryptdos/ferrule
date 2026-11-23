@@ -340,3 +340,61 @@ describe("alignment on a GA (design-v0.3 §5)", () => {
     expect(b.y - (a.y + a.h)).toBeCloseTo(c.y - (b.y + b.h), 0);
   });
 });
+
+describe("GA detail sheets (design-v0.3 §6)", () => {
+  async function setup() {
+    const ops = await import("./ops");
+    const ga = await import("./ga");
+    const { p } = project();
+    const door = ops.addGaPage(p, "", { scale: 12.5, enclosure: { w: 600, h: 800 }, view: "door-front" });
+    const det = ops.addGaPage(p, "", { scale: 1, enclosure: { w: 1, h: 1 }, view: "detail" });
+    return { p, ops, ga, door, det };
+  }
+
+  test("a detail is lettered A, B… across the project; its letter can be changed but not to one taken", async () => {
+    const { p, ops, door } = await setup();
+    const a = ops.addGaItem(p, door.id, { kind: "detail", x: 50, y: 50, w: 120, h: 60 });
+    const b = ops.addGaItem(p, door.id, { kind: "detail", x: 50, y: 150, w: 120, h: 60 });
+    expect([a.letter, b.letter]).toEqual(["A", "B"]);
+    expect(() => ops.updateGaItem(p, door.id, b.id, { letter: "a" })).toThrow();
+    ops.updateGaItem(p, door.id, b.id, { letter: "x" });
+    expect(b.letter).toBe("X");
+  });
+
+  test("a frame shows one detail at the largest standard scale that fits; it follows the detail's size", async () => {
+    const { p, ops, ga, door, det } = await setup();
+    const a = ops.addGaItem(p, door.id, { kind: "detail", x: 50, y: 50, w: 120, h: 60, text: "Supply fan" });
+    const f = ops.addGaItem(p, det.id, { kind: "frame", detail: a.id, x: 0, y: 0, w: 1, h: 1 });
+    expect(f.zoom).toBe(2);
+    expect([f.w, f.h]).toEqual([240, 120]);
+    expect(ga.frameCaption(p, f)).toBe(`DETAIL A: SUPPLY FAN, 2:1 (${door.number})`);
+    expect(ga.detailLabel(p, a)).toBe(`A (${det.number})`);
+    // One frame per detail.
+    expect(() => ops.addGaItem(p, det.id, { kind: "frame", detail: a.id, x: 0, y: 0, w: 1, h: 1 })).toThrow();
+    // Resizing the detail resizes the frame; changing the frame's scale too.
+    ops.updateGaItem(p, door.id, a.id, { w: 100 });
+    expect(f.w).toBe(200);
+    ops.updateGaItem(p, det.id, f.id, { zoom: 0.5 });
+    expect([f.w, f.h]).toEqual([50, 30]);
+    // Only frames go on a detail sheet, and frames go nowhere else.
+    expect(() => ops.addGaItem(p, det.id, { kind: "rail", x: 0, y: 0, w: 100, h: 35 })).toThrow();
+    expect(() => ops.addGaItem(p, door.id, { kind: "frame", detail: a.id, x: 0, y: 0, w: 1, h: 1 })).toThrow();
+    // Deleting the detail takes its frame with it.
+    ops.deleteGaItems(p, door.id, [a.id]);
+    expect(det.gaItems).toHaveLength(0);
+  });
+
+  test("Check warns about a detail with no frame; files keep details and frames", async () => {
+    const { checkProject } = await import("./checks");
+    const { p, ops, door, det } = await setup();
+    const a = ops.addGaItem(p, door.id, { kind: "detail", x: 50, y: 50, w: 120, h: 60 });
+    expect(checkProject(p).some((x) => x.message.includes("detail A isn't shown"))).toBe(true);
+    ops.addGaItem(p, det.id, { kind: "frame", detail: a.id, x: 10, y: 10, w: 1, h: 1, zoom: 1 });
+    expect(checkProject(p).some((x) => x.message.includes("detail A isn't shown"))).toBe(false);
+    const q = parseProject(JSON.parse(JSON.stringify(p)));
+    const qd = q.pages.find((x) => x.id === det.id)!;
+    expect(qd.ga!.view).toBe("detail");
+    expect(qd.gaItems![0]).toMatchObject({ kind: "frame", detail: a.id, zoom: 1 });
+    expect(q.pages.find((x) => x.id === door.id)!.gaItems![0]).toMatchObject({ kind: "detail", letter: "A" });
+  });
+});
