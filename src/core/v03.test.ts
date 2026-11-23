@@ -258,3 +258,85 @@ describe("link arrows: wire number and bracketed reference (v0.3 §2)", () => {
     expect(elementTexts(arrow, p).wire).toBe(c.number);
   });
 });
+
+describe("alignment tools (design-v0.3 §5)", () => {
+  test("one item aligns to the sheet's usable space; several to the first picked", async () => {
+    const { alignElements, USABLE } = await import("./align");
+    const { p, pg } = project();
+    const a = addElement(p, pg, "coil", [20, 30]);
+    const b = addElement(p, pg, "coil", [50, 41]);
+    const body = (el: typeof a) => {
+      const g = localGeometry(el, "");
+      return { x: el.pos[0] + g.body.x, y: el.pos[1] + g.body.y, w: g.body.w, h: g.body.h };
+    };
+    // Centre one on the sheet, across and down.
+    alignElements(p, pg, [a.id], "centre");
+    alignElements(p, pg, [a.id], "middle");
+    const ra = body(a);
+    expect(Math.abs(ra.x + ra.w / 2 - USABLE.w / 2)).toBeLessThanOrEqual(0.5);
+    expect(Math.abs(ra.y + ra.h / 2 - USABLE.h / 2)).toBeLessThanOrEqual(0.5);
+    // Then the second lines up under the first: the first stays put.
+    const before: [number, number] = [a.pos[0], a.pos[1]];
+    alignElements(p, pg, [a.id, b.id], "centre");
+    expect(a.pos).toEqual(before);
+    expect(body(b).x + body(b).w / 2).toBeCloseTo(body(a).x + body(a).w / 2, 0);
+    alignElements(p, pg, [b.id, a.id], "top");
+    expect(body(a).y).toBe(body(b).y);
+  });
+
+  test("a box selection aligns to the outline around them all", async () => {
+    const { alignElements } = await import("./align");
+    const { p, pg } = project();
+    const a = addElement(p, pg, "coil", [20, 30]);
+    const b = addElement(p, pg, "coil", [50, 10]);
+    alignElements(p, pg, [a.id, b.id], "top", true);
+    expect(a.pos[1]).toBe(10);
+    expect(b.pos[1]).toBe(10);
+  });
+
+  test("distribute keeps the outer two and makes the gaps between bodies equal", async () => {
+    const { distributeElements } = await import("./align");
+    const { p, pg } = project();
+    const a = addElement(p, pg, "coil", [10, 30]);
+    const b = addElement(p, pg, "lamp", [14, 30]);
+    const c = addElement(p, pg, "coil", [50, 30]);
+    distributeElements(p, pg, [a.id, b.id, c.id], "across");
+    expect(a.pos[0]).toBe(10);
+    expect(c.pos[0]).toBe(50);
+    const box = (el: typeof a) => {
+      const g = localGeometry(el, "");
+      return [el.pos[0] + g.body.x, el.pos[0] + g.body.x + g.body.w];
+    };
+    const gap1 = box(b)[0]! - box(a)[1]!;
+    const gap2 = box(c)[0]! - box(b)[1]!;
+    expect(Math.abs(gap1 - gap2)).toBeLessThanOrEqual(1);
+  });
+
+  test("an aligned part's wires follow it, as if dragged", async () => {
+    const { alignElements } = await import("./align");
+    const { p, pg } = project();
+    const a = addElement(p, pg, "coil", [20, 30]);
+    const b = addElement(p, pg, "coil", [40, 50]);
+    connect(p, pg, [a.id, "A2"], [b.id, "A1"]);
+    alignElements(p, pg, [a.id, b.id], "centre");
+    expect(b.pos[0]).toBe(20);
+    expect(p.pages[0]!.segments).toHaveLength(1);
+  });
+});
+
+describe("alignment on a GA (design-v0.3 §5)", () => {
+  test("GA items align in whole mm to the first picked, and distribute down", async () => {
+    const { alignGaItems, distributeGaItems } = await import("./align");
+    const { addGaPage, addGaItem } = await import("./ops");
+    const { p } = project();
+    const ga = addGaPage(p, "", { scale: 5, enclosure: { w: 600, h: 800 }, view: "backplate" });
+    const a = addGaItem(p, ga.id, { kind: "rail", x: 100.5, y: 100, w: 40, h: 10 });
+    const b = addGaItem(p, ga.id, { kind: "rail", x: 230, y: 140, w: 20, h: 10 });
+    const c = addGaItem(p, ga.id, { kind: "rail", x: 160, y: 400, w: 30, h: 10 });
+    alignGaItems(p, ga.id, [a.id, b.id, c.id], "left");
+    expect(b.x).toBe(c.x);
+    expect(Math.abs(b.x - a.x)).toBeLessThanOrEqual(0.5);
+    distributeGaItems(p, ga.id, [a.id, b.id, c.id], "down");
+    expect(b.y - (a.y + a.h)).toBeCloseTo(c.y - (b.y + b.h), 0);
+  });
+});
