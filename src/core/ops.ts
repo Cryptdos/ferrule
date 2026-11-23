@@ -71,7 +71,7 @@ export function addElement(
     id: newId("e"),
     symbol,
     tag: opts.tag ?? "",
-    label: opts.label ?? (symbol === "notes" ? "## Notes\n1. " : ""),
+    label: opts.label ?? (symbol === "text" ? "Text" : ""),
     pos: clampToArea(snapVec(pos)),
     rot: opts.rot ?? 0,
     zone: opts.zone ?? "internal",
@@ -103,6 +103,17 @@ export function rotateElements(project: Project, pageId: string, ids: string[]):
   for (const id of ids) {
     const el = getElement(page, id);
     el.rot = (((el.rot + 90) % 360) as Rotation);
+  }
+  updateZones(page);
+}
+
+/** Flip parts top to bottom (F). Flipping twice puts them back. */
+export function flipElements(project: Project, pageId: string, ids: string[]): void {
+  const page = getPage(project, pageId);
+  for (const id of ids) {
+    const el = getElement(page, id);
+    if (el.flip) delete el.flip;
+    else el.flip = true;
   }
   updateZones(page);
 }

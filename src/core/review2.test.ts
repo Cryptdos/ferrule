@@ -94,8 +94,8 @@ describe("rail taps", () => {
     const page = p.pages[0]!;
     const bus = addElement(p, pg, "busbar", [10, 10], { params: { length: 60, name: "L" } });
     const h = addElement(p, pg, "lamp", [20, 45]);
-    const down = connect(p, pg, [h.id, "V-"], [bus.id, "24"]); // V- points down, the bar is above
-    const up = connect(p, pg, [h.id, "V+"], [bus.id, "30"]); // V+ points up at the bar
+    const down = connect(p, pg, [h.id, "-V"], [bus.id, "24"]); // V- points down, the bar is above
+    const up = connect(p, pg, [h.id, "+V"], [bus.id, "30"]); // V+ points up at the bar
     slideRailTaps(page);
     expect(down.to[1]).toBe("24");
     expect(up.to[1]).toBe("10");
@@ -157,8 +157,8 @@ describe("simulation: supplies", () => {
     connect(p, pg, [q.id, "2"], [l.id, "6"]);
     connect(p, pg, [q.id, "4"], [nb.id, "9"]);
     const h = addElement(p, pg, "lamp", [40, 32]);
-    connect(p, pg, [l.id, "36"], [h.id, "V+"]);
-    connect(p, pg, [h.id, "V-"], [nb.id, "36"]);
+    connect(p, pg, [l.id, "36"], [h.id, "+V"]);
+    connect(p, pg, [h.id, "-V"], [nb.id, "36"]);
     const t = addElement(p, pg, "transformer", [60, 34]);
     connect(p, pg, [l.id, "56"], [t.id, "P1"]);
     connect(p, pg, [nb.id, "59"], [t.id, "P2"]);
@@ -192,10 +192,10 @@ describe("simulation: plant groups", () => {
     const run = addElement(p, pg, "lamp", [20, 40]);
     const stop = addElement(p, pg, "lamp", [40, 40]);
     connect(p, pg, [cct.id, "20"], [v.id, "C"]);
-    connect(p, pg, [v.id, "NO"], [run.id, "V+"]);
-    connect(p, pg, [v.id, "NC"], [stop.id, "V+"]);
-    connect(p, pg, [run.id, "V-"], [ov.id, "20"]);
-    connect(p, pg, [stop.id, "V-"], [ov.id, "40"]);
+    connect(p, pg, [v.id, "NO"], [run.id, "+V"]);
+    connect(p, pg, [v.id, "NC"], [stop.id, "+V"]);
+    connect(p, pg, [run.id, "-V"], [ov.id, "20"]);
+    connect(p, pg, [stop.id, "-V"], [ov.id, "40"]);
     const c = compile(p);
     let s = initialState(c);
     expect([s.lamps[run.id], s.lamps[stop.id]]).toEqual([false, true]);
@@ -212,11 +212,11 @@ describe("simulation: plant groups", () => {
     const run = addElement(p, pg, "lamp", [40, 40]);
     const fault = addElement(p, pg, "lamp", [60, 40]);
     connect(p, pg, [cct.id, "30"], [v.id, "3"]);
-    connect(p, pg, [v.id, "4"], [run.id, "V+"]);
-    connect(p, pg, [run.id, "V-"], [ov.id, "40"]);
+    connect(p, pg, [v.id, "4"], [run.id, "+V"]);
+    connect(p, pg, [run.id, "-V"], [ov.id, "40"]);
     connect(p, pg, [cct.id, "50"], [v.id, "5"]);
-    connect(p, pg, [v.id, "6"], [fault.id, "V+"]);
-    connect(p, pg, [fault.id, "V-"], [ov.id, "60"]);
+    connect(p, pg, [v.id, "6"], [fault.id, "+V"]);
+    connect(p, pg, [fault.id, "-V"], [ov.id, "60"]);
     item.groups!.find((g) => g.name === "RUNNING")!.follows = "ENABLE";
     item.groups!.find((g) => g.name === "RUNNING")!.delay = 3;
     item.groups!.find((g) => g.name === "FAULT")!.follows = "ENABLE";
@@ -238,11 +238,11 @@ describe("simulation: push buttons", () => {
   test("held for as long as they're held", () => {
     const { p, pg } = project();
     const { cct: cct, ov: ov } = controlBusbars(p, pg, 10, 60);
-    const b = addElement(p, pg, "pb-no", [20, 25]);
+    const b = addElement(p, pg, "pushbutton", [20, 25]);
     const h = addElement(p, pg, "lamp", [20, 45]);
     connect(p, pg, [cct.id, "20"], [b.id, "13"]);
-    connect(p, pg, [b.id, "14"], [h.id, "V+"]);
-    connect(p, pg, [h.id, "V-"], [ov.id, "20"]);
+    connect(p, pg, [b.id, "14"], [h.id, "+V"]);
+    connect(p, pg, [h.id, "-V"], [ov.id, "20"]);
     const c = compile(p);
     let s = hold(c, initialState(c), b.id, true);
     expect(s.lamps[h.id]).toBe(true);

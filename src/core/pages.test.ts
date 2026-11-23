@@ -40,7 +40,7 @@ describe("pages", () => {
     const pg = p.pages[0]!.id;
     const a = addElement(p, pg, "coil", [10, 10], { tag: "K1" });
     const b = addElement(p, pg, "lamp", [20, 10]);
-    connect(p, pg, [a.id, "A2"], [b.id, "V-"]);
+    connect(p, pg, [a.id, "A2"], [b.id, "-V"]);
     const copy = duplicatePage(p, pg);
     expect(copy.number).toBe(2);
     expect(copy.elements).toHaveLength(2);

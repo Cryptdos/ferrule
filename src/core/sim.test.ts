@@ -18,8 +18,8 @@ function ladder() {
 describe("relay logic", () => {
   test("start/stop latch with a running lamp", () => {
     const { p, add, w, top, bottom } = ladder();
-    const stop = add("pb-nc", 20, 20);
-    const start = add("pb-no", 20, 35);
+    const stop = add("pushbutton", 20, 20, { contact: "nc" });
+    const start = add("pushbutton", 20, 35);
     const hold = add("contact-no", 30, 35);
     const k = add("coil", 20, 70);
     w(top(20), [stop.id, "21"]);
@@ -32,8 +32,8 @@ describe("relay logic", () => {
     const kl = add("contact-no", 50, 30);
     const lamp = add("lamp", 50, 60);
     w(top(50), [kl.id, "13"]);
-    w([kl.id, "14"], [lamp.id, "V+"]);
-    w([lamp.id, "V-"], bottom(50));
+    w([kl.id, "14"], [lamp.id, "+V"]);
+    w([lamp.id, "-V"], bottom(50));
     linkContact(p, kl.id, k.id);
 
     const c = compile(p);
@@ -54,11 +54,11 @@ describe("relay logic", () => {
     w(top(20), [sw.id, "13"]);
     w([sw.id, "14"], [t.id, "A1"]);
     w([t.id, "A2"], bottom(20));
-    const tc = add("timer-contact", 40, 30);
+    const tc = add("contact-no", 40, 30);
     const lamp = add("lamp", 40, 60);
-    w(top(40), [tc.id, "17"]);
-    w([tc.id, "18"], [lamp.id, "V+"]);
-    w([lamp.id, "V-"], bottom(40));
+    w(top(40), [tc.id, "13"]);
+    w([tc.id, "14"], [lamp.id, "+V"]);
+    w([lamp.id, "-V"], bottom(40));
     linkContact(p, tc.id, t.id);
     const c = compile(p);
     let s = toggle(c, initialState(c), sw.id);
@@ -86,8 +86,8 @@ describe("relay logic", () => {
     const q = add("isolator", 20, 30, { poles: 1 });
     const lamp = add("lamp", 20, 60);
     w(top(20), [q.id, "1"]);
-    w([q.id, "2"], [lamp.id, "V+"]);
-    w([lamp.id, "V-"], bottom(20));
+    w([q.id, "2"], [lamp.id, "+V"]);
+    w([lamp.id, "-V"], bottom(20));
     const c = compile(p);
     expect(initialState(c).lamps[lamp.id]).toBe(true);
     expect(toggle(c, initialState(c), q.id).lamps[lamp.id]).toBe(false);

@@ -15,6 +15,7 @@
     resetRoute,
     reverseSegment,
     setWireKind,
+    flipElements,
     rotateElements,
     setConductorNumber,
     setConductorInfo,
@@ -155,8 +156,8 @@
         <button class="link-btn" onclick={() => editor.goTo(partner.el.id)}>Go to {address(partner.page, partner.el.pos)} →</button>
       {/if}
     {/if}
-    {#if one.symbol === "notes"}
-      <div class="sub">Notes</div>
+    {#if one.symbol === "text"}
+      <div class="sub">Text</div>
       <MarkdownEditor
         value={one.label}
         oninput={(v) => {
@@ -172,11 +173,11 @@
       </p>
     {:else if one.symbol !== "junction"}
       <label>
-        {one.symbol === "text" || one.symbol === "plate" ? "Text" : "Label"}
+        {one.symbol === "plate" ? "Text" : "Label"}
         <FieldInput
           {editor}
           value={one.label}
-          multiline={one.symbol === "text" || one.symbol === "plate"}
+          multiline={one.symbol === "plate"}
           onchange={(v) => patch({ label: v })}
         />
       </label>
@@ -228,7 +229,10 @@
         </label>
       {:else}
         <label>
-          {p.label}
+          <span>
+            {p.label}
+            {#if p.help}<span class="help" title={p.help}>?</span>{/if}
+          </span>
           {#if p.type === "select"}
             <select value={String(v)} onchange={(e) => setParam(p.key, e.currentTarget.value)}>
               {#each p.options ?? [] as o (o.value)}
@@ -561,6 +565,12 @@
         }}>Rotate (R)</button
       >
       <button
+        onclick={() => {
+          const ids = sel.map((e) => e.id);
+          editor.apply((p) => flipElements(p, editor.pageId, ids));
+        }}>Flip (F)</button
+      >
+      <button
         class="danger"
         onclick={() => {
           const ids = sel.map((e) => e.id);
@@ -654,5 +664,18 @@
     color: #556;
     line-height: 1.5;
     margin: 0;
+  }
+  .help {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    margin-left: 4px;
+    border-radius: 50%;
+    background: #dde;
+    color: #334;
+    font-size: 10px;
+    line-height: 14px;
+    text-align: center;
+    cursor: help;
   }
 </style>

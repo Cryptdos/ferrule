@@ -11,7 +11,7 @@ import { refreshConductors } from "../core/conductors";
 import { api, ConflictError } from "./api";
 import { getAvoid } from "./avoid";
 
-export type Tool = "select" | "place" | "wire" | "section" | "cloud" | "stamp" | "ga-rail" | "ga-trunking" | "ga-note";
+export type Tool = "select" | "place" | "wire" | "section" | "cloud" | "stamp" | "ga-rail" | "ga-trunking";
 export type SaveState = "saved" | "pending" | "saving" | "error";
 
 const HISTORY_LIMIT = 200;

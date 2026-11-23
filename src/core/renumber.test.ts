@@ -11,7 +11,7 @@ function rung() {
   const pg = p.pages[0]!.id;
   const { cct: cct, ov: ov } = controlBusbars(p, pg, 10, 60);
   // Column 16 is x = 30..31.
-  const s1 = addElement(p, pg, "pb-no", [30, 25]);
+  const s1 = addElement(p, pg, "pushbutton", [30, 25]);
   const k1 = addElement(p, pg, "coil", [30, 57]);
   connect(p, pg, [cct.id, "30"], [s1.id, "13"]);
   connect(p, pg, [s1.id, "14"], [k1.id, "A1"]);
@@ -119,12 +119,12 @@ describe("cross-references", () => {
     const inn = addElement(p, pg2, "offpage", [20, 20], { rot: 180 });
     const h = addElement(p, pg2, "lamp", [20, 40]);
     connect(p, pg, [s1.id, "14"], [out.id, "1"]);
-    connect(p, pg2, [inn.id, "1"], [h.id, "V+"]);
+    connect(p, pg2, [inn.id, "1"], [h.id, "+V"]);
     linkOffpage(p, out.id, inn.id);
     renumber(p);
     expect(elementTexts(out, p).xref).toBe("2-11");
     expect(elementTexts(inn, p).xref).toBe("1-26");
     const num = (id: string, t: string) => p.conductors.find((c) => c.terminals.some(([e, n]) => e === id && n === t))!.number;
-    expect(num(h.id, "V+")).toBe(num(s1.id, "14"));
+    expect(num(h.id, "+V")).toBe(num(s1.id, "14"));
   });
 });
