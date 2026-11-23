@@ -38,7 +38,7 @@
   import TemplatesDialog from "./TemplatesDialog.svelte";
   import SimPanel from "./SimPanel.svelte";
   import SettingsDialog from "./SettingsDialog.svelte";
-  import Modal from "./Modal.svelte";
+  import Modal, { closeTopmost } from "./Modal.svelte";
   import { Simulator } from "../sim.svelte";
 
   let { editor, onclose, onopen }: { editor: Editor; onclose: () => void; onopen?: (id: string) => void } = $props();
@@ -96,11 +96,10 @@
   });
   let showProject = $state(false);
   /** Open windows: they don't block the drawing, and several can be open at once. */
-  type DialogName = "expectations" | "plant" | "controllers" | "distribution" | "checks" | "schedules" | "templates" | "renumber" | "devices" | "settings" | "place";
+  type DialogName = "expectations" | "plant" | "controllers" | "table" | "distribution" | "checks" | "schedules" | "templates" | "renumber" | "devices" | "settings" | "place";
   let open: Partial<Record<DialogName, boolean>> = $state({});
   /** Export PDF failed: what went wrong, with the Print way round it. */
   let pdfError = $state("");
-  let tableView = $state(false);
   let help = $state(false);
   let browserWidth = $state(0);
   const gaSelected = $derived((editor.page.gaItems ?? []).some((i) => editor.selection.includes(i.id)));
@@ -126,7 +125,6 @@
     editor.gaPlace = null;
     editor.selection = [];
     if (mode === "simulate") {
-      tableView = false;
       editor.tool = "select";
       editor.placeSymbol = null;
       editor.selection = [];
@@ -180,9 +178,9 @@
     }
   }
 
-  function doRenumber() {
-    // Show what would change first; nothing changes until it's applied.
-    open.renumber = true;
+  /** A menu button opens its window, and closes it again when it's open (10). */
+  function toggle(name: DialogName) {
+    open[name] = !open[name];
   }
 
   async function print() {
@@ -199,7 +197,7 @@
 
   function onKey(e: KeyboardEvent) {
     // Windows don't block the drawing: keys work on it unless a window has the focus.
-    if (isTyping(e.target) || inWindow(e.target) || tableView) return;
+    if (isTyping(e.target) || inWindow(e.target)) return;
     const ctrl = e.ctrlKey || e.metaKey;
     // GA: move, turn and delete layout items.
     if (editor.mode === "ga") {
@@ -225,6 +223,8 @@
         editor.apply((p) => moveGaItems(p, editor.pageId, gaIds, d));
       } else if (e.key === "Escape") {
         if (canvas?.cancel()) return;
+        // Then the window on top (13), then what's picked.
+        if (closeTopmost()) return;
         editor.gaPlace = null;
         editor.tool = "select";
         editor.selection = [];
@@ -238,6 +238,7 @@
     }
     // Simulating: only moving about (sheets, fit); nothing is edited.
     if (editor.mode === "simulate") {
+      if (e.key === "Escape") closeTopmost();
       if (e.key === "PageDown" || e.key === "PageUp") {
         e.preventDefault();
         const pages = editor.project.pages;
@@ -295,6 +296,8 @@
         return;
       }
       if (canvas?.cancel()) return;
+      // Then the window on top (13), then what's picked.
+      if (closeTopmost()) return;
       editor.stamp = null;
       editor.tool = "select";
       editor.placeSymbol = null;
@@ -368,8 +371,16 @@
       <span class="status" class:error={editor.saveState === "error"}>{saveText}</span>
     </div>
     <div class="row two">
-      <!-- The same order on every workbench (§10): tools, undo and redo, view, menus. -->
+      <!-- The same order on every workbench (v0.2.1 note 15): undo and redo, view, tools, menus. -->
       {#if editor.mode !== "simulate"}
+        <button class="icon" disabled={!editor.canUndo} onclick={() => editor.undo()} title="Undo (Ctrl+Z)"><Icon name="undo" /></button>
+        <button class="icon" disabled={!editor.canRedo} onclick={() => editor.redo()} title="Redo (Ctrl+Y)"><Icon name="redo" /></button>
+        <span class="sep"></span>
+      {/if}
+      <button class="icon" onclick={() => canvas?.fit()} title="Fit sheet (tap Space)"><Icon name="fit" /></button>
+      <button class="icon" class:active={!!editor.splitPageId} onclick={toggleSplit} title="Show another sheet alongside"><Icon name="split" /></button>
+      {#if editor.mode !== "simulate"}
+        <span class="sep"></span>
         <button class="icon" class:active={editor.tool === "select"} onclick={() => ((editor.tool = "select"), (editor.placeSymbol = null), (editor.gaPlace = null))} title="Select (S)">
           <Icon name="select" />
         </button>
@@ -378,97 +389,85 @@
             <Icon name="wire" /> Wire
           </button>
         {/if}
-        <span class="sep"></span>
-        <button class="icon" disabled={!editor.canUndo} onclick={() => editor.undo()} title="Undo (Ctrl+Z)"><Icon name="undo" /></button>
-        <button class="icon" disabled={!editor.canRedo} onclick={() => editor.redo()} title="Redo (Ctrl+Y)"><Icon name="redo" /></button>
-        <span class="sep"></span>
-      {/if}
-      <button class="icon" onclick={() => canvas?.fit()} title="Fit sheet (tap Space)"><Icon name="fit" /></button>
-      <button class="icon" class:active={!!editor.splitPageId} onclick={toggleSplit} title="Show another sheet alongside"><Icon name="split" /></button>
-      {#if editor.mode === "draft"}
-        <button class="icon" class:active={tableView} onclick={() => (tableView = !tableView)} title="Table: every element in the project"><Icon name="table" /></button>
       {/if}
       {#if editor.mode === "simulate"}
         <span class="sep"></span>
         <span class="simnote">Simulating: click switches, buttons and plant outputs on the drawing; double-click to follow a link. Editing is off.</span>
-        <button onclick={() => (open.expectations = true)} title="What the drawing should do: checked live, and by Check logic">Expectations…</button>
+        <button class:active={!!open.expectations} onclick={() => toggle("expectations")} title="What the drawing should do: checked live, and by Check logic">Expectations…</button>
       {:else if editor.mode === "draft"}
         <span class="sep"></span>
-        <button onclick={doRenumber} title="See what Renumber would change to tags, terminal and wire numbers, then apply">Renumber</button>
-        <button onclick={() => (open.templates = true)} title="Save and stamp sheet and section templates">Templates</button>
-        <button onclick={() => (open.plant = true)} title="Field equipment: define plant and place views">Plant</button>
-        <button onclick={() => (open.controllers = true)} title="Outstations and PLCs: their modules, in rail order, and module views">Controllers</button>
-        <button onclick={() => (open.distribution = true)} title="The supplies busbars, link arrows and the incoming supply pick from">Distribution</button>
-        <button onclick={() => (open.checks = true)} title="Check the drawing for problems">Check</button>
-        <button onclick={() => (open.expectations = true)} title="What the drawing should do: checked live in Simulate, and by Check logic">Expectations…</button>
-        <button onclick={() => (open.schedules = true)} title="Terminal and cable schedules">Schedules</button>
+        <button class:active={!!open.renumber} onclick={() => toggle("renumber")} title="See what Renumber would change to tags, terminal and wire numbers, then apply">Renumber</button>
+        <button class:active={!!open.templates} onclick={() => toggle("templates")} title="Save and stamp sheet and section templates">Templates</button>
+        <button class:active={!!open.plant} onclick={() => toggle("plant")} title="Field equipment: define plant and place views">Plant</button>
+        <button class:active={!!open.controllers} onclick={() => toggle("controllers")} title="Outstations and PLCs: their modules, in rail order, and module views">Controllers</button>
+        <button class:active={!!open.distribution} onclick={() => toggle("distribution")} title="The supplies busbars, link arrows and the incoming supply pick from">Distribution</button>
+        <button class:active={!!open.table} onclick={() => toggle("table")} title="Table: every element in the project, to filter, edit and find-and-replace">Table</button>
+        <button class:active={!!open.checks} onclick={() => toggle("checks")} title="Check the drawing for problems">Check</button>
+        <button class:active={!!open.expectations} onclick={() => toggle("expectations")} title="What the drawing should do: checked live in Simulate, and by Check logic">Expectations…</button>
+        <button class:active={!!open.schedules} onclick={() => toggle("schedules")} title="Terminal, cable and IO schedules">Schedules</button>
       {:else if editor.mode === "ga"}
         <span class="sep"></span>
-        <button onclick={() => (open.checks = true)} title="Check the drawing for problems, with how full each DIN rail is">Check</button>
-        <button onclick={() => (open.schedules = true)} title="Terminal and cable schedules, and the bill of materials">Schedules</button>
+        <button class:active={!!open.checks} onclick={() => toggle("checks")} title="Check the drawing for problems, with how full each DIN rail is">Check</button>
+        <button class:active={!!open.schedules} onclick={() => toggle("schedules")} title="Terminal and cable schedules, and the bill of materials">Schedules</button>
         <button class:active={!!open.place} onclick={() => (open.place = !open.place)} title="Parts from the schematic not on a GA yet: pick one, then click on the sheet">Place parts…</button>
-        <button onclick={() => (open.devices = true)} title="Real devices with their sizes, datasheets and pictures">Device table…</button>
+        <button class:active={!!open.devices} onclick={() => toggle("devices")} title="Real devices with their sizes, datasheets and pictures">Device table…</button>
       {/if}
     </div>
   </header>
-  <main class:split={!!editor.splitPageId && !tableView} style:--split={splitAt} bind:this={mainEl}>
-    {#if tableView}
-      <TableView {editor} onclose={() => (tableView = false)} />
-    {:else}
-      <div class="pane"><Canvas bind:this={canvas} {editor} {sim} insetLeft={browserWidth} atlas /></div>
-      {#if editor.splitPageId}
-        <!-- Drag the divider to share the width between the two sheets (note 14). -->
-        <div
-          class="divider"
-          role="separator"
-          aria-orientation="vertical"
-          aria-label="Drag to resize the split"
-          onpointerdown={(e) => {
-            e.currentTarget.setPointerCapture(e.pointerId);
-            dividerDrag = true;
-          }}
-          onpointermove={(e) => {
-            if (!dividerDrag || !mainEl) return;
-            const r = mainEl.getBoundingClientRect();
-            splitAt = Math.min(0.85, Math.max(0.15, (e.clientX - r.left) / r.width));
-          }}
-          onpointerup={() => {
-            dividerDrag = false;
-            try {
-              localStorage.setItem("ferrule.split", String(splitAt));
-            } catch {
-              /* storage may be unavailable */
-            }
-          }}
-        ></div>
-        <div class="pane"><SplitPane {editor} /></div>
-      {/if}
-      <Browser {editor} bind:width={browserWidth} onplace={() => (open.place = true)} />
-      {#if sim}
-        <FloatBox title="Simulation" store="sim"><SimPanel {editor} {sim} onexpectations={() => (open.expectations = true)} /></FloatBox>
-      {:else if editor.mode === "ga"}
-        {#if gaSelected || editor.sheetSettings}
-          <FloatBox title={gaSelected ? "Properties" : "Sheet"} store="props" onclose={closeProps}>
-            {#if editor.sheetSettings && !gaSelected}<SheetProps {editor} />{/if}
-            <GaProps {editor} ondevices={() => (open.devices = true)} />
-          </FloatBox>
-        {/if}
-      {:else if editor.selection.length || editor.sheetSettings}
-        <FloatBox title={editor.selection.length ? "Properties" : "Sheet"} store="props" onclose={closeProps}>
-          {#if editor.selection.length}<Props {editor} />{:else}<SheetProps {editor} />{/if}
+  <main class:split={!!editor.splitPageId} style:--split={splitAt} bind:this={mainEl}>
+    <div class="pane"><Canvas bind:this={canvas} {editor} {sim} insetLeft={browserWidth} atlas /></div>
+    {#if editor.splitPageId}
+      <!-- Drag the divider to share the width between the two sheets (note 14). -->
+      <div
+        class="divider"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Drag to resize the split"
+        onpointerdown={(e) => {
+          e.currentTarget.setPointerCapture(e.pointerId);
+          dividerDrag = true;
+        }}
+        onpointermove={(e) => {
+          if (!dividerDrag || !mainEl) return;
+          const r = mainEl.getBoundingClientRect();
+          splitAt = Math.min(0.85, Math.max(0.15, (e.clientX - r.left) / r.width));
+        }}
+        onpointerup={() => {
+          dividerDrag = false;
+          try {
+            localStorage.setItem("ferrule.split", String(splitAt));
+          } catch {
+            /* storage may be unavailable */
+          }
+        }}
+      ></div>
+      <div class="pane"><SplitPane {editor} /></div>
+    {/if}
+    <Browser {editor} bind:width={browserWidth} onplace={() => (open.place = true)} />
+    {#if sim}
+      <FloatBox title="Simulation" store="sim"><SimPanel {editor} {sim} onexpectations={() => (open.expectations = true)} /></FloatBox>
+    {:else if editor.mode === "ga"}
+      {#if gaSelected || editor.sheetSettings}
+        <FloatBox title={gaSelected ? "Properties" : "Sheet"} store="props" onclose={closeProps}>
+          {#if editor.sheetSettings && !gaSelected}<SheetProps {editor} />{/if}
+          <GaProps {editor} ondevices={() => (open.devices = true)} />
         </FloatBox>
       {/if}
-      {#if help}
-        <FloatBox title="Help" store="help" top={162} right={344} width={280} onclose={() => (help = false)}>
-          <div class="help">
-            <p>Pick a part in the browser and click to place it; then it's back to Select (or keep placing until <kbd>Esc</kbd>: Settings). Drag to move, <kbd>R</kbd> rotate, <kbd>Del</kbd> delete, <kbd>Ctrl</kbd>+<kbd>D</kbd> duplicate, arrows nudge.</p>
-            <p>Scroll to zoom, middle-drag or <kbd>Space</kbd>+drag to pan; tap <kbd>Space</kbd> to fit the sheet. <kbd>R</kbd> rotates, <kbd>F</kbd> flips top to bottom. Drag the outline in the overview (top right) to move about.</p>
-            <p><kbd>W</kbd> wire tool: click a terminal, then another; click on a wire to tee into it. <kbd>Esc</kbd> cancels, <kbd>S</kbd> back to select.</p>
-            <p><kbd>PgUp</kbd>/<kbd>PgDn</kbd> change sheet. Double-click a contact, coil or link arrow to jump to its partner.</p>
-            <p><kbd>Ctrl</kbd>+<kbd>Z</kbd> undo, <kbd>Ctrl</kbd>+<kbd>Y</kbd> redo, <kbd>Ctrl</kbd>+<kbd>A</kbd> select all on this workbench. Saving is automatic.</p>
-          </div>
-        </FloatBox>
-      {/if}
+    {:else if editor.selection.length || editor.sheetSettings}
+      <FloatBox title={editor.selection.length ? "Properties" : "Sheet"} store="props" onclose={closeProps}>
+        {#if editor.selection.length}<Props {editor} />{:else}<SheetProps {editor} />{/if}
+      </FloatBox>
+    {/if}
+    {#if help}
+      <FloatBox title="Help" store="help" top={162} right={344} width={280} onclose={() => (help = false)}>
+        <div class="help">
+          <p>Pick a part in the browser and click to place it; then it's back to Select (or keep placing until <kbd>Esc</kbd>: Settings). Drag to move, <kbd>R</kbd> rotate, <kbd>Del</kbd> delete, <kbd>Ctrl</kbd>+<kbd>D</kbd> duplicate, arrows nudge.</p>
+          <p>Scroll to zoom, middle-drag or <kbd>Space</kbd>+drag to pan; tap <kbd>Space</kbd> to fit the sheet. <kbd>R</kbd> rotates, <kbd>F</kbd> flips top to bottom. Drag the outline in the overview (top right) to move about.</p>
+          <p><kbd>W</kbd> wire tool: click a terminal, then another; click on a wire to tee into it. <kbd>Esc</kbd> cancels, <kbd>S</kbd> back to select.</p>
+          <p><kbd>PgUp</kbd>/<kbd>PgDn</kbd> change sheet. Double-click a contact, coil or link arrow to jump to its partner.</p>
+          <p><kbd>Ctrl</kbd>+<kbd>Z</kbd> undo, <kbd>Ctrl</kbd>+<kbd>Y</kbd> redo, <kbd>Ctrl</kbd>+<kbd>A</kbd> select all on this workbench. Saving is automatic.</p>
+        </div>
+      </FloatBox>
     {/if}
     {#if editor.linking}
       <div class="linkbar">
@@ -501,6 +500,9 @@
 {/if}
 {#if open.expectations}
   <ExpectationsDialog {editor} onclose={() => (open.expectations = false)} />
+{/if}
+{#if open.table && editor.mode === "draft"}
+  <Modal title="Table" store="table" wide onclose={() => (open.table = false)}><TableView {editor} /></Modal>
 {/if}
 {#if open.renumber}
   <RenumberDialog {editor} onclose={() => (open.renumber = false)} />

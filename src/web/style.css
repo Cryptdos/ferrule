@@ -66,12 +66,15 @@ select {
    symbol icons inside the chrome are turned back so they show as they are. */
 html[data-theme="dark"],
 html[data-theme="dark"] body {
-  background: #16181b;
-  --desk: #2a2e34;
+  background: #1f2226;
+  --desk: #2e3238;
 }
+/* Turned dark and toned down a little (14): white becomes a dark grey and
+   black text a soft white, which reads more easily than white on black. */
 html[data-theme="dark"] :is(.editor > header, .browser, .float, .window, .split > .bar, .divider, .picker, .table-view, .atlas, .linkbar, .toast) {
-  filter: invert(1) hue-rotate(180deg);
+  filter: invert(1) hue-rotate(180deg) contrast(0.82);
 }
+/* …and pictures inside turned back as they were (undoing the contrast too). */
 html[data-theme="dark"] :is(.editor > header, .browser, .float, .window, .split > .bar, .picker, .table-view, .atlas) :is(img, .atlas svg, .preview) {
-  filter: invert(1) hue-rotate(180deg);
+  filter: contrast(1.22) invert(1) hue-rotate(180deg);
 }

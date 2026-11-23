@@ -9,7 +9,7 @@
   import type { Editor } from "../editor.svelte";
 
   /** Every element in the project as a row (DESIGN.md §11). */
-  let { editor, onclose }: { editor: Editor; onclose: () => void } = $props();
+  let { editor }: { editor: Editor } = $props();
 
   let type = $state("");
   let plant = $state("");
@@ -95,8 +95,6 @@
     {/if}
     <input bind:value={text} placeholder="Search tag, type or label" />
     <span class="count">{filtered.length} rows</span>
-    <span class="grow"></span>
-    <button onclick={onclose}>Back to drawing</button>
   </div>
   <div class="bulk">
     <span>{ids.length} ticked:</span>
@@ -163,10 +161,7 @@
             </td>
             <td>
               <button
-                onclick={() => {
-                  editor.goTo(r.el.id);
-                  onclose();
-                }}>Show</button
+                onclick={() => editor.goTo(r.el.id)}>Show</button
               >
             </td>
           </tr>
@@ -201,9 +196,6 @@
     align-items: center;
     gap: 3px;
   }
-  .grow {
-    flex: 1;
-  }
   .sep {
     width: 1px;
     height: 18px;
@@ -216,6 +208,7 @@
     overflow: auto;
     flex: 1;
     min-height: 0;
+    max-height: calc(100vh - 290px);
   }
   td.lock {
     text-align: center;

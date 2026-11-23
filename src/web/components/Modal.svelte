@@ -3,6 +3,15 @@
   let topZ = 40;
   /** How many are open: a new one opens a little down and right of the last, so none hides another. */
   let openCount = 0;
+  /** Open windows, to close the topmost with Esc wherever the focus is. */
+  const stack = new Set<{ z: () => number; close: () => void }>();
+  /** Close the window on top (the one clicked last). False if none is open. */
+  export function closeTopmost(): boolean {
+    let top: { z: () => number; close: () => void } | null = null;
+    for (const w of stack) if (!top || w.z() > top.z()) top = w;
+    top?.close();
+    return !!top;
+  }
 </script>
 
 <script lang="ts">
@@ -38,8 +47,13 @@
   let min = $state(!!saved?.min);
   let z = $state(++topZ);
   const cascade = openCount++ * 28;
-  $effect(() => () => {
-    openCount = Math.max(0, openCount - 1);
+  $effect(() => {
+    const me = { z: () => z, close: () => onclose() };
+    stack.add(me);
+    return () => {
+      stack.delete(me);
+      openCount = Math.max(0, openCount - 1);
+    };
   });
   let win: HTMLDivElement | undefined = $state();
   let drag: { cx: number; cy: number; x: number; y: number } | null = null;
