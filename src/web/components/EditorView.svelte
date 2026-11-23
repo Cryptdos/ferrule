@@ -142,7 +142,10 @@
 
   /** Split the active tile: the new half, to its right, shows the same sheet. */
   function split() {
-    editor.splitTile(editor.activeTile, "row");
+    const id = editor.activeTile;
+    editor.splitTile(id, "row");
+    // It's narrower now: fit its sheet to it again.
+    setTimeout(() => canvases.get(id)?.fit(), 60);
   }
   let exporting = $state(false);
 
@@ -437,9 +440,10 @@
       <FloatBox title="Help" store="help" top={162} right={344} width={280} onclose={() => (help = false)}>
         <div class="help">
           <p>Pick a part in the browser and click to place it; then it's back to Select (or keep placing until <kbd>Esc</kbd>: Settings). Drag to move, <kbd>R</kbd> rotate, <kbd>Del</kbd> delete, <kbd>Ctrl</kbd>+<kbd>D</kbd> duplicate, arrows nudge.</p>
-          <p>Scroll to zoom, middle-drag or <kbd>Space</kbd>+drag to pan; tap <kbd>Space</kbd> to fit the sheet. <kbd>R</kbd> rotates, <kbd>F</kbd> flips top to bottom. Drag the outline in the overview (top right) to move about.</p>
+          <p>Scroll to zoom, middle-drag or <kbd>Space</kbd>+drag to pan; tap <kbd>Space</kbd> to fit the sheet. <kbd>R</kbd> rotates, <kbd>F</kbd> flips top to bottom. Drag the outline in the overview (top right of the tile you're in) to move about.</p>
           <p><kbd>W</kbd> wire tool: click a terminal, then another; click on a wire to tee into it. <kbd>Esc</kbd> cancels, <kbd>S</kbd> back to select.</p>
           <p><kbd>PgUp</kbd>/<kbd>PgDn</kbd> change sheet. Double-click a contact, coil or link arrow to jump to its partner.</p>
+          <p>Split the drawing into tiles from a tile's bar (split right, split down); click a tile to work in it. Drag a window's title bar onto a tile to put it there, and its tile's bar out to float it again.</p>
           <p><kbd>Ctrl</kbd>+<kbd>Z</kbd> undo, <kbd>Ctrl</kbd>+<kbd>Y</kbd> redo, <kbd>Ctrl</kbd>+<kbd>A</kbd> select all on this workbench. Saving is automatic.</p>
         </div>
       </FloatBox>

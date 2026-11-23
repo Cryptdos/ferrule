@@ -4,7 +4,7 @@
 
 It's one portable `.exe` for Windows: no install, nothing to configure. Your browser is the screen.
 
-![Ferrule drafting a controls sheet: the browser of sheets and parts on the left, the drawing in the middle, the sheet overview and a timer coil's properties on the right](docs/images/editor-draft.png)
+![Ferrule drafting a controls sheet in one tile with a starter sheet in another: the browser of sheets and parts on the left, the active tile outlined with its overview, and a timer coil's properties on the right](docs/images/editor-draft.png)
 
 **[Download the latest release](https://github.com/Cryptdos/ferrule/releases/latest)**: unzip `ferrule.exe` anywhere (e.g. `C:\Temp\eCAD`) and double-click it. Status: **0.1.0 preview**, for feature testing.
 
@@ -22,7 +22,7 @@ Everything above the block is in the panel; everything below is out on site, wit
 
 ### Simulate: try the logic before anyone wires it
 
-![Simulating: live wires and busbars highlighted, energised coils filled, a fail timer counting down, the fire alarm monitoring inputs green because they see what their expectations say, and every plant point listed in the floating panel](docs/images/simulate.png)
+![Simulating in two tiles at once: live wires and rails red on both sheets, the fire alarm monitoring inputs green because they see what their expectations say, and every plant point listed in the floating panel](docs/images/simulate.png)
 
 Click switches, selectors, push buttons and plant outputs on the drawing. Coils pull in, contacts move, lamps glow in their colour, live wires go red and timers count down (TON, TOF, TP and flashers, named as IEC 61131-3). Power comes from the incoming supply, a transformer or plant that supplies power (a UPS, a PSU), phases kept separate. **Expectations** say what the drawing should do, in plain words ("FA-SF SF-01 running should be on when K8-23 is energised", "Never: K8-6 and K8-11 energised"): plant inputs turn green or red as you go, and **Check logic** tries every sequence of operations to find one that breaks an expectation, shorts the supply or makes relays chatter, with a replay.
 
