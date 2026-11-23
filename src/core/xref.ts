@@ -167,9 +167,10 @@ export function linkedTarget(project: Project, el: Element): string | null {
 export function xrefText(project: Project, el: Element, masterTag: string): string {
   const here = locate(project, el.id)?.page;
   if (el.symbol === "offpage") {
+    // In brackets: brackets always mean a place, a bare number a wire (v0.3 §2).
     const p = partnerOf(project, el);
-    if (p) return address(p.page, p.el.pos, here);
-    return typeof el.params.ref === "string" ? el.params.ref : "";
+    const ref = p ? address(p.page, p.el.pos, here) : typeof el.params.ref === "string" ? el.params.ref.trim().replace(/^\((.*)\)$/, "$1") : "";
+    return ref ? `(${ref})` : "";
   }
   const m = masterOf(project, el);
   if (m) {

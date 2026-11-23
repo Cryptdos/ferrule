@@ -122,8 +122,8 @@ describe("cross-references", () => {
     connect(p, pg2, [inn.id, "1"], [h.id, "+V"]);
     linkOffpage(p, out.id, inn.id);
     renumber(p);
-    expect(elementTexts(out, p).xref).toBe("2-11");
-    expect(elementTexts(inn, p).xref).toBe("1-26");
+    expect(elementTexts(out, p).xref).toBe("(2-11)");
+    expect(elementTexts(inn, p).xref).toBe("(1-26)");
     const num = (id: string, t: string) => p.conductors.find((c) => c.terminals.some(([e, n]) => e === id && n === t))!.number;
     expect(num(h.id, "+V")).toBe(num(s1.id, "14"));
   });

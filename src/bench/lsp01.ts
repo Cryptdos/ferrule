@@ -287,20 +287,21 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
   w([frLamp, "14"], [hFire, "+V"]);
   w([hFire, "-V"], tap(ov, 86));
   linkContact(p, frLamp.id, fr.id);
-  const sLt = add("pushbutton", 98, 51, { label: "LAMP TEST" });
-  const lt = ctl(null, 98, 57, 6, "LT");
-  w(tap(cct, 98), [sLt, "13"]);
-  w([sLt, "14"], tap(lt, 98));
+  const sLt = add("pushbutton", 96, 51, { label: "LAMP TEST" });
+  const lt = ctl(null, 96, 57, 6, "LT");
+  w(tap(cct, 96), [sLt, "13"]);
+  w([sLt, "14"], tap(lt, 96));
   // Lamp test: the LT rail feeds each lamp's test terminal.
-  w(tap(lt, 98), [hFire, "LT"]);
+  w(tap(lt, 96), [hFire, "LT"]);
   w([hFire, "LT"], [hHealthy, "LT"]);
   // CCT and 0V out to the four starters and the two controls sheets.
-  const cctOuts = [108, 114, 120, 126, 132, 138].map((x) => {
+  // Eight units apart: each arrow has its wire number to the left and its reference to the right.
+  const cctOuts = [102, 110, 118, 126, 134, 142].map((x) => {
     const a = arrowOut(x, 51);
     w(tap(cct, x), [a, "1"]);
     return a;
   });
-  const ovOuts = [111, 117, 123, 129, 135, 141].map((x) => {
+  const ovOuts = [102, 110, 118, 126, 134, 142].map((x) => {
     const a = arrowIn(x, 61);
     w([a, "1"], tap(ov, x));
     return a;
@@ -345,7 +346,7 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
     linkContact(p, k.id, er.id);
   };
   enLoop(11, er1, tag(SF1.id));
-  enLoop(31, er2, tag(SF2.id));
+  enLoop(33, er2, tag(SF2.id));
   // Running relays, from each starter's run signal.
   const runRelay = (x: number, fanTag: string) => {
     const a = arrowIn(x, 44, `${fanTag}\nRUN`);
@@ -453,7 +454,7 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
   // Enable loops and run signals between each starter and its controls sheet.
   starters.forEach((s, i) => {
     const sh = i < 2 ? controlsSheet : efSheet;
-    const y = i % 2 === 0 ? 11 : 31;
+    const y = i % 2 === 0 ? 11 : 33;
     linkOffpage(p, at(s.page, "offpage", 46, 33).id, at(sh, "offpage", 28, y).id);
     linkOffpage(p, at(sh, "offpage", 28, y + 14).id, at(s.page, "offpage", 46, 40).id);
     linkOffpage(p, at(s.page, "offpage", 78, 45).id, at(sh, "offpage", i % 2 === 0 ? 45 : 55, 44).id);
