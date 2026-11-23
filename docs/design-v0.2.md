@@ -451,6 +451,7 @@ Each step is one pull request, with a build to test.
 **Step 7a (GA and simulation; the rest of step 7 is 7b)**
 
 - **Split:** step 7 went into two PRs. 7a: fuse breaking, sheet type, GA notes gone, any scale, strips that keep up, device "suits". 7b: the Annotate tools (arrow, highlight, call-outs, polygon), door views with split doors and door devices drawn from the schematic, dimensions, the GA tool library and *Place parts…* window, bill of materials, rail and trunking fill, door cut-outs.
+- **GA label tool (for 7b, decided 23/11/26):** the *label* in §8's GA tools is a **label plate placed at true size on the door**, shown on the door views (and counted in the bill of materials). It isn't free text (GA notes stay gone, 46) or a device's label (already in its properties).
 - **Fuse (49):** a blown fuse is drawn with its link broken inside the carrier and crossed out, and is listed with the other inputs in the simulation panel (On = intact). An MCB already trips by clicking (it's an isolator with the breaker function) and is drawn open; no extra mark.
 - **Sheet type (12):** a GA can change type only with nothing laid out on it, and only an empty sheet (no parts, wires or sections) can become a GA, starting as a 600 × 800 backplate at the scale that fits.
 - **GA notes (46):** a note in a file from a test build becomes a Text annotation where it was. The example's rail note is a Text annotation.
