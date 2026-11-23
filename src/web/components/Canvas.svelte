@@ -622,7 +622,7 @@
     // The group whose terminals are nearest across.
     let best: { name: string; d: number } | null = null;
     for (const g of lay.groups) {
-      const d = x < g.x0 - 1.5 ? g.x0 - 1.5 - x : x > g.x1 + 1.5 ? x - g.x1 - 1.5 : 0;
+      const d = x < g.x0 - 1 ? g.x0 - 1 - x : x > g.x1 + 1 ? x - g.x1 - 1 : 0;
       if (!best || d < best.d) best = { name: g.name, d };
     }
     const item = editor.project.plant.find((p) => p.id === el.params.plant);

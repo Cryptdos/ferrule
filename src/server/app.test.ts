@@ -211,3 +211,24 @@ describe("save as", () => {
     expect(existsSync(target + ".bak")).toBe(true);
   });
 });
+
+describe("projects from Ferrule 0.1", () => {
+  test("are listed with the reason they can't open, and refused plainly", async () => {
+    const d = await mkdtemp(join(tmpdir(), "ferrule-old-"));
+    try {
+      await Bun.write(join(d, "old-panel.ferrule"), JSON.stringify({ format: "ferrule", version: 2, id: "old-panel", pages: [] }));
+      const storage = new Storage(d);
+      await storage.init();
+      const a = createApp({ storage });
+      const list = await (await a.request("/api/projects")).json();
+      expect(list).toHaveLength(1);
+      expect(list[0].id).toBe("old-panel");
+      expect(list[0].error).toMatch(/made with Ferrule 0\.1/);
+      const res = await a.request("/api/projects/old-panel");
+      expect(res.status).toBe(400);
+      expect((await res.json()).error).toMatch(/can't open it/);
+    } finally {
+      await rm(d, { recursive: true, force: true });
+    }
+  });
+});

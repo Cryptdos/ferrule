@@ -16,9 +16,11 @@ import {
   type Rect,
   type Rotation,
   type Vec,
+  lineUnits,
   rotate,
   rotateDir,
   rotateRect,
+  textUnits,
   unionRect,
 } from "./geometry";
 import type { Element, ParamValue } from "./model";
@@ -109,14 +111,27 @@ export interface SymbolDef {
 // ---------------------------------------------------------------------------
 // Drawing helpers
 
-const W = 0.18; // normal line weight (≈ 0.25 mm)
-const RAIL_W = 0.3;
-const BAR_W = 0.6;
-const TAG = 1.4; // tag text size (≈ 1.9 mm)
-const LABEL = 1.1; // ≈ 1.5 mm
-const TERM = 0.95; // ≈ 1.3 mm
-/** Text sizes for drawing text, in grid units (2.5, 3.5, 5 and 7 mm on paper). */
-const TEXT_SIZES: Record<string, number> = { small: 1.8, normal: 2.53, large: 3.61, title: 5.05 };
+// Sizes come from the named styles in geometry.ts (millimetres on paper).
+const W = lineUnits("thin");
+const RAIL_W = lineUnits("thick");
+const BAR_W = lineUnits("thick");
+/** Part tags, labels and names. */
+const TAG = textUnits("tag");
+/** Terminal numbers, ratings, functions, colours, cross-references. */
+const DETAIL = textUnits("detail");
+/** Text styles a user can pick for drawing text. */
+const TEXT_SIZES: Record<string, number> = {
+  detail: textUnits("detail"),
+  note: textUnits("note"),
+  heading: textUnits("heading"),
+  title: textUnits("title"),
+};
+const TEXT_SIZE_OPTIONS = [
+  { value: "detail", label: "Detail (1.8 mm)" },
+  { value: "note", label: "Note (2.5 mm)" },
+  { value: "heading", label: "Heading (3.5 mm)" },
+  { value: "title", label: "Title (5 mm)" },
+];
 
 const line = (...pts: Vec[]): Prim => ({ t: "line", pts });
 const dashed = (...pts: Vec[]): Prim => ({ t: "line", pts, dash: true });
@@ -146,7 +161,7 @@ const text = (x: number, y: number, s: string, size: number, anchor: Anchor, rol
   role,
 });
 const term = (x: number, y: number, s: string, anchor: Anchor = "start"): Prim =>
-  text(x, y, s, TERM, anchor, "term");
+  text(x, y, s, DETAIL, anchor, "term");
 
 function str(el: Element, key: string, fallback: string): string {
   const v = el.params[key];
@@ -167,8 +182,8 @@ function bool(el: Element, key: string, fallback: boolean): boolean {
  * the label under that. An empty cross-reference closes up.
  */
 function tagAndLabel(x: number, el: Element): Prim[] {
-  const out: Prim[] = [text(x, 0.5, "{tag}", TAG, "end", "tag"), text(x, 1.75, "{xref}", TERM, "end", "xref")];
-  if (el.label) out.push(text(x, 3.0, "{label}", LABEL, "end", "label"));
+  const out: Prim[] = [text(x, 0.5, "{tag}", TAG, "end", "tag"), text(x, 1.75, "{xref}", DETAIL, "end", "xref")];
+  if (el.label) out.push(text(x, 3.0, "{label}", TAG, "end", "label"));
   return out;
 }
 
@@ -180,7 +195,6 @@ function poleMarks(el: Element, base: [string, string]): [string, string] {
 }
 
 /** A block cell's number: 1.05 units (≈1.5 mm, clear of the cell walls), smaller only if it won't fit up the cell. */
-const termSize = (tag: string, half: number) => Math.min(1.05, (half * 2 - 0.4) / Math.max(0.1, textWidth(tag, 1)));
 
 const vterms = (a: string, b: string, half = 3): TerminalDef[] => [
   { name: a, at: [0, -half], dir: "up" },
@@ -502,7 +516,7 @@ const SYMBOLS: SymbolDef[] = [
             opOf(el) ? line([0, 1.5], [-0.25, -1.5]) : line([0, 1.5], [-1.1, -1.7]),
             dashed([-0.55, -0.1], [hx, -0.1]),
             ...(key ? keyHead(hx) : turnHead(hx)).map((p) => (p.t === "line" ? { ...p, pts: p.pts.map(([x, y]) => [x, y - 0.1] as Vec) } : p)),
-            text(hx, -1.5, legend, TERM, "middle", "note"),
+            text(hx, -1.5, legend, DETAIL, "middle", "note"),
             term(0.45, -2.2, "14"),
             term(-2.45, -2.2, "12", "end"),
             term(0.45, 2.9, "11"),
@@ -521,7 +535,7 @@ const SYMBOLS: SymbolDef[] = [
           ...noContact(0, opOf(el)),
           dashed(NO_MID, [-2.4, 0]),
           ...(key ? keyHead(-2.4) : turnHead(-2.4)),
-          text(-2.4, -1.4, legend, TERM, "middle", "note"),
+          text(-2.4, -1.4, legend, DETAIL, "middle", "note"),
           ...contactTerms(["13", "14"]).prims,
           ...tagAndLabel(-3.6, el),
         ],
@@ -630,7 +644,7 @@ const SYMBOLS: SymbolDef[] = [
         terminals.push({ name: a, at: [x, -3], dir: "up" }, { name: b, at: [x, 3], dir: "down" });
       }
       if (poles > 1) prims.push(dashed([0.6, 0], [(poles - 1) * 3 - 0.6, 0]));
-      if (rating) prims.push(text((poles - 1) * 3 + 1, 0.45, rating, LABEL, "start", "note"));
+      if (rating) prims.push(text((poles - 1) * 3 + 1, 0.45, rating, DETAIL, "start", "note"));
       prims.push(...tagAndLabel(-1.2, el));
       return { prims, terminals, body: { x: -0.6, y: -1.6, w: (poles - 1) * 3 + 1.2, h: 3.2 } };
     },
@@ -706,9 +720,9 @@ const SYMBOLS: SymbolDef[] = [
         term(0.45, -1.6, "A1"),
         term(0.45, 2.9, "A2"),
         text(tx, 0.5, "{tag}", TAG, "end", "tag"),
-        text(tx, 1.75, fn, LABEL, "end", "note"),
+        text(tx, 1.75, fn, DETAIL, "end", "note"),
       ];
-      if (el.label) prims.push(text(tx, 3.0, "{label}", LABEL, "end", "label"));
+      if (el.label) prims.push(text(tx, 3.0, "{label}", TAG, "end", "label"));
       return { prims, terminals: vterms("A1", "A2"), body: { x: -2.8, y: -1.1, w: 4.4, h: 2.2 } };
     },
   },
@@ -741,7 +755,7 @@ const SYMBOLS: SymbolDef[] = [
         line([-d, d], [d, -d]),
         term(0.45, -2.2, "V+"),
         term(0.45, 2.9, "V-"),
-        ...(colour ? [text(1.8, 0.45, colour, LABEL, "start", "note")] : []),
+        ...(colour ? [text(1.8, 0.45, colour, DETAIL, "start", "note")] : []),
       ];
       const terminals = vterms("V+", "V-");
       if (test) {
@@ -792,7 +806,9 @@ const SYMBOLS: SymbolDef[] = [
       const prims: Prim[] = [];
       // In the block the cell is 3 units tall (room for a readable number);
       // on its own the terminal is a small circle with leads to ±1.
-      const half = onBlock ? BLOCK_HALF : 1;
+      // params.cellHalf is set by the sheet (fitBlock) when a long number needs taller cells.
+      const cellHalf = typeof el.params.cellHalf === "number" ? Math.min(10, Math.max(BLOCK_HALF, el.params.cellHalf)) : BLOCK_HALF;
+      const half = onBlock ? cellHalf : 1;
       // A fused or disconnect terminal: the fuse or knife in the lead on the
       // panel side, right on top of the terminal, so it can't be missed.
       const top = fn === "plain" ? -half : -half - 2;
@@ -820,18 +836,18 @@ const SYMBOLS: SymbolDef[] = [
         // A cell of the boundary's terminal block, its number written up the cell.
         prims.push(
           line([-0.5, -half], [0.5, -half], [0.5, half], [-0.5, half], [-0.5, -half]),
-          // As big as reads well, smaller only if it won't fit up the cell (3-13A).
+          // Always the detail size: a long number makes the cells taller instead.
           {
             t: "text",
             // Centred across the cell: the capitals sit either side of the middle.
-            at: [termSize(t?.tag ?? el.tag ?? "", half) * CAP_HEIGHT * 0.5, 0],
+            at: [DETAIL * CAP_HEIGHT * 0.5, 0],
             text: "{tag}",
-            size: termSize(t?.tag ?? el.tag ?? "", half),
+            size: DETAIL,
             anchor: "middle",
             role: "tag",
             vertical: true,
           },
-          ...(el.label ? [text(0.65, half + 1, "{label}", TERM, "start", "label")] : []),
+          ...(el.label ? [text(0.65, half + 1, "{label}", DETAIL, "start", "label")] : []),
         );
         return {
           prims,
@@ -849,10 +865,10 @@ const SYMBOLS: SymbolDef[] = [
         // White inside: a terminal on the panel boundary sits over the line.
         { t: "circle", c: [0, 0], r: 0.45, bg: true },
         // The terminal's number sits beside it, across the wire, so it doesn't read as a wire number.
-        text(0.6, -0.15, "{tag}", 0.85, "start", "tag"),
+        text(0.6, -0.15, "{tag}", DETAIL, "start", "tag"),
         // Its strip on the other side, when asked for.
-        ...(strip ? [text(-0.6, -0.15, strip, 0.85, "end", "note")] : []),
-        ...(el.label ? [text(0.65, 1.0, "{label}", TERM, "start", "label")] : []),
+        ...(strip ? [text(-0.6, -0.15, strip, DETAIL, "end", "note")] : []),
+        ...(el.label ? [text(0.65, 1.0, "{label}", DETAIL, "start", "label")] : []),
       );
       return {
         prims,
@@ -928,7 +944,7 @@ const SYMBOLS: SymbolDef[] = [
         ...tagAndLabel(-1.2, el),
       ];
       if (bool(el, "screen", false)) prims.push(dashed([cx - 3, 0], [cx + 3, 0]), line([cx + 3, 0], [cx + 3.6, 0]));
-      if (rating) prims.push(text(cx + 3, 2.6, rating, LABEL, "start", "note"));
+      if (rating) prims.push(text(cx + 3, 2.6, rating, DETAIL, "start", "note"));
       return {
         prims,
         terminals: [
@@ -964,7 +980,7 @@ const SYMBOLS: SymbolDef[] = [
           term(-3.45, -4.4, "U", "end"),
           term(0.45, -4.4, "V"),
           term(3.45, -4.4, "W"),
-          ...(rating ? [text(4.1, 2.5, rating, LABEL, "start", "note")] : []),
+          ...(rating ? [text(4.1, 2.5, rating, DETAIL, "start", "note")] : []),
           ...tagAndLabel(-4.2, el),
         ],
         terminals: [
@@ -993,9 +1009,9 @@ const SYMBOLS: SymbolDef[] = [
       return {
         prims: [
           heavy(BAR_W, [0, 0], [len, 0]),
-          ...(name ? [text(-0.8, 0.5, name, LABEL, "end", "note")] : []),
+          ...(name ? [text(-0.8, 0.5, name, DETAIL, "end", "note")] : []),
           text(len / 2, -1, "{tag}", TAG, "middle", "tag"),
-          ...(el.label ? [text(len / 2, 2.2, "{label}", LABEL, "middle", "label")] : []),
+          ...(el.label ? [text(len / 2, 2.2, "{label}", TAG, "middle", "label")] : []),
         ],
         terminals: railTerminals(el),
         body: { x: 0, y: -0.3, w: len, h: 0.6 },
@@ -1023,7 +1039,7 @@ const SYMBOLS: SymbolDef[] = [
           text(-0.6, -0.45, name, TAG, "end", "note"),
           text(len + 0.6, -0.45, name, TAG, "start", "note"),
           // Other sheets the same rail is on (a rail of the same name is the same conductor).
-          text(len + 0.6, 1.5, "{xref}", TERM, "start", "xref"),
+          text(len + 0.6, 1.5, "{xref}", DETAIL, "start", "xref"),
         ],
         terminals: railTerminals(el),
         body: { x: 0, y: -0.15, w: len, h: 0.3 },
@@ -1105,12 +1121,12 @@ const SYMBOLS: SymbolDef[] = [
           // Whichever way the arrow points, the reference reads on its right and the label on its left.
           ...(el.rot === 180
             ? [
-                text(-1, -1, "{xref}", LABEL, "end", "xref"),
-                ...(el.label ? [text(1, -1, "{label}", LABEL, "start", "label")] : []),
+                text(-1, -1, "{xref}", DETAIL, "end", "xref"),
+                ...(el.label ? [text(1, -1, "{label}", TAG, "start", "label")] : []),
               ]
             : [
-                text(1, 1.2, "{xref}", LABEL, "start", "xref"),
-                ...(el.label ? [text(-1, 1.2, "{label}", LABEL, "end", "label")] : []),
+                text(1, 1.2, "{xref}", DETAIL, "start", "xref"),
+                ...(el.label ? [text(-1, 1.2, "{label}", TAG, "end", "label")] : []),
               ]),
         ],
         terminals: [{ name: "1", at: [0, -2], dir: "up" }],
@@ -1158,7 +1174,7 @@ const SYMBOLS: SymbolDef[] = [
       const lx = drain === "left" ? cx + rx + 0.5 : cx - rx - 0.5;
       const anchor: Anchor = drain === "left" ? "start" : "end";
       prims.push(text(lx, -0.4, "{tag}", TAG, anchor, "tag"));
-      if (el.label) prims.push(text(lx, 0.95, "{label}", LABEL, anchor, "label"));
+      if (el.label) prims.push(text(lx, 0.95, "{label}", TAG, anchor, "label"));
       // No body: the wires pass through the screen.
       return { prims, terminals, body: { x: cx, y: 0, w: 0, h: 0 } };
     },
@@ -1188,26 +1204,36 @@ const SYMBOLS: SymbolDef[] = [
       prims.push(lay.partial ? line(...zig(right)) : line([right, 0], [right, h]));
       if (pbo) {
         prims.push(
-          text(left - 0.9, h / 2 - 0.2, "POWER BY", LABEL, "end", "note"),
-          text(left - 0.9, h / 2 + 1.2, "OTHERS", LABEL, "end", "note"),
+          text(left - 0.9, h / 2 - 0.2, "POWER BY", DETAIL, "end", "note"),
+          text(left - 0.9, h / 2 + 1.2, "OTHERS", DETAIL, "end", "note"),
         );
       }
-      // Terminal boxes along the top inside edge; adjacent ones share a wall.
+      // Terminal boxes along the top inside edge, adjacent ones sharing a wall,
+      // each name written up its box like a terminal block cell.
+      const half = PLANT.pitch / 2;
       for (const t of lay.terms) {
-        prims.push(rect(t.x - 1.5, 0, 3, PLANT.termH), text(t.x, PLANT.termH - 0.35, t.name, TERM, "middle", "term"));
+        prims.push(rect(t.x - half, 0, PLANT.pitch, lay.termH), {
+          t: "text",
+          at: [t.x + DETAIL * CAP_HEIGHT * 0.5, lay.termH / 2],
+          text: t.name,
+          size: DETAIL,
+          anchor: "middle",
+          role: "term",
+          vertical: true,
+        });
       }
-      for (const g of lay.groups) prims.push(text((g.x0 + g.x1) / 2, PLANT.termH + 1.7, g.name, PLANT.group, "middle", "note"));
+      for (const g of lay.groups) prims.push(text((g.x0 + g.x1) / 2, lay.termH + 1.9, g.name, PLANT.group, "middle", "note"));
       // Tag, description and information under the box: centred under a box
       // wider than they are, otherwise left-aligned from its left edge.
       const lines: [string, number, TextRole][] = [["{tag}", TAG, "tag"]];
-      for (const l of [str(el, "pdesc", ""), ...str(el, "pinfo", "").split("\n")].filter(Boolean)) lines.push([l, LABEL, "note"]);
-      if (el.label) lines.push(["{label}", LABEL, "label"]);
+      for (const l of [str(el, "pdesc", ""), ...str(el, "pinfo", "").split("\n")].filter(Boolean)) lines.push([l, DETAIL, "note"]);
+      if (el.label) lines.push(["{label}", TAG, "label"]);
       const widest = Math.max(...lines.map(([t, size]) => (t === "{tag}" ? 8 : t.length) * size * 0.55));
       const centred = widest < right - left;
       let y = h + 1.8;
       for (const [t, size, role] of lines) {
         prims.push(text(centred ? (left + right) / 2 : left, y, t, size, centred ? "middle" : "start", role));
-        y += size === TAG ? 1.6 : 1.4;
+        y += size * 1.35;
       }
       const terminals: TerminalDef[] = lay.terms.map((t) => ({ name: t.id, at: [t.x, 0], dir: "up" as Dir }));
       return { prims, terminals, body: { x: left, y: 0, w: right - left, h } };
@@ -1224,13 +1250,8 @@ const SYMBOLS: SymbolDef[] = [
         key: "size",
         label: "Size",
         type: "select",
-        default: "normal",
-        options: [
-          { value: "small", label: "Small (2.5 mm)" },
-          { value: "normal", label: "Normal (3.5 mm)" },
-          { value: "large", label: "Large (5 mm)" },
-          { value: "title", label: "Title (7 mm)" },
-        ],
+        default: "note",
+        options: TEXT_SIZE_OPTIONS,
       },
       {
         key: "align",
@@ -1246,7 +1267,7 @@ const SYMBOLS: SymbolDef[] = [
     ],
     kind: () => null,
     draw(el) {
-      const size = TEXT_SIZES[str(el, "size", "normal")] ?? TEXT_SIZES.normal!;
+      const size = TEXT_SIZES[str(el, "size", "note")] ?? TEXT_SIZES.note!;
       const anchor = str(el, "align", "start") as Anchor;
       const lines = (el.label || "Text").split("\n");
       const width = Math.max(...lines.map((l) => l.length)) * size * 0.5;
@@ -1269,18 +1290,14 @@ const SYMBOLS: SymbolDef[] = [
         key: "size",
         label: "Size",
         type: "select",
-        default: "small",
-        options: [
-          { value: "small", label: "Small (2.5 mm)" },
-          { value: "normal", label: "Normal (3.5 mm)" },
-          { value: "large", label: "Large (5 mm)" },
-        ],
+        default: "note",
+        options: TEXT_SIZE_OPTIONS,
       },
       { key: "width", label: "Width (units)", type: "number", min: 10, max: 200, default: 80 },
     ],
     kind: () => null,
     draw(el, t) {
-      const size = TEXT_SIZES[str(el, "size", "small")] ?? TEXT_SIZES.small!;
+      const size = TEXT_SIZES[str(el, "size", "note")] ?? TEXT_SIZES.note!;
       const md = (t?.label ?? el.label) || "## Notes\n- Write notes here";
       const n = notesLayout(md, size, num(el, "width", 80, 10, 200));
       return { prims: n.prims, terminals: [], body: { x: 0, y: 0, w: n.w, h: n.h } };
@@ -1298,16 +1315,13 @@ const SYMBOLS: SymbolDef[] = [
         key: "size",
         label: "Size",
         type: "select",
-        default: "small",
-        options: [
-          { value: "small", label: "Small (2.5 mm)" },
-          { value: "normal", label: "Normal (3.5 mm)" },
-        ],
+        default: "note",
+        options: TEXT_SIZE_OPTIONS,
       },
     ],
     kind: () => null,
     draw(el, t) {
-      const size = TEXT_SIZES[str(el, "size", "small")] ?? TEXT_SIZES.small!;
+      const size = TEXT_SIZES[str(el, "size", "note")] ?? TEXT_SIZES.note!;
       const r = revisionTable(t?.rows ?? [], num(el, "rows", 6, 1, 40), size);
       return { prims: r.prims, terminals: [], body: { x: 0, y: 0, w: r.w, h: r.h } };
     },
@@ -1324,16 +1338,13 @@ const SYMBOLS: SymbolDef[] = [
         key: "size",
         label: "Size",
         type: "select",
-        default: "small",
-        options: [
-          { value: "small", label: "Small (2.5 mm)" },
-          { value: "normal", label: "Normal (3.5 mm)" },
-        ],
+        default: "note",
+        options: TEXT_SIZE_OPTIONS,
       },
     ],
     kind: () => null,
     draw(el, t) {
-      const size = TEXT_SIZES[str(el, "size", "small")] ?? TEXT_SIZES.small!;
+      const size = TEXT_SIZES[str(el, "size", "note")] ?? TEXT_SIZES.note!;
       const entries = t?.legend ?? [];
       if (!entries.length) {
         return { prims: [text(0, 2, "SYMBOL LEGEND: no parts drawn yet", size, "start", "label")], terminals: [], body: { x: 0, y: 0, w: 40, h: 3 } };
@@ -1361,7 +1372,7 @@ const SYMBOLS: SymbolDef[] = [
       const pts: Vec[] = [[0, 0], [w, 0], [w, h], [0, h], [0, 0]];
       const prim: Prim = { t: "line", pts, dash: bool(el, "dashed", false), w: bool(el, "heavy", false) ? 0.35 : W };
       return {
-        prims: [prim, ...(el.label ? [text(0.6, 1.8, "{label}", LABEL, "start", "label")] : [])],
+        prims: [prim, ...(el.label ? [text(0.6, 1.8, "{label}", TAG, "start", "label")] : [])],
         terminals: [],
         body: { x: 0, y: 0, w, h },
       };
@@ -1380,19 +1391,15 @@ const SYMBOLS: SymbolDef[] = [
         key: "size",
         label: "Text size",
         type: "select",
-        default: "small",
-        options: [
-          { value: "small", label: "Small (2.5 mm)" },
-          { value: "normal", label: "Normal (3.5 mm)" },
-          { value: "large", label: "Large (5 mm)" },
-        ],
+        default: "note",
+        options: TEXT_SIZE_OPTIONS,
       },
     ],
     kind: () => null,
     draw(el) {
       const w = num(el, "w", 20, 4, 200);
       const h = num(el, "h", 5, 2, 60);
-      const size = TEXT_SIZES[str(el, "size", "small")] ?? TEXT_SIZES.small!;
+      const size = TEXT_SIZES[str(el, "size", "note")] ?? TEXT_SIZES.note!;
       const lines = (el.label || "LABEL").split("\n");
       const lh = size * 1.3;
       const top = h / 2 - ((lines.length - 1) * lh) / 2 + size * 0.35;
@@ -1465,15 +1472,15 @@ const SYMBOLS: SymbolDef[] = [
         const x = i * 3;
         prims.push(line([x, -2.6], [x, 0]), { t: "poly", pts: [[x - 0.45, -1.5], [x + 0.45, -1.5], [x, -0.6]], fill: true });
         const [tx, ty] = rotate([x, -2.6], rot);
-        const mid = ty + cap(TERM) / 2;
+        const mid = ty + cap(DETAIL) / 2;
         prims.push(
           rot === 0
-            ? placed([tx, ty - gap], name, TERM, "middle", "term")
+            ? placed([tx, ty - gap], name, DETAIL, "middle", "term")
             : rot === 180
-              ? placed([tx, ty + gap + cap(TERM)], name, TERM, "middle", "term")
+              ? placed([tx, ty + gap + cap(DETAIL)], name, DETAIL, "middle", "term")
               : rot === 90
-                ? placed([tx + gap, mid], name, TERM, "start", "term")
-                : placed([tx - gap, mid], name, TERM, "end", "term"),
+                ? placed([tx + gap, mid], name, DETAIL, "start", "term")
+                : placed([tx - gap, mid], name, DETAIL, "end", "term"),
         );
         terminals.push({ name, at: [x, 0], dir: "down" });
       });
@@ -1481,12 +1488,12 @@ const SYMBOLS: SymbolDef[] = [
         const last = (names.length - 1) * 3;
         const label =
           rot === 0
-            ? placed([-0.6, -4.4], "{label}", LABEL, "start", "label")
+            ? placed([-0.6, -4.4], "{label}", TAG, "start", "label")
             : rot === 180
-              ? placed([-last - 0.6, 2.6 + 2 * gap + cap(TERM) + cap(LABEL)], "{label}", LABEL, "start", "label")
+              ? placed([-last - 0.6, 2.6 + 2 * gap + cap(DETAIL) + cap(TAG)], "{label}", TAG, "start", "label")
               : rot === 90
-                ? placed([-0.6, -0.9], "{label}", LABEL, "start", "label")
-                : placed([0.6, -last - 0.9], "{label}", LABEL, "end", "label");
+                ? placed([-0.6, -0.9], "{label}", TAG, "start", "label")
+                : placed([0.6, -last - 0.9], "{label}", TAG, "end", "label");
         prims.push(label);
       }
       return { prims, terminals, body: { x: -0.5, y: -2.6, w: (names.length - 1) * 3 + 1, h: 2.6 } };
@@ -1551,12 +1558,14 @@ export function plantTerminalName(id: string, group?: string): string {
 
 /** Plant view sizes, grid units. */
 export const PLANT = {
-  /** Every plant box is this tall, so they line up. */
-  h: 6,
-  /** Terminal boxes along the top inside edge. */
-  termH: 1.6,
-  /** Group names, in capitals, a touch larger than other labels. */
-  group: 1.25,
+  /** Terminal boxes along the top inside edge: 1 unit apart, like terminal block cells. */
+  pitch: 1,
+  /** Terminal boxes are at least this tall (as tall as a terminal block cell); a long name makes them taller. */
+  termH: 3,
+  /** Room under the boxes for the group names. */
+  below: 3,
+  /** Group names, in capitals. */
+  group: textUnits("tag"),
 };
 
 /**
@@ -1571,6 +1580,7 @@ export function plantViewLayout(el: Element): {
   left: number;
   right: number;
   h: number;
+  termH: number;
   partial: boolean;
 } {
   const all = str(el, "terms", "").split(",").filter(Boolean);
@@ -1586,26 +1596,30 @@ export function plantViewLayout(el: Element): {
     if (last && last.name === name) last.terms.push(t);
     else runs.push({ name, terms: [t] });
   }
-  const textW = (name: string) => (name ? name.length * PLANT.group * 0.62 : 0);
+  const textW = (name: string) => (name ? textWidth(name, PLANT.group) : 0);
+  const P = PLANT.pitch;
   const terms: { id: string; name: string; x: number }[] = [];
   const groups: { name: string; x0: number; x1: number }[] = [];
   let prevRight = -Infinity; // right edge of whatever the previous run drew (boxes or name)
   for (const [i, r] of runs.entries()) {
-    const span = (r.terms.length - 1) * 3;
-    const half = Math.max(span + 3, textW(r.name)) / 2;
-    // Centre far enough right to clear the last run by a box width.
+    const span = (r.terms.length - 1) * P;
+    const half = Math.max(span + P, textW(r.name)) / 2;
+    // Centre far enough right to clear the last run by a unit and a half.
     let x0 = 0;
-    if (i > 0) x0 = Math.ceil(prevRight + 3 + half - span / 2);
+    if (i > 0) x0 = Math.ceil(prevRight + 1.5 + half - span / 2);
     const centre = x0 + span / 2;
-    r.terms.forEach((t, j) => terms.push({ id: t, name: plantTerminalName(t, r.name), x: x0 + j * 3 }));
+    r.terms.forEach((t, j) => terms.push({ id: t, name: plantTerminalName(t, r.name), x: x0 + j * P }));
     if (r.name) groups.push({ name: r.name.toUpperCase(), x0, x1: x0 + span });
     prevRight = centre + half;
   }
   const lastX = terms.length ? terms[terms.length - 1]!.x : 0;
   const nameEdge = (g: { name: string; x0: number; x1: number }, side: -1 | 1) => (g.x0 + g.x1) / 2 + (side * textW(g.name)) / 2;
-  const left = Math.min(-3, ...groups.map((g) => nameEdge(g, -1) - 1));
-  const right = Math.max(lastX + 3, left + 6, ...groups.map((g) => nameEdge(g, 1) + 1));
-  return { terms, groups, left, right, h: PLANT.h, partial: shown.length < all.length };
+  const left = Math.min(-1.5, ...groups.map((g) => nameEdge(g, -1) - 1));
+  const right = Math.max(lastX + 1.5, left + 6, ...groups.map((g) => nameEdge(g, 1) + 1));
+  // Boxes tall enough for the longest name written up them, in half-unit steps.
+  const longest = Math.max(0, ...terms.map((t) => textWidth(t.name, DETAIL)));
+  const termH = Math.max(PLANT.termH, Math.ceil((longest + 0.4) * 2) / 2);
+  return { terms, groups, left, right, h: termH + PLANT.below, termH, partial: shown.length < all.length };
 }
 
 /** Does a parameter apply to this element as it's set now? */
@@ -1739,9 +1753,20 @@ export function localGeometry(el: Element, texts: string | GeometryText): Geomet
     if (m) return labelLines[Number(m[1])] ?? "";
     return s;
   };
-  const prims = raw.map((p) => {
-    const q = rotatePrim(p, el.rot);
-    return q.t === "text" ? { ...q, text: fill(q.text) } : q;
+  const rotated = raw.map((p) => rotatePrim(p, el.rot));
+  const tagAt = rotated.find((p) => p.t === "text" && p.text === "{tag}");
+  const prims = rotated.flatMap((q): Prim[] => {
+    if (q.t !== "text") return [q];
+    const filled = fill(q.text);
+    // A label written on several lines reads down from where its first line
+    // goes; a label drawn above the tag grows upwards instead, clear of it.
+    if (q.text === "{label}" && filled.includes("\n")) {
+      const lines = filled.split("\n");
+      const up = !!tagAt && tagAt.t === "text" && q.at[1] < tagAt.at[1];
+      const lh = q.size * 1.25;
+      return lines.map((line, i) => ({ ...q, at: [q.at[0], q.at[1] + (up ? i - (lines.length - 1) : i) * lh] as Vec, text: line }));
+    }
+    return [{ ...q, text: filled }];
   });
   const terminals = d.terminals.map((t) => ({ ...t, at: rotate(t.at, el.rot), dir: rotateDir(t.dir, el.rot) }));
   const body = rotateRect(d.body, el.rot);

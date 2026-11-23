@@ -172,8 +172,8 @@ async function edit<T>(ctx: ToolContext, projectId: string, fn: (p: Project) => 
 const project = { type: "string", description: "Project id (see list_projects)" };
 const sheet = { type: "integer", description: "Sheet number, 1-based" };
 const xy = {
-  x: { type: "number", description: "Grid units across, 0–200 (2 units per column; column = floor(x/2)+1)" },
-  y: { type: "number", description: "Grid units down, 0–120" },
+  x: { type: "number", description: `Grid units across, 0–${AREA_UNITS.w} (2 units per column; column = floor(x/2)+1)` },
+  y: { type: "number", description: `Grid units down, 0–${AREA_UNITS.h}` },
 };
 const obj = (properties: Record<string, unknown>, required: string[] = []) => ({
   type: "object",
@@ -798,7 +798,7 @@ export const TOOLS: Tool[] = [
 
 export const INSTRUCTIONS = `Ferrule drafts control panel schematics on A4 landscape sheets.
 
-Coordinates are grid units: x 0–${AREA_UNITS.w} across (100 columns, 2 units each), y 0–${AREA_UNITS.h} down. Every terminal sits on a whole unit. Symbols are vertical by default (current flows top to bottom), so a ladder rung is a column of symbols between a CCT rail at the top and a 0V rail at the bottom: wire terminal to terminal down the column.
+Coordinates are grid units: x 0–${AREA_UNITS.w} across (${AREA_UNITS.w / 2} columns, 2 units each), y 0–${AREA_UNITS.h} down. Every terminal sits on a whole unit. Symbols are vertical by default (current flows top to bottom), so a ladder rung is a column of symbols between a CCT rail at the top and a 0V rail at the bottom: wire terminal to terminal down the column.
 
 Typical flow: create_project or pick one from list_projects → add_element (rails, contacts, coils, lamps, terminals) → connect → link contacts to their coils → add_plant / place_plant_view for field equipment below a panel boundary (update_page boundaryY), with terminals on the boundary → renumber → check → view_page to look at the result → export_pdf.
 

@@ -1,5 +1,8 @@
 <script lang="ts">
   import type { Prim } from "../../core/symbols";
+  import { lineUnits } from "../../core/geometry";
+
+  const THIN = lineUnits("thin");
 
   let { prims, x = 0, y = 0 }: { prims: Prim[]; x?: number; y?: number } = $props();
 
@@ -11,7 +14,7 @@
     {#if p.t === "line"}
       <polyline
         points={pts(p.pts)}
-        stroke-width={p.w ?? 0.18}
+        stroke-width={p.w ?? THIN}
         stroke-dasharray={p.dash ? "0.6 0.4" : undefined}
       />
     {:else if p.t === "poly"}
@@ -51,7 +54,7 @@
   circle,
   ellipse,
   path {
-    stroke-width: 0.18;
+    stroke-width: var(--thin, 0.135);
   }
   .filled {
     fill: #000;

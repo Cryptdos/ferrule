@@ -6,7 +6,7 @@ import type { Rotation, Vec } from "./geometry";
 import type { ProjectDevice } from "./devices";
 
 export const FORMAT = "ferrule";
-export const FORMAT_VERSION = 2;
+export const FORMAT_VERSION = 3;
 
 export type ParamValue = string | number | boolean;
 

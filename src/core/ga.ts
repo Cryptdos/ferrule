@@ -9,13 +9,13 @@
  * GA items are kept in real millimetres, measured from the enclosure's
  * top-left corner; they're drawn at the sheet's scale.
  */
-import { UNIT_MM, type Vec } from "./geometry";
+import { AREA_UNITS, UNIT_MM, type Vec } from "./geometry";
 import type { Element, GaItem, GaSettings, Page, Project } from "./model";
 import { getSymbol } from "./symbols";
 import { isSlave, slavesOf } from "./xref";
 
 /** Where the enclosure's top-left corner sits on the sheet, in grid units. */
-export const GA_ORIGIN: Vec = [10, 12];
+export const GA_ORIGIN: Vec = [8, 9];
 
 /** Scales offered, as 1:n. */
 export const GA_SCALES = [1, 2, 2.5, 5, 10, 15, 20];
@@ -37,7 +37,8 @@ export function sheetToGa(ga: GaSettings, p: Vec): Vec {
 
 /** The smallest usual scale at which an enclosure fits the drawing area beside its dimensions. */
 export function fitScale(w: number, h: number): number {
-  const room = { w: 175 * UNIT_MM, h: 95 * UNIT_MM };
+  // Room to the right and below for the dimensions.
+  const room = { w: (AREA_UNITS.w - GA_ORIGIN[0]) * UNIT_MM - 20, h: (AREA_UNITS.h - GA_ORIGIN[1]) * UNIT_MM - 18 };
   return GA_SCALES.find((s) => w / s <= room.w && h / s <= room.h) ?? GA_SCALES[GA_SCALES.length - 1]!;
 }
 

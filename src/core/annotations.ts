@@ -2,13 +2,13 @@
  * Drawn annotations built from text or from the project: formatted notes
  * (a small Markdown), the revision list and the symbol legend.
  */
-import type { Vec } from "./geometry";
+import { lineUnits, type Vec } from "./geometry";
 import type { Element, Project } from "./model";
 import { getSymbol, listSymbols, localGeometry, type Prim } from "./symbols";
 import { CAP_HEIGHT, textWidth } from "./textwidth";
 
-const THIN = 0.12;
-const RULE = 0.18;
+const THIN = lineUnits("thin");
+const RULE = lineUnits("thick");
 
 /** A prim moved by (dx, dy). */
 export function movePrim(p: Prim, dx: number, dy: number): Prim {
@@ -214,11 +214,12 @@ export function notesLayout(md: string, size: number, width: number): { prims: P
 // ---------------------------------------------------------------------------
 // Revision list
 
+/** Column widths, in multiples of the text size, so the table keeps its shape at any size. */
 export const REV_COLUMNS = [
-  { key: "rev", title: "REV", w: 6 },
-  { key: "date", title: "DATE", w: 12 },
-  { key: "description", title: "DESCRIPTION", w: 56 },
-  { key: "drawnBy", title: "BY", w: 12 },
+  { key: "rev", title: "REV", w: 3.5 },
+  { key: "date", title: "DATE", w: 7 },
+  { key: "description", title: "DESCRIPTION", w: 32 },
+  { key: "drawnBy", title: "BY", w: 7 },
 ] as const;
 
 /** The project's revisions as table rows, oldest first. */
@@ -229,14 +230,15 @@ export function revisionRows(project: Project): string[][] {
 /** A revision list: heading row and one row per revision, with blank rows to make up `min` rows. */
 export function revisionTable(rows: string[][], min: number, size: number): { prims: Prim[]; w: number; h: number } {
   const rowH = size * 1.8;
-  const total = REV_COLUMNS.reduce((a, c) => a + c.w, 0);
+  const cols = REV_COLUMNS.map((c) => ({ ...c, w: c.w * size }));
+  const total = cols.reduce((a, c) => a + c.w, 0);
   const all = [...rows];
   while (all.length < min) all.push(["", "", "", ""]);
   const prims: Prim[] = [];
   const n = all.length + 1;
   const mid = (r: number) => r * rowH + rowH / 2 + (size * CAP_HEIGHT) / 2;
   let x = 0;
-  REV_COLUMNS.forEach((c, ci) => {
+  cols.forEach((c, ci) => {
     prims.push(txt(x + size * 0.5, mid(0), c.title, size, true));
     all.forEach((r, ri) => {
       let s = r[ci] ?? "";

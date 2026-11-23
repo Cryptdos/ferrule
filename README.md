@@ -76,7 +76,7 @@ bun run build      # build the browser UI into dist/web
 bun run start      # start the server and open http://127.0.0.1:4810/
 ```
 
-A project is one `.ferrule` file (JSON) with everything in it, pictures included, so it can be copied, emailed or kept in a job folder. New projects go in a `projects` folder (next to the program when running as the .exe, otherwise in the current folder); files opened from elsewhere stay where they are and are remembered in the project list. The previous save is kept as `.bak`. Older `.ferrule.json` files still open. *Delete* on the project list moves the file to `projects/Deleted`.
+A project is one `.ferrule` file (JSON) with everything in it, pictures included, so it can be copied, emailed or kept in a job folder. New projects go in a `projects` folder (next to the program when running as the .exe, otherwise in the current folder); files opened from elsewhere stay where they are and are remembered in the project list. The previous save is kept as `.bak`. Ferrule 0.2 can't open projects made with 0.1 (there's no upgrading before 1.0); they need redrawing. *Delete* on the project list moves the file to `projects/Deleted`.
 
 Set `FERRULE_BROWSER` to the path of a Chromium-based browser to choose which one makes PDFs.
 

@@ -51,13 +51,6 @@ describe("link arrows", () => {
     expect(xrefText(p, a, "")).toBe("26");
   });
 
-  test("older files: direction in/out becomes the Source tick", () => {
-    const { p, pg } = project();
-    const a = addElement(p, pg, "offpage", [10, 10]);
-    const old = JSON.parse(JSON.stringify(p));
-    old.pages[0].elements.find((e: { id: string }) => e.id === a.id).params = { direction: "in" };
-    expect(parseProject(old).pages[0]!.elements[0]!.params.source).toBe(false);
-  });
 });
 
 describe("plant tags", () => {
@@ -72,12 +65,6 @@ describe("plant tags", () => {
     expect(u.tag).toBe("U1-31");
   });
 
-  test("older plant tags give their prefix", () => {
-    const { p } = project();
-    const old = JSON.parse(JSON.stringify(p));
-    old.plant = [{ id: "p1", tag: "SF-01", description: "", terminals: [] }];
-    expect(parseProject(old).plant[0]!.prefix).toBe("SF");
-  });
 });
 
 describe("renumber preview", () => {
