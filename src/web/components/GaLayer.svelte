@@ -19,17 +19,24 @@
   import { textUnits } from "../../core/geometry";
   import { displayTag } from "../../core/tags";
   import { resolveFields } from "../../core/fields";
+  import { lampGlow } from "../lamps";
 
   /** A GA sheet's enclosure (or door) and items, drawn at its scale (grid units, like the rest of the sheet). */
   let {
     project,
     page,
     preview = null,
+    lit = null,
   }: {
     project: Project;
     page: Page;
     /** Items being dragged or sized: their temporary place, by id. */
     preview?: Map<string, GaItem> | null;
+    /**
+     * Simulate: schematic lamps that are lit (design-v0.3 §4). Their door
+     * lamps glow in their colour; for seeing only, nothing here is clicked.
+     */
+    lit?: Set<string> | null;
   } = $props();
 
   const ga = $derived(page.ga!);
@@ -203,8 +210,13 @@
         {:else}
           <rect class="legend" {x} y={y + top} width={w} height={plateH} />
           <circle class="bezel" {cx} {cy} {r} />
-          {#if dp.kind === "lamp"}
-            <circle class="lens" {cx} {cy} r={r * 0.72} style:fill={LENS[String(dp.el.params.colour)] ?? "#ffffff"} />
+          {#if dp.kind === "lamp" && lit?.has(dp.el.id)}
+            <!-- Lit in Simulate: it glows in its colour, as the schematic lamp does. -->
+            <circle class="glow" {cx} {cy} r={r * 1.9} style:fill={lampGlow(dp.el.params.colour)} />
+            <circle class="lens lit" {cx} {cy} r={r * 0.72} style:fill={lampGlow(dp.el.params.colour)} />
+          {:else if dp.kind === "lamp"}
+            <!-- In Simulate an unlit lamp is drawn dim, so the lit ones stand out. -->
+            <circle class="lens" class:off={!!lit} {cx} {cy} r={r * 0.72} style:fill={LENS[String(dp.el.params.colour)] ?? "#ffffff"} />
           {:else if dp.kind === "pushbutton"}
             <circle class="button" {cx} {cy} r={r * 0.72} />
             <circle class="button-in" {cx} {cy} r={r * 0.55} />
@@ -238,6 +250,10 @@
           <circle class="cutout" {cx} {cy} r={u(c.d) / 2} />
         {:else if c}
           <rect class="cutout" x={cx - u(c.w) / 2} y={cy - u(c.h) / 2} width={u(c.w)} height={u(c.h)} />
+        {/if}
+        {#if bp?.kind === "lamp" && lit?.has(bp.el.id)}
+          <!-- Lit in Simulate: the glow shows from inside too. -->
+          <circle class="glow" {cx} {cy} r={Math.min(w, top) * 0.45} style:fill={lampGlow(bp.el.params.colour)} />
         {/if}
         <text class="tag halo" x={cx} y={y + h + SMALLEST * 1.05} font-size={SMALLEST} text-anchor="middle">{text}</text>
         {#if c}
@@ -367,6 +383,14 @@
   .lens {
     stroke: #000;
     stroke-width: 0.1;
+  }
+  /* A lamp lit in Simulate (design-v0.3 §4). */
+  .glow {
+    opacity: 0.6;
+    filter: blur(0.5px);
+  }
+  .lens.off {
+    fill-opacity: 0.25;
   }
   .knob {
     fill: #444;

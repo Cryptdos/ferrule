@@ -32,6 +32,7 @@
     under,
     over,
     focus = null,
+    litLamps = null,
   }: {
     project: Project;
     page: Page;
@@ -63,6 +64,8 @@
      * drawn grey (note 8). Unset for print and previews.
      */
     focus?: "draft" | "annotate" | null;
+    /** Simulate: lamps lit, by schematic id, drawn lit on a door GA (design-v0.3 §4). */
+    litLamps?: Set<string> | null;
   } = $props();
   const dimDraft = $derived(focus === "annotate");
   const dimAnnotate = $derived(focus === "draft");
@@ -177,7 +180,7 @@
       <circle cx={d[0]} cy={d[1]} r="0.35" />
     {/each}
   </g>
-  {#if page.ga}<GaLayer {project} {page} preview={gaPreview} />{/if}
+  {#if page.ga}<GaLayer {project} {page} preview={gaPreview} lit={litLamps} />{/if}
   {#each drawOrder as el (el.id)}
     {@const o = offset?.(el.id)}
     <g class:dim={focus && benchOf(el) !== focus}>

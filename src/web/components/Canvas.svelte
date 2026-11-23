@@ -71,6 +71,7 @@
   import { contactRows, contactTableAt, contactTableRect, contactTableRowAt, isMaster, linkedTarget } from "../../core/xref";
   import Sheet from "./Sheet.svelte";
   import ElementView from "./ElementView.svelte";
+  import { lampGlow } from "../lamps";
 
   let {
     editor,
@@ -1307,10 +1308,9 @@
     }
     return out;
   });
-  function lampColour(c: unknown): string {
-    // White lamps glow a warm white, so they show on white paper.
-    return { Gn: "#3cc85a", Rd: "#ff4a4a", Wh: "#ffe9a8", Bu: "#4a8cff", Ye: "#ffd21f" }[String(c)] ?? "#ffe9a8";
-  }
+  const lampColour = lampGlow;
+  /** Lamps lit in Simulate, for the door GA (design-v0.3 §4). */
+  const litLamps = $derived(sim ? new Set(Object.entries(sim.state.lamps).filter(([, on]) => on).map(([id]) => id)) : null);
 
   const cursorClass = $derived(
     gesture?.kind === "pan" || spaceDown
@@ -1392,6 +1392,7 @@
     colourCheck={editor.colourCheck && editor.mode === "draft" && !sim}
     {gaPreview}
     focus={sim || page.ga ? null : bench}
+    {litLamps}
   >
     {#snippet under()}
       {#if sim}
