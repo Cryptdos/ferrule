@@ -77,14 +77,19 @@
     sim = null,
     insetLeft = 0,
     atlas = false,
+    tile = "",
   }: {
     editor: Editor;
     sim?: Simulator | null;
-    /** Width (px) covered by the floating browser on the left: Fit centres the sheet in the rest. */
+    /** Width (px) covered by the floating browser on the left of the main area: Fit centres the sheet in the rest. */
     insetLeft?: number;
-    /** Show the sheet overview in the top-right corner. */
+    /** Show the sheet overview in the top-right corner (of the active tile). */
     atlas?: boolean;
+    /** The tile this canvas is in (design-v0.3 §7): it shows that tile's sheet, and clicking it makes it the active tile. */
+    tile?: string;
   } = $props();
+  /** The tile being worked on: what's picked, the overview and jumps belong to it. */
+  const isActive = $derived(!tile || editor.activeTile === tile);
 
   let svg: SVGSVGElement | undefined = $state();
   let box = $state({ w: 1200, h: 800 });
@@ -126,27 +131,35 @@
   type Pending = { end: WireEnd; at: Vec };
   let pending: Pending | null = $state(null);
 
-  const page = $derived(editor.page);
+  const page = $derived(tile ? (editor.project.pages.find((p) => p.id === editor.tilePage(tile)) ?? editor.page) : editor.page);
   /** What can be picked: drafting (parts, wires, rails…) or annotation (text, boxes, sections, clouds…). */
   const bench = $derived(editor.mode === "annotate" ? "annotate" : "draft");
   const clouds = $derived(cloudsOn(editor.project, page.id));
   const geoms = $derived(
     new Map<string, Geometry>(page.elements.map((e) => [e.id, localGeometry(e, elementTexts(e, editor.project))])),
   );
-  const selected = $derived(new Set(editor.selection));
+  const selected = $derived(new Set(isActive ? editor.selection : []));
 
   $effect(() => {
     // Drop a half-drawn wire when the tool or page changes.
     void editor.tool;
-    void editor.pageId;
+    void page.id;
     pending = null;
     polyDraft = [];
     dimDraft = [];
   });
 
+  /** How much of this canvas the floating browser covers: none unless the tile is at the left of the main area. */
+  function covered(): number {
+    const main = svg?.closest("main");
+    if (!svg || !main) return insetLeft;
+    const left = svg.getBoundingClientRect().left - main.getBoundingClientRect().left;
+    return Math.max(0, insetLeft - left);
+  }
+
   export function fit(): void {
     // Fit the sheet into the part of the canvas not covered by the browser.
-    const inset = insetLeft < box.w * 0.5 ? insetLeft : 0;
+    const inset = covered() < box.w * 0.5 ? covered() : 0;
     const aw = Math.max(1, box.w - inset);
     const bh = Math.max(1, box.h);
     const mmPerPx = Math.max((SHEET_MM.w + 10) / aw, (SHEET_MM.h + 10) / bh);
@@ -591,6 +604,8 @@
   }
 
   function onPointerDown(e: PointerEvent) {
+    // Clicking a tile makes it the one being worked on, then the click does what it does there.
+    if (!isActive) editor.activateTile(tile);
     svg!.setPointerCapture(e.pointerId);
     if (e.button === 1 || (e.button === 0 && spaceDown)) {
       if (spaceDown) spacePanned = true;
@@ -1067,6 +1082,7 @@
   /** Pictures dropped on the sheet go where they're dropped (Annotate workbench). */
   async function onDrop(e: DragEvent) {
     if (sim) return;
+    if (!isActive) editor.activateTile(tile);
     const files = [...(e.dataTransfer?.files ?? [])].filter((f) => f.type.startsWith("image/"));
     if (!files.length) return;
     e.preventDefault();
@@ -1122,7 +1138,7 @@
     void page.id;
     untrack(() => {
       const id = editor.highlight;
-      if (!id || !svg) return;
+      if (!id || !svg || !isActive) return;
       const at = focusPoint(id);
       if (!at) return;
       const cx = AREA_MM.x + at[0] * UNIT_MM;
@@ -1130,7 +1146,7 @@
       const v = $state.snapshot(view);
       const mmPerPx = v.w / Math.max(1, box.w);
       const h = box.h * mmPerPx;
-      const inset = insetLeft < box.w * 0.5 ? insetLeft : 0;
+      const inset = covered() < box.w * 0.5 ? covered() : 0;
       // The middle of the uncovered area, in mm from the view's left edge.
       const midX = (inset + (box.w - inset) / 2) * mmPerPx;
       view = { ...v, x: cx - midX, y: cy - h / 2 };
@@ -1161,7 +1177,7 @@
   });
 
   const highlighted = $derived.by(() => {
-    const id = editor.highlight;
+    const id = isActive ? editor.highlight : null;
     const el = id ? page.elements.find((x) => x.id === id) : null;
     const g = el ? geoms.get(el.id) : null;
     return el && g ? { el, g } : null;
@@ -1305,11 +1321,11 @@
 
 <svelte:window
   onkeydown={(e) => {
-    if (e.key === "Enter" && polyDraft.length && !isTyping(e.target)) {
+    if (e.key === "Enter" && isActive && polyDraft.length && !isTyping(e.target)) {
       e.preventDefault();
       finishPolygon();
     }
-    if (e.key === "Enter" && dimDraft.length && !isTyping(e.target)) {
+    if (e.key === "Enter" && isActive && dimDraft.length && !isTyping(e.target)) {
       e.preventDefault();
       const it = dimFrom(dimDraft, null);
       const mm = pointer && frame ? sheetToGa(frame, pointer) : null;
@@ -1328,7 +1344,7 @@
     if (e.code !== "Space") return;
     const tapped = spaceDown && !spacePanned && performance.now() - spaceAt < 400 && !isTyping(e.target);
     spaceDown = false;
-    if (tapped) fit();
+    if (tapped && isActive) fit();
   }}
 />
 
@@ -1594,7 +1610,7 @@
     {/snippet}
   </Sheet>
 </svg>
-{#if atlas}
+{#if atlas && isActive}
   <Atlas
     project={editor.project}
     {page}

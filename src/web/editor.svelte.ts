@@ -10,6 +10,7 @@ import { routesStale } from "../core/wires";
 import { markGaSeen, syncGaStrips } from "../core/ga";
 import { refreshConductors } from "../core/conductors";
 import { api, ConflictError } from "./api";
+import { findLeaf, leaves, removeLeaf, setContent, sheetLeaf, splitLeaf, type TileNode } from "./tiles";
 import { getAvoid } from "./avoid";
 
 export type Tool = "select" | "place" | "wire" | "section" | "cloud" | "polygon" | "stamp" | "ga-rail" | "ga-trunking" | "ga-dim" | "ga-label";
@@ -20,9 +21,12 @@ const SAVE_DELAY_MS = 600;
 
 export class Editor {
   project: Project = $state()!;
+  /** The sheet being worked on: the active sheet tile's (design-v0.3 §7). */
   pageId: string = $state("");
-  /** Sheet shown in the other half of the split view, or null when it's closed. */
-  splitPageId: string | null = $state(null);
+  /** The main area's tiles. Not saved: a project opens with one sheet tile. */
+  tiles: TileNode = $state(sheetLeaf(""));
+  /** The sheet tile last clicked: the browser, Properties, the sheet list and the tools work on it. */
+  activeTile: string = $state("");
   /** Selected element ids on the current page. */
   selection: string[] = $state([]);
   tool: Tool = $state("select");
@@ -76,6 +80,8 @@ export class Editor {
     this.project = project;
     this.version = version;
     this.pageId = project.pages[0]?.id ?? "";
+    this.tiles = sheetLeaf(this.pageId);
+    this.activeTile = this.tiles.id;
     // Wires added outside the editor may not have routes yet.
     for (const page of this.project.pages) {
       if (routesStale(page)) routePage(getAvoid(), page);
@@ -174,7 +180,6 @@ export class Editor {
   private restore(json: string): void {
     this.project = JSON.parse(json);
     if (!this.project.pages.some((p) => p.id === this.pageId)) this.pageId = this.project.pages[0]!.id;
-    if (this.splitPageId && !this.project.pages.some((p) => p.id === this.splitPageId)) this.splitPageId = null;
     const ids = new Set([
       ...this.page.elements.map((e) => e.id),
       ...this.page.segments.map((s) => s.id),
@@ -197,24 +202,68 @@ export class Editor {
     this.markSeen();
   }
 
-  /** Swap the two halves of the split view. */
-  swapSplit(): void {
-    if (!this.splitPageId) return;
-    const other = this.splitPageId;
-    this.splitPageId = this.pageId;
-    this.setPage(other);
+  /** The sheet a tile shows: the active one follows the sheet being worked on. */
+  tilePage(tileId: string): string {
+    if (tileId === this.activeTile) return this.pageId;
+    const leaf = findLeaf(this.tiles, tileId);
+    const id = leaf?.content.type === "sheet" ? leaf.content.pageId : "";
+    return this.project.pages.some((p) => p.id === id) ? id : (this.project.pages[0]?.id ?? "");
+  }
+
+  /** Make a sheet tile the one being worked on. What's picked belongs to the tile it was picked in. */
+  activateTile(tileId: string): void {
+    if (tileId === this.activeTile) return;
+    const leaf = findLeaf(this.tiles, tileId);
+    if (!leaf || leaf.content.type !== "sheet") return;
+    const target = this.tilePage(tileId);
+    // The tile being left keeps the sheet it was showing.
+    this.tiles = setContent(this.tiles, this.activeTile, { type: "sheet", pageId: this.pageId });
+    this.activeTile = tileId;
+    this.selection = [];
+    this.setPage(target);
+  }
+
+  /** Split a tile: the new half, right of it or below it, shows the same sheet (or the active sheet, for a window). */
+  splitTile(tileId: string, dir: "row" | "col"): void {
+    const pageId = tileId === this.activeTile ? this.pageId : this.tilePage(tileId);
+    const leaf = sheetLeaf(pageId);
+    this.tiles = splitLeaf(this.syncedTiles(), tileId, dir, leaf);
+  }
+
+  /** Close a tile. The last sheet tile stays. */
+  closeTile(tileId: string): void {
+    const all = leaves(this.tiles);
+    const leaf = all.find((l) => l.id === tileId);
+    if (!leaf) return;
+    const sheets = all.filter((l) => l.content.type === "sheet");
+    if (leaf.content.type === "sheet" && sheets.length <= 1) return;
+    this.tiles = removeLeaf(this.syncedTiles(), tileId);
+    if (tileId === this.activeTile) {
+      const next = leaves(this.tiles).find((l) => l.content.type === "sheet")!;
+      this.activeTile = next.id;
+      this.selection = [];
+      this.setPage(next.content.type === "sheet" ? next.content.pageId : this.pageId);
+    }
+  }
+
+  /** Replace the tree (after a divider drag, a drop…), keeping the active tile's sheet. */
+  setTiles(tiles: TileNode): void {
+    this.tiles = tiles;
+  }
+
+  /** The tree with the active tile's sheet written into it. */
+  syncedTiles(): TileNode {
+    return setContent(this.tiles, this.activeTile, { type: "sheet", pageId: this.pageId });
   }
 
   /**
-   * Show an element: switch to its sheet and select it. With the split view
-   * open, the sheet you came from stays in view in the other half.
+   * Show an element: switch the active tile to its sheet and select it.
    */
   goTo(id: string): void {
     const page = this.project.pages.find(
       (p) => p.elements.some((e) => e.id === id) || p.segments.some((s) => s.id === id) || (p.gaItems ?? []).some((i) => i.id === id),
     );
     if (!page) return;
-    if (this.splitPageId && page.id !== this.pageId) this.splitPageId = this.pageId;
     this.setPage(page.id);
     this.selection = [id];
     this.tool = "select";
@@ -299,7 +348,6 @@ export class Editor {
       this.project = project;
       this.version = version;
       if (!project.pages.some((p) => p.id === this.pageId)) this.pageId = project.pages[0]!.id;
-      if (this.splitPageId && !project.pages.some((p) => p.id === this.splitPageId)) this.splitPageId = null;
       const ids = new Set(this.page.elements.map((e) => e.id).concat(this.page.segments.map((s) => s.id)));
       this.selection = this.selection.filter((id) => ids.has(id));
       this.undoStack = [];
