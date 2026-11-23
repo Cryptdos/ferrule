@@ -229,7 +229,27 @@ export function connect(project: Project, pageId: string, from: TerminalRef, to:
   const seg: Segment = { id: newId("w"), conductor: "", from: [...from], to: [...to], route: "auto", points: [] };
   page.segments.push(seg);
   refreshConductors(project);
+  inheritBusbarColour(project, page, seg);
   return seg;
+}
+
+/**
+ * A wire drawn from a busbar takes the busbar's core colour, if its
+ * conductor has none yet. It's copied once, when the wire is drawn, so it
+ * can be changed afterwards like any other wire's colour.
+ */
+function inheritBusbarColour(project: Project, page: Page, seg: Segment): void {
+  const c = project.conductors.find((x) => x.id === seg.conductor);
+  if (!c || c.colour) return;
+  for (const ref of [seg.from, seg.to]) {
+    const el = page.elements.find((e) => e.id === ref[0]);
+    if (el?.symbol !== "busbar") continue;
+    const colour = String(el.params.colour || distributionOf(project, el)?.colour || "");
+    if (colour) {
+      c.colour = colourCode(colour);
+      return;
+    }
+  }
 }
 
 export function deleteSegments(project: Project, pageId: string, ids: string[]): void {

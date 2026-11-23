@@ -99,3 +99,26 @@ describe("distributions (design-v0.2 §2)", () => {
     expect(r2.page.elements[0]!.params.dist).toBe(own.id);
   });
 });
+
+describe("wire colour from the busbar", () => {
+  test("a wire drawn from a busbar takes its colour once, and can be changed", async () => {
+    const { setConductorInfo } = await import("./ops");
+    const { p, pg } = project();
+    const n = addDistribution(p, { name: "N", kind: "neutral", colour: "Bu" });
+    const bus = addElement(p, pg, "busbar", [0, 10], { params: { dist: n.id, length: 60 } });
+    const own = addElement(p, pg, "busbar", [0, 20], { params: { colour: "Bk", dist: n.id, length: 60 } });
+    const h = addElement(p, pg, "lamp", [20, 40]);
+    const k = addElement(p, pg, "coil", [40, 40]);
+    const w1 = connect(p, pg, [bus.id, "20"], [h.id, "V+"]);
+    const colourOf = (w: { conductor: string }) => p.conductors.find((c) => c.id === w.conductor)?.colour;
+    expect(colourOf(w1)).toBe("Bu");
+    // The busbar's own colour wins over its distribution's.
+    const w2 = connect(p, pg, [own.id, "40"], [k.id, "A1"]);
+    expect(colourOf(w2)).toBe("Bk");
+    // Changed by hand, it stays changed; changing the busbar later doesn't touch it.
+    setConductorInfo(p, w1.conductor, { colour: "Rd" });
+    bus.params.colour = "Gy";
+    connect(p, pg, [h.id, "V-"], [k.id, "A2"]);
+    expect(colourOf(w1)).toBe("Rd");
+  });
+});
