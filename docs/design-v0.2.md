@@ -489,3 +489,11 @@ Each step is one pull request, with a build to test.
 - **Renaming a point** carries the expectations and conditions that name it.
 - **Analogue against digital** compares signal pins only: an analogue 0 V sharing a DI common is normal and isn't flagged.
 - **Files from the test builds:** plant groups become points (inputs, outputs and their follows), and logic rules become *never* statements, on load (with the rest of `preRelease()`, removed at release).
+
+**Step 8c (logo; done before 8b, which is the largest piece left)**
+
+- **Chosen from sketches (23/11/26):** a crimp ferrule on the diagonal, which fills a square icon better than a flat side view; a red collar, as on a 1 mm² ferrule, red being the one colour the app uses (live in Simulate); straight-walled collar with a shoulder down to the sleeve, about 40% of the length, as on a real ferrule; copper at the tip; a black cable cut at a slant, its cut face a lighter sliver with the copper core in it, with no outline round the face. Set aside: a side view (plainest), a ferrule going into a terminal (too busy at 16 px), a flared collar, a grey cable, a break-line cable end.
+- **Three drawings, one design:** full detail for 48 px and up, simplified for 24–32 px (one crimp mark, no shoulder line), flat shapes for 16 px (no outlines; the cable's cut face is just its copper core). Each size of the .ico is drawn from the right one rather than scaled from the largest.
+- **On a tile** the colour of the sheet on screen (#FAF8F3), rounded, so the icon reads on dark tabs and taskbars.
+- **Where it's used:** the browser tab, the project list's heading, the README, and the exe's icon.
+- **The exe icon needs Windows:** Bun only sets an exe's icon when it's built on Windows, so CI's exe job now runs on Windows. Builds made elsewhere (including the one sent with each PR from here) work the same, with Bun's default icon; the one attached to the CI run has the logo.

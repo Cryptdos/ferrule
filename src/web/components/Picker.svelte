@@ -1,6 +1,7 @@
 <script lang="ts">
   import { api, type ProjectSummary } from "../api";
   import FileBrowser from "./FileBrowser.svelte";
+  import logo from "../logo/ferrule.svg";
 
   let { onopen }: { onopen: (id: string) => void } = $props();
 
@@ -89,7 +90,7 @@
 </script>
 
 <div class="picker">
-  <h1>Ferrule</h1>
+  <h1><img src={logo} alt="" width="40" height="40" /> Ferrule</h1>
   <form onsubmit={create}>
     <input bind:value={title} placeholder="New project title" />
     <button type="submit">Create project</button>
@@ -99,7 +100,7 @@
     <input type="checkbox" bind:checked={useLibrary} /> Use the shared device library for GA sheets
   </label>
   <p class="example">
-    Or <button class="link" onclick={example}>add the LSP-01 example</button>: a 14-sheet life safety panel drawn
+    Or <button class="link" onclick={example}>add the LSP-01 example</button>: a 16-sheet life safety panel drawn
     entirely with Ferrule's own tools.
   </p>
   {#if error}<p class="error">{error}</p>{/if}
@@ -163,6 +164,9 @@
   }
   h1 {
     font-size: 22px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
   }
   form {
     display: flex;

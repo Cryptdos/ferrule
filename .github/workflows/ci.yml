@@ -18,7 +18,8 @@ jobs:
 
   exe:
     needs: check
-    runs-on: ubuntu-latest
+    # On Windows so the exe gets its icon (Bun sets it only when building there).
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
