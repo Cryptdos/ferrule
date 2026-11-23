@@ -95,7 +95,7 @@ describe("revision list and symbol legend", () => {
     addElement(p, pg, "coil", [20, 10], { tag: "K2" });
     addElement(p, pg, "isolator", [30, 10], { params: { function: "breaker" } });
     addElement(p, pg, "isolator", [50, 10], { params: { function: "isolator" } });
-    addElement(p, pg, "rail", [0, 40], { params: { length: 190 } });
+    addElement(p, pg, "busbar", [0, 40], { params: { length: 140 } });
     addElement(p, pg, "text", [0, 50], { label: "not in the legend" });
     const e = legendEntries(p);
     const names = e.map((x) => x.name);

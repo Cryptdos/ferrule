@@ -19,6 +19,7 @@
 import type { Element, LogicRule, Project } from "./model";
 import { isolatorAux } from "./symbols";
 import { masterOf } from "./xref";
+import { netJoins } from "./conductors";
 import { displayTag } from "./tags";
 
 // ---------------------------------------------------------------------------
@@ -108,17 +109,15 @@ export interface SimState {
   /** When each timer started timing (simulation seconds). */
   since: Record<string, number>;
   lamps: Record<string, boolean>;
-  /** Conductor ids connected to a supply. */
+  /** Conductor ids connected to a supply's phase (or +). */
   live: string[];
+  /** Conductor ids connected to a live supply's return (N, 0 V), so the current's path reads both ways. */
+  returns: string[];
   /** Supply shorted straight to return through closed contacts. */
   short: boolean;
   /** The circuit didn't settle (it oscillates). */
   unstable: boolean;
 }
-
-/** Rails that feed the control circuit, and the rail it returns to. */
-const SUPPLY = /^(CCT\d*|\+?24V(AC|DC)?)$/i;
-const RETURN = /^0V$/i;
 
 /** Delay in seconds from text like "10s", "500ms", "2m", "10". */
 export function parseDelay(text: unknown): number {
@@ -145,6 +144,8 @@ export function compile(project: Project): Circuit {
   const followers: Follower[] = [];
   const ops = new Map<string, (s: SimState) => boolean>();
   const railNodes = new Set<string>();
+  /** Distributions already standing in as the supply (no Incoming supply part). */
+  const fallback = new Set<string>();
   const hasIncoming = project.pages.some((pg) => pg.elements.some((e) => e.symbol === "supply"));
 
   const byId = new Map<string, Element>();
@@ -170,14 +171,19 @@ export function compile(project: Project): Circuit {
       if (["contact-no", "contact-nc", "contact-co", "timer-contact"].includes(el.symbol)) ops.set(el.id, operated);
       if (el.symbol === "pb-no" || el.symbol === "pb-nc" || el.symbol === "selector") ops.set(el.id, press);
       switch (el.symbol) {
-        case "rail":
         case "busbar": {
-          const name = String(el.params.name ?? "");
           const conds = project.conductors.filter((c) => c.terminals.some(([id]) => id === el.id)).map((c) => c.id);
           conds.forEach((c) => railNodes.add(c));
-          // Without an Incoming supply part, the control rails are the supply, as drawn.
-          if (!hasIncoming && SUPPLY.test(name)) conds.forEach((c) => supply.add(c));
-          if (!hasIncoming && RETURN.test(name)) conds.forEach((c) => ret.add(c));
+          // Without an Incoming supply part, busbars on a line or DC + distribution are the
+          // supply, and those on a neutral or DC 0 V distribution the return, as drawn.
+          // One node per distribution is enough: the rest are joined to it.
+          const d = project.distributions.find((x) => x.id === el.params.dist);
+          const first = conds[0];
+          if (!hasIncoming && d && first && !fallback.has(d.id)) {
+            if (d.kind === "line" || d.kind === "dc+") supply.add(first);
+            if (d.kind === "neutral" || d.kind === "dc0") ret.add(first);
+            fallback.add(d.id);
+          }
           break;
         }
         case "supply": {
@@ -320,6 +326,8 @@ export function compile(project: Project): Circuit {
       }
     }
   }
+  // Busbars and distributions join their wires electrically (each wire still has its own number).
+  for (const j of netJoins(project)) links.push({ a: node.get(`${j.a[0]}:${j.a[1]}`) ?? `${j.a[0]}:${j.a[1]}`, b: node.get(`${j.b[0]}:${j.b[1]}`) ?? `${j.b[0]}:${j.b[1]}`, el: j.el, src: j.el, closed: () => true });
   if (supply.size && ret.size) supplies.push({ el: "rails", phases: [...supply], ret: [...ret] });
   return { links, loads, supply, ret, supplies, followers, railNodes, ops, inputs, timers, names };
 }
@@ -343,7 +351,7 @@ class UF {
 
 /** Everything off (isolators and breakers on), at time zero, solved. */
 export function initialState(c: Circuit): SimState {
-  return settle(c, { t: 0, inputs: {}, energised: {}, timed: {}, since: {}, lamps: {}, live: [], short: false, unstable: false });
+  return settle(c, { t: 0, inputs: {}, energised: {}, timed: {}, since: {}, lamps: {}, live: [], returns: [], short: false, unstable: false });
 }
 
 /** One pass: which loads are energised with the contacts as they are. */
@@ -357,6 +365,7 @@ function pass(c: Circuit, s: SimState) {
     ret: new Set(x.ret.map((r) => uf.find(r))),
   }));
   const phaseRoots = new Set(doms.flatMap((d) => [...d.phases]));
+  const retRoots = new Set(doms.flatMap((d) => [...d.ret]));
   const across = (x: string, y: string) => {
     const a = uf.find(x);
     const b = uf.find(y);
@@ -366,12 +375,23 @@ function pass(c: Circuit, s: SimState) {
     );
   };
   const on = (l: Load) => across(l.a, l.b) || (!!l.test && across(l.test, l.b));
-  // A short: a phase joined straight to its return, or two phases of one supply joined.
-  const short = live.some((x) => {
-    const ph = x.phases.map((p) => uf.find(p));
-    return ph.some((p) => x.ret.some((r) => uf.find(r) === p)) || new Set(ph).size < ph.length;
-  });
-  return { uf, phaseRoots, short, on, live };
+  // A short: a phase joined straight to its return, two phases of one supply
+  // joined, or two different supplies feeding one conductor.
+  const fedBy = new Map<string, number>();
+  const short =
+    live.some((x) => {
+      const ph = x.phases.map((p) => uf.find(p));
+      return ph.some((p) => x.ret.some((r) => uf.find(r) === p)) || new Set(ph).size < ph.length;
+    }) ||
+    live.some((x, i) =>
+      x.phases.some((p) => {
+        const r = uf.find(p);
+        const other = fedBy.get(r);
+        fedBy.set(r, i);
+        return other !== undefined && other !== i;
+      }),
+    );
+  return { uf, phaseRoots, retRoots, short, on, live };
 }
 
 /**
@@ -448,6 +468,12 @@ export function settle(c: Circuit, s: SimState): SimState {
       }
       for (const sup of r.live) for (const x of sup.phases) live.add(x);
       next.live = [...live];
+      const returns = new Set<string>();
+      for (const l of [...c.links, ...c.loads]) {
+        for (const x of [l.a, l.b]) if (!live.has(x) && r.retRoots.has(r.uf.find(x))) returns.add(x);
+      }
+      for (const sup of r.live) for (const x of sup.ret) if (!live.has(x)) returns.add(x);
+      next.returns = [...returns];
       return next;
     }
   }

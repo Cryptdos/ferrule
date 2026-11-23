@@ -173,15 +173,7 @@ export function renumber(project: Project): RenumberResult {
       takenWires.add(c.number);
       continue;
     }
-    // Named rails and busbars give their name to everything on them.
-    const railName = c.terminals
-      .map(([id]) => where.get(id)?.el)
-      .find((el) => el && (el.symbol === "rail" || el.symbol === "busbar") && typeof el.params.name === "string" && el.params.name);
-    if (railName) {
-      c.number = String(railName.params.name);
-      result.wires++;
-      continue;
-    }
+    // Numbering stops at busbars: each wire leaving one is numbered by where it starts, like any other.
     let start: { page: number; at: Vec } | null = null;
     for (const [id, term] of c.terminals) {
       const w = where.get(id);

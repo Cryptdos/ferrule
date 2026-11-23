@@ -20,7 +20,7 @@ const BUFFER = 0.25;
 const INSET = 0.5;
 
 /** Symbols wires may cross or run along: conductors themselves, or a cable screen drawn over the cores. */
-const NOT_OBSTACLES = new Set(["junction", "rail", "busbar", "screen"]);
+const NOT_OBSTACLES = new Set(["junction", "busbar", "screen"]);
 
 /** Rough outline of a symbol's text, so wires keep off tags, labels and ratings. */
 function textRect(el: Element, p: Extract<Prim, { t: "text" }>): Rect | null {
@@ -60,8 +60,8 @@ function obstacleRect(el: Element): Rect | null {
 function dirFlags(avoid: Avoid, page: Page, ref: [string, string]): number {
   const F = avoid.ConnDirFlag;
   const el = findElement(page, ref[0]);
-  if (el && (el.symbol === "rail" || el.symbol === "busbar")) {
-    // Rails are tapped from above or below, never along their length.
+  if (el && el.symbol === "busbar") {
+    // Busbars are tapped from above or below, never along their length.
     return el.rot % 180 === 0 ? F.ConnDirUp | F.ConnDirDown : F.ConnDirLeft | F.ConnDirRight;
   }
   switch (endDir(page, ref)) {
@@ -353,7 +353,7 @@ export function slideRailTaps(page: Page): void {
       [seg.to, seg.from],
     ] as [TerminalRef, TerminalRef][]) {
       const rail = findElement(page, railEnd[0]);
-      if (!rail || (rail.symbol !== "rail" && rail.symbol !== "busbar")) continue;
+      if (!rail || rail.symbol !== "busbar") continue;
       if (otherEnd[0] === rail.id) continue;
       const p = endPoint(page, otherEnd);
       if (!p) continue;

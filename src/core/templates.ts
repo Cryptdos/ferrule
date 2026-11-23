@@ -20,7 +20,7 @@ import {
   type Template,
   newId,
 } from "./model";
-import { OpError, addPage, addPlant, getPage, prefixOf, syncPlantViews, updateZones } from "./ops";
+import { OpError, addPage, addPlant, distParamKeys, getPage, prefixOf, syncPlantViews, updateZones } from "./ops";
 
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v));
 
@@ -54,6 +54,8 @@ function capture(
   const refs = plantRefs(els, secs);
   // Plant named in fields by tag (rather than id) is captured too.
   const plant = project.plant.filter((p) => refs.has(p.id) || refs.has(p.tag));
+  const distIds = new Set(els.flatMap((e) => distParamKeys(e).map((k) => e.params[k])));
+  const distributions = project.distributions.filter((d) => distIds.has(d.id));
   return {
     id: newId("tpl"),
     name: name.trim() || page.title || "Template",
@@ -65,6 +67,7 @@ function capture(
     elements: els,
     segments: segs,
     size,
+    ...(distributions.length ? { distributions: clone(distributions) } : {}),
   };
 }
 
@@ -165,6 +168,17 @@ export function stampTemplate(project: Project, templateId: string, opts: StampO
     plantMap.set(item.tag, target.id);
   }
 
+  // Resolve distributions: the same one if it's in this project, else one of the same name, else a copy.
+  const distMap = new Map<string, string>();
+  for (const d of t.distributions ?? []) {
+    let target = project.distributions.find((x) => x.id === d.id) ?? project.distributions.find((x) => x.name === d.name);
+    if (!target) {
+      target = clone(d);
+      project.distributions.push(target);
+    }
+    distMap.set(d.id, target.id);
+  }
+
   let page: Page;
   let offset: Vec = [0, 0];
   if (t.kind === "sheet") {
@@ -190,6 +204,10 @@ export function stampTemplate(project: Project, templateId: string, opts: StampO
     el.label = remapFields(el.label, plantMap);
     if (el.symbol === "plant-view" && typeof el.params.plant === "string") {
       el.params.plant = plantMap.get(el.params.plant) ?? el.params.plant;
+    }
+    for (const k of distParamKeys(el)) {
+      const v = el.params[k];
+      if (typeof v === "string" && distMap.has(v)) el.params[k] = distMap.get(v)!;
     }
     return el;
   });

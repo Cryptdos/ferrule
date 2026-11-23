@@ -15,8 +15,9 @@
 import type { Avoid } from "libavoid-js";
 import { refreshConductors } from "../core/conductors";
 import type { Vec } from "../core/geometry";
-import { type Element, type Page, type ParamValue, type Project, newProject } from "../core/model";
+import { type Distribution, type Element, type Page, type ParamValue, type Project, newProject } from "../core/model";
 import {
+  addDistribution,
   addCloud,
   addElement,
   addGaItem,
@@ -79,6 +80,16 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
   const FAM_EF = addPlant(p, "FA-EF", "Fire alarm monitoring, extract fans (by others)", ["1", "2", "3", "4"]);
   const tag = (id: string) => `{plant:${id}.tag}`;
 
+  // --- Distributions: what the busbars, arrows and the incoming supply carry ---
+  const D = {
+    L1: addDistribution(p, { name: "L1", kind: "line", voltage: "230 V", colour: "Bn", function: "L1" }),
+    L2: addDistribution(p, { name: "L2", kind: "line", voltage: "230 V", colour: "Bk", function: "L2" }),
+    L3: addDistribution(p, { name: "L3", kind: "line", voltage: "230 V", colour: "Gy", function: "L3" }),
+    N: addDistribution(p, { name: "N", kind: "neutral", voltage: "", colour: "Bu", function: "N" }),
+    CCT: addDistribution(p, { name: "CCT", kind: "line", voltage: "24 V AC", colour: "Rd", function: "24V AC" }),
+    OV: addDistribution(p, { name: "0V", kind: "neutral", voltage: "0 V", colour: "Wh", function: "0V" }),
+  };
+
   // --- Drawing helpers -----------------------------------------------------------
   let page: Page = p.pages[0]!;
   const add = (symbol: string, x: number, y: number, opts: { rot?: 0 | 90 | 180 | 270; label?: string; params?: Record<string, ParamValue> } = {}) =>
@@ -90,9 +101,12 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
     return wire(p, page.id, { terminal: [from[0].id, from[1]] }, { wire: seg.id, at });
   };
   const tap = (rail: Element, x: number): End => [rail, String(x - rail.pos[0])];
-  const rail = (name: string, x: number, y: number, length: number) => add("rail", x, y, { params: { name, length } });
-  const bus = (name: string, x: number, y: number, length: number, label = "") =>
-    add("busbar", x, y, { label, params: { name, length } });
+  // Busbars: distribution (thick) for power, control (thin) for CCT and 0V; on a
+  // distribution, or local (null) when they join nothing else.
+  const bus = (d: Distribution | null, x: number, y: number, length: number, label = "") =>
+    add("busbar", x, y, { label, params: { dist: d?.id ?? "", length } });
+  const ctl = (d: Distribution | null, x: number, y: number, length: number, name = "") =>
+    add("busbar", x, y, { params: { style: "control", dist: d?.id ?? "", name, length, bothEnds: true } });
   const arrowOut = (x: number, y: number, label = "") => add("offpage", x, y, { label });
   const arrowIn = (x: number, y: number, label = "") => add("offpage", x, y, { rot: 180, label, params: { source: false } });
   const text = (x: number, y: number, s: string, size = "note", align = "start") =>
@@ -124,15 +138,18 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
   page = addPage(p, "Main incoming section");
   addSection(p, page.id, "MAIN INCOMING SECTION", [2, 2, 146, 70]);
   // Where the power comes in: the simulator's source.
-  const incoming = add("supply", 22, 11, { label: "415V 3PH+N 50Hz SUPPLY (BY OTHERS)", params: { system: "3ph-n" } });
+  const incoming = add("supply", 22, 11, {
+    label: "415V 3PH+N 50Hz SUPPLY (BY OTHERS)",
+    params: { system: "3ph-n", dist_L1: D.L1.id, dist_L2: D.L2.id, dist_L3: D.L3.id, dist_N: D.N.id },
+  });
   const x0 = [22, 25, 28, 31].map((x, i) => add("terminal", x, 14, { label: ["L1", "L2", "L3", "N"][i], params: { strip: "X0" } }));
   x0.forEach((t, i) => w([incoming, ["L1", "L2", "L3", "N"][i]!], [t, "1"]));
   const qMain = add("isolator", 22, 24, { label: "63A DOOR\nINTERLOCKED", params: { poles: 4, aux: 0, operator: "turn" } });
   x0.forEach((t, i) => w([t, "2"], [qMain, String(2 * i + 1)]));
-  const busL1 = bus("L1", 10, 34, 128, "80A DISTRIBUTION BLOCKS");
-  const busL2 = bus("L2", 10, 38, 128);
-  const busL3 = bus("L3", 10, 42, 128);
-  const busN = bus("N", 10, 46, 128);
+  const busL1 = bus(D.L1, 14, 34, 124, "80A DISTRIBUTION BLOCKS");
+  const busL2 = bus(D.L2, 14, 38, 124);
+  const busL3 = bus(D.L3, 14, 42, 124);
+  const busN = bus(D.N, 14, 46, 124);
   [busL1, busL2, busL3, busN].forEach((b, i) => w([qMain, String(2 * i + 2)], tap(b, 22 + 3 * i)));
   const fPower = add("fuse", 112, 56, { params: { rating: "4A" } });
   const hPower = add("lamp", 112, 66, { label: "POWER ON", params: { colour: "Ye" } });
@@ -147,7 +164,7 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
   setBoundary(p, page.id, 64);
   addSection(p, page.id, `${tag(SF1.id)} STARTER SECTION`, [2, 2, 146, 60]);
   // Power: 3 poles at x 18, 21, 24; the isolator's auxiliary poles at 28 and 31.
-  const L = [rail("L1", 4, 6, 20), rail("L2", 4, 9, 20), rail("L3", 4, 12, 20)];
+  const L = [bus(D.L1, 12, 6, 12), bus(D.L2, 12, 9, 12), bus(D.L3, 12, 12, 12)];
   const qFan = add("isolator", 18, 25, { label: "40A DOOR\nINTERLOCKED", params: { poles: 3, aux: 2, operator: "turn" } });
   const fuses = add("fuse", 18, 35, { params: { poles: 3, rating: "10A" } });
   const km = add("isolator", 18, 45, { params: { function: "contactor", poles: 3 } });
@@ -168,8 +185,9 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
   const ovIn = arrowIn(31, 19);
   w([cctIn, "1"], [qFan, "13"]);
   w([ovIn, "1"], [qFan, "23"]);
-  const cctLocal = add("rail", 36, 30, { params: { name: "", length: 50 } });
-  const ovLocal = add("rail", 36, 58, { params: { name: "", length: 50 } });
+  // After the isolator's auxiliary poles: this starter's own control busbars.
+  const cctLocal = add("busbar", 36, 30, { params: { style: "control", length: 50 } });
+  const ovLocal = add("busbar", 36, 58, { params: { style: "control", length: 50 } });
   w([qFan, "14"], tap(cctLocal, 36));
   w([qFan, "24"], tap(ovLocal, 36));
   const enOut = arrowOut(46, 33, "ENABLE");
@@ -209,8 +227,8 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
   page = addPage(p, "Controls section: supplies", after.id);
   setBoundary(p, page.id, 70);
   addSection(p, page.id, "CONTROLS SECTION: SUPPLIES", [2, 2, 146, 66]);
-  const sL1 = rail("L1", 4, 6, 36);
-  const sN = rail("N", 4, 9, 36);
+  const sL1 = bus(D.L1, 11, 6, 29);
+  const sN = bus(D.N, 11, 9, 29);
   const cmcb = add("isolator", 12, 17, { label: "6A TYPE D", params: { function: "breaker", poles: 2, operator: "none" } });
   const socket = add("socket", 12, 30, { label: "13A SOCKET\n(LAPTOP)" });
   w(tap(sL1, 12), [cmcb, "1"]);
@@ -228,8 +246,8 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
   w([pmcb, "4"], [tx, "P2"]);
   const smcb = add("isolator", 28, 39, { label: "10A TYPE D", params: { function: "breaker", poles: 1, operator: "none" } });
   w([tx, "S1"], [smcb, "1"]);
-  const cct = rail("CCT", 36, 46, 110);
-  const ov = rail("0V", 36, 66, 110);
+  const cct = ctl(D.CCT, 36, 46, 110);
+  const ov = ctl(D.OV, 36, 66, 110);
   w([smcb, "2"], tap(cct, 38));
   w([tx, "S2"], tap(ov, 38));
   const hHealthy = add("lamp", 48, 58, { label: "CONTROL CCT\nHEALTHY", params: { colour: "Wh", testPin: true } });
@@ -250,7 +268,7 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
   w([hFire, "V-"], tap(ov, 86));
   linkContact(p, frLamp.id, fr.id);
   const sLt = add("pb-no", 98, 51, { label: "LAMP TEST" });
-  const lt = rail("LT", 98, 57, 6);
+  const lt = ctl(null, 98, 57, 6, "LT");
   w(tap(cct, 98), [sLt, "13"]);
   w([sLt, "14"], tap(lt, 98));
   // Lamp test: the LT rail feeds each lamp's test terminal.
@@ -275,8 +293,8 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
   page = addPage(p, `Controls section: ${tag(SF1.id)}/${tag(SF2.id)} duty/standby`, supplies.id);
   setBoundary(p, page.id, 70);
   addSection(p, page.id, `${tag(SF1.id)} / ${tag(SF2.id)} DUTY/STANDBY CONTROL`, [2, 1, 146, 65]);
-  const c = rail("CCT", 4, 6, 143);
-  const o = rail("0V", 4, 62, 143);
+  const c = ctl(D.CCT, 4, 6, 143);
+  const o = ctl(D.OV, 4, 62, 143);
   const cIn = arrowIn(147, 2);
   const oIn = arrowOut(147, 66);
   w([cIn, "1"], tap(c, 147));

@@ -246,7 +246,7 @@ export const TOOLS: Tool[] = [
           const terms =
             s.id === "plant-view"
               ? "the plant's ticked terminals, along the top"
-              : s.id === "rail" || s.id === "busbar"
+              : s.id === "busbar"
                 ? "taps '0'…'length' along it"
                 : localGeometry(el, "").terminals.map((t) => `${t.name}@${t.at.join(",")}`);
           return {
@@ -434,7 +434,7 @@ export const TOOLS: Tool[] = [
   {
     name: "connect",
     description:
-      "Wire two ends together on a sheet. Each end is {element, terminal} (rails: terminal is the tap offset along the rail, e.g. '30') or {wire, x, y} to tee into an existing wire at that grid point. Routing is automatic.",
+      "Wire two ends together on a sheet. Each end is {element, terminal} (busbars: terminal is the tap offset along the bar, e.g. '30') or {wire, x, y} to tee into an existing wire at that grid point. Routing is automatic.",
     inputSchema: obj(
       {
         project,
@@ -707,7 +707,7 @@ export const TOOLS: Tool[] = [
   {
     name: "simulate",
     description:
-      "Run the relay logic as drawn (DESIGN.md §9). Start with everything off (isolators and breakers on), apply actions in order — {toggle: id} for switches, selectors, isolators and field plant contacts (a plant view acts as a volt-free contact), {press: id} for push buttons, {wait: seconds} for timers — and report which coils are energised and which lamps are lit after each step. Supply is any rail named CCT…, return the 0V rail.",
+      "Run the relay logic as drawn (DESIGN.md §9). Start with everything off (isolators and breakers on), apply actions in order — {toggle: id} for switches, selectors, isolators and field plant contacts (a plant view acts as a volt-free contact), {press: id} for push buttons, {wait: seconds} for timers — and report which coils are energised and which lamps are lit after each step. Supply is the Incoming supply part (and transformers); with none drawn, busbars on a line or DC + distribution supply and those on a neutral or DC 0 V distribution return.",
     inputSchema: obj(
       {
         project,
@@ -794,13 +794,44 @@ export const TOOLS: Tool[] = [
       return { saved: await ctx.exportPdf(str(a, "project")) };
     },
   },
+  {
+    name: "add_distribution",
+    description:
+      "Add a distribution (a supply the project distributes: L1, N, CCT, 0V…), or update one (give its name or id as 'distribution'). Busbars, link arrows and the incoming supply pick one with params.dist (supply: params.dist_<terminal>, e.g. dist_L1); everything on the same distribution is joined on every sheet. A busbar with no distribution is local. Returns the list.",
+    inputSchema: obj(
+      {
+        project,
+        distribution: { type: "string", description: "Existing distribution name or id, to update" },
+        name: { type: "string" },
+        kind: { type: "string", enum: ["line", "neutral", "dc+", "dc0", "earth"] },
+        voltage: { type: "string", description: "As written, e.g. 230 V or 24 V DC" },
+        colour: { type: "string", description: "Core colour code, e.g. Bn, Bu, Wh" },
+        function: { type: "string", description: "e.g. L, N, +24V, 0V" },
+      },
+      ["project"],
+    ),
+    run: async (a, ctx) =>
+      edit(ctx, str(a, "project"), (p) => {
+        const s = (k: string) => (typeof a[k] === "string" ? (a[k] as string) : undefined);
+        const kind = s("kind") as "line" | "neutral" | "dc+" | "dc0" | "earth" | undefined;
+        const patch = { name: s("name"), kind, voltage: s("voltage"), colour: s("colour"), function: s("function") };
+        if (typeof a.distribution === "string") {
+          const d = p.distributions.find((x) => x.id === a.distribution || x.name === a.distribution);
+          if (!d) throw new ArgError(`No distribution "${a.distribution}"`);
+          op.updateDistribution(p, d.id, patch);
+        } else {
+          op.addDistribution(p, { ...patch, name: str(a, "name") });
+        }
+        return p.distributions;
+      }),
+  },
 ];
 
 export const INSTRUCTIONS = `Ferrule drafts control panel schematics on A4 landscape sheets.
 
-Coordinates are grid units: x 0–${AREA_UNITS.w} across (${AREA_UNITS.w / 2} columns, 2 units each), y 0–${AREA_UNITS.h} down. Every terminal sits on a whole unit. Symbols are vertical by default (current flows top to bottom), so a ladder rung is a column of symbols between a CCT rail at the top and a 0V rail at the bottom: wire terminal to terminal down the column.
+Coordinates are grid units: x 0–${AREA_UNITS.w} across (${AREA_UNITS.w / 2} columns, 2 units each), y 0–${AREA_UNITS.h} down. Every terminal sits on a whole unit. Symbols are vertical by default (current flows top to bottom), so a ladder rung is a column of symbols between a CCT busbar at the top and a 0V busbar at the bottom (control style, each on its distribution): wire terminal to terminal down the column.
 
-Typical flow: create_project or pick one from list_projects → add_element (rails, contacts, coils, lamps, terminals) → connect → link contacts to their coils → add_plant / place_plant_view for field equipment below a panel boundary (update_page boundaryY), with terminals on the boundary → renumber → check → view_page to look at the result → export_pdf.
+Typical flow: create_project or pick one from list_projects → add_distribution (CCT, 0V…) → add_element (busbars with params.dist, contacts, coils, lamps, terminals) → connect → link contacts to their coils → add_plant / place_plant_view for field equipment below a panel boundary (update_page boundaryY), with terminals on the boundary → renumber → check → view_page to look at the result → export_pdf.
 
 Never type tags or wire numbers: renumber generates them from position (e.g. K3-16 = sheet 3, column 16). Labels can use fields such as {plant:SF-01.tag} so they follow the plant. Use templates (save_template / apply_template) for repeated sheets such as one starter per fan.`;
 

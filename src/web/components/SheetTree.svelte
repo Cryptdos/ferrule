@@ -3,7 +3,7 @@
   import { columnOf } from "../../core/geometry";
   import { resolveFields } from "../../core/fields";
   import { benchOf, requireSymbol } from "../../core/symbols";
-  import { displayTag } from "../../core/tags";
+  import { displayTag, elementTexts } from "../../core/tags";
   import type { Page } from "../../core/model";
   import type { Editor } from "../editor.svelte";
   import Icon from "./Icon.svelte";
@@ -47,7 +47,7 @@
         tag: displayTag(e, p),
         text:
           resolveFields(e.label, p) ||
-          (e.symbol === "rail" || e.symbol === "busbar" ? String(e.params.name ?? "") : "") ||
+          (e.symbol === "busbar" ? (elementTexts(e, p).name ?? "") : "") ||
           requireSymbol(e.symbol).name,
         col: columnOf(e.pos[0]),
         y: e.pos[1],

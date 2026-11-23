@@ -2,7 +2,7 @@
  * Terminal and cable schedules, generated from the drawing (DESIGN.md §7).
  */
 import type { Element, Page, Project, Segment } from "./model";
-import { displayTag } from "./tags";
+import { displayTag, elementTexts } from "./tags";
 import { address } from "./xref";
 
 export interface TerminalRow {
@@ -28,7 +28,7 @@ function endName(project: Project, el: Element | undefined, term: string): strin
   if (el.symbol === "junction") return "(junction)";
   const tag = displayTag(el, project);
   if (el.symbol === "terminal") return `${el.params.strip ?? "X1"}:${tag}`;
-  if (el.symbol === "rail" || el.symbol === "busbar") return String(el.params.name || tag || el.symbol);
+  if (el.symbol === "busbar") return elementTexts(el, project).name || tag || "busbar";
   return `${tag || el.symbol}:${term}`;
 }
 

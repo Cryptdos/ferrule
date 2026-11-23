@@ -160,7 +160,7 @@ export function connectionDots(page: Page): Vec[] {
       const at = terminalPoint(el, ref[1]);
       if (!at) continue;
       const key = `${ref[0]}:${ref[1]}`;
-      const isBar = el.symbol === "rail" || el.symbol === "busbar";
+      const isBar = el.symbol === "busbar";
       const len = typeof el.params.length === "number" ? el.params.length : 0;
       const tap = isBar && ref[1] !== "0" && ref[1] !== String(len);
       const cur = count.get(key) ?? { n: 0, at, tap };

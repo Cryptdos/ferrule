@@ -38,5 +38,11 @@ export function elementTexts(el: Element, project: Project): GeometryText {
   const t: GeometryText = { tag: displayTag(el, project), xref: xrefText(project, el, masterTag), label: resolveFields(el.label, project) };
   if (el.symbol === "revtable") t.rows = revisionRows(project);
   else if (el.symbol === "legend") t.legend = legendEntries(project);
+  else if (el.symbol === "busbar" || el.symbol === "offpage") {
+    // On a distribution: a busbar is named after it, an unlabelled arrow says which it carries.
+    const d = typeof el.params.dist === "string" && el.params.dist ? project.distributions.find((x) => x.id === el.params.dist) : undefined;
+    if (el.symbol === "busbar") t.name = d?.name ?? String(el.params.name ?? "");
+    else if (d && !t.label) t.label = d.name;
+  }
   return t;
 }

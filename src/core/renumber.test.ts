@@ -1,3 +1,4 @@
+import { controlBusbars } from "./testing";
 import { describe, expect, test } from "bun:test";
 import { newProject } from "./model";
 import { addElement, addPage, connect, linkContact, linkOffpage, setConductorNumber, updateElement } from "./ops";
@@ -8,8 +9,7 @@ import { contactTable } from "./xref";
 function rung() {
   const p = newProject("t");
   const pg = p.pages[0]!.id;
-  const cct = addElement(p, pg, "rail", [0, 10], { params: { name: "CCT", length: 190 } });
-  const ov = addElement(p, pg, "rail", [0, 60], { params: { name: "0V", length: 190 } });
+  const { cct: cct, ov: ov } = controlBusbars(p, pg, 10, 60);
   // Column 16 is x = 30..31.
   const s1 = addElement(p, pg, "pb-no", [30, 25]);
   const k1 = addElement(p, pg, "coil", [30, 57]);
@@ -36,13 +36,15 @@ describe("renumber (position scheme)", () => {
     expect([a.tag, c.tag, b.tag]).toEqual(["P1-31", "P1-31A", "P1-31B"]);
   });
 
-  test("wire numbers come from the conductor's start; rails give their names", () => {
-    const { p, s1 } = rung();
+  test("wire numbers come from the conductor's start; numbering stops at busbars", () => {
+    const { p, s1, k1 } = rung();
     renumber(p);
     const byTerm = (id: string, t: string) =>
       p.conductors.find((c) => c.terminals.some(([e, n]) => e === id && n === t))!.number;
-    expect(byTerm(s1.id, "13")).toBe("CCT");
-    expect(byTerm(s1.id, "14")).toBe("1-16");
+    // The wire off the CCT busbar starts at the busbar: the column's first number.
+    expect(byTerm(s1.id, "13")).toBe("1-16");
+    expect(byTerm(s1.id, "14")).toBe("1-16A");
+    expect(byTerm(k1.id, "A2")).toBe("1-16B");
   });
 
   test("locked tags and wire numbers are kept, and nobody else takes them", () => {
@@ -76,7 +78,7 @@ describe("renumber (sequential scheme)", () => {
     const k2 = addElement(p, pg, "coil", [80, 57]);
     renumber(p);
     expect([k1.tag, k2.tag]).toEqual(["K1", "K2"]);
-    expect(p.conductors.map((c) => c.number).filter((n) => /^\d+$/.test(n))).toEqual(["100"]);
+    expect(p.conductors.map((c) => c.number).filter((n) => /^\d+$/.test(n)).sort()).toEqual(["100", "101", "102"]);
   });
 });
 

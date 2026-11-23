@@ -16,7 +16,7 @@ export interface Finding {
   ids: string[];
 }
 
-const NO_TERMINAL_CHECK = new Set(["rail", "busbar", "junction", "plant-view", "isolator", "transformer", "motor", "socket"]);
+const NO_TERMINAL_CHECK = new Set(["busbar", "junction", "plant-view", "isolator", "transformer", "motor", "socket"]);
 
 function wiredTerminals(page: Page): Map<string, Set<string>> {
   const out = new Map<string, Set<string>>();

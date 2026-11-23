@@ -8,6 +8,7 @@
   import { resolveFields } from "../../core/fields";
   import { cloudsOn } from "../../core/ops";
   import { cloudPath } from "../../core/titleblock";
+  import { liveColour } from "../../core/wirecolours";
   import ElementView from "./ElementView.svelte";
   import GaLayer from "./GaLayer.svelte";
   import type { GaItem } from "../../core/model";
@@ -66,16 +67,11 @@
   /** Field wires (out to plant) are drawn dashed and don't print their number unless asked to. */
   const field = $derived(new Set(page.segments.filter((s) => isFieldWire(page, s)).map((s) => s.id)));
 
-  /** Conductors on a named rail: the rail's name says what they are, so no number. */
-  const railConds = $derived.by(() => {
-    const railIds = new Set(page.elements.filter((e) => e.symbol === "rail" || e.symbol === "busbar").map((e) => e.id));
-    return new Set(project.conductors.filter((c) => c.terminals.some(([id]) => railIds.has(id))).map((c) => c.id));
-  });
   const condById = $derived(new Map(project.conductors.map((c) => [c.id, c])));
-  /** Ends that land on a symbol's terminal (not a rail, busbar or junction) get the wire's function. */
+  /** Ends that land on a symbol's terminal (not a busbar or junction) get the wire's function. */
   const terminalEnd = (ref: [string, string]) => {
     const el = page.elements.find((e) => e.id === ref[0]);
-    return !!el && el.symbol !== "rail" && el.symbol !== "busbar" && el.symbol !== "junction";
+    return !!el && el.symbol !== "busbar" && el.symbol !== "junction";
   };
 </script>
 
@@ -106,11 +102,21 @@
   <g class="wires">
     {#each page.segments as seg (seg.id)}
       {@const pts = routes?.get(seg.id) ?? routeOf(page, seg)}
-      <polyline class:field={field.has(seg.id)} class:live={!!live?.has(seg.conductor)} points={pts.map((p) => p.join(",")).join(" ")} />
       {@const c = condById.get(seg.conductor)}
+      {@const lc = live?.has(seg.conductor) ? liveColour(c?.colour) : null}
+      {#if lc?.edge}
+        <!-- A white core gets a dark edge so it shows on the sheet. -->
+        <polyline class="live-edge" points={pts.map((p) => p.join(",")).join(" ")} />
+      {/if}
+      <polyline
+        class:field={field.has(seg.id)}
+        class:live={!!lc}
+        style={lc ? `stroke: ${lc.stroke}` : undefined}
+        points={pts.map((p) => p.join(",")).join(" ")}
+      />
       {#if c}
         {#each wireTexts(pts, {
-          number: railConds.has(c.id) || (field.has(seg.id) && !seg.showNumber) ? "" : c.number,
+          number: field.has(seg.id) && !seg.showNumber ? "" : c.number,
           colour: c.colour,
           func: c.function,
           labelFrom: terminalEnd(seg.from),
@@ -160,6 +166,10 @@
   .wires polyline.live {
     stroke: #d42020;
     stroke-width: var(--thick);
+  }
+  .wires polyline.live-edge {
+    stroke: #555;
+    stroke-width: calc(var(--thick) * 1.8);
   }
   .wires polyline.field {
     stroke-dasharray: 0.9 0.5;

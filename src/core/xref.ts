@@ -164,18 +164,6 @@ export function xrefText(project: Project, el: Element, masterTag: string): stri
     if (p) return address(p.page, p.el.pos, here);
     return typeof el.params.ref === "string" ? el.params.ref : "";
   }
-  if (el.symbol === "rail" || el.symbol === "busbar") {
-    // The other sheets with a rail or busbar of the same name: it's the same conductor.
-    const name = String(el.params.name ?? "");
-    const sheets = project.pages
-      .filter(
-        (pg) =>
-          pg.id !== here?.id &&
-          pg.elements.some((e) => (e.symbol === "rail" || e.symbol === "busbar") && String(e.params.name ?? "") === name),
-      )
-      .map((pg) => `/${pg.number}`);
-    return name ? sheets.join(" ") : "";
-  }
   const m = masterOf(project, el);
   if (m) {
     const where = address(m.page, m.el.pos, here);

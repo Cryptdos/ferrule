@@ -1,8 +1,13 @@
 /**
  * Conductors (potentials), DESIGN.md §4: every terminal joined by wire
  * without passing through a component is one conductor with one number.
- * Wires join terminals; terminal blocks, rails and busbars carry the
- * potential straight through. Coils, contacts and other components don't.
+ * Wires join terminals; terminal blocks carry the conductor straight
+ * through. Coils, contacts and other components don't.
+ *
+ * A busbar is a joint, like a distribution block (design-v0.2 §2): each wire
+ * leaving it is its own conductor with its own number. Electrically the
+ * busbar still joins them, and busbars on the same distribution are joined
+ * on every sheet: `netJoins` lists those joins for simulation and checks.
  *
  * Conductors are derived from the wiring. Recomputing keeps the id and
  * number of each conductor that still exists (matched by the terminals it
@@ -80,20 +85,6 @@ export function refreshConductors(project: Project): void {
     }
   }
 
-  // Rails and busbars of the same name are one conductor, continued across sheets.
-  const railByName = new Map<string, string>();
-  for (const page of project.pages) {
-    for (const el of page.elements) {
-      if ((el.symbol !== "rail" && el.symbol !== "busbar") || typeof el.params.name !== "string" || !el.params.name) continue;
-      const tapped = page.segments.flatMap((s) => [s.from, s.to]).find((r) => r[0] === el.id);
-      if (!tapped) continue;
-      const k = key(tapped);
-      const first = railByName.get(el.params.name);
-      if (first) uf.union(first, k);
-      else railByName.set(el.params.name, k);
-    }
-  }
-
   // Linked off-page arrows carry the conductor onto the other page.
   for (const page of project.pages) {
     for (const el of page.elements) {
@@ -143,4 +134,38 @@ export function refreshConductors(project: Project): void {
       seg.conductor = (k && groupOf.get(k)?.id) || "";
     }
   }
+}
+
+/**
+ * Joins beyond the conductors (design-v0.2 §2): every wire on a busbar is on
+ * the same net, and so is everything on the same distribution (busbars,
+ * link arrows and incoming supply terminals that pick it). Each join is two
+ * terminal refs and the element that makes it.
+ */
+export function netJoins(project: Project): { a: TerminalRef; b: TerminalRef; el: string }[] {
+  const out: { a: TerminalRef; b: TerminalRef; el: string }[] = [];
+  const firstOn = new Map<string, TerminalRef>(); // distribution id → a terminal on it
+  const onDist = (dist: unknown, ref: TerminalRef, el: string) => {
+    if (typeof dist !== "string" || !dist || !project.distributions.some((d) => d.id === dist)) return;
+    const first = firstOn.get(dist);
+    if (first) out.push({ a: first, b: ref, el });
+    else firstOn.set(dist, ref);
+  };
+  for (const page of project.pages) {
+    for (const el of page.elements) {
+      if (el.symbol === "busbar") {
+        // The wired taps, in order along the bar.
+        const taps = [...new Set(page.segments.flatMap((s) => [s.from, s.to]).filter((r) => r[0] === el.id).map((r) => r[1]))].sort(
+          (x, y) => Number(x) - Number(y),
+        );
+        for (let i = 1; i < taps.length; i++) out.push({ a: [el.id, taps[0]!], b: [el.id, taps[i]!], el: el.id });
+        if (taps.length) onDist(el.params.dist, [el.id, taps[0]!], el.id);
+      } else if (el.symbol === "offpage") {
+        onDist(el.params.dist, [el.id, "1"], el.id);
+      } else if (el.symbol === "supply") {
+        for (const [k, v] of Object.entries(el.params)) if (k.startsWith("dist_")) onDist(v, [el.id, k.slice(5)], el.id);
+      }
+    }
+  }
+  return out;
 }

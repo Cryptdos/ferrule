@@ -8,6 +8,7 @@ import { projectCopy, type DeviceEntry, type ProjectDevice } from "./devices";
 import { AREA_UNITS, type Rotation, type Vec, clampToArea, snapVec } from "./geometry";
 import { refreshConductors } from "./conductors";
 import {
+  type Distribution,
   type Element,
   type Page,
   type ParamValue,
@@ -1203,4 +1204,60 @@ export function setGaItemDevice(project: Project, pageId: string, itemId: string
   it.x = Math.round((cx - it.w / 2) * 2) / 2;
   if (deviceId) it.device = deviceId;
   else delete it.device;
+}
+
+// ---------------------------------------------------------------------------
+// Distributions (design-v0.2 §2)
+
+/** The params on an element that name a distribution: a busbar's or arrow's `dist`, an incoming supply's `dist_<terminal>`. */
+export function distParamKeys(el: Element): string[] {
+  if (el.symbol === "busbar" || el.symbol === "offpage") return ["dist"];
+  if (el.symbol === "supply") return Object.keys(el.params).filter((k) => k.startsWith("dist_"));
+  return [];
+}
+
+/** The distribution an element (or one supply terminal) is on, if any. */
+export function distributionOf(project: Project, el: Element, terminal?: string): Distribution | undefined {
+  const key = el.symbol === "supply" ? `dist_${terminal ?? ""}` : "dist";
+  const id = el.params[key];
+  return typeof id === "string" && id ? project.distributions.find((d) => d.id === id) : undefined;
+}
+
+export function addDistribution(project: Project, d: Partial<Omit<Distribution, "id">> & { name: string }): Distribution {
+  const name = d.name.trim();
+  if (!name) throw new OpError("A distribution needs a name");
+  if (project.distributions.some((x) => x.name === name)) throw new OpError(`There's already a distribution called ${name}`);
+  const out: Distribution = { id: newId("d"), name, kind: d.kind ?? "line", voltage: (d.voltage ?? "").trim() };
+  if (d.colour?.trim()) out.colour = colourCode(d.colour);
+  if (d.function?.trim()) out.function = d.function.trim();
+  project.distributions.push(out);
+  return out;
+}
+
+export function updateDistribution(project: Project, id: string, patch: Partial<Omit<Distribution, "id">>): Distribution {
+  const d = project.distributions.find((x) => x.id === id);
+  if (!d) throw new OpError(`No distribution "${id}"`);
+  if (patch.name !== undefined) {
+    const name = patch.name.trim();
+    if (!name) throw new OpError("A distribution needs a name");
+    if (project.distributions.some((x) => x.id !== id && x.name === name)) throw new OpError(`There's already a distribution called ${name}`);
+    d.name = name;
+  }
+  if (patch.kind) d.kind = patch.kind;
+  if (patch.voltage !== undefined) d.voltage = patch.voltage.trim();
+  if (patch.colour !== undefined) {
+    if (patch.colour.trim()) d.colour = colourCode(patch.colour);
+    else delete d.colour;
+  }
+  if (patch.function !== undefined) {
+    if (patch.function.trim()) d.function = patch.function.trim();
+    else delete d.function;
+  }
+  return d;
+}
+
+/** Delete a distribution: busbars and arrows on it become local, supply terminals stop feeding it. */
+export function deleteDistribution(project: Project, id: string): void {
+  project.distributions = project.distributions.filter((d) => d.id !== id);
+  for (const pg of project.pages) for (const el of pg.elements) for (const k of distParamKeys(el)) if (el.params[k] === id) delete el.params[k];
 }

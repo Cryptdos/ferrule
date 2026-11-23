@@ -23,7 +23,7 @@
     plantLabel,
   } from "../../core/ops";
   import { address, contactMarks, contactType, isMaster, isSlave, masterOf, partnerOf, slavesOf } from "../../core/xref";
-  import { paramApplies, requireSymbol } from "../../core/symbols";
+  import { paramApplies, requireSymbol, terminalNames } from "../../core/symbols";
   import { WIRE_COLOURS, WIRE_FUNCTIONS } from "../../core/wirecolours";
   import { displayTag, tagPrefix } from "../../core/tags";
   import type { ParamValue } from "../../core/model";
@@ -170,7 +170,7 @@
           ? "Lists the project's revisions: add and edit them under Project settings."
           : "One of each part drawn in the project, by name. It keeps itself up to date."}
       </p>
-    {:else if one.symbol !== "junction" && one.symbol !== "rail"}
+    {:else if one.symbol !== "junction"}
       <label>
         {one.symbol === "text" || one.symbol === "plate" ? "Text" : "Label"}
         <FieldInput
@@ -180,6 +180,33 @@
           onchange={(v) => patch({ label: v })}
         />
       </label>
+    {/if}
+    {#if one.symbol === "busbar" || one.symbol === "offpage"}
+      <label>
+        Distribution
+        <select value={String(one.params.dist ?? "")} onchange={(e) => setParam("dist", e.currentTarget.value)}>
+          <option value="">{one.symbol === "busbar" ? "Local (this busbar alone)" : "None"}</option>
+          {#each editor.project.distributions as d (d.id)}
+            <option value={d.id}>{d.name}{d.voltage ? ` (${d.voltage})` : ""}</option>
+          {/each}
+        </select>
+      </label>
+      {#if !editor.project.distributions.length}
+        <p class="hint">The project's distributions are set up under Distribution… in the top bar.</p>
+      {/if}
+    {:else if one.symbol === "supply"}
+      <div class="sub">Distribution each conductor feeds</div>
+      {#each terminalNames(one) as t (t)}
+        <label>
+          {t}
+          <select value={String(one.params[`dist_${t}`] ?? "")} onchange={(e) => setParam(`dist_${t}`, e.currentTarget.value)}>
+            <option value="">None</option>
+            {#each editor.project.distributions as d (d.id)}
+              <option value={d.id}>{d.name}{d.voltage ? ` (${d.voltage})` : ""}</option>
+            {/each}
+          </select>
+        </label>
+      {/each}
     {/if}
     {#each def.params.filter((x) => !x.hidden) as p (p.key)}
       {@const v = one.params[p.key] ?? p.default}
