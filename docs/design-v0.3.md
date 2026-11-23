@@ -213,6 +213,11 @@ Each step is one PR with a build, `ferrule-windows-v0.3.0-pre.zip`. The working 
 - **Prompts** a docked window opens (New plant…, say) float as usual.
 - **Table** in a tile outside Draft says it's for Draft, rather than vanishing from its tile.
 
+**Step 6c (tidying)**
+
+- **Splitting** a tile fits its sheet to its new, smaller size, as the old split did; other tiles keep their zoom.
+- The help has a line on tiles and docking; the README's drafting and simulating pictures are retaken with two tiles. The other pictures (Annotate, GA, controllers) show one view and are left until their workbenches change.
+
 ## 11. Director notes, as written (23/11/26)
 
 **On tiling (§7):**

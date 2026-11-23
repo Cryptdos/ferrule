@@ -49,6 +49,14 @@
     };
   });
 
+  /** Split this tile; it's narrower now, so its sheet is fitted to it again. */
+  function split(dir: "row" | "col") {
+    if (node.kind !== "leaf") return;
+    const id = node.id;
+    editor.splitTile(id, dir);
+    setTimeout(() => canvases.get(id)?.fit(), 60);
+  }
+
   const sheetCount = $derived(editor.tiles.kind === "leaf" ? 1 : countSheets(editor.tiles));
   function countSheets(n: TileNode): number {
     return n.kind === "leaf" ? (n.content.type === "sheet" ? 1 : 0) : countSheets(n.a) + countSheets(n.b);
@@ -122,8 +130,8 @@
       }}
     >
       <span class="name" title={name}>{name}</span>
-      <button class="icon" title="Split right: the new tile shows the same sheet" onclick={() => editor.splitTile(node.id, "row")}><Icon name="splitRight" size={16} /></button>
-      <button class="icon" title="Split down: the new tile shows the same sheet" onclick={() => editor.splitTile(node.id, "col")}><Icon name="splitDown" size={16} /></button>
+      <button class="icon" title="Split right: the new tile shows the same sheet" onclick={() => split("row")}><Icon name="splitRight" size={16} /></button>
+      <button class="icon" title="Split down: the new tile shows the same sheet" onclick={() => split("col")}><Icon name="splitDown" size={16} /></button>
       <button
         class="icon"
         title={node.content.type === "sheet" && sheetCount <= 1 ? "The last sheet tile stays open" : "Close this tile"}
