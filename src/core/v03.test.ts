@@ -276,7 +276,7 @@ describe("alignment tools (design-v0.3 §5)", () => {
     expect(Math.abs(ra.x + ra.w / 2 - USABLE.w / 2)).toBeLessThanOrEqual(0.5);
     expect(Math.abs(ra.y + ra.h / 2 - USABLE.h / 2)).toBeLessThanOrEqual(0.5);
     // Then the second lines up under the first: the first stays put.
-    const before = [...a.pos];
+    const before: [number, number] = [a.pos[0], a.pos[1]];
     alignElements(p, pg, [a.id, b.id], "centre");
     expect(a.pos).toEqual(before);
     expect(body(b).x + body(b).w / 2).toBeCloseTo(body(a).x + body(a).w / 2, 0);
