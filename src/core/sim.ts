@@ -23,7 +23,7 @@
 import type { Condition, Element, Expectation, Project } from "./model";
 import { contactPins, isAnalogueForm, pointRef, signalPins } from "./points";
 import { pointLabel, viewsOf } from "./modules";
-import { isolatorAux, selectorPoles } from "./symbols";
+import { changeoverTerms, isolatorAux, pushPoles, selectorPoles } from "./symbols";
 import { masterOf } from "./xref";
 import { netJoins } from "./conductors";
 import { displayTag } from "./tags";
@@ -238,9 +238,11 @@ export function compile(project: Project): Circuit {
           if (manual) inputs.push({ el: el.id, kind: "toggle", label: "Contact (no coil)", initial: 0 });
           break;
         case "pushbutton": {
-          const c = el.params.contact;
-          if (c !== "nc") link(el, "13", "14", press);
-          if (c === "nc" || c === "both") link(el, "21", "22", (s) => !press(s));
+          pushPoles(el).forEach((nc, i) => {
+            const k = i + 1;
+            if (nc) link(el, `${k}1`, `${k}2`, (s) => !press(s));
+            else link(el, `${k}3`, `${k}4`, press);
+          });
           inputs.push({ el: el.id, kind: "press", label: el.label || "Push button", initial: 0 });
           break;
         }
@@ -250,8 +252,9 @@ export function compile(project: Project): Circuit {
           selectorPoles(el).forEach((p, i) => {
             const k = i + 1;
             if (p.kind === "co") {
-              link(el, `${k}1`, `${k}4`, (s) => p.closed.includes(at(s)));
-              link(el, `${k}1`, `${k}2`, (s) => (p.closed12 ?? []).includes(at(s)));
+              const t = changeoverTerms(k, el.params.positions === "3");
+              link(el, t.com, t.second, (s) => p.closed.includes(at(s)));
+              link(el, t.com, t.first, (s) => (p.closed12 ?? []).includes(at(s)));
             } else if (p.kind === "nc") {
               link(el, `${k}1`, `${k}2`, (s) => p.closed.includes(at(s)));
             } else {

@@ -384,6 +384,10 @@
       {/if}
       <button class="icon" onclick={() => canvas?.fit()} title="Fit sheet (tap Space)"><Icon name="fit" /></button>
       <button class="icon" class:active={!!editor.splitPageId} onclick={toggleSplit} title="Show another sheet alongside"><Icon name="split" /></button>
+      {#if editor.mode === "draft"}
+        <button class="icon" class:active={editor.colourCheck} onclick={() => (editor.colourCheck = !editor.colourCheck)}
+          title="Colour check: every wire and busbar in its core colour (grey dashes: no colour set). Print and PDF stay black"><Icon name="colours" /></button>
+      {/if}
       {#if editor.mode !== "simulate"}
         <span class="sep"></span>
         <button class="icon" class:active={editor.tool === "select"} onclick={() => ((editor.tool = "select"), (editor.placeSymbol = null), (editor.gaPlace = null))} title="Select (S)">

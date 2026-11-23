@@ -99,3 +99,11 @@ Split view and tiling windows (9), alignment tools (5), icon-only buttons (11). 
 - **Plant minimum height:** the boxes are tall enough for a name like `BAT+5`; most plant views grow half a unit.
 - **PE earth:** the stem runs in from the top of the circle to bars just below its middle, so the sign sits centred.
 - **The logo** without its cable is scaled up a little and centred on its tile; the exe icon is redrawn at every size from the three drawings.
+
+**Step 2b (parts and Annotate, second half)**
+
+- **Markdown:** each line of the source is a line on the drawing, as before (Markdown would join lines into paragraphs; on a drawing, what you type is what you get). Images print as their text: a picture goes in as a *Picture*. Italic is the font slanted. A Title or Heading text in a file gets `#` or `##` on each of its lines; Detail-sized text becomes Note.
+- **Push button:** an NC alone is pole 1, so it's numbered 11/12 (it was 21/22); files are renumbered on load, wires included. NO and NC together stay 13/14 and 21/22.
+- **Selector names:** one name per position (Position 1, Off or mid, Position 2), blank for I, 0, II. The legend runs left from just right of the head, under the tag and label, so long names don't run into the poles. A legend from a file (`HAND OFF AUTO`, `1 2`) becomes the names when it has one word per position.
+- **3-position changeover:** the I side is drawn left and the II side right, the common between them; the blade is drawn in the position the switch is in while simulating. Files' 3-position changeovers are renumbered (k1 → common, k2 → I side, k4 → II side). A 2-position changeover keeps k1/k2/k4.
+- **Colour check** is a toggle in Draft; it shows on the sheet being edited, not the split pane.

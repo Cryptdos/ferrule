@@ -7,6 +7,7 @@
   import { BLOCK_INSET, blockLabels, connectionDots, earthConductors, isFieldWire, isScreenWire, numberedSegments, routeOf, wireTexts } from "../../core/wires";
   import { resolveFields } from "../../core/fields";
   import { cloudsOn } from "../../core/ops";
+  import { coreCss } from "../../core/wirecolours";
   import { cloudPath } from "../../core/titleblock";
   import ElementView from "./ElementView.svelte";
   import { benchOf } from "../../core/symbols";
@@ -25,6 +26,8 @@
     boundary,
     live = null,
     ops = null,
+    positions = null,
+    colourCheck = false,
     gaPreview = null,
     under,
     over,
@@ -45,6 +48,10 @@
     live?: Set<string> | null;
     /** Simulation: elements drawn operated (contacts closed or opened, buttons pressed). */
     ops?: Record<string, boolean> | null;
+    /** Simulate: the position each selector is in, to box its name in the legend. */
+    positions?: Record<string, number> | null;
+    /** Colour check: every wire and busbar drawn in its core colour (v0.2.1 note 31). */
+    colourCheck?: boolean;
     /** GA items being dragged or sized: where they'd go. */
     gaPreview?: Map<string, GaItem> | null;
     /** Extra drawing in grid units, under the elements (selection boxes). */
@@ -110,12 +117,42 @@
     {/each}
   {/if}
   {@render under?.()}
+  {#if colourCheck}
+    <!-- Busbars in their colour: their own, else their distribution's. -->
+    {#each page.elements.filter((e) => e.symbol === "busbar") as el (el.id)}
+      {@const len = Number(el.params.length) || 0}
+      {@const v = el.rot === 90 ? [0, 1] : el.rot === 180 ? [-1, 0] : el.rot === 270 ? [0, -1] : [1, 0]}
+      {@const own = String(el.params.colour ?? "")}
+      {@const dist = project.distributions.find((d) => d.id === el.params.dist)}
+      {@const css = coreCss(own || dist?.colour)}
+      {@const line = `${el.pos[0]},${el.pos[1]} ${el.pos[0] + v[0]! * len},${el.pos[1] + v[1]! * len}`}
+      {#if !css.length}
+        <polyline class="cc-none bar" points={line} />
+      {:else}
+        <polyline class="cc-edge bar" points={line} />
+        <polyline class="cc bar" points={line} style:stroke={css[0]} />
+        {#if css[1]}<polyline class="cc cc-second bar" points={line} style:stroke={css[1]} />{/if}
+      {/if}
+    {/each}
+  {/if}
   <g class="wires" class:dim={dimDraft}>
     {#each page.segments as seg (seg.id)}
       {@const pts = routes?.get(seg.id) ?? routeOf(page, seg)}
       {@const c = condById.get(seg.conductor)}
       <!-- Live wires are red, whatever their core colour: a black or grey core would hide it. -->
       <polyline class:field={field.has(seg.id)} class:screen={screen.has(seg.id)} class:live={!!live?.has(seg.conductor)} points={pts.map((p) => p.join(",")).join(" ")} />
+      {#if colourCheck}
+        {@const css = coreCss(c?.colour)}
+        {@const line = pts.map((p) => p.join(",")).join(" ")}
+        {#if !css.length}
+          <!-- No colour set: drawn hatched grey, so it stands out. -->
+          <polyline class="cc-none" points={line} />
+        {:else}
+          <polyline class="cc-edge" points={line} />
+          <polyline class="cc" points={line} style:stroke={css[0]} />
+          {#if css[1]}<polyline class="cc cc-second" points={line} style:stroke={css[1]} />{/if}
+        {/if}
+      {/if}
       {#if c}
         {#each wireTexts(pts, {
           // Shown by the usual rules, unless the wire says otherwise.
@@ -143,7 +180,14 @@
   {#each drawOrder as el (el.id)}
     {@const o = offset?.(el.id)}
     <g class:dim={focus && benchOf(el) !== focus}>
-      <ElementView el={ops?.[el.id] ? { ...el, params: { ...el.params, __op: true } } : el} {project} dx={o?.[0] ?? 0} dy={o?.[1] ?? 0} />
+      <ElementView
+        el={ops?.[el.id] || positions?.[el.id] !== undefined
+          ? { ...el, params: { ...el.params, ...(ops?.[el.id] ? { __op: true } : {}), ...(positions?.[el.id] !== undefined ? { __pos: positions[el.id]! } : {}) } }
+          : el}
+        {project}
+        dx={o?.[0] ?? 0}
+        dy={o?.[1] ?? 0}
+      />
     </g>
   {/each}
   {#each clouds as c (c.id)}
@@ -158,6 +202,35 @@
 </g>
 
 <style>
+  /* Colour check (v0.2.1 note 31): cores drawn in their colours, a dark edge so white shows. */
+  polyline.cc-edge {
+    fill: none;
+    stroke: #333;
+    stroke-width: 0.62;
+    stroke-linecap: round;
+  }
+  polyline.cc {
+    fill: none;
+    stroke-width: 0.45;
+    stroke-linecap: round;
+  }
+  polyline.cc-second {
+    stroke-dasharray: 1 1;
+    stroke-linecap: butt;
+  }
+  polyline.cc-none {
+    fill: none;
+    stroke: #b0b0b0;
+    stroke-width: 0.45;
+    stroke-dasharray: 0.4 0.4;
+  }
+  polyline.bar {
+    stroke-width: 0.8;
+  }
+  polyline.cc-edge.bar {
+    stroke-width: 1;
+  }
+
   .paper {
     fill: var(--paper, #fff);
   }

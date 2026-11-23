@@ -38,6 +38,7 @@
         text-anchor={p.anchor}
         class={p.role}
         class:bold={p.bold}
+        font-style={p.italic ? "italic" : undefined}
         transform={p.vertical ? `rotate(-90 ${p.at[0]} ${p.at[1]})` : undefined}>{p.text}</text
       >
     {/if}

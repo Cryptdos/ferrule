@@ -42,28 +42,81 @@ const vline = (x: number, y0: number, y1: number, w = THIN): Prim => ({ t: "line
 // ---------------------------------------------------------------------------
 // Notes: a small Markdown
 
-type Run = { text: string; bold: boolean };
+type Run = { text: string; bold: boolean; italic?: boolean; strike?: boolean };
 
-/** `**bold**` spans in a line; `code` marks are dropped. */
+const sameStyle = (a: Run, b: Omit<Run, "text">) => a.bold === b.bold && !!a.italic === !!b.italic && !!a.strike === !!b.strike;
+
+/**
+ * Inline Markdown in a line (v0.2.1 note 8): `***bold italic***`, `**bold**`
+ * or `__bold__`, `*italic*` or `_italic_`, `~~struck~~`, `` `code` `` (as
+ * written), links `[text](url)` and images `![alt](file)` as their text, and
+ * `\*` for a character that would otherwise be a mark.
+ */
 function runsOf(s: string, bold = false): Run[] {
   const out: Run[] = [];
-  const parts = s.replace(/`/g, "").split("**");
-  parts.forEach((p, i) => {
-    if (p) out.push({ text: p, bold: i % 2 === 1 ? !bold : bold });
-  });
+  const st = { bold, italic: false, strike: false };
+  let buf = "";
+  const flush = () => {
+    if (!buf) return;
+    const last = out[out.length - 1];
+    if (last && sameStyle(last, st)) last.text += buf;
+    else out.push({ text: buf, bold: st.bold, ...(st.italic ? { italic: true } : {}), ...(st.strike ? { strike: true } : {}) });
+    buf = "";
+  };
+  // Links and images read as their text.
+  const src = s.replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1");
+  for (let i = 0; i < src.length; i++) {
+    const c = src[i]!;
+    const next = src[i + 1];
+    if (c === "\\" && next && /[\\`*_{}[\]()#+\-.!|~>]/.test(next)) {
+      buf += next;
+      i++;
+      continue;
+    }
+    if (c === "`") {
+      const end = src.indexOf("`", i + 1);
+      if (end > i) {
+        buf += src.slice(i + 1, end);
+        i = end;
+        continue;
+      }
+    }
+    if (c === "~" && next === "~") {
+      flush();
+      st.strike = !st.strike;
+      i++;
+      continue;
+    }
+    if (c === "*" || c === "_") {
+      // An underscore inside a word (a_b) is just a character.
+      if (c === "_" && /\w/.test(src[i - 1] ?? "") && /\w/.test(next ?? "")) {
+        buf += c;
+        continue;
+      }
+      let n = 1;
+      while (src[i + n] === c && n < 3) n++;
+      flush();
+      if (n >= 2) st.bold = !st.bold;
+      if (n !== 2) st.italic = !st.italic;
+      i += n - 1;
+      continue;
+    }
+    buf += c;
+  }
+  flush();
   return out;
 }
 
 /** Runs broken into lines no wider than `width`, word by word. */
 function wrap(runs: Run[], size: number, width: number): Run[][] {
-  const words: { text: string; bold: boolean; space: boolean }[] = [];
+  const words: (Run & { space: boolean })[] = [];
   for (const r of runs) {
     const bits = r.text.split(/(\s+)/);
     for (const b of bits) {
       if (!b) continue;
       if (/^\s+$/.test(b)) {
         if (words.length) words[words.length - 1]!.space = true;
-      } else words.push({ text: b, bold: r.bold, space: false });
+      } else words.push({ ...r, text: b, space: false });
     }
   }
   const lines: Run[][] = [];
@@ -77,11 +130,12 @@ function wrap(runs: Run[], size: number, width: number): Run[][] {
       cur = [];
       w = 0;
     }
+    const { space: sp, ...style } = word;
     const last = cur[cur.length - 1];
-    if (last && last.bold === word.bold) last.text += word.text;
-    else cur.push({ text: word.text, bold: word.bold });
+    if (last && sameStyle(last, style)) last.text += word.text;
+    else cur.push({ ...style });
     w += ww;
-    if (word.space) {
+    if (sp) {
       cur[cur.length - 1]!.text += " ";
       w += space;
     }
@@ -90,12 +144,16 @@ function wrap(runs: Run[], size: number, width: number): Run[][] {
   return lines.length ? lines : [[]];
 }
 
-/** Text prims for one line of runs, starting at x on a baseline. */
+/** Text prims for one line of runs, starting at x on a baseline. Struck runs get a line through them. */
 function runPrims(line: Run[], x: number, baseline: number, size: number): Prim[] {
   const out: Prim[] = [];
   for (const r of line) {
     const t = r.text.replace(/\s+$/, "");
-    if (t) out.push(txt(x, baseline, t, size, r.bold));
+    if (t) {
+      const p = txt(x, baseline, t, size, r.bold);
+      out.push(r.italic && p.t === "text" ? { ...p, italic: true } : p);
+      if (r.strike) out.push(hline(x, x + textWidth(t, size), baseline - size * CAP_HEIGHT * 0.45));
+    }
     x += textWidth(r.text, size);
   }
   return out;
@@ -110,12 +168,17 @@ const cellsOf = (s: string) =>
     .split("|")
     .map((c) => c.trim());
 const isDivider = (cells: string[]) => cells.length > 0 && cells.every((c) => /^:?-{2,}:?$/.test(c));
+const plainWidth = (s: string, size: number) => runsOf(s).reduce((a, r) => a + textWidth(r.text, size), 0);
 
 /**
- * Formatted notes, top-left at (0, 0): `#`/`##`/`###` headings, `**bold**`,
- * `-` bullets, `1.` numbered lists (indent with two spaces), `|` tables (a
- * `|---|` line under the first row makes it a heading row) and `---` rules.
- * Each line of the source is a line on the drawing; long lines wrap to `width`.
+ * Formatted notes, top-left at (0, 0), in Markdown (v0.2.1 note 8): all of
+ * its basic syntax and some extended. Headings `#` (Title), `##` (Heading),
+ * `###` and below (Note, bold); bold, italic, struck and code spans; links
+ * and images as their text; `>` quotes; `-`, `*` or `+` bullets, `1.`
+ * numbered lists and `- [ ]` / `- [x]` task lists (two spaces indent a
+ * level); fenced code blocks; `|` tables (a `|---|` line under the first row
+ * makes it a heading row); `---` rules. Each line of the source is a line
+ * on the drawing; long lines wrap to `width`. `size` is the body text size.
  */
 export function notesLayout(md: string, size: number, width: number): { prims: Prim[]; w: number; h: number } {
   const prims: Prim[] = [];
@@ -131,6 +194,23 @@ export function notesLayout(md: string, size: number, width: number): { prims: P
       y += lh * 0.5;
       continue;
     }
+    // Fenced code: its lines as written, in a thin box.
+    if (/^\s*(```|~~~)/.test(line)) {
+      const fence = line.trim().slice(0, 3);
+      const code: string[] = [];
+      i++;
+      while (i < lines.length && !lines[i]!.trim().startsWith(fence)) code.push(lines[i++]!.replace(/\t/g, "  "));
+      const pad = size * 0.5;
+      const top = y + size * 0.2;
+      const w = Math.min(width, Math.max(size * 4, ...code.map((c) => textWidth(c, size) + pad * 2)));
+      code.forEach((c, k) => {
+        if (c.trim()) prims.push(txt(pad, top + pad + k * lh + base - size * 0.25, c, size));
+      });
+      const h = code.length * lh + pad * 2;
+      prims.push({ t: "line", pts: [[0, top], [w, top], [w, top + h], [0, top + h], [0, top]], w: THIN });
+      y = top + h + size * 0.4;
+      continue;
+    }
     // Table: this row and the ones after it.
     if (isTableRow(line)) {
       const rows: string[][] = [];
@@ -144,9 +224,7 @@ export function notesLayout(md: string, size: number, width: number): { prims: P
       i--;
       const cols = Math.max(...rows.map((r) => r.length));
       const pad = size * 0.5;
-      const colW = Array.from({ length: cols }, (_, c) =>
-        Math.max(size * 2, ...rows.map((r) => textWidth((r[c] ?? "").replace(/\*\*/g, ""), size) + pad * 2)),
-      );
+      const colW = Array.from({ length: cols }, (_, c) => Math.max(size * 2, ...rows.map((r) => plainWidth(r[c] ?? "", size) + pad * 2)));
       const rowH = size * 1.7;
       const total = colW.reduce((a, b) => a + b, 0);
       maxW = Math.max(maxW, total);
@@ -177,25 +255,46 @@ export function notesLayout(md: string, size: number, width: number): { prims: P
       y += lh;
       continue;
     }
-    const h = /^(#{1,3})\s+(.*)$/.exec(line);
+    const h = /^(#{1,6})\s+(.*)$/.exec(line);
     if (h) {
       const k = h[1]!.length;
-      const s = size * (k === 1 ? 1.45 : k === 2 ? 1.2 : 1);
+      // # Title (5 mm), ## Heading (3.5 mm), ### and below the body size in bold, with body text at Note (2.5 mm).
+      const s = size * (k === 1 ? 2 : k === 2 ? 1.4 : 1);
       if (y > 0) y += s * 0.3;
-      for (const l of wrap(runsOf(h[2]!, true), s, width)) {
+      for (const l of wrap(runsOf(h[2]!.replace(/\s+#+\s*$/, ""), true), s, width)) {
         prims.push(...runPrims(l, 0, y + s * (0.5 + CAP_HEIGHT / 2) + s * 0.25, s));
         y += s * 1.45;
       }
       continue;
     }
+    // A quote: indented, with a rule down its left side.
+    const quote = /^\s*>\s?(.*)$/.exec(line);
+    if (quote) {
+      const ind = size * 1.2;
+      const top = y;
+      for (const l of wrap(runsOf(quote[1]!), size, Math.max(size * 4, width - ind))) {
+        prims.push(...runPrims(l, ind, y + base, size));
+        y += lh;
+      }
+      prims.push(vline(size * 0.35, top + size * 0.15, y - size * 0.15, RULE));
+      continue;
+    }
     const indent = Math.floor((raw.length - raw.trimStart().length) / 2) * size * 1.3;
-    const bullet = /^\s*[-*+]\s+(.*)$/.exec(raw);
+    const task = /^\s*[-*+]\s+\[( |x|X)\]\s+(.*)$/.exec(raw);
+    const bullet = task ? null : /^\s*[-*+]\s+(.*)$/.exec(raw);
     const numbered = /^\s*(\d+|[a-z])[.)]\s+(.*)$/i.exec(raw);
-    if (bullet || numbered) {
-      const hang = indent + size * (numbered ? 1.8 : 1.3);
-      const body = bullet ? bullet[1]! : numbered![2]!;
+    if (task || bullet || numbered) {
+      const hang = indent + size * (numbered ? 1.8 : task ? 1.6 : 1.3);
+      const body = task ? task[2]! : bullet ? bullet[1]! : numbered![2]!;
       const wrapped = wrap(runsOf(body), size, Math.max(size * 4, width - hang));
-      if (bullet) prims.push({ t: "circle", c: [indent + size * 0.45, y + base - size * CAP_HEIGHT * 0.45], r: size * 0.13, fill: true });
+      const mid = y + base - size * CAP_HEIGHT * 0.45;
+      if (task) {
+        // A box, crossed when it's done.
+        const b = size * 0.7;
+        const x0 = indent + size * 0.15;
+        prims.push({ t: "line", pts: [[x0, mid - b / 2], [x0 + b, mid - b / 2], [x0 + b, mid + b / 2], [x0, mid + b / 2], [x0, mid - b / 2]], w: THIN });
+        if (task[1] !== " ") prims.push({ t: "line", pts: [[x0 + b * 0.2, mid], [x0 + b * 0.42, mid + b * 0.28], [x0 + b * 0.85, mid - b * 0.32]], w: RULE });
+      } else if (bullet) prims.push({ t: "circle", c: [indent + size * 0.45, mid], r: size * 0.13, fill: true });
       else prims.push(txt(indent, y + base, `${numbered![1]}.`, size));
       for (const l of wrapped) {
         prims.push(...runPrims(l, hang, y + base, size));

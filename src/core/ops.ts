@@ -65,6 +65,16 @@ export interface AddElementOptions {
 function normaliseParams(symbol: string, params: Record<string, ParamValue>): Record<string, ParamValue> {
   if (symbol === "lamp" && typeof params.colour === "string") params.colour = lampColour(params.colour);
   if (symbol === "busbar" && typeof params.colour === "string") params.colour = knownColour(params.colour);
+  // A selector's legend as it was written before its positions had names (v0.2.1 note 23).
+  if (symbol === "selector" && typeof params.legend === "string") Object.assign(params, legendToPositions(params.legend, params.positions === "3"));
+  if (symbol === "selector") delete params.legend;
+  // A push button's contact as it was set before poles (v0.2.1 note 24): NO, NC, or both.
+  if (symbol === "pushbutton" && typeof params.contact === "string") {
+    const c = params.contact;
+    delete params.contact;
+    if (c === "both") Object.assign(params, { poles: 2, pole1: "no", pole2: "nc" });
+    else Object.assign(params, { poles: 1, pole1: c === "nc" ? "nc" : "no" });
+  }
   return params;
 }
 
@@ -215,6 +225,14 @@ export interface ElementPatch {
   zone?: Element["zone"];
   rot?: Rotation;
   params?: Record<string, ParamValue>;
+}
+
+/** A legend written as words ("HAND OFF AUTO", "1  2") as position names, when there's one word per position. */
+export function legendToPositions(legend: string, three: boolean): Record<string, string> {
+  const w = legend.trim().split(/\s+/).filter(Boolean);
+  if (three && w.length === 3) return { pos1: w[0]!, pos0: w[1]!, pos2: w[2]! };
+  if (!three && w.length === 2) return { pos0: w[0]!, pos1: w[1]! };
+  return {};
 }
 
 /** The width a label written on several lines wraps at to keep those lines: its widest line, in whole units. */

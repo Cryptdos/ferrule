@@ -4,7 +4,7 @@
  * this format. There's no upgrading before 1.0: an older file is refused
  * with a plain message rather than half-opened.
  */
-import { PLANT_VIEW_KEYS, labelWidthFor } from "./ops";
+import { PLANT_VIEW_KEYS, labelWidthFor, legendToPositions } from "./ops";
 import { parseProjectDevices } from "./devices";
 import { AREA_UNITS } from "./geometry";
 import { DISTRIBUTION_KINDS, type DistributionKind, POINT_FORMS, type Condition, type Controller, type ControllerSlot, type ModuleInfo, type ModuleType, type PlantItem, type Expectation, type IoPoint, type PinInfo, type PointForm, FORMAT, FORMAT_VERSION, type GaDim, type GaDimPoint, type GaItem, type Page, type Project, emptyInfo } from "./model";
@@ -484,6 +484,12 @@ function preRelease(input: Record<string, unknown>): void {
     const renamed = new Set<string>();
     for (const el of arr(pg.elements).filter(isObj)) {
       const params = isObj(el.params) ? el.params : {};
+      // Text sizes became Markdown headings (note 8): a Title or Heading text gets # or ## on each line.
+      if (el.symbol === "text" && (params.size === "title" || params.size === "heading") && typeof el.label === "string") {
+        const mark = params.size === "title" ? "# " : "## ";
+        el.label = el.label.split("\n").map((l) => (l.trim() && !/^#/.test(l) ? mark + l : l)).join("\n");
+      }
+      if (el.symbol === "text") delete params.size;
       if (el.symbol === "plate") {
         el.symbol = "box";
         el.params = { w: params.w ?? 20, h: params.h ?? 5 };
@@ -548,6 +554,29 @@ function preRelease(input: Record<string, unknown>): void {
         terms.set(id, { "V+": "+V", "V-": "-V", T: "LT" });
       } else if (e.symbol === "supply") {
         terms.set(id, { "+": "+V", "-": "-V" });
+      }
+      // A selector's legend became its position names; a 3-position changeover is numbered as makers do (v0.2.1 note 23).
+      if (e.symbol === "selector") {
+        const three = params.positions === "3";
+        if (typeof params.legend === "string") Object.assign(params, legendToPositions(params.legend, three));
+        delete params.legend;
+        if (three) {
+          const map: Record<string, string> = { ...(terms.get(id) ?? {}) };
+          for (let k = 1; k <= 4; k++) {
+            if (params[`pole${k}`] !== "co") continue;
+            const b = 4 * (k - 1);
+            Object.assign(map, { [`${k}1`]: String(b + 2), [`${k}2`]: String(b + 3), [`${k}4`]: String(b + 1) });
+          }
+          if (Object.keys(map).length) terms.set(id, map);
+        }
+      }
+      // Push buttons have poles now (v0.2.1 note 24); an NC alone is pole 1 (11/12, was 21/22).
+      if (e.symbol === "pushbutton" && typeof params.contact === "string") {
+        const c = params.contact;
+        delete params.contact;
+        if (c === "both") Object.assign(params, { poles: 2, pole1: "no", pole2: "nc" });
+        else Object.assign(params, { poles: 1, pole1: c === "nc" ? "nc" : "no" });
+        if (c === "nc") terms.set(id, { ...(terms.get(id) ?? {}), "21": "11", "22": "12" });
       }
       if (e.symbol === "isolator" && params.operator === "push") params.operator = "turn";
       // Busbar colours were free text in the test builds; now one of the wire colours (T4).

@@ -49,6 +49,8 @@ export type Prim =
       vertical?: boolean;
       /** Drawn with an outline as well as fill, which reads as bold in the one-weight font. */
       bold?: boolean;
+      /** Slanted (Markdown italic). */
+      italic?: boolean;
       /** Already placed for the element's rotation: left exactly where the symbol put it. */
       placed?: boolean;
       /** A label on several lines grows upwards from here (it sits above something). */
@@ -282,8 +284,37 @@ const SELECTOR_POLE_OPTIONS = [
   { value: "I+II", label: "NO, closed in I and II (3 position)" },
   { value: "nc-I", label: "NC, opened in I" },
   { value: "nc-II", label: "NC, opened in II (3 position)" },
-  { value: "co", label: "Changeover: 12 in 0 / I, 14 in I / II" },
+  { value: "co", label: "Changeover (2 position: 12 in 0, 14 in I; 3 position: 2–3 in I, open in 0, 2–1 in II)" },
 ];
+
+/**
+ * A changeover pole's terminals (v0.2.1 note 23). On a 2-position switch,
+ * k1 common, k2 made in 0, k4 in I. On a 3-position switch, numbered as
+ * makers do: a common in the middle and a contact either side, pole 1 being
+ * 3, 2, 1 (common 2) and pole 2 being 7, 6, 5: closed to the I side in I,
+ * open in 0, to the II side in II.
+ */
+export function changeoverTerms(k: number, three: boolean): { com: string; first: string; second: string } {
+  if (!three) return { com: `${k}1`, first: `${k}2`, second: `${k}4` };
+  const b = 4 * (k - 1);
+  return { com: String(b + 2), first: String(b + 3), second: String(b + 1) };
+}
+
+/** A selector's position names in the order they're drawn: I, 0, II on a 3-position switch; 0, I on a 2. */
+export function selectorNames(el: Element): { pos: number; name: string }[] {
+  const three = el.params.positions === "3";
+  const nm = (i: number, d: string) => String(el.params[`pos${i}`] ?? "").trim() || d;
+  return three
+    ? [
+        { pos: 1, name: nm(1, "I") },
+        { pos: 0, name: nm(0, "0") },
+        { pos: 2, name: nm(2, "II") },
+      ]
+    : [
+        { pos: 0, name: nm(0, "0") },
+        { pos: 1, name: nm(1, "I") },
+      ];
+}
 
 export interface SelectorPole {
   kind: "no" | "nc" | "co";
@@ -320,6 +351,12 @@ const instantParam: ParamDef = {
   when: (el) => el.links.length > 0,
   fixed: "Only for a contact linked to a timer",
 };
+
+/** A push button's poles, in order: true for NC. Files from before (`contact`: no, nc, both) are read the same way. */
+export function pushPoles(el: Element): boolean[] {
+  const n = Math.max(1, Math.min(4, typeof el.params.poles === "number" ? el.params.poles : 1));
+  return Array.from({ length: n }, (_, i) => String(el.params[`pole${i + 1}`] ?? ((i + 1) % 2 ? "no" : "nc")) === "nc");
+}
 
 /** Push-button head on the left at x = hx. */
 function pushHead(hx: number): Prim[] {
@@ -504,54 +541,45 @@ const SYMBOLS: SymbolDef[] = [
     group: "Operators",
     palette: true,
     params: [
-      {
-        key: "contact",
-        label: "Contact",
-        type: "select",
-        default: "no",
-        options: [
-          { value: "no", label: "NO (13/14)" },
-          { value: "nc", label: "NC (21/22)" },
-          { value: "both", label: "NO and NC (13/14, 21/22)" },
-        ],
-      },
+      // Poles worked by the one head, each NO or NC, numbered by pole like a selector's: NO k3/k4, NC k1/k2 (v0.2.1 note 24).
+      { key: "poles", label: "Poles", type: "number", min: 1, max: 4, default: 1 },
+      ...[1, 2, 3, 4].map(
+        (k): ParamDef => ({
+          key: `pole${k}`,
+          label: `Pole ${k}`,
+          type: "select",
+          default: k % 2 ? "no" : "nc",
+          options: [
+            { value: "no", label: `NO (${k}3/${k}4)` },
+            { value: "nc", label: `NC (${k}1/${k}2)` },
+          ],
+          when: (el) => num(el, "poles", 1, 1, 4) >= k,
+          fixed: "–",
+        }),
+      ),
     ],
     kind: () => "pushButton",
     draw(el) {
-      const c = str(el, "contact", "no");
       const op = opOf(el);
-      const head = (dy: number) => pushHead(-2.4).map((p) => (p.t === "line" ? { ...p, pts: p.pts.map(([x, y]) => [x, y + dy] as Vec) } : p));
-      if (c === "nc") {
-        return {
-          prims: [...ncContact(0, op), dashed(NC_MID, [-2.4, NC_MID[1]]), ...head(NC_MID[1]), ...contactTerms(["21", "22"]).prims, ...tagAndLabel(-3.2, el)],
-          terminals: vterms("21", "22"),
-          body: { x: -2.8, y: -1.9, w: 4.2, h: 3.4 },
-        };
-      }
-      if (c === "both") {
-        // NO on the left, NC 3 units to its right, one head working both.
-        const nc = ncContact(0, op).map((p) => (p.t === "line" ? { ...p, pts: p.pts.map(([x, y]) => [x + 3, y] as Vec) } : p));
-        return {
-          prims: [
-            ...noContact(0, op),
-            ...nc,
-            dashed(NO_MID, [-2.4, 0]),
-            dashed([NO_MID[0] + 0.6, 0], [3 + NC_MID[0], 0]),
-            ...head(0),
-            ...contactTerms(["13", "14"]).prims,
-            term(3.45, -2.2, "21"),
-            term(3.45, 2.9, "22"),
-            ...tagAndLabel(-3.2, el),
-          ],
-          terminals: [...vterms("13", "14"), { name: "21", at: [3, -3], dir: "up" }, { name: "22", at: [3, 3], dir: "down" }],
-          body: { x: -2.8, y: -1.9, w: 7.2, h: 3.4 },
-        };
-      }
-      return {
-        prims: [...noContact(0, op), dashed(NO_MID, [-2.4, 0]), ...head(0), ...contactTerms(["13", "14"]).prims, ...tagAndLabel(-3.2, el)],
-        terminals: vterms("13", "14"),
-        body: { x: -2.8, y: -1.7, w: 2.9, h: 3.2 },
-      };
+      const poles = pushPoles(el);
+      const prims: Prim[] = [];
+      const terminals: TerminalDef[] = [];
+      let lastMid: Vec = NO_MID;
+      poles.forEach((nc, i) => {
+        const x = i * 3;
+        const k = i + 1;
+        if (nc) {
+          prims.push(...ncContact(x, op), term(x + 0.45, -2.2, `${k}1`), term(x + 0.45, 2.9, `${k}2`));
+          terminals.push({ name: `${k}1`, at: [x, -3], dir: "up" }, { name: `${k}2`, at: [x, 3], dir: "down" });
+          lastMid = [x + NC_MID[0], 0];
+        } else {
+          prims.push(...noContact(x, op), term(x + 0.45, -2.2, `${k}3`), term(x + 0.45, 2.9, `${k}4`));
+          terminals.push({ name: `${k}3`, at: [x, -3], dir: "up" }, { name: `${k}4`, at: [x, 3], dir: "down" });
+          lastMid = [x + NO_MID[0], 0];
+        }
+      });
+      prims.push(dashed([-2.4, 0], lastMid), ...pushHead(-2.4), ...tagAndLabel(-3.2, el));
+      return { prims, terminals, body: { x: -2.8, y: -1.9, w: (poles.length - 1) * 3 + 4.2, h: 3.4 } };
     },
   },
   {
@@ -608,14 +636,18 @@ const SYMBOLS: SymbolDef[] = [
         fixed: "–",
       },
       { key: "key", label: "Key operated", type: "bool", default: false },
-      { key: "legend", label: "Position legend", type: "text", default: "", placeholder: "e.g. HAND OFF AUTO" },
+      // What each position is called, drawn as the legend under the head (v0.2.1 note 23).
+      { key: "pos1", label: "Position 1 (I)", type: "text", default: "", placeholder: "e.g. SUPPLY 1" },
+      { key: "pos0", label: "Off / mid position (0)", type: "text", default: "", placeholder: "e.g. OFF" },
+      { key: "pos2", label: "Position 2 (II)", type: "text", default: "", placeholder: "e.g. SUPPLY 2", when: (el) => el.params.positions === "3", fixed: "3 position only" },
     ],
     kind: () => "selector",
     draw(el) {
       const key = bool(el, "key", false);
       const three = str(el, "positions", "2") === "3";
-      const legend = str(el, "legend", "") || (three ? "I 0 II" : "0  I");
       const op = opOf(el);
+      // In Simulate: the position it's in.
+      const at = typeof el.params.__pos === "number" ? el.params.__pos : null;
       const poles = selectorPoles(el);
       const prims: Prim[] = [];
       const terminals: TerminalDef[] = [];
@@ -625,7 +657,26 @@ const SYMBOLS: SymbolDef[] = [
       poles.forEach((p, i) => {
         if (i > 0) x += 3 + (p.kind === "co" ? 2 : 0);
         const k = i + 1;
-        if (p.kind === "co") {
+        if (p.kind === "co" && three) {
+          // A common in the middle under a contact either side: I side left, II side right; open in 0.
+          const t = changeoverTerms(k, true);
+          const blade = at === 1 ? [x - 1.85, -1.55] : at === 2 ? [x - 0.15, -1.55] : [x - 1, -1.2];
+          prims.push(
+            line([x - 2, -3], [x - 2, -1.5], [x - 1.55, -1.5]),
+            line([x, -3], [x, -1.5], [x - 0.45, -1.5]),
+            line([x - 1, 3], [x - 1, 1.5]),
+            line([x - 1, 1.5], blade as Vec),
+            term(x - 2.45, -2.2, t.first, "end"),
+            term(x + 0.45, -2.2, t.second),
+            term(x - 0.55, 2.9, t.com),
+          );
+          terminals.push(
+            { name: t.first, at: [x - 2, -3], dir: "up" },
+            { name: t.second, at: [x, -3], dir: "up" },
+            { name: t.com, at: [x - 1, 3], dir: "down" },
+          );
+          lastMid = [x - 1, 0];
+        } else if (p.kind === "co") {
           prims.push(
             line([x, -3], [x, -1.5]),
             line([x - 2, -3], [x - 2, -1.5], [x - 0.9, -1.5]),
@@ -654,7 +705,26 @@ const SYMBOLS: SymbolDef[] = [
       // The head on the left, clear of a first changeover's NC side; the legend under it,
       // away from the terminal numbers.
       const hx = poles[0]?.kind === "co" ? -4.4 : -2.4;
-      prims.push(dashed([hx, 0], lastMid), ...(key ? keyHead(hx) : turnHead(hx)), text(hx, 2.5, legend, DETAIL, "middle", "note"));
+      prims.push(dashed([hx, 0], lastMid), ...(key ? keyHead(hx) : turnHead(hx)));
+      // The legend: the position names in order, POS1 – MID – POS2, the one it's in boxed in Simulate.
+      const names = selectorNames(el);
+      const dash = " – ";
+      const widths = names.map((n) => textWidth(n.name, DETAIL));
+      const total = widths.reduce((a, b) => a + b, 0) + textWidth(dash, DETAIL) * (names.length - 1);
+      // Ends just right of the head and runs left, under the tag and label, clear of the poles and their numbers.
+      const ly = 3.1;
+      let lx = hx + 0.3 - total;
+      names.forEach((n, i) => {
+        if (i) {
+          const gap = textWidth(dash, DETAIL);
+          prims.push(text(lx + gap / 2, ly, "–", DETAIL, "middle", "note"));
+          lx += gap;
+        }
+        const tp: Prim = { ...text(lx, ly, n.name, DETAIL, "start", "note"), ...(at === n.pos ? { bold: true } : {}) } as Prim;
+        prims.push(tp);
+        if (at === n.pos) prims.push(rect(lx - 0.25, ly - DETAIL * CAP_HEIGHT - 0.3, widths[i]! + 0.5, DETAIL * CAP_HEIGHT + 0.6));
+        lx += widths[i]!;
+      });
       prims.push(...tagAndLabel(hx - 1.6, el));
       return { prims, terminals, body: { x: hx - 0.5, y: -1.9, w: x - hx + 1.9, h: 3.4 } };
     },
@@ -1445,7 +1515,6 @@ const SYMBOLS: SymbolDef[] = [
     group: "Drawing",
     palette: true,
     params: [
-      { key: "size", label: "Size", type: "select", default: "note", options: TEXT_SIZE_OPTIONS },
       {
         key: "align",
         label: "Align",
@@ -1461,9 +1530,9 @@ const SYMBOLS: SymbolDef[] = [
     ],
     kind: () => null,
     draw(el, t) {
-      // Formatted text (headings, bold, lists, tables, rules), top left at the origin;
-      // centred or right-aligned lines are placed about it.
-      const size = TEXT_SIZES[str(el, "size", "note")] ?? TEXT_SIZES.note!;
+      // Formatted text in Markdown, top left at the origin; centred or right-aligned
+      // lines are placed about it. Body text is Note; headings set their own sizes (v0.2.1 note 8).
+      const size = TEXT_SIZES.note!;
       const width = num(el, "width", 0, 0, 150);
       const n = notesLayout((t?.label ?? el.label) || "Text", size, width || 1000);
       const anchor = str(el, "align", "start");

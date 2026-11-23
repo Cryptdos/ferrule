@@ -125,8 +125,11 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
     add("busbar", x, y, { params: { style: "control", dist: d?.id ?? "", name, length, bothEnds: true } });
   const arrowOut = (x: number, y: number, label = "") => add("offpage", x, y, { label });
   const arrowIn = (x: number, y: number, label = "") => add("offpage", x, y, { rot: 180, label, params: { source: false } });
-  const text = (x: number, y: number, s: string, size = "note", align = "start") =>
-    add("text", x, y, { label: s, params: { size, align } });
+  // Text sizes are Markdown headings (# Title, ## Heading); body text is Note.
+  const text = (x: number, y: number, s: string, size = "note", align = "start") => {
+    const mark = size === "title" ? "# " : size === "heading" ? "## " : "";
+    return add("text", x, y, { label: s.split("\n").map((l) => mark + l).join("\n"), params: { align } });
+  };
   const box = (x: number, y: number, bw: number, bh: number, label = "", dashed = false) =>
     add("box", x, y, { label, params: { w: bw, h: bh, dashed } });
   // Door labels on the not-to-scale GA are boxes named for them; real label plates go on the door GA.
@@ -317,10 +320,10 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
   w([cIn, "1"], tap(c, 147));
   w(tap(o, 147), [oIn, "1"]);
   // Enable: AUTO/TEST (fire alarm or test), fans-fail latch, duty selector.
-  const sAt = add("selector", 10, 13, { label: "AUTO/TEST", params: { key: true, legend: "AUTO TEST" } });
+  const sAt = add("selector", 10, 13, { label: "AUTO/TEST", params: { key: true, pos0: "AUTO", pos1: "TEST" } });
   const frEn = add("contact-no", 16, 13);
   const ffEn = add("contact-nc", 10, 24);
-  const sDuty = add("selector", 10, 35, { rot: 180, label: "DUTY\nSELECTOR", params: { pole1: "co", key: true, legend: "1  2" } });
+  const sDuty = add("selector", 10, 35, { rot: 180, label: "DUTY\nSELECTOR", params: { pole1: "co", key: true, pos0: "1", pos1: "2" } });
   const er1 = add("coil", 10, 56, { label: `${tag(SF1.id)}\nENABLE` });
   const er2 = add("coil", 20, 56, { label: `${tag(SF2.id)}\nENABLE` });
   w(tap(c, 10), [sAt, "13"]);
@@ -400,12 +403,12 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
   const sReset = add("pushbutton", 120, 33, { label: "FANS TRIP\nRESET", params: { contact: "nc" } });
   const ff = add("coil", 120, 56, { label: "FANS\nFAIL" });
   w(tap(c, 120), [t1c, "13"]);
-  w([t1c, "14"], [sReset, "21"]);
+  w([t1c, "14"], [sReset, "11"]);
   w(tap(c, 127), [t2c, "13"]);
-  tee([t2c, "14"], [sReset, "21"], [120, 21]);
+  tee([t2c, "14"], [sReset, "11"], [120, 21]);
   w(tap(c, 133), [ffHold, "13"]);
-  tee([ffHold, "14"], [sReset, "21"], [120, 23]);
-  w([sReset, "22"], [ff, "A1"]);
+  tee([ffHold, "14"], [sReset, "11"], [120, 23]);
+  w([sReset, "12"], [ff, "A1"]);
   w([ff, "A2"], tap(o, 120));
   linkContact(p, t1c.id, t1.id);
   linkContact(p, t2c.id, t2.id);
@@ -528,7 +531,7 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
       addGaItem(p, gaPg.id, { kind: "trunking", x: 80, y: y + 80 + (i === rails.length - 1 ? 40 : 0), w: 840, h: 60 });
     });
     // A note on a GA is an ordinary Text annotation (note 46).
-    addElement(p, gaPg.id, "text", gaToSheet(gaPg.ga!, [80, 1490]), { label: "35 mm DIN RAIL. TRUNKING 60 × 60.", params: { size: "detail" } });
+    addElement(p, gaPg.id, "text", gaToSheet(gaPg.ga!, [80, 1490]), { label: "35 mm DIN RAIL. TRUNKING 60 × 60." });
     // Relays and timers on the first two rails, terminals on the last; the rest left to place by hand.
     const wanted = (c: GaCandidate) => {
       const el = p.pages.flatMap((pg) => pg.elements).find((e) => e.id === c.refs[0]);

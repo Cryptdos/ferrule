@@ -71,3 +71,56 @@ describe("step 2a: parts and Annotate", () => {
     expect(label.t === "text" && name.t === "text" && label.at[1]).toBeGreaterThan(name.t === "text" ? name.at[1] : 0);
   });
 });
+
+describe("step 2b: Markdown, push buttons, selectors", () => {
+  test("Markdown text: headings set their sizes, inline marks, quotes, tasks and code blocks", async () => {
+    const { notesLayout } = await import("./annotations");
+    const n = notesLayout("# T\n## H\nA **b** *i* ~~s~~ `c` [l](u)\n> q\n- [x] done\n```\nX_Y\n```", 1, 60);
+    const texts = n.prims.filter((p) => p.t === "text") as Extract<(typeof n.prims)[number], { t: "text" }>[];
+    expect(texts.find((t) => t.text === "T")!.size).toBe(2);
+    expect(texts.find((t) => t.text === "H")!.size).toBe(1.4);
+    expect(texts.find((t) => t.text === "b")!.bold).toBe(true);
+    expect(texts.find((t) => t.text === "i")!.italic).toBe(true);
+    // Code as written and a link as its text, in the plain run after the struck word.
+    expect(texts.some((t) => t.text === "c l")).toBe(true);
+    expect(n.prims.some((p) => p.t === "line" && p.pts.length === 2 && p.pts[0]![1] === p.pts[1]![1])).toBe(true);
+    expect(texts.some((t) => t.text === "X_Y")).toBe(true);
+  });
+
+  test("push buttons have poles, numbered NO k3/k4 and NC k1/k2; files' contact setting maps across (24)", () => {
+    const { p, pg } = sheet();
+    const b = addElement(p, pg, "pushbutton", [20, 20], { params: { poles: 3, pole1: "no", pole2: "nc", pole3: "nc" } });
+    expect(localGeometry(b, "S1").terminals.map((t) => t.name)).toEqual(["13", "14", "21", "22", "31", "32"]);
+    const old = addElement(p, pg, "pushbutton", [40, 20], { params: { contact: "nc" } });
+    expect(localGeometry(old, "S2").terminals.map((t) => t.name)).toEqual(["11", "12"]);
+  });
+
+  test("a 3-position changeover: common 2, I side 3, II side 1, open in 0; names drawn as the legend (23)", async () => {
+    const { compile, initialState, toggle } = await import("./sim");
+    const { connect } = await import("./ops");
+    const { controlBusbars } = await import("./testing");
+    const { p, pg } = sheet();
+    const { cct, ov } = controlBusbars(p, pg);
+    const s = addElement(p, pg, "selector", [40, 40], { params: { positions: "3", pole1: "co", pos1: "SUPPLY 1", pos0: "OFF", pos2: "SUPPLY 2" } });
+    const g = localGeometry(s, "S1");
+    expect(g.terminals.map((t) => t.name).sort()).toEqual(["1", "2", "3"]);
+    expect(g.prims.filter((x) => x.t === "text").map((x) => (x.t === "text" ? x.text : ""))).toEqual(expect.arrayContaining(["SUPPLY 1", "OFF", "SUPPLY 2"]));
+    const k1 = addElement(p, pg, "coil", [20, 70]);
+    const k2 = addElement(p, pg, "coil", [60, 70]);
+    connect(p, pg, [cct.id, "39"], [s.id, "2"]);
+    connect(p, pg, [s.id, "3"], [k1.id, "A1"]);
+    connect(p, pg, [s.id, "1"], [k2.id, "A1"]);
+    connect(p, pg, [k1.id, "A2"], [ov.id, "20"]);
+    connect(p, pg, [k2.id, "A2"], [ov.id, "60"]);
+    const c = compile(p);
+    let st = initialState(c);
+    expect([st.energised[k1.id], st.energised[k2.id]]).toEqual([false, false]);
+    st = toggle(c, st, s.id);
+    expect([st.energised[k1.id], st.energised[k2.id]]).toEqual([true, false]);
+    st = toggle(c, st, s.id);
+    expect([st.energised[k1.id], st.energised[k2.id]]).toEqual([false, true]);
+    // In Simulate the position it's in is boxed (and drawn bold).
+    const boxed = localGeometry({ ...s, params: { ...s.params, __pos: 2 } }, "S1").prims.find((x) => x.t === "text" && x.text === "SUPPLY 2");
+    expect(boxed && boxed.t === "text" && boxed.bold).toBe(true);
+  });
+});
