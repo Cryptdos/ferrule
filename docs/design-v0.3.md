@@ -230,6 +230,11 @@ Each step is one PR with a build, `ferrule-windows-v0.3.0-pre.zip`. The working 
 - **The first picked** is the first in the selection: click it first, then Shift+click the rest. A box selection stays "a box" until the selection changes.
 - **The buttons** sit after the tools (Select, Wire), before the menus. Their hover text says what they'll align to: the sheet, the first picked, or the outline.
 
+**Step 9 (door lamps in Simulate)**
+
+- **Unlit lamps are dimmed** on the door while simulating, as each lens is already drawn in its colour; otherwise a lit lamp hardly stands out from an unlit one. Out of Simulate the door is drawn as before.
+- **The door back** shows a lit lamp's glow in its cut-out, as the design names door back views too.
+
 ## 11. Director notes, as written (23/11/26)
 
 **On tiling (§7):**
