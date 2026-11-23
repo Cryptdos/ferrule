@@ -161,7 +161,7 @@
               {#if item?.module}
                 {@const m = item.module}
                 <td class="tag">{plantLabel(item)}</td>
-                <td>
+                <td class="type">
                   <select value={m.type} title={moduleType(m.type).label} onchange={(e) => editor.apply((p) => updateModule(p, item.id, { type: e.currentTarget.value as ModuleType }))}>
                     {#each MODULE_TYPES as t (t.value)}<option value={t.value}>{t.short}: {t.label}</option>{/each}
                   </select>
@@ -302,6 +302,9 @@
   }
   td.narrow {
     width: 64px;
+  }
+  td.type {
+    min-width: 170px;
   }
   td.tag {
     white-space: nowrap;

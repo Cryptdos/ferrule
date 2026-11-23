@@ -243,8 +243,8 @@
           onchange={(v) => patch({ label: v })}
         />
       </label>
-      {#if one.label && one.symbol !== "plate"}
-        <!-- Longer labels wrap onto more lines at this width (28). -->
+      {#if one.symbol !== "plate"}
+        <!-- Longer labels wrap onto more lines at this width (28); shown before there's a label, so it's found. -->
         <label>
           Label width (units, 0: one line)
           <input
