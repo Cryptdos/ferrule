@@ -66,6 +66,11 @@ export interface Supply {
   ret: string[];
   /** A transformer's secondary is only a source while its primary is energised. */
   when?: string;
+  /**
+   * A transformer's primary ends (P1, P2). The secondary's live side follows
+   * the primary's: P1 on the phase makes S1 live, P2 on the phase makes S2 live.
+   */
+  primary?: [string, string];
 }
 
 /** A plant output that follows one of its inputs, e.g. RUNNING after ENABLE. */
@@ -184,7 +189,7 @@ export function compile(project: Project): Circuit {
         case "transformer":
           // The primary is a load; the secondary a supply while the primary is on.
           loads.push({ el: el.id, kind: "transformer", a: n(el, "P1"), b: n(el, "P2") });
-          supplies.push({ el: el.id, phases: [n(el, "S1")], ret: [n(el, "S2")], when: el.id });
+          supplies.push({ el: el.id, phases: [n(el, "S1")], ret: [n(el, "S2")], when: el.id, primary: [n(el, "P1"), n(el, "P2")] });
           break;
         case "contact-no":
           link(el, "13", "14", operated);
@@ -346,7 +351,7 @@ function pass(c: Circuit, s: SimState) {
   const uf = new UF();
   for (const l of c.links) if (l.closed(s)) uf.union(l.a, l.b);
   // Each live supply: its phases (kept apart) and its return.
-  const live = c.supplies.filter((x) => !x.when || !!s.energised[x.when]);
+  const live = liveSupplies(c, s, uf);
   const doms = live.map((x) => ({
     phases: new Set(x.phases.map((p) => uf.find(p))),
     ret: new Set(x.ret.map((r) => uf.find(r))),
@@ -366,7 +371,36 @@ function pass(c: Circuit, s: SimState) {
     const ph = x.phases.map((p) => uf.find(p));
     return ph.some((p) => x.ret.some((r) => uf.find(r) === p)) || new Set(ph).size < ph.length;
   });
-  return { uf, phaseRoots, short, on };
+  return { uf, phaseRoots, short, on, live };
+}
+
+/**
+ * The supplies that are live: every Incoming supply, and each transformer
+ * whose primary is energised, with its secondary turned the way its primary
+ * is fed. (A transformer fed from another transformer is worked out after it.)
+ */
+function liveSupplies(c: Circuit, s: SimState, uf: UF): Supply[] {
+  const out: Supply[] = c.supplies.filter((x) => !x.when);
+  const pending = c.supplies.filter((x) => x.when && s.energised[x.when]);
+  for (let round = 0; pending.length && round < 8; round++) {
+    for (let i = 0; i < pending.length; i++) {
+      const x = pending[i]!;
+      if (!x.primary) {
+        out.push(x);
+        pending.splice(i--, 1);
+        continue;
+      }
+      const p1 = uf.find(x.primary[0]);
+      const p2 = uf.find(x.primary[1]);
+      const fed = out.find((d) => d.phases.some((p) => uf.find(p) === p2) && d.ret.some((r) => uf.find(r) === p1));
+      const straight = out.some((d) => d.phases.some((p) => uf.find(p) === p1));
+      if (!fed && !straight && round < 7) continue;
+      // P2 on the phase and P1 on the return: the secondary's live side is S2.
+      out.push(fed && !straight ? { ...x, phases: x.ret, ret: x.phases } : x);
+      pending.splice(i--, 1);
+    }
+  }
+  return out;
 }
 
 /** Solve until stable at the current time. */
@@ -412,7 +446,7 @@ export function settle(c: Circuit, s: SimState): SimState {
       for (const l of [...c.links, ...c.loads]) {
         for (const x of [l.a, l.b]) if (r.phaseRoots.has(r.uf.find(x))) live.add(x);
       }
-      for (const sup of c.supplies) if (!sup.when || next.energised[sup.when]) for (const x of sup.phases) live.add(x);
+      for (const sup of r.live) for (const x of sup.phases) live.add(x);
       next.live = [...live];
       return next;
     }

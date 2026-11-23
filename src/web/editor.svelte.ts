@@ -183,7 +183,9 @@ export class Editor {
    * open, the sheet you came from stays in view in the other half.
    */
   goTo(id: string): void {
-    const page = this.project.pages.find((p) => p.elements.some((e) => e.id === id) || p.segments.some((s) => s.id === id));
+    const page = this.project.pages.find(
+      (p) => p.elements.some((e) => e.id === id) || p.segments.some((s) => s.id === id) || (p.gaItems ?? []).some((i) => i.id === id),
+    );
     if (!page) return;
     if (this.splitPageId && page.id !== this.pageId) this.splitPageId = this.pageId;
     this.setPage(page.id);

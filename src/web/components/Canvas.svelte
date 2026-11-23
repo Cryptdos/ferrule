@@ -468,6 +468,7 @@
       if (symbol === "plant-view") {
         editor.tool = "select";
         editor.placeSymbol = null;
+        editor.placeParams = {};
       }
       return;
     }
@@ -805,27 +806,46 @@
     if (target) editor.goTo(target);
   }
 
-  // Bring an element we've jumped to into view, at the current zoom. Only a
+  // Centre whatever we've jumped to (a part, a wire or a GA item), at the
+  // current zoom, in the part of the canvas the browser doesn't cover. Only a
   // new jump (focusRequest) or the sheet appearing runs this: reading the view
-  // here would pull you back to the element every time you zoom or pan.
+  // here would pull you back to it every time you zoom or pan.
   $effect(() => {
     void editor.focusRequest;
     void page.id;
     untrack(() => {
       const id = editor.highlight;
       if (!id || !svg) return;
-      const el = page.elements.find((x) => x.id === id);
-      if (!el) return;
-      const cx = AREA_MM.x + el.pos[0] * UNIT_MM;
-      const cy = AREA_MM.y + el.pos[1] * UNIT_MM;
+      const at = focusPoint(id);
+      if (!at) return;
+      const cx = AREA_MM.x + at[0] * UNIT_MM;
+      const cy = AREA_MM.y + at[1] * UNIT_MM;
       const v = $state.snapshot(view);
-      const h = v.w * (box.h / Math.max(1, box.w));
-      const margin = v.w * 0.1;
-      if (cx < v.x + margin || cx > v.x + v.w - margin || cy < v.y + margin || cy > v.y + h - margin) {
-        view = { ...v, x: cx - v.w / 2, y: cy - h / 2 };
-      }
+      const mmPerPx = v.w / Math.max(1, box.w);
+      const h = box.h * mmPerPx;
+      const inset = insetLeft < box.w * 0.5 ? insetLeft : 0;
+      // The middle of the uncovered area, in mm from the view's left edge.
+      const midX = (inset + (box.w - inset) / 2) * mmPerPx;
+      view = { ...v, x: cx - midX, y: cy - h / 2 };
     });
   });
+
+  /** Where to centre for an element, a wire (the middle of its route) or a GA item, in sheet units. */
+  function focusPoint(id: string): [number, number] | null {
+    const el = page.elements.find((x) => x.id === id);
+    if (el) return [el.pos[0], el.pos[1]];
+    const seg = page.segments.find((x) => x.id === id);
+    if (seg) {
+      const pts = routeOf(page, seg);
+      if (!pts.length) return null;
+      const xs = pts.map((p) => p[0]);
+      const ys = pts.map((p) => p[1]);
+      return [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2];
+    }
+    const it = page.ga && page.gaItems?.find((x) => x.id === id);
+    if (it && page.ga) return [GA_ORIGIN[0] + mmToUnits(page.ga, it.x + it.w / 2), GA_ORIGIN[1] + mmToUnits(page.ga, it.y + it.h / 2)];
+    return null;
+  }
 
   // The highlight lasts until the selection moves on.
   $effect(() => {

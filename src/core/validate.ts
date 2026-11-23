@@ -2,6 +2,7 @@
  * Loading project files. Checks the shape, fills in fields added since
  * the file was written, and rejects anything that isn't a Ferrule project.
  */
+import { PLANT_VIEW_KEYS } from "./ops";
 import { parseProjectDevices } from "./devices";
 import { FORMAT, FORMAT_VERSION, type GaItem, type Page, type Project, emptyInfo } from "./model";
 import { getSymbol } from "./symbols";
@@ -92,6 +93,8 @@ export function parseProject(input: unknown): Project {
   // Terminals on a panel boundary are cells of its terminal block (older files didn't say).
   for (const pg of project.pages) {
     for (const el of pg.elements) {
+      // Plant view settings picked up by other parts (a placement bug in 0.1) are dropped.
+      if (el.symbol !== "plant-view") for (const k of PLANT_VIEW_KEYS) delete el.params[k];
       if (el.symbol !== "terminal") continue;
       if (pg.boundaryY !== null && el.pos[1] === pg.boundaryY && (el.rot === 0 || el.rot === 180)) el.params.onBlock = true;
       else delete el.params.onBlock;

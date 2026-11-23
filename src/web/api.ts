@@ -35,9 +35,19 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.error ?? `${res.status} ${res.statusText}`);
+    throw new ApiError(body.error ?? `${res.status} ${res.statusText}`, res.status);
   }
   return res.json() as Promise<T>;
+}
+
+/** An error from the server, with its HTTP status (409: that file is already there). */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+  }
 }
 
 export const api = {

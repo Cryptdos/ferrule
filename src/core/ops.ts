@@ -77,6 +77,7 @@ export function addElement(
     params: normaliseParams(symbol, { ...defaultParams(symbol), ...opts.params }),
     links: [],
   };
+  if (symbol !== "plant-view") for (const k of PLANT_VIEW_KEYS) delete el.params[k];
   page.elements.push(el);
   snapToBlock(page, el);
   if (page.boundaryY !== null) updateZones(page);
@@ -238,13 +239,41 @@ export function deleteSegments(project: Project, pageId: string, ids: string[]):
   refreshConductors(project);
 }
 
+/**
+ * Snap a route's corners to the grid, but leave its ends exactly on their
+ * terminals (some sit on half units, e.g. terminal block cells) and keep the
+ * runs next to the ends straight.
+ */
+function snapInside(points: Vec[], a: Vec, b: Vec): Vec[] {
+  // Without repeated points or straight-through corners, the runs alternate across and down.
+  const pre = simplifyRoute(points.map((p) => [p[0], p[1]] as Vec));
+  if (pre.length < 2) return pre;
+  const n = pre.length;
+  // Ends within half a unit of their terminals are taken as on them.
+  const near = (p: Vec, t: Vec) => Math.abs(p[0] - t[0]) <= 0.5 && Math.abs(p[1] - t[1]) <= 0.5;
+  const out = pre.map((p, i) => (i === 0 || i === n - 1 ? ([p[0], p[1]] as Vec) : snapVec(p)));
+  if (near(out[0]!, a)) out[0] = [a[0], a[1]];
+  if (near(out[n - 1]!, b)) out[n - 1] = [b[0], b[1]];
+  if (n === 2) return out;
+  const vertical = (i: number) => Math.abs(pre[i]![0] - pre[i + 1]![0]) < 1e-6;
+  // Square each run off from the start, keeping each corner's other coordinate on the grid…
+  for (let i = 0; i < n - 2; i++) {
+    if (vertical(i)) out[i + 1]![0] = out[i]![0];
+    else out[i + 1]![1] = out[i]![1];
+  }
+  // …and the last run onto the end terminal.
+  if (vertical(n - 2)) out[n - 2]![0] = out[n - 1]![0];
+  else out[n - 2]![1] = out[n - 1]![1];
+  return out;
+}
+
 /** Set a hand-drawn route. Must be square and start and end on the wire's terminals. */
 export function setManualRoute(project: Project, pageId: string, id: string, points: Vec[]): void {
   const page = getPage(project, pageId);
   const seg = getSegment(page, id);
-  const pts = simplifyRoute(points.map(snapVec));
   const a = terminalPoint(getElement(page, seg.from[0]), seg.from[1])!;
   const b = terminalPoint(getElement(page, seg.to[0]), seg.to[1])!;
+  const pts = simplifyRoute(snapInside(points, a, b));
   const first = pts[0];
   const last = pts[pts.length - 1];
   if (!first || !last || first[0] !== a[0] || first[1] !== a[1] || last[0] !== b[0] || last[1] !== b[1]) {
@@ -799,6 +828,9 @@ export function setPlantViewTerminals(project: Project, pageId: string, elId: st
 }
 
 /** Copy plant data into its views (they draw from their own params) and drop wires on terminals that went away. */
+/** Settings that belong to plant views only; any other part carrying them picked them up by mistake. */
+export const PLANT_VIEW_KEYS = ["plant", "show", "terms", "pdesc", "pinfo", "pgroups", "pbo"];
+
 export function syncPlantViews(project: Project): void {
   for (const page of project.pages) {
     for (const el of page.elements) {

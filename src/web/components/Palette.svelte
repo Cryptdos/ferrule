@@ -27,6 +27,8 @@
     } else {
       editor.tool = "place";
       editor.placeSymbol = id;
+      // Start clean: nothing carried over from the last thing placed (e.g. a plant view).
+      editor.placeParams = {};
     }
   }
 </script>
