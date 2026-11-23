@@ -4,7 +4,7 @@
   import type { Page, Project } from "../../core/model";
   import type { Vec } from "../../core/geometry";
   import { blockHalf } from "../../core/blocks";
-  import { BLOCK_INSET, blockLabels, connectionDots, hiddenColours, isFieldWire, routeOf, wireTexts } from "../../core/wires";
+  import { BLOCK_INSET, blockLabels, connectionDots, isFieldWire, routeOf, wireTexts } from "../../core/wires";
   import { resolveFields } from "../../core/fields";
   import { cloudsOn } from "../../core/ops";
   import { cloudPath } from "../../core/titleblock";
@@ -68,8 +68,6 @@
   const field = $derived(new Set(page.segments.filter((s) => isFieldWire(page, s)).map((s) => s.id)));
 
   const condById = $derived(new Map(project.conductors.map((c) => [c.id, c])));
-  /** Wires whose colour is their busbar's: not printed unless the busbar says to. */
-  const quietColours = $derived(hiddenColours(project));
   /** Ends that land on a symbol's terminal (not a busbar or junction) get the wire's function. */
   const terminalEnd = (ref: [string, string]) => {
     const el = page.elements.find((e) => e.id === ref[0]);
@@ -118,8 +116,9 @@
       />
       {#if c}
         {#each wireTexts(pts, {
-          number: field.has(seg.id) && !seg.showNumber ? "" : c.number,
-          colour: quietColours.has(c.id) ? undefined : c.colour,
+          // Shown by the usual rules (numbers off on field wires), unless the wire says otherwise.
+          number: (seg.showNumber ?? !field.has(seg.id)) ? c.number : "",
+          colour: seg.showColour === false ? undefined : c.colour,
           func: c.function,
           labelFrom: terminalEnd(seg.from),
           labelTo: terminalEnd(seg.to),
