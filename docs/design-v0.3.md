@@ -182,6 +182,12 @@ Each step is one PR with a build, `ferrule-windows-v0.3.0-pre.zip`. The working 
 - **Pin ids** (C, NO, ⊥) in plant and module views stay 1.8 mm: they're names, not numbers.
 - **The example** has its terminal and plant pins redrawn 2 apart (sheets 7 and 8). It has no controller, so the module view was checked on a scratch sheet.
 
+**Step 4 (wire numbers from terminals)**
+
+- **Ties** along the strip are broken top to bottom, after sheet and left to right.
+- **Two strips in one column** (X1 and X2 terminals at the same place) give the same number to two wires, since each wire must agree with its terminal. Check warns, and moving one terminal along fixes it.
+- **Sequential scheme:** the same rule; a wire on a terminal takes the terminal's sequence number.
+
 ## 11. Director notes, as written (23/11/26)
 
 **On tiling (§7):**

@@ -6,8 +6,10 @@
  * Position scheme (default):
  *  - component tags: prefix + sheet-column of the component, e.g. K10-16;
  *  - terminals: sheet-column, e.g. 10-12 (the strip groups them);
- *  - wire numbers: sheet-column of the conductor's start (its highest
- *    point), e.g. 11-22;
+ *  - wire numbers: a wire on a terminal takes the terminal's number (the
+ *    first along the strip, by sheet then left to right, if it reaches
+ *    more than one); any other, the sheet-column of the conductor's start
+ *    (its highest point), e.g. 11-22 (v0.3 §2);
  *  - in each case the highest item in a column keeps the plain address and
  *    the rest, working down, get A, B, C…
  * Sequential scheme: K1, K2… and wires 100, 101…, in sheet, column, height
@@ -19,12 +21,30 @@
  */
 import { refreshConductors } from "./conductors";
 import { columnOf, type Vec } from "./geometry";
-import type { Element, Page, Project } from "./model";
+import type { Conductor, Element, Page, Project } from "./model";
 import { assignAddresses, collisionSuffix, type Placed } from "./numbering";
 import { requireSymbol, terminalPoint } from "./symbols";
 import { tagPrefix } from "./tags";
 import { plantTag } from "./ops";
 import { isMaster, masterOf, slavesOf } from "./xref";
+
+/**
+ * The terminal a conductor takes its number from (v0.3 §2): the first along
+ * the strip it reaches, by sheet then left to right. None if it reaches no
+ * terminal, or only unnumbered ones.
+ */
+export function numberingTerminal(project: Project, c: Conductor): { el: Element; page: Page } | null {
+  const ids = new Set(c.terminals.map(([id]) => id));
+  let best: { el: Element; page: Page } | null = null;
+  for (const page of project.pages) {
+    for (const el of page.elements) {
+      if (el.symbol !== "terminal" || !el.tag || !ids.has(el.id)) continue;
+      if (!best || page.number < best.page.number || (page.number === best.page.number && (el.pos[0] < best.el.pos[0] || (el.pos[0] === best.el.pos[0] && el.pos[1] < best.el.pos[1]))))
+        best = { el, page };
+    }
+  }
+  return best;
+}
 
 export interface RenumberResult {
   tags: number;
@@ -170,11 +190,20 @@ export function renumber(project: Project): RenumberResult {
 
   const condItems: Item[] = [];
   const takenWires = new Set<string>();
+  for (const c of project.conductors) if (c.locked && c.number) takenWires.add(c.number);
+  // A wire on a terminal takes the terminal's number: the two always agree (v0.3 §2).
+  const fromTerminal = new Set<string>();
   for (const c of project.conductors) {
-    if (c.locked && c.number) {
-      takenWires.add(c.number);
-      continue;
-    }
+    if (c.locked && c.number) continue;
+    const t = numberingTerminal(project, c);
+    if (!t) continue;
+    c.number = t.el.tag;
+    takenWires.add(c.number);
+    fromTerminal.add(c.id);
+    result.wires++;
+  }
+  for (const c of project.conductors) {
+    if ((c.locked && c.number) || fromTerminal.has(c.id)) continue;
     // Numbering stops at busbars: each wire leaving one is numbered by where it starts, like any other.
     let start: { page: number; at: Vec } | null = null;
     for (const [id, term] of c.terminals) {
