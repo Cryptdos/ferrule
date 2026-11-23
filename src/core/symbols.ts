@@ -1387,7 +1387,9 @@ const SYMBOLS: SymbolDef[] = [
     palette: false,
     params: [],
     kind: () => null,
-    draw(el) {
+    draw(el, t) {
+      // A controller's module: at the top of the sheet, terminals along the bottom (controller.md §5).
+      if (str(el, "pmod", "")) return drawModuleView(el, t);
       const lay = plantViewLayout(el);
       const { left, right, h } = lay;
       const pbo = bool(el, "pbo", false);
@@ -1861,17 +1863,134 @@ export function isolatorAux(el: Element): { a: string; b: string; nc: boolean }[
   return out;
 }
 
-/** A plant view's pins as its params carry them (ops.ts plantPinsParam): number, as printed, id, label under its run. */
-export function parsePlantPins(s: string): { pin: string; printed: string; id: string; label: string }[] {
+/**
+ * A plant view's pins as its params carry them (ops.ts plantPinsParam):
+ * number, as printed, id, label under its run; a module's also its point
+ * and that point's job label.
+ */
+export function parsePlantPins(s: string): { pin: string; printed: string; id: string; label: string; point: string; job: string }[] {
   try {
     const v = JSON.parse(s || "[]");
     if (!Array.isArray(v)) return [];
     return v
       .filter((r): r is string[] => Array.isArray(r) && typeof r[0] === "string")
-      .map((r) => ({ pin: r[0]!, printed: String(r[1] ?? r[0]), id: String(r[2] ?? ""), label: String(r[3] ?? "") }));
+      .map((r) => ({
+        pin: r[0]!,
+        printed: String(r[1] ?? r[0]),
+        id: String(r[2] ?? ""),
+        label: String(r[3] ?? ""),
+        point: String(r[4] ?? ""),
+        job: String(r[5] ?? ""),
+      }));
   } catch {
     return [];
   }
+}
+
+/** Module view sizes, grid units. */
+export const MODULE = {
+  /** Room for the channel names (AO1) over the id boxes. */
+  groups: 2.5,
+  /** Room for the heading (ANALOGUE OUTPUTS) over the channel names. */
+  heading: 2.5,
+  /** Job labels start this far under the terminals, along the wire. */
+  labelGap: 0.8,
+};
+
+/**
+ * A module view (controller.md §5): its title row above the box; inside,
+ * the heading, then per channel its name, pin ids and pin numbers, with the
+ * terminals along the bottom edge; each point's job label under them, along
+ * its wire. A view that leaves out channels has a break at that edge.
+ */
+export function moduleViewLayout(el: Element) {
+  const base = plantViewLayout(el);
+  const all = str(el, "terms", "").split(",").filter(Boolean);
+  const shown = base.terms.map((t) => t.id);
+  const cutLeft = !!all.length && !!shown.length && shown[0] !== all[0];
+  const cutRight = !!all.length && !!shown.length && shown[shown.length - 1] !== all[all.length - 1];
+  const h = base.termH + base.idH + MODULE.groups + MODULE.heading;
+  // Job labels, one per point, between (or beside) its shown pins.
+  const pins = parsePlantPins(str(el, "ppins", ""));
+  const xOf = new Map(base.terms.map((t) => [t.id, t.x]));
+  const labels: { x: number; text: string }[] = [];
+  const seen = new Set<string>();
+  for (const p of pins) {
+    if (!p.point || !p.job || seen.has(p.point)) continue;
+    const xs = pins.filter((q) => q.point === p.point && xOf.has(q.pin)).map((q) => xOf.get(q.pin)!);
+    if (!xs.length) continue;
+    seen.add(p.point);
+    const a = Math.min(...xs);
+    // Beside the point's first wire, in the gap before it (between channels), reading along it.
+    labels.push({ x: a - 0.55, text: p.job.toUpperCase() });
+  }
+  return { ...base, h, cutLeft, cutRight, labels };
+}
+
+function drawModuleView(el: Element, t?: GeometryText): { prims: Prim[]; terminals: TerminalDef[]; body: Rect } {
+  const lay = moduleViewLayout(el);
+  const { left, right, h } = lay;
+  let info: { heading?: string } = {};
+  try {
+    info = JSON.parse(str(el, "pmod", "{}")) as { heading?: string };
+  } catch {
+    /* drawn without a heading */
+  }
+  const zig = (x: number): Vec[] => {
+    const pts: Vec[] = [[x, -h]];
+    for (let i = 0, y = -h + 0.4; y < 0; i++, y += 0.8) pts.push([x + (i % 2 ? 0.4 : -0.4), y]);
+    pts.push([x, 0]);
+    return pts;
+  };
+  const prims: Prim[] = [line([left, -h], [right, -h]), line([left, 0], [right, 0])];
+  prims.push(lay.cutLeft ? line(...zig(left)) : line([left, -h], [left, 0]));
+  prims.push(lay.cutRight ? line(...zig(right)) : line([right, -h], [right, 0]));
+  // Title row over the box: tag, type, maker and model, controller (or where it carries on from).
+  prims.push(text(left, -h - 0.7, "{xref}", TAG, "start", "tag"));
+  // Heading, centred under the top edge.
+  if (info.heading) prims.push(text((left + right) / 2, -h + MODULE.heading - 0.6, info.heading, PLANT.group, "middle", "note"));
+  // Channel names over the id boxes.
+  const top = -(lay.termH + lay.idH);
+  for (const g of lay.groups) prims.push(text((g.x0 + g.x1) / 2, top - 0.7, g.name, DETAIL, "middle", "note"));
+  // Terminal boxes along the bottom inside edge: numbers at the bottom, ids above them.
+  const half = PLANT.pitch / 2;
+  for (const tm of lay.terms) {
+    prims.push(rect(tm.x - half, -lay.termH, PLANT.pitch, lay.termH), {
+      t: "text",
+      at: [tm.x + DETAIL * CAP_HEIGHT * 0.5, -lay.termH / 2],
+      text: tm.name,
+      size: DETAIL,
+      anchor: "middle",
+      role: "term",
+      vertical: true,
+    });
+    if (lay.idH && tm.pinId) {
+      prims.push(rect(tm.x - half, top, PLANT.pitch, lay.idH), {
+        t: "text",
+        at: [tm.x + DETAIL * CAP_HEIGHT * 0.5, top + lay.idH / 2],
+        text: tm.pinId,
+        size: DETAIL,
+        anchor: "middle",
+        role: "note",
+        vertical: true,
+      });
+    }
+  }
+  // What each point does on this job, along its wire under the terminals.
+  for (const l of lay.labels) {
+    prims.push({
+      t: "text",
+      at: [l.x + DETAIL * CAP_HEIGHT * 0.5, MODULE.labelGap],
+      text: l.text,
+      size: DETAIL,
+      anchor: "end",
+      role: "note",
+      vertical: true,
+    });
+  }
+  void t;
+  const terminals: TerminalDef[] = lay.terms.map((tm) => ({ name: tm.id, at: [tm.x, 0], dir: "down" as Dir }));
+  return { prims, terminals, body: { x: left, y: -h, w: right - left, h } };
 }
 
 /** Plant view sizes, grid units. */

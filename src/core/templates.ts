@@ -45,6 +45,9 @@ function capture(
   offset: Vec,
   size: [number, number],
 ): Template {
+  // A controller's module views stay with their controller: a template carries plant, not controllers.
+  const isModuleView = (e: Element) => e.symbol === "plant-view" && !!project.plant.find((p) => p.id === e.params.plant)?.module;
+  elements = elements.filter((e) => !isModuleView(e));
   const keep = new Set(elements.map((e) => e.id));
   const segments = page.segments.filter((s) => keep.has(s.from[0]) && keep.has(s.to[0]));
   const shift = (v: Vec): Vec => [v[0] - offset[0], v[1] - offset[1]];
@@ -60,7 +63,7 @@ function capture(
     id: newId("tpl"),
     name: name.trim() || page.title || "Template",
     kind,
-    plant: clone(plant),
+    plant: clone(plant).map(({ module: _m, ...p }) => p),
     title: page.title,
     boundaryY: kind === "sheet" ? page.boundaryY : null,
     sections: secs,

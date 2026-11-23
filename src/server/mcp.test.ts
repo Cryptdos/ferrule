@@ -173,3 +173,35 @@ describe("MCP simulation", () => {
     expect(saved.broken[0].expectation).toBe(set.expectations[0].text);
   });
 });
+
+describe("MCP controller tools", () => {
+  test("add a controller and modules, place a view, renumber, and refer to its points", async () => {
+    const proj = (await call("create_project", { title: "Controllers" })).data;
+    const c = (await call("controller", { project: proj.id, description: "AHU-1 outstation" })).data;
+    expect(c.tag).toBe("A?");
+    await call("add_module", { project: proj.id, controller: c.id, type: "host" });
+    const r = (await call("add_module", {
+      project: proj.id,
+      controller: "AHU-1 outstation",
+      type: "do",
+      channels: 4,
+      pattern: { ids: "Y ⊥", first: 31, shared: "⊥", shareBy: 2 },
+      labels: { DO1: "SF-01 enable" },
+    })).data;
+    const dout = r.slots[1];
+    expect(dout.type).toBe("DO-4");
+    expect(dout.points[0]).toEqual({ name: "DO1", ref: "A?:DO1", form: "contact", pins: ["31 (Y)", "32 (⊥)"], label: "SF-01 enable" });
+    expect((await call("add_module", { project: proj.id, controller: c.id, spare: true })).data.slots[2].spare).toBe(true);
+    const placed = await call("place_plant_view", { project: proj.id, sheet: 1, plant: dout.module, x: 44, y: 20 });
+    expect(placed.error).toBe(false);
+    await call("renumber", { project: proj.id });
+    const list = (await call("controller", { project: proj.id })).data;
+    expect(list[0].slots[1].tag).toBe("A1-23");
+    expect(list[0].slots[1].drawn).toEqual(["1-23"]);
+    expect(list[0].slots[1].points[0].ref).toBe("A1-23:DO1");
+    const bad = await call("add_module", { project: proj.id, controller: c.id, type: "xx" });
+    expect(bad.error).toBe(true);
+    const gone = (await call("controller", { project: proj.id, controller: c.id, delete: true })).data;
+    expect(gone.controllers).toEqual([]);
+  });
+});

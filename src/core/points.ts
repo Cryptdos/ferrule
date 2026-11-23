@@ -11,12 +11,14 @@ import {
   type Condition,
   type Expectation,
   type IoPoint,
+  type PinInfo,
   type PlantItem,
   type PointForm,
   type Project,
 } from "./model";
 import { displayTag } from "./tags";
 import { terminalNames } from "./symbols";
+import { pointLabel, viewsOf } from "./modules";
 
 /** The simulator's (and expectations') id for a point: shared by every view of its device. */
 export function pointRef(plantId: string, point: string): string {
@@ -57,9 +59,13 @@ export function guessForm(name: string, pins: string[]): PointForm {
   return "contact";
 }
 
-/** A contact point's common, NO and NC pins: by name (C, COM, NO, NC), else in order C, NO, NC. */
-export function contactPins(p: IoPoint): { c?: string; no?: string; nc?: string } {
-  const find = (...names: string[]) => p.pins.find((t) => names.includes(bare(t)));
+/**
+ * A contact point's common, NO and NC pins: by name (C, COM, NO, NC; the
+ * pin's id where it has one, else its number), else in order C, NO, NC.
+ */
+export function contactPins(p: IoPoint, pinInfo?: Record<string, PinInfo>): { c?: string; no?: string; nc?: string } {
+  const nameOf = (t: string) => (pinInfo?.[t]?.id ? pinInfo[t]!.id!.toUpperCase() : bare(t));
+  const find = (...names: string[]) => p.pins.find((t) => names.includes(nameOf(t)));
   const c = find("C", "COM");
   const no = find("NO");
   const nc = find("NC");
@@ -135,16 +141,19 @@ export function mergePoints(before: IoPoint[], after: IoPoint[]): IoPoint[] {
 export function cleanPoints(points: IoPoint[], terminals: string[]): IoPoint[] {
   const have = new Set(terminals);
   const seen = new Set<string>();
-  const used = new Set<string>();
   const out: IoPoint[] = [];
   for (const p of points) {
     const name = p.name.trim();
-    // A pin is in one point.
-    const pins = [...new Set(p.pins)].filter((t) => have.has(t) && !used.has(t));
+    // A pin may be in several points: a shared common (⊥, C1) is one pin, drawn once.
+    const pins = [...new Set(p.pins)].filter((t) => have.has(t));
     if (!name || seen.has(name) || !pins.length) continue;
     seen.add(name);
-    pins.forEach((t) => used.add(t));
     const q: IoPoint = { ...p, name, pins };
+    if (q.label !== undefined) {
+      const l = q.label.trim();
+      if (l) q.label = l;
+      else delete q.label;
+    }
     if (!isOutputForm(q.form)) {
       delete q.follows;
       delete q.join;
@@ -205,15 +214,17 @@ export function things(project: Project): Thing[] {
     }
   }
   for (const item of project.plant) {
-    const first = project.pages.find((pg) => pg.elements.some((e) => e.symbol === "plant-view" && e.params.plant === item.id));
+    const views = viewsOf(project, item.id);
     for (const p of item.points ?? []) {
       if (isAnalogueForm(p.form) || p.form === "comms") continue;
+      const shown = views.find((v) => String(v.el.params.show ?? "").split(",").includes(p.pins[0] ?? "")) ?? views[0];
       out.push({
         ref: pointRef(item.id, p.name),
-        name: `${item.tag || `${item.prefix || "U"}?`} ${p.name}`,
+        // SF-01 Running; a module's A3-23:DI2, or A3-23:DO5 (4-10) when drawn on a continuation.
+        name: pointLabel(project, item, p, views),
         onWord: "on",
         offWord: "off",
-        page: first?.number,
+        page: shown?.page.number,
         form: p.form,
       });
     }
@@ -256,8 +267,13 @@ export function missingRefs(project: Project, e: Expectation, list = things(proj
   return refs.filter((r) => !have.has(r));
 }
 
-/** A thing named by tag as people write it ("K3-12", "SF-01 Running", "SF-01:Running"), or by its ref. */
+/**
+ * A thing named by tag as people write it ("K3-12", "SF-01 Running",
+ * "SF-01:Running", "A3-23:DI2", "A3-23 DI2"), or by its ref. Where a point
+ * is drawn, "(4-10)", needn't be given.
+ */
 export function findThing(project: Project, name: string, list = things(project)): Thing | undefined {
-  const n = name.trim().toLowerCase().replace(/:/, " ");
-  return list.find((t) => t.ref === name) ?? list.find((t) => t.name.toLowerCase() === n);
+  const key = (s: string) => s.trim().toLowerCase().replace(/\s*\(\d+-\d+\)$/, "").replace(/:/, " ");
+  const n = key(name);
+  return list.find((t) => t.ref === name) ?? list.find((t) => key(t.name) === n);
 }

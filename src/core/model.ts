@@ -218,6 +218,50 @@ export interface PlantItem {
   points?: IoPoint[];
   /** More information shown under the box (model, rating, supply…). May have several lines. */
   info?: string;
+  /**
+   * A controller's module (controller.md §4) rather than plant: drawn at the
+   * top of the sheet with its terminals underneath. Its controller lists it
+   * in rail order.
+   */
+  module?: ModuleInfo;
+}
+
+/** The generic module types Ferrule ships (controller.md §4). */
+export type ModuleType = "psu" | "host" | "di" | "do" | "uio" | "ai" | "ao";
+
+/** What makes a plant item a controller's module. */
+export interface ModuleInfo {
+  /** The controller it's part of. */
+  controller: string;
+  type: ModuleType;
+  /** Channels, like a contactor's poles: a DI module with 8 is a DI-8. Unset on a power supply or host. */
+  channels?: number;
+  maker?: string;
+  model?: string;
+  /** Its position on the controller's bus, set by hand to match its DIP switches. Unset: from rail order. */
+  address?: number;
+}
+
+/**
+ * A BMS outstation or PLC (controller.md §4): its modules together, in rail
+ * order, with any spare slots. Identified by its host module's tag.
+ */
+export interface Controller {
+  id: string;
+  /** e.g. "AHU-1 outstation". */
+  description: string;
+  /** Letters its modules' tags start with: A unless the project says otherwise. */
+  prefix: string;
+  slots: ControllerSlot[];
+}
+
+/** A place on the controller's rail: a module (a plant item's id) or a spare slot. */
+export interface ControllerSlot {
+  module?: string;
+  /** A spare slot: drawn dashed on the controller map (Spare I/O). */
+  spare?: boolean;
+  /** A spare slot's bus address set by hand. */
+  address?: number;
 }
 
 /** A pin's labels beyond its number (controller.md §3): both optional, shown when present. */
@@ -274,6 +318,8 @@ export interface IoPoint {
   delay?: number;
   /** Supply out: the distribution each pin feeds, by pin number. */
   dists?: Record<string, string>;
+  /** What it does on this job, printed along its wire under a module's terminals: "SF-01 RUNNING". */
+  label?: string;
 }
 
 /**
@@ -387,6 +433,8 @@ export interface Project {
   designation: { standard: string; overrides: Record<string, string> };
   titleBlock: string;
   plant: PlantItem[];
+  /** Controllers (controller.md §4): their modules are plant items with `module` set. */
+  controllers?: Controller[];
   /** Supplies busbars, link arrows and the incoming supply pick from. Starts empty. */
   distributions: Distribution[];
   pages: Page[];

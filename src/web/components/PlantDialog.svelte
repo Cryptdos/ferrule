@@ -51,6 +51,8 @@
   const usedOn = (id: string) =>
     editor.project.pages.filter((pg) => pg.elements.some((e) => e.symbol === "plant-view" && e.params.plant === id)).map((pg) => pg.number);
   const update = (id: string, patch: Parameters<typeof updatePlant>[2]) => editor.apply((p) => updatePlant(p, id, patch));
+  /** Controllers' modules are listed under Controllers. */
+  const plantOnly = $derived(editor.project.plant.filter((p) => !p.module));
   /** The device whose pins and points window is open. */
   let open = $state<string | null>(null);
 </script>
@@ -62,7 +64,7 @@
     type a tag yourself to fix it. In labels, <code>{"{plant:SF-01.tag}"}</code> fills in the tag.
   </p>
   <div class="top"><button onclick={() => (adding = true)}>New plant…</button></div>
-  {#if !editor.project.plant.length}
+  {#if !plantOnly.length}
     <p class="hint">No plant yet. <em>New plant…</em> adds one.</p>
   {:else}
   <table>
@@ -74,7 +76,7 @@
       </tr>
     </thead>
     <tbody>
-      {#each editor.project.plant as item (item.id)}
+      {#each plantOnly as item (item.id)}
         <tr>
           <td class="narrow"><input value={item.prefix ?? ""} placeholder="U" onchange={(e) => update(item.id, { prefix: e.currentTarget.value })} /></td>
           <td class="narrow">
