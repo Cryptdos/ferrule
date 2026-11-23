@@ -1016,6 +1016,8 @@ const SYMBOLS: SymbolDef[] = [
       { key: "name", label: "Name", type: "text", default: "", when: (el) => !el.params.dist, fixed: "From its distribution", placeholder: "e.g. La" },
       { key: "bothEnds", label: "Name at both ends", type: "bool", default: false },
       { key: "colour", label: "Core colour", type: "text", default: "", placeholder: "from its distribution" },
+      // The colour is for wires drawn from it and for simulating; a busbar isn't a cable, so it isn't printed.
+      { key: "showColour", label: "Show colour (on its wires)", type: "bool", default: false },
       { key: "function", label: "Function", type: "text", default: "", placeholder: "from its distribution" },
     ],
     // Control busbars (CCT, 0V) carry no tag; distribution busbars are tagged like other parts.
