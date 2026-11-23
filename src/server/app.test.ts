@@ -198,3 +198,16 @@ describe("device library", () => {
     expect(created.useDeviceLibrary).toBe(false);
   });
 });
+
+describe("save as", () => {
+  test("refuses to replace a file unless asked, and keeps the old one as .bak", async () => {
+    const { existsSync } = await import("node:fs");
+    const p = await (await app.request("/api/projects", json({ title: "Save as test" }))).json();
+    const target = join(dir, "elsewhere", "copy.ferrule");
+    const post = (overwrite?: boolean) => app.request(`/api/projects/${p.id}/save-as`, json({ path: target, ...(overwrite ? { overwrite } : {}) }));
+    expect((await post()).status).toBe(200);
+    expect((await post()).status).toBe(409);
+    expect((await post(true)).status).toBe(200);
+    expect(existsSync(target + ".bak")).toBe(true);
+  });
+});

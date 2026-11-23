@@ -314,3 +314,52 @@ export function routesStale(page: Page): boolean {
     return f[0] !== a[0] || f[1] !== a[1] || l[0] !== b[0] || l[1] !== b[1];
   });
 }
+
+/**
+ * Cut out any loop in a square route: wherever a run meets an earlier run
+ * (crossing it, or doubling back along it), the route goes straight on from
+ * that point instead of going round. The ends stay where they are.
+ */
+export function removeLoops(points: Vec[]): Vec[] {
+  let pts = points.map((p) => [p[0], p[1]] as Vec);
+  const between = (v: number, a: number, b: number) => v >= Math.min(a, b) - 1e-9 && v <= Math.max(a, b) + 1e-9;
+  // Where runs p1-p2 and q1-q2 meet (null if they don't), choosing the meeting point that keeps the route shortest.
+  const meet = (p1: Vec, p2: Vec, q1: Vec, q2: Vec): Vec | null => {
+    const pv = p1[0] === p2[0];
+    const qv = q1[0] === q2[0];
+    if (pv && qv) {
+      if (p1[0] !== q1[0]) return null;
+      const lo = Math.max(Math.min(p1[1], p2[1]), Math.min(q1[1], q2[1]));
+      const hi = Math.min(Math.max(p1[1], p2[1]), Math.max(q1[1], q2[1]));
+      if (lo > hi + 1e-9) return null;
+      const best = Math.min(Math.max(q2[1], lo), hi);
+      return [p1[0], best];
+    }
+    if (!pv && !qv) {
+      if (p1[1] !== q1[1]) return null;
+      const lo = Math.max(Math.min(p1[0], p2[0]), Math.min(q1[0], q2[0]));
+      const hi = Math.min(Math.max(p1[0], p2[0]), Math.max(q1[0], q2[0]));
+      if (lo > hi + 1e-9) return null;
+      const best = Math.min(Math.max(q2[0], lo), hi);
+      return [best, p1[1]];
+    }
+    const [v1, v2, h1, h2] = pv ? [p1, p2, q1, q2] : [q1, q2, p1, p2];
+    const x = v1[0];
+    const y = h1[1];
+    return between(x, h1[0], h2[0]) && between(y, v1[1], v2[1]) ? [x, y] : null;
+  };
+  for (let guard = 0; guard < 50; guard++) {
+    let cut = false;
+    outer: for (let i = 0; i < pts.length - 1; i++) {
+      for (let j = pts.length - 2; j >= i + 2; j--) {
+        const x = meet(pts[i]!, pts[i + 1]!, pts[j]!, pts[j + 1]!);
+        if (!x) continue;
+        pts = [...pts.slice(0, i + 1), x, ...pts.slice(j + 1)];
+        cut = true;
+        break outer;
+      }
+    }
+    if (!cut) break;
+  }
+  return simplifyRoute(pts);
+}

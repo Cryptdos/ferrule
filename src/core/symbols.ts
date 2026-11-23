@@ -45,6 +45,8 @@ export type Prim =
       vertical?: boolean;
       /** Drawn with an outline as well as fill, which reads as bold in the one-weight font. */
       bold?: boolean;
+      /** Already placed for the element's rotation: left exactly where the symbol put it. */
+      placed?: boolean;
     };
 
 export type TextRole = "tag" | "label" | "term" | "note" | "xref";
@@ -1452,16 +1454,41 @@ const SYMBOLS: SymbolDef[] = [
       const names = sys === "1ph-n" ? ["L", "N"] : sys === "3ph" ? ["L1", "L2", "L3"] : sys === "dc" ? ["+", "-"] : ["L1", "L2", "L3", "N"];
       const prims: Prim[] = [];
       const terminals: TerminalDef[] = [];
+      // Text stays upright, so the names and label are placed for the way the
+      // arrows point: each name just beyond its arrow's tail, the label clear
+      // of the names (above them, or below when the arrows point up).
+      const rot = el.rot;
+      const gap = 0.4;
+      const cap = (size: number) => size * CAP_HEIGHT;
+      const placed = (at: Vec, s: string, size: number, anchor: Anchor, role: TextRole): Prim => ({ t: "text", at, text: s, size, anchor, role, placed: true });
       names.forEach((name, i) => {
         const x = i * 3;
+        prims.push(line([x, -2.6], [x, 0]), { t: "poly", pts: [[x - 0.45, -1.5], [x + 0.45, -1.5], [x, -0.6]], fill: true });
+        const [tx, ty] = rotate([x, -2.6], rot);
+        const mid = ty + cap(TERM) / 2;
         prims.push(
-          line([x, -2.6], [x, 0]),
-          { t: "poly", pts: [[x - 0.45, -1.5], [x + 0.45, -1.5], [x, -0.6]], fill: true },
-          text(x, -3.0, name, TERM, "middle", "term"),
+          rot === 0
+            ? placed([tx, ty - gap], name, TERM, "middle", "term")
+            : rot === 180
+              ? placed([tx, ty + gap + cap(TERM)], name, TERM, "middle", "term")
+              : rot === 90
+                ? placed([tx + gap, mid], name, TERM, "start", "term")
+                : placed([tx - gap, mid], name, TERM, "end", "term"),
         );
         terminals.push({ name, at: [x, 0], dir: "down" });
       });
-      if (el.label) prims.push(text(-0.6, -4.4, "{label}", LABEL, "start", "label"));
+      if (el.label) {
+        const last = (names.length - 1) * 3;
+        const label =
+          rot === 0
+            ? placed([-0.6, -4.4], "{label}", LABEL, "start", "label")
+            : rot === 180
+              ? placed([-last - 0.6, 2.6 + 2 * gap + cap(TERM) + cap(LABEL)], "{label}", LABEL, "start", "label")
+              : rot === 90
+                ? placed([-0.6, -0.9], "{label}", LABEL, "start", "label")
+                : placed([0.6, -last - 0.9], "{label}", LABEL, "end", "label");
+        prims.push(label);
+      }
       return { prims, terminals, body: { x: -0.5, y: -2.6, w: (names.length - 1) * 3 + 1, h: 2.6 } };
     },
   },
@@ -1630,6 +1657,7 @@ function rotatePrim(p: Prim, rot: Rotation): Prim {
     case "arc":
       return { ...p, from: rotate(p.from, rot), to: rotate(p.to, rot) };
     case "text": {
+      if (p.placed) return p;
       // Text stays upright. Text beside a vertical symbol ends up above or
       // below it once turned, so centre it there.
       let at = rotate(p.at, rot);

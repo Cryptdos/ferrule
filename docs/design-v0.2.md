@@ -369,4 +369,9 @@ Each step is one pull request, with a build to test.
 
 ### Changed during build
 
-(None yet.)
+**Step 1 (bug fixes)**
+
+- **Routing (4, 23, 66).** Router settings were left alone: turning nudging off or changing its penalties made other wires worse. Instead every route is checked after routing. A wire whose ends line up and face each other runs straight unless a part or another wire is in the way; tags and labels never bend it. A route that loops, crosses a part or runs along another wire is replaced by the best simple route (fewest crossings, then shortest).
+- **ATS-1's N wire (66)** was saved hand-routed with the old bend, so it keeps it. *Reset route* now gives a straight wire.
+- **Transformer polarity (74).** The secondary's live side follows the primary: P1 on the phase makes S1 live; P2 on the phase makes S2 live.
+- **Incoming supply (64).** Names sit beyond each arrow's tail at every rotation. The label goes above the arrows, or below them when they point up.

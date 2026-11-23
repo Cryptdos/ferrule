@@ -9,7 +9,7 @@
     rotateElements,
   } from "../../core/ops";
   import { benchOf } from "../../core/symbols";
-  import { api } from "../api";
+  import { api, ApiError } from "../api";
   import FileBrowser from "./FileBrowser.svelte";
   import Browser from "./Browser.svelte";
   import FloatBox from "./FloatBox.svelte";
@@ -40,8 +40,16 @@
     savingAs = false;
     await editor.saveNow();
     try {
-      const { id } = await api.saveAs(editor.project.id, path);
-      editor.flash(`Saved a copy as ${path}. Now editing the copy.`);
+      let id: string;
+      try {
+        id = (await api.saveAs(editor.project.id, path)).id;
+      } catch (e) {
+        // Already a file there: replace it if asked to (the old one is kept as .bak).
+        if (!(e instanceof ApiError && e.status === 409)) throw e;
+        if (!confirm(`${e.message}. Replace it? (The file that's there now is kept as a .bak beside it.)`)) return;
+        id = (await api.saveAs(editor.project.id, path, true)).id;
+      }
+      editor.flash(`Saved as ${path}. Now editing that file.`);
       onopen?.(id);
     } catch (e) {
       editor.flash((e as Error).message);

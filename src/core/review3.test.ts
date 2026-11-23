@@ -176,7 +176,7 @@ describe("annotations and routing", () => {
 });
 
 import { blockLabels, routesStale } from "./wires";
-import { setBoundary, moveElements, rotateElements, updateElement } from "./ops";
+import { setBoundary, moveElements, rotateElements, updateElement, setManualRoute } from "./ops";
 import { terminalPoint } from "./symbols";
 
 describe("terminal block on the panel boundary", () => {
@@ -233,5 +233,116 @@ describe("terminal block on the panel boundary", () => {
     const t = addElement(p, pg, "terminal", [20, 80]);
     delete t.params.onBlock;
     expect(parseProject(JSON.parse(JSON.stringify(p))).pages[0]!.elements[0]!.params.onBlock).toBe(true);
+  });
+});
+
+describe("sprint 1: hand-routed wires on half-unit terminals", () => {
+  test("dragging a wire to a terminal block cell keeps its end on the terminal", () => {
+    const { p, pg } = project();
+    setBoundary(p, pg, 80);
+    const k = addElement(p, pg, "coil", [20, 60]);
+    const t = addElement(p, pg, "terminal", [30, 80]);
+    const w = connect(p, pg, [k.id, "A2"], [t.id, "1"]);
+    const end = terminalPoint(t, "1")!;
+    expect(end[1]).toBe(78.5);
+    const start = terminalPoint(k, "A2")!;
+    // A dragged route: down from the coil, across, down onto the half-unit terminal.
+    setManualRoute(p, pg, w.id, [start, [start[0], 70.2], [end[0], 70.2], end]);
+    expect(w.points[0]).toEqual(start);
+    expect(w.points[w.points.length - 1]).toEqual(end);
+    for (let i = 0; i < w.points.length - 1; i++) {
+      const [a, b] = [w.points[i]!, w.points[i + 1]!];
+      expect(a[0] === b[0] || a[1] === b[1]).toBe(true);
+    }
+  });
+});
+
+describe("sprint 1: routing never loops", () => {
+  test("two wires with swapped ends (testing note 4/23) route without loops or touching", async () => {
+    const { loadServerAvoid } = await import("../server/avoid");
+    const { routePage } = await import("./routing");
+    const { p, pg } = project();
+    const page = p.pages[0]!;
+    const left = addElement(p, pg, "offpage", [40, 9], { rot: 180 });
+    const right = addElement(p, pg, "offpage", [46, 9], { rot: 180 });
+    const q = addElement(p, pg, "isolator", [24, 22], { params: { function: "isolator", poles: 3, aux: 2 } });
+    const w1 = connect(p, pg, [left.id, "1"], [q.id, "13"]);
+    const w2 = connect(p, pg, [right.id, "1"], [q.id, "23"]);
+    routePage(await loadServerAvoid(), page);
+    for (const w of [w1, w2]) {
+      const pts = w.points;
+      // Never visits a point twice, and every run is square.
+      const seen = new Set(pts.map((x) => x.join(",")));
+      expect(seen.size).toBe(pts.length);
+      for (let i = 0; i < pts.length - 1; i++) expect(pts[i]![0] === pts[i + 1]![0] || pts[i]![1] === pts[i + 1]![1]).toBe(true);
+      expect(pts.length).toBeLessThanOrEqual(6);
+    }
+    // The two wires don't share any point.
+    const a = new Set(w1.points.map((x) => x.join(",")));
+    expect(w2.points.some((x) => a.has(x.join(",")))).toBe(false);
+  });
+});
+
+describe("sprint 1: straight wires stay straight", () => {
+  test("a wire past a fuse's tag runs straight (testing note 66)", async () => {
+    const { loadServerAvoid } = await import("../server/avoid");
+    const { routePage } = await import("./routing");
+    const { p, pg } = project();
+    const page = p.pages[0]!;
+    const sup = addElement(p, pg, "supply", [19, 89], { rot: 180, params: { system: "1ph-n" } });
+    const q = addElement(p, pg, "isolator", [16, 57], { params: { function: "isolator", poles: 2, aux: 0 } });
+    const f = addElement(p, pg, "fuse", [19, 74], { params: { poles: 1, rating: "100A BS88-3" } });
+    f.tag = "F1-10";
+    q.tag = "Q1-9";
+    connect(p, pg, [sup.id, "L"], [f.id, "2"]);
+    const n = connect(p, pg, [sup.id, "N"], [q.id, "2"]);
+    routePage(await loadServerAvoid(), page);
+    expect(n.points).toEqual([
+      [16, 89],
+      [16, 60],
+    ]);
+  });
+});
+
+describe("sprint 1: transformer polarity", () => {
+  test("the secondary's live side follows the primary's (testing note 74)", async () => {
+    const { compile, initialState } = await import("./sim");
+    for (const swapped of [false, true]) {
+      const { p, pg } = project();
+      const sup = addElement(p, pg, "supply", [10, 6], { params: { system: "1ph-n" } });
+      const t = addElement(p, pg, "transformer", [40, 30]);
+      connect(p, pg, [sup.id, "L"], [t.id, swapped ? "P2" : "P1"]);
+      connect(p, pg, [sup.id, "N"], [t.id, swapped ? "P1" : "P2"]);
+      const h = addElement(p, pg, "lamp", [40, 60]);
+      const w1 = connect(p, pg, [t.id, "S1"], [h.id, "V+"]);
+      const w2 = connect(p, pg, [h.id, "V-"], [t.id, "S2"]);
+      const c = compile(p);
+      const s = initialState(c);
+      expect(s.lamps[h.id]).toBe(true);
+      const live = new Set(s.live);
+      // The live node set holds the secondary terminal that's on the phase side.
+      const s1 = [...live].some((x) => x.includes(t.id + ":S1") || x === w1.conductor);
+      const s2 = [...live].some((x) => x.includes(t.id + ":S2") || x === w2.conductor);
+      expect([s1, s2]).toEqual(swapped ? [false, true] : [true, false]);
+    }
+  });
+});
+
+describe("sprint 1: Incoming supply labels", () => {
+  test("names sit beyond each arrow's tail at every rotation (testing note 64)", () => {
+    const { p, pg } = project();
+    for (const rot of [0, 90, 180, 270] as const) {
+      const e = addElement(p, pg, "supply", [20, 20], { rot, params: { system: "3ph-n" } });
+      const g = localGeometry(e, "");
+      const names = g.prims.filter((q) => q.t === "text" && q.role === "term");
+      expect(names.length).toBe(4);
+      // Every name in its own place, and none on a lead.
+      expect(new Set(names.map((q) => (q.t === "text" ? q.at.join(",") : ""))).size).toBe(4);
+      for (const q of names) {
+        if (q.t !== "text") continue;
+        const along = rot === 90 || rot === 270 ? Math.abs(q.at[0]) : Math.abs(q.at[1]);
+        expect(along).toBeGreaterThan(2.6);
+      }
+    }
   });
 });
