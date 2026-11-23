@@ -159,3 +159,20 @@ describe("simulating without an Incoming supply", () => {
     expect(s.short).toBe(false);
   });
 });
+
+describe("a supply that bypasses its own isolator", () => {
+  test("Check warns when the supply feeds a distribution its wiring also reaches", async () => {
+    const { supplyBypasses } = await import("./checks");
+    const { p, pg } = project();
+    const L = addDistribution(p, { name: "L1", kind: "line" });
+    const sup = addElement(p, pg, "supply", [10, 4], { params: { system: "1ph-n", dist_L: L.id } });
+    const q = addElement(p, pg, "isolator", [10, 20], { params: { poles: 1, aux: 0 } });
+    const bus = addElement(p, pg, "busbar", [4, 40], { params: { dist: L.id, length: 60 } });
+    connect(p, pg, [sup.id, "L"], [q.id, "1"]);
+    connect(p, pg, [q.id, "2"], [bus.id, "6"]);
+    expect(supplyBypasses(p).map((f) => f.ids)).toEqual([[sup.id]]);
+    // Left empty, nothing to warn about.
+    delete sup.params.dist_L;
+    expect(supplyBypasses(p)).toEqual([]);
+  });
+});

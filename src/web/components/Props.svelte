@@ -196,6 +196,10 @@
       {/if}
     {:else if one.symbol === "supply"}
       <div class="sub">Distribution each conductor feeds</div>
+      <p class="hint">
+        Only when its busbars aren't wired from this supply. Everything on a distribution is joined, so wiring in
+        between (a main isolator, say) would be bypassed. Check warns when that happens.
+      </p>
       {#each terminalNames(one) as t (t)}
         <label>
           {t}

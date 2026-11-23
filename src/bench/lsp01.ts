@@ -138,10 +138,9 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
   page = addPage(p, "Main incoming section");
   addSection(p, page.id, "MAIN INCOMING SECTION", [2, 2, 146, 70]);
   // Where the power comes in: the simulator's source.
-  const incoming = add("supply", 22, 11, {
-    label: "415V 3PH+N 50Hz SUPPLY (BY OTHERS)",
-    params: { system: "3ph-n", dist_L1: D.L1.id, dist_L2: D.L2.id, dist_L3: D.L3.id, dist_N: D.N.id },
-  });
+  // Wired through the main isolator to the busbars, so the supply itself is on no
+  // distribution: if it were, the isolator would be bypassed.
+  const incoming = add("supply", 22, 11, { label: "415V 3PH+N 50Hz SUPPLY (BY OTHERS)", params: { system: "3ph-n" } });
   const x0 = [22, 25, 28, 31].map((x, i) => add("terminal", x, 14, { label: ["L1", "L2", "L3", "N"][i], params: { strip: "X0" } }));
   x0.forEach((t, i) => w([incoming, ["L1", "L2", "L3", "N"][i]!], [t, "1"]));
   const qMain = add("isolator", 22, 24, { label: "63A DOOR\nINTERLOCKED", params: { poles: 4, aux: 0, operator: "turn" } });
