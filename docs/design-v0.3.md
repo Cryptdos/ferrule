@@ -205,6 +205,14 @@ Each step is one PR with a build, `ferrule-windows-v0.3.0-pre.zip`. The working 
 - **Clicking another tile** clears what's picked before the click acts there: what's picked belongs to one tile.
 - **Fit** on a tile covered by the browser leaves room for it only where the browser actually overlaps that tile.
 
+**Step 6b (windows in tiles)**
+
+- **Which windows:** the eight the design lists. Renumber (a preview to apply), Device table, Place parts, Settings, Project and the file browser stay floating: they're tools and prompts, not views of the project.
+- **In a tile** a window has no title bar of its own: the tile's bar shows its name and closes it. Its menu button in the top bar closes it too, as before.
+- **The last sheet tile** is never replaced: a window dropped in its middle goes beside it, on the right.
+- **Prompts** a docked window opens (New plant…, say) float as usual.
+- **Table** in a tile outside Draft says it's for Draft, rather than vanishing from its tile.
+
 ## 11. Director notes, as written (23/11/26)
 
 **On tiling (§7):**

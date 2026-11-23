@@ -35,6 +35,9 @@
   import TableView from "./TableView.svelte";
   import Tiles from "./Tiles.svelte";
   import { canvases } from "../canvases";
+  import Dockable from "./Dockable.svelte";
+  import { docking, DOCKABLE } from "../docking.svelte";
+  import { leaves } from "../tiles";
   import TemplatesDialog from "./TemplatesDialog.svelte";
   import SimPanel from "./SimPanel.svelte";
   import SettingsDialog from "./SettingsDialog.svelte";
@@ -89,7 +92,10 @@
   let showProject = $state(false);
   /** Open windows: they don't block the drawing, and several can be open at once. */
   type DialogName = "expectations" | "plant" | "controllers" | "table" | "distribution" | "checks" | "schedules" | "templates" | "renumber" | "devices" | "settings" | "place";
-  let open: Partial<Record<DialogName, boolean>> = $state({});
+  const open: Partial<Record<DialogName, boolean>> = editor.open;
+  /** Windows in tiles (design-v0.3 §7), and where a dragged window would go. */
+  const inTile = $derived(new Set(leaves(editor.tiles).flatMap((l) => (l.content.type === "window" ? [l.content.name] : []))));
+  docking.dock = (name, tile, zone) => editor.dockWindow(name, tile, zone);
   /** Export PDF failed: what went wrong, with the Print way round it. */
   let pdfError = $state("");
   let help = $state(false);
@@ -163,9 +169,11 @@
     }
   }
 
-  /** A menu button opens its window, and closes it again when it's open (10). */
+  /** A menu button opens its window, and closes it again when it's open (10), in a tile or not. */
   function toggle(name: DialogName) {
-    open[name] = !open[name];
+    const tile = editor.windowTile(name);
+    if (tile) editor.closeTile(tile);
+    else open[name] = !open[name];
   }
 
   async function print() {
@@ -409,7 +417,7 @@
     </div>
   </header>
   <main>
-    <div class="pane"><Tiles {editor} node={editor.tiles} {sim} insetLeft={browserWidth} /></div>
+    <div class="pane"><Tiles {editor} node={editor.tiles} {sim} insetLeft={browserWidth} window={tileWindow} /></div>
     <Browser {editor} bind:width={browserWidth} onplace={() => (open.place = true)} />
     {#if sim}
       <FloatBox title="Simulation" store="sim"><SimPanel {editor} {sim} onexpectations={() => (open.expectations = true)} /></FloatBox>
@@ -456,38 +464,53 @@
     onclose={() => (savingAs = false)}
   />
 {/if}
-{#if open.distribution}
-  <DistributionDialog {editor} onclose={() => (open.distribution = false)} />
-{/if}
-{#if open.plant}
-  <PlantDialog {editor} onclose={() => (open.plant = false)} onexpectations={() => (open.expectations = true)} />
-{/if}
-{#if open.controllers}
-  <ControllersDialog {editor} onclose={() => (open.controllers = false)} onexpectations={() => (open.expectations = true)} />
-{/if}
-{#if open.expectations}
-  <ExpectationsDialog {editor} onclose={() => (open.expectations = false)} />
-{/if}
-{#if open.table && editor.mode === "draft"}
-  <Modal title="Table" store="table" wide onclose={() => (open.table = false)}><TableView {editor} /></Modal>
+{#snippet windowBody(name: string)}
+  {#if name === "distribution"}
+    <DistributionDialog {editor} onclose={() => toggle("distribution")} />
+  {:else if name === "plant"}
+    <PlantDialog {editor} onclose={() => toggle("plant")} onexpectations={() => (open.expectations = true)} />
+  {:else if name === "controllers"}
+    <ControllersDialog {editor} onclose={() => toggle("controllers")} onexpectations={() => (open.expectations = true)} />
+  {:else if name === "expectations"}
+    <ExpectationsDialog {editor} onclose={() => toggle("expectations")} />
+  {:else if name === "table"}
+    <Modal title="Table" store="table" wide onclose={() => toggle("table")}>
+      {#if editor.mode === "draft"}<TableView {editor} />{:else}<p class="hint">The table is for Draft.</p>{/if}
+    </Modal>
+  {:else if name === "checks"}
+    <ChecksDialog {editor} onclose={() => toggle("checks")} />
+  {:else if name === "templates"}
+    <TemplatesDialog {editor} onclose={() => toggle("templates")} />
+  {:else if name === "schedules"}
+    <SchedulesDialog {editor} onclose={() => toggle("schedules")} />
+  {/if}
+{/snippet}
+{#snippet tileWindow(name: string, tile: string)}
+  <Dockable {name} {tile}>{@render windowBody(name)}</Dockable>
+{/snippet}
+{#each DOCKABLE as name (name)}
+  {#if open[name] && !inTile.has(name) && (name !== "table" || editor.mode === "draft")}
+    <Dockable {name}>{@render windowBody(name)}</Dockable>
+  {/if}
+{/each}
+{#if docking.hint}
+  {@const h = docking.hint}
+  <div
+    class="dockhint"
+    style:left="{h.rect.left + (h.zone === "right" ? h.rect.width / 2 : 0)}px"
+    style:top="{h.rect.top + (h.zone === "bottom" ? h.rect.height / 2 : 0)}px"
+    style:width="{h.zone === "left" || h.zone === "right" ? h.rect.width / 2 : h.rect.width}px"
+    style:height="{h.zone === "top" || h.zone === "bottom" ? h.rect.height / 2 : h.rect.height}px"
+  ></div>
 {/if}
 {#if open.renumber}
   <RenumberDialog {editor} onclose={() => (open.renumber = false)} />
-{/if}
-{#if open.checks}
-  <ChecksDialog {editor} onclose={() => (open.checks = false)} />
-{/if}
-{#if open.templates}
-  <TemplatesDialog {editor} onclose={() => (open.templates = false)} />
 {/if}
 {#if open.place && editor.mode === "ga"}
   <PlacePartsDialog {editor} onclose={() => ((open.place = false), (editor.gaPlace = null))} />
 {/if}
 {#if open.devices}
   <DevicesDialog {editor} onclose={() => (open.devices = false)} />
-{/if}
-{#if open.schedules}
-  <SchedulesDialog {editor} onclose={() => (open.schedules = false)} />
 {/if}
 {#if open.settings}
   <SettingsDialog onclose={() => (open.settings = false)} />
@@ -690,6 +713,17 @@
     display: flex;
     gap: 10px;
     align-items: center;
+  }
+  .dockhint {
+    position: fixed;
+    background: rgba(30, 110, 230, 0.18);
+    border: 2px solid #1e6ee6;
+    z-index: 1000;
+    pointer-events: none;
+  }
+  .hint {
+    font-size: 12px;
+    color: #667;
   }
   .toast {
     position: absolute;

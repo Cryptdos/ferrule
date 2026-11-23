@@ -10,7 +10,7 @@ import { routesStale } from "../core/wires";
 import { markGaSeen, syncGaStrips } from "../core/ga";
 import { refreshConductors } from "../core/conductors";
 import { api, ConflictError } from "./api";
-import { findLeaf, leaves, removeLeaf, setContent, sheetLeaf, splitLeaf, type TileNode } from "./tiles";
+import { dropOn, findLeaf, leaves, removeLeaf, setContent, sheetLeaf, splitLeaf, tileId, type DropZone, type TileNode } from "./tiles";
 import { getAvoid } from "./avoid";
 
 export type Tool = "select" | "place" | "wire" | "section" | "cloud" | "polygon" | "stamp" | "ga-rail" | "ga-trunking" | "ga-dim" | "ga-label";
@@ -27,6 +27,8 @@ export class Editor {
   tiles: TileNode = $state(sheetLeaf(""));
   /** The sheet tile last clicked: the browser, Properties, the sheet list and the tools work on it. */
   activeTile: string = $state("");
+  /** Windows open, by name: floating, or in a tile when a tile shows them. */
+  open: Record<string, boolean> = $state({});
   /** Selected element ids on the current page. */
   selection: string[] = $state([]);
   tool: Tool = $state("select");
@@ -225,7 +227,8 @@ export class Editor {
 
   /** Split a tile: the new half, right of it or below it, shows the same sheet (or the active sheet, for a window). */
   splitTile(tileId: string, dir: "row" | "col"): void {
-    const pageId = tileId === this.activeTile ? this.pageId : this.tilePage(tileId);
+    const leaf0 = findLeaf(this.tiles, tileId);
+    const pageId = tileId === this.activeTile || leaf0?.content.type !== "sheet" ? this.pageId : this.tilePage(tileId);
     const leaf = sheetLeaf(pageId);
     this.tiles = splitLeaf(this.syncedTiles(), tileId, dir, leaf);
   }
@@ -238,12 +241,54 @@ export class Editor {
     const sheets = all.filter((l) => l.content.type === "sheet");
     if (leaf.content.type === "sheet" && sheets.length <= 1) return;
     this.tiles = removeLeaf(this.syncedTiles(), tileId);
+    // Closing a window's tile closes the window.
+    if (leaf.content.type === "window") this.open[leaf.content.name] = false;
     if (tileId === this.activeTile) {
       const next = leaves(this.tiles).find((l) => l.content.type === "sheet")!;
       this.activeTile = next.id;
       this.selection = [];
       this.setPage(next.content.type === "sheet" ? next.content.pageId : this.pageId);
     }
+  }
+
+  /** The tile a window is in, if it's docked. */
+  windowTile(name: string): string | null {
+    return leaves(this.tiles).find((l) => l.content.type === "window" && l.content.name === name)?.id ?? null;
+  }
+
+  /**
+   * Put a window in a tile (design-v0.3 §7): dropped on an edge it splits
+   * that tile, in the middle it replaces what's there. The last sheet tile
+   * is never replaced: the window goes beside it instead.
+   */
+  dockWindow(name: string, target: string, zone: DropZone): void {
+    let tree = this.syncedTiles();
+    const already = this.windowTile(name);
+    if (already === target) return;
+    if (already) tree = removeLeaf(tree, already);
+    const at = findLeaf(tree, target);
+    if (!at) return;
+    const sheets = leaves(tree).filter((l) => l.content.type === "sheet");
+    let z = zone;
+    if (z === "middle" && at.content.type === "sheet" && sheets.length <= 1) z = "right";
+    // A window replaced by this one closes.
+    if (z === "middle" && at.content.type === "window") this.open[at.content.name] = false;
+    tree = dropOn(tree, target, z, { kind: "leaf", id: tileId(), content: { type: "window", name } });
+    this.tiles = tree;
+    this.open[name] = true;
+    if (z === "middle" && target === this.activeTile) {
+      const next = leaves(tree).find((l) => l.content.type === "sheet")!;
+      this.activeTile = next.id;
+      this.selection = [];
+      this.setPage(next.content.type === "sheet" ? next.content.pageId : this.pageId);
+    }
+  }
+
+  /** Take a window out of its tile: it floats again. */
+  undockWindow(tile: string): void {
+    const leaf = findLeaf(this.tiles, tile);
+    if (!leaf || leaf.content.type !== "window") return;
+    this.tiles = removeLeaf(this.syncedTiles(), tile);
   }
 
   /** Replace the tree (after a divider drag, a drop…), keeping the active tile's sheet. */

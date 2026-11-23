@@ -12,6 +12,8 @@
   import { setRatio, type TileNode } from "../tiles";
   import { canvases } from "../canvases";
   import { resolveFields } from "../../core/fields";
+  import { floatNextAt } from "./Modal.svelte";
+  import { isDockable, WINDOW_TITLES } from "../docking.svelte";
   import Canvas from "./Canvas.svelte";
   import Icon from "./Icon.svelte";
   import Tiles from "./Tiles.svelte";
@@ -33,6 +35,9 @@
 
   let box: HTMLDivElement | undefined = $state();
   let dragging = false;
+  let tileEl: HTMLDivElement | undefined = $state();
+  /** A window's tile being dragged out by its bar. */
+  let pulling = $state(false);
 
   let canvas: Canvas | undefined = $state();
   $effect(() => {
@@ -51,7 +56,7 @@
 
   const name = $derived.by(() => {
     if (node.kind !== "leaf") return "";
-    if (node.content.type === "window") return node.content.name;
+    if (node.content.type === "window") return isDockable(node.content.name) ? WINDOW_TITLES[node.content.name] : node.content.name;
     const id = editor.tilePage(node.id);
     const i = editor.project.pages.findIndex((p) => p.id === id);
     const pg = editor.project.pages[i];
@@ -87,14 +92,33 @@
   </div>
 {:else}
   {@const active = node.content.type === "sheet" && editor.activeTile === node.id}
-  <div class="tile" class:active class:outlined={active && sheetCount > 1} data-tile={node.id}>
+  {@const isWindow = node.content.type === "window"}
+  <div class="tile" class:active class:outlined={active && sheetCount > 1} data-tile={node.id} bind:this={tileEl}>
     <div
       class="bar"
+      class:grab={isWindow}
+      class:pulling
       role="toolbar"
       tabindex="-1"
       aria-label="Tile {name}"
-      onpointerdown={() => {
-        if (node.kind === "leaf" && node.content.type === "sheet") editor.activateTile(node.id);
+      title={isWindow ? "Drag out of the tile to float this window again" : undefined}
+      onpointerdown={(e) => {
+        if (node.kind !== "leaf") return;
+        if (node.content.type === "sheet") editor.activateTile(node.id);
+        else if (!(e.target as HTMLElement).closest("button")) {
+          e.currentTarget.setPointerCapture(e.pointerId);
+          pulling = true;
+        }
+      }}
+      onpointerup={(e) => {
+        if (!pulling || node.kind !== "leaf") return;
+        pulling = false;
+        const r = tileEl?.getBoundingClientRect();
+        const outside = r && (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom);
+        if (outside) {
+          floatNextAt(Math.max(0, e.clientX - 120), Math.max(0, e.clientY - 14));
+          editor.undockWindow(node.id);
+        }
       }}
     >
       <span class="name" title={name}>{name}</span>
@@ -187,6 +211,12 @@
     font-size: 12px;
     color: #445;
     user-select: none;
+  }
+  .bar.grab {
+    cursor: grab;
+  }
+  .bar.pulling {
+    cursor: grabbing;
   }
   .tile.active .bar {
     background: #e2ecfc;

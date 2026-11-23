@@ -62,8 +62,7 @@ export function splitLeaf(root: TileNode, id: string, dir: "row" | "col", leaf: 
 /** Drop a leaf onto a tile: an edge splits it, the middle replaces what's there. */
 export function dropOn(root: TileNode, targetId: string, zone: DropZone, leaf: TileLeaf): TileNode {
   if (zone === "middle") {
-    const at = findLeaf(root, targetId);
-    return at ? replace(root, targetId, { ...leaf, id: at.id }) : root;
+    return findLeaf(root, targetId) ? replace(root, targetId, leaf) : root;
   }
   const dir = zone === "left" || zone === "right" ? "row" : "col";
   return splitLeaf(root, targetId, dir, leaf, zone === "left" || zone === "top");
