@@ -1,18 +1,20 @@
 /**
- * Preferences for this browser (not saved in projects): how placing works
- * and the interface theme (design-v0.2 §10).
+ * Preferences for this browser (not saved in projects): how placing works,
+ * the interface theme (design-v0.2 §10) and how buttons show (design-v0.3 §8).
  */
 export interface Settings {
   /** Keep placing the same part until Esc, rather than one and back to Select (note 72). */
   keepPlacing: boolean;
   /** Dark interface chrome. The sheet stays a paper colour with black drawing. */
   dark: boolean;
+  /** Workbench and menu buttons: their names (the default), names with icons, or icons only (design-v0.3 §8). */
+  buttons: "labels" | "both" | "icons";
 }
 
 const KEY = "ferrule.settings";
 
 function load(): Settings {
-  const base: Settings = { keepPlacing: false, dark: false };
+  const base: Settings = { keepPlacing: false, dark: false, buttons: "labels" };
   try {
     return { ...base, ...JSON.parse(localStorage.getItem(KEY) ?? "{}") };
   } catch {

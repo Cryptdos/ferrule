@@ -73,6 +73,14 @@
     <input type="checkbox" bind:checked={settings.dark} onchange={saveSettings} />
     Dark interface (the sheet stays paper-coloured, the drawing black)
   </label>
+  <label class="row">
+    Buttons
+    <select bind:value={settings.buttons} onchange={saveSettings}>
+      <option value="labels">Labels</option>
+      <option value="both">Labels and icons</option>
+      <option value="icons">Icons (the name shows on hover)</option>
+    </select>
+  </label>
 
   <h3>Status</h3>
   {#if stopped}
@@ -123,6 +131,13 @@
 </Modal>
 
 <style>
+  label.row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    margin: 6px 0;
+  }
   h3 {
     font-size: 13px;
     margin: 14px 0 6px;
