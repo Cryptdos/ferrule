@@ -24,6 +24,7 @@
   import Props from "./Props.svelte";
   import ProjectDialog from "./ProjectDialog.svelte";
   import PlantDialog from "./PlantDialog.svelte";
+  import DistributionDialog from "./DistributionDialog.svelte";
   import ChecksDialog from "./ChecksDialog.svelte";
   import RenumberDialog from "./RenumberDialog.svelte";
   import SchedulesDialog from "./SchedulesDialog.svelte";
@@ -58,7 +59,7 @@
 
   let canvas: Canvas | undefined = $state();
   let showProject = $state(false);
-  let dialog: "plant" | "checks" | "schedules" | "templates" | "renumber" | "devices" | null = $state(null);
+  let dialog: "plant" | "distribution" | "checks" | "schedules" | "templates" | "renumber" | "devices" | null = $state(null);
   let tableView = $state(false);
   let help = $state(false);
   let browserWidth = $state(0);
@@ -380,6 +381,7 @@
           <button onclick={doRenumber} title="See what Renumber would change to tags, terminal and wire numbers, then apply">Renumber</button>
           <button onclick={() => (dialog = "templates")} title="Save and stamp sheet and section templates">Templates</button>
           <button onclick={() => (dialog = "plant")} title="Field equipment: define plant and place views">Plant</button>
+          <button onclick={() => (dialog = "distribution")} title="The supplies busbars, link arrows and the incoming supply pick from">Distribution</button>
           <button onclick={() => (dialog = "checks")} title="Check the drawing for problems">Check</button>
           <button onclick={() => (dialog = "schedules")} title="Terminal and cable schedules">Schedules</button>
         {/if}
@@ -431,6 +433,9 @@
     onpick={(path) => void saveAs(path)}
     onclose={() => (savingAs = false)}
   />
+{/if}
+{#if dialog === "distribution"}
+  <DistributionDialog {editor} onclose={() => (dialog = null)} />
 {/if}
 {#if dialog === "plant"}
   <PlantDialog {editor} onclose={() => (dialog = null)} />

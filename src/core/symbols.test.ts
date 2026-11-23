@@ -45,7 +45,7 @@ describe("symbol library", () => {
   });
 
   test("rails can be tapped at every unit along their length", () => {
-    const g = localGeometry(el("rail", 0, { length: 10 }), "");
+    const g = localGeometry(el("busbar", 0, { length: 10 }), "");
     expect(g.terminals.length).toBe(11);
   });
 

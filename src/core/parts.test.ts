@@ -3,6 +3,7 @@
  * isolator NC auxiliaries, timer functions, off-page directions, cable
  * screens, grouped plant terminals and wire colours.
  */
+import { controlBusbars } from "./testing";
 import { describe, expect, test } from "bun:test";
 import { newProject } from "./model";
 import {
@@ -46,8 +47,7 @@ describe("lamps", () => {
 
   test("the test terminal lights the lamp", () => {
     const { p, pg, add } = sheet();
-    const cct = add("rail", 0, 10, { name: "CCT", length: 100 });
-    const ov = add("rail", 0, 80, { name: "0V", length: 100 });
+    const { cct: cct, ov: ov } = controlBusbars(p, pg, 10, 80);
     const lt = add("pb-no", 30, 20);
     const h = add("lamp", 40, 60, { testPin: true });
     connect(p, pg, [cct.id, "30"], [lt.id, "13"]);
@@ -85,8 +85,7 @@ describe("isolators", () => {
 
   test("a contactor's auxiliaries follow its coil, NC opening", () => {
     const { p, pg, add } = sheet();
-    const cct = add("rail", 0, 10, { name: "CCT", length: 100 });
-    const ov = add("rail", 0, 80, { name: "0V", length: 100 });
+    const { cct: cct, ov: ov } = controlBusbars(p, pg, 10, 80);
     const s = add("pb-no", 10, 20);
     const k = add("coil", 10, 60);
     connect(p, pg, [cct.id, "10"], [s.id, "13"]);
@@ -140,8 +139,7 @@ describe("timer functions", () => {
   });
   test("a flasher drives its contact in the simulator", () => {
     const { p, pg, add } = sheet();
-    const cct = add("rail", 0, 10, { name: "CCT", length: 100 });
-    const ov = add("rail", 0, 80, { name: "0V", length: 100 });
+    const { cct: cct, ov: ov } = controlBusbars(p, pg, 10, 80);
     const kt = add("timer-coil", 10, 60, { mode: "flash-on", time: "1s" });
     connect(p, pg, [cct.id, "10"], [kt.id, "A1"]);
     connect(p, pg, [kt.id, "A2"], [ov.id, "10"]);

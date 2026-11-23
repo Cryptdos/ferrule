@@ -386,3 +386,12 @@ Each step is one pull request, with a build to test.
 - **Plant terminal boxes** are 1 unit apart with the name running up the box, like block cells. They're 3 units tall, taller when a name needs it.
 - **GA sheets:** the enclosure's corner moved to (8, 9) so the same room in millimetres is left for dimensions.
 - **Your test files** (Example Building, ATS-1) are format 2, so this build refuses them with the 0.1 message, as agreed. The LSP-01 example is rebuilt for the new grid.
+
+**Step 3 (busbars and distributions)**
+
+- **Distribution kinds** are AC line, AC neutral, DC +, DC 0 V and earth, not "Control". The simulator needs to know which side is the supply and which the return. A 24 V AC CCT is an AC line, and its 0V an AC neutral.
+- **Control busbars** are drawn at 0.35 mm, between a wire and a distribution busbar, and carry no tag (CCT and 0V never had one). Distribution busbars are tagged W like before. The tag sits just before the name, on the bar's line, so stacked busbars don't collide.
+- **Incoming supply:** each terminal can feed a distribution, and does so with no wire drawn. A link arrow on a distribution is labelled with its name unless given a label.
+- **Without an Incoming supply,** line and DC + distributions are the supply, and neutral and DC 0 V the return. This replaces the old "rails named CCT…" rule.
+- **Live colours:** in Simulate, busbars and wires are drawn in their core colour, and returns (N, 0V) light up too. A wire with no colour set stays red, as specified, so in the example only the busbars show their colours. A conductor fed by two supplies is reported as a short.
+- **Templates** carry the distributions they use. When stamped into another project, each is matched by name, or added if it's missing.

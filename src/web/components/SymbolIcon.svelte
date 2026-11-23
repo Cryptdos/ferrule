@@ -7,8 +7,7 @@
 
   const geom = $derived.by(() => {
     const params = defaultParams(symbol);
-    if (symbol === "rail" || symbol === "busbar") params.length = 8;
-    if (symbol === "rail") params.name = "";
+    if (symbol === "busbar") params.length = 8;
     const el: Element = { id: "icon", symbol, tag: "", label: "", pos: [0, 0], rot: 0, zone: "internal", params, links: [] };
     const g = localGeometry(el, "");
     return { prims: g.prims.filter((p) => p.t !== "text"), bbox: g.bbox };

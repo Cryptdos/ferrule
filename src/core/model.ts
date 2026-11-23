@@ -204,7 +204,38 @@ export interface Template {
   segments: Segment[];
   /** Size of the stamped area, for section templates. */
   size: [number, number];
+  /** Distributions referred to, as they were when the template was saved. */
+  distributions?: Distribution[];
 }
+
+/**
+ * A supply the project distributes (design-v0.2 §2): busbars, link arrows
+ * and the incoming supply pick one by identity. Busbars on the same
+ * distribution are one net on every sheet.
+ */
+export interface Distribution {
+  id: string;
+  /** As printed beside a busbar: "L1", "N (grid)", "CCT", "0V". */
+  name: string;
+  kind: DistributionKind;
+  /** As written, e.g. "230 V", "24 V DC". */
+  voltage: string;
+  /** Core colour code (Bn, Bu, Wh…), for busbars on it unless they say otherwise. */
+  colour?: string;
+  /** Function (L, N, +24V, 0V…), likewise. */
+  function?: string;
+}
+
+/** What a distribution is: a line or neutral, a DC + or 0 V, or earth. */
+export type DistributionKind = "line" | "neutral" | "dc+" | "dc0" | "earth";
+
+export const DISTRIBUTION_KINDS: { value: DistributionKind; label: string }[] = [
+  { value: "line", label: "AC line" },
+  { value: "neutral", label: "AC neutral" },
+  { value: "dc+", label: "DC +" },
+  { value: "dc0", label: "DC 0 V" },
+  { value: "earth", label: "Earth" },
+];
 
 export type NumberingScheme = "position" | "sequential";
 
@@ -218,6 +249,8 @@ export interface Project {
   designation: { standard: string; overrides: Record<string, string> };
   titleBlock: string;
   plant: PlantItem[];
+  /** Supplies busbars, link arrows and the incoming supply pick from. Starts empty. */
+  distributions: Distribution[];
   pages: Page[];
   conductors: Conductor[];
   revisions: Revision[];
@@ -293,6 +326,7 @@ export function newProject(id: string, title = "Untitled project"): Project {
     designation: { standard: "iec-81346-2-2019", overrides: {} },
     titleBlock: "default-a4",
     plant: [],
+    distributions: [],
     pages: [newPage(1, "Sheet 1")],
     conductors: [],
     revisions: [{ rev: "A", date: "", drawnBy: "", description: "First issue", clouds: [] }],

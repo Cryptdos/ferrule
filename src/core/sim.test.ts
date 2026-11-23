@@ -1,3 +1,4 @@
+import { controlBusbars } from "./testing";
 import { describe, expect, test } from "bun:test";
 import { newProject, type Project } from "./model";
 import { addElement, connect, linkContact } from "./ops";
@@ -6,8 +7,7 @@ import { advance, compile, describeAction, initialState, press, search, settle, 
 function ladder() {
   const p = newProject("t");
   const pg = p.pages[0]!.id;
-  const cct = addElement(p, pg, "rail", [0, 10], { params: { name: "CCT", length: 190 } });
-  const ov = addElement(p, pg, "rail", [0, 80], { params: { name: "0V", length: 190 } });
+  const { cct: cct, ov: ov } = controlBusbars(p, pg, 10, 80);
   const add = (s: string, x: number, y: number, params = {}) => addElement(p, pg, s, [x, y], { params });
   const w = (a: [string, string], b: [string, string]) => connect(p, pg, a, b);
   const top = (x: number): [string, string] => [cct.id, String(x)];

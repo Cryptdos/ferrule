@@ -16,6 +16,7 @@ import {
   type Rect,
   type Rotation,
   type Vec,
+  UNIT_MM,
   lineUnits,
   rotate,
   rotateDir,
@@ -113,8 +114,9 @@ export interface SymbolDef {
 
 // Sizes come from the named styles in geometry.ts (millimetres on paper).
 const W = lineUnits("thin");
-const RAIL_W = lineUnits("thick");
+/** Busbars: distribution (thick) and control (a touch heavier than a wire). */
 const BAR_W = lineUnits("thick");
+const CONTROL_W = 0.35 / UNIT_MM;
 /** Part tags, labels and names. */
 const TAG = textUnits("tag");
 /** Terminal numbers, ratings, functions, colours, cross-references. */
@@ -994,55 +996,47 @@ const SYMBOLS: SymbolDef[] = [
   },
   {
     id: "busbar",
-    name: "Distribution block / busbar",
+    name: "Busbar",
     group: "Connection",
     palette: true,
     params: [
-      { key: "length", label: "Length (units)", type: "number", min: 2, max: 200, default: 8 },
-      { key: "name", label: "Name", type: "text", default: "" },
+      {
+        key: "style",
+        label: "Style",
+        type: "select",
+        default: "distribution",
+        options: [
+          { value: "distribution", label: "Distribution (thick)" },
+          { value: "control", label: "Control (thin)" },
+        ],
+      },
+      { key: "length", label: "Length (units)", type: "number", min: 2, max: 150, default: 20 },
+      // Picked from the project's distribution list (Props); empty: Local, this busbar alone.
+      { key: "dist", label: "Distribution", type: "text", default: "", hidden: true },
+      { key: "name", label: "Name", type: "text", default: "", when: (el) => !el.params.dist, fixed: "From its distribution", placeholder: "e.g. La" },
+      { key: "bothEnds", label: "Name at both ends", type: "bool", default: false },
+      { key: "colour", label: "Core colour", type: "text", default: "", placeholder: "from its distribution" },
+      { key: "function", label: "Function", type: "text", default: "", placeholder: "from its distribution" },
     ],
-    kind: () => "busbar",
-    bridged: (el) => [railTerminals(el).map((t) => t.name)],
-    draw(el) {
-      const len = num(el, "length", 8, 2, 200);
-      const name = str(el, "name", "");
+    // Control busbars (CCT, 0V) carry no tag; distribution busbars are tagged like other parts.
+    kind: (el) => (el.params.style === "control" ? null : "busbar"),
+    draw(el, t) {
+      const len = num(el, "length", 20, 2, 150);
+      const name = t?.name ?? str(el, "name", "");
+      const control = el.params.style === "control";
+      const label = t?.label ?? el.label;
       return {
         prims: [
-          heavy(BAR_W, [0, 0], [len, 0]),
-          ...(name ? [text(-0.8, 0.5, name, DETAIL, "end", "note")] : []),
-          text(len / 2, -1, "{tag}", TAG, "middle", "tag"),
-          ...(el.label ? [text(len / 2, 2.2, "{label}", TAG, "middle", "label")] : []),
+          heavy(control ? CONTROL_W : BAR_W, [0, 0], [len, 0]),
+          // The name at the left end and the tag just before it, on the bar's line, clear
+          // of the wires tapping it and of busbars stacked above and below.
+          ...(name ? [text(-0.8, 0.45, name, TAG, "end", "note")] : []),
+          ...(name && el.params.bothEnds === true ? [text(len + 0.8, 0.45, name, TAG, "start", "note")] : []),
+          ...(control ? [] : [text(name ? -1.6 - textWidth(name, TAG) : -0.8, 0.45, "{tag}", TAG, "end", "tag")]),
+          ...(label ? [text(len / 2, 2.2, "{label}", TAG, "middle", "label")] : []),
         ],
         terminals: railTerminals(el),
         body: { x: 0, y: -0.3, w: len, h: 0.6 },
-      };
-    },
-  },
-  {
-    id: "rail",
-    name: "Control rail (CCT / 0V)",
-    group: "Connection",
-    palette: true,
-    params: [
-      { key: "length", label: "Length (units)", type: "number", min: 2, max: 200, default: 190 },
-      { key: "name", label: "Name", type: "text", default: "CCT" },
-    ],
-    kind: () => null,
-    bridged: (el) => [railTerminals(el).map((t) => t.name)],
-    draw(el) {
-      const len = num(el, "length", 190, 2, 200);
-      const name = str(el, "name", "CCT");
-      return {
-        prims: [
-          heavy(RAIL_W, [0, 0], [len, 0]),
-          // Names sit just above the rail at each end, clear of the line.
-          text(-0.6, -0.45, name, TAG, "end", "note"),
-          text(len + 0.6, -0.45, name, TAG, "start", "note"),
-          // Other sheets the same rail is on (a rail of the same name is the same conductor).
-          text(len + 0.6, 1.5, "{xref}", DETAIL, "start", "xref"),
-        ],
-        terminals: railTerminals(el),
-        body: { x: 0, y: -0.15, w: len, h: 0.3 },
       };
     },
   },
@@ -1102,10 +1096,13 @@ const SYMBOLS: SymbolDef[] = [
     params: [
       { key: "source", label: "Source (where the conductor comes from)", type: "bool", default: true },
       { key: "ref", label: "Reference (if not linked)", type: "text", default: "", placeholder: "e.g. 8-34" },
+      // Picked from the project's distribution list (Props): the arrow carries that supply.
+      { key: "dist", label: "Distribution", type: "text", default: "", hidden: true },
     ],
     kind: () => null,
-    draw(el) {
+    draw(el, t) {
       const source = el.params.source !== false;
+      const label = t?.label ?? el.label;
       // A slim isosceles triangle. The source points away along the wire
       // (it goes on elsewhere); the destination points back into its wire
       // (it comes from elsewhere) and is filled, so the two never get mixed up.
@@ -1122,11 +1119,11 @@ const SYMBOLS: SymbolDef[] = [
           ...(el.rot === 180
             ? [
                 text(-1, -1, "{xref}", DETAIL, "end", "xref"),
-                ...(el.label ? [text(1, -1, "{label}", TAG, "start", "label")] : []),
+                ...(label ? [text(1, -1, "{label}", TAG, "start", "label")] : []),
               ]
             : [
                 text(1, 1.2, "{xref}", DETAIL, "start", "xref"),
-                ...(el.label ? [text(-1, 1.2, "{label}", TAG, "end", "label")] : []),
+                ...(label ? [text(-1, 1.2, "{label}", TAG, "end", "label")] : []),
               ]),
         ],
         terminals: [{ name: "1", at: [0, -2], dir: "up" }],
@@ -1518,7 +1515,7 @@ const SYMBOLS: SymbolDef[] = [
 
 /** Rails and busbars can be tapped at any whole unit along their length. */
 function railTerminals(el: Element): TerminalDef[] {
-  const len = num(el, "length", el.symbol === "rail" ? 190 : 8, 2, 200);
+  const len = num(el, "length", 20, 2, 150);
   const out: TerminalDef[] = [];
   for (let i = 0; i <= len; i++) out.push({ name: String(i), at: [i, 0], dir: "any" });
   return out;
@@ -1721,6 +1718,8 @@ export interface GeometryText {
   xref?: string;
   /** Label with any fields filled in. Defaults to the element's label. */
   label?: string;
+  /** A busbar's name: its distribution's, or its own when it's local. */
+  name?: string;
   /** Revision list rows (revision table). */
   rows?: string[][];
   /** One of each part used (symbol legend). */

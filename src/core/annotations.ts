@@ -258,7 +258,7 @@ export function revisionTable(rows: string[][], min: number, size: number): { pr
 // Symbol legend
 
 /** The params that make a part look different (and mean something different). */
-const VARIANT_KEYS = ["function", "type", "system", "operator", "kind", "contact", "mode"];
+const VARIANT_KEYS = ["function", "type", "system", "operator", "kind", "contact", "mode", "style"];
 
 export interface LegendEntry {
   name: string;
@@ -302,8 +302,11 @@ export function legendEntries(project: Project): LegendEntry[] {
       delete params.xrefDy;
       delete params.onBlock;
       // Rails and busbars are drawn short: the line is the symbol.
-      if (el.symbol === "rail" || el.symbol === "busbar") params.length = 10;
-      if (el.symbol === "rail") params.name = "";
+      if (el.symbol === "busbar") {
+        params.length = 10;
+        delete params.name;
+        delete params.dist;
+      }
       seen.set(name, { name, el: { ...el, tag: "", label: "", rot: 0, links: [], params } });
     }
   }

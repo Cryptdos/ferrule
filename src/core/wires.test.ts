@@ -53,7 +53,7 @@ describe("wiring", () => {
 
   test("a straight rung routes straight", () => {
     const { p, pg, page } = setup();
-    const rail = addElement(p, pg, "rail", [0, 10], { params: { length: 100 } });
+    const rail = addElement(p, pg, "busbar", [0, 10], { params: { length: 100 } });
     const s = addElement(p, pg, "contact-no", [20, 20]);
     const k = addElement(p, pg, "coil", [20, 30]);
     connect(p, pg, [rail.id, "20"], [s.id, "13"]);
@@ -165,9 +165,9 @@ describe("tees and conductors", () => {
     expect([page.segments[0]!.from[0], page.segments[0]!.to[0]].sort()).toEqual([a.id, b.id].sort());
   });
 
-  test("components break conductors; terminals and rails carry them", () => {
+  test("components and busbars break conductors; terminals carry them", () => {
     const { p, pg } = setup();
-    const rail = addElement(p, pg, "rail", [0, 10], { params: { length: 100 } });
+    const rail = addElement(p, pg, "busbar", [0, 10], { params: { length: 100 } });
     const x1 = addElement(p, pg, "terminal", [20, 15]);
     const s = addElement(p, pg, "contact-no", [20, 25]);
     const h = addElement(p, pg, "lamp", [40, 25]);
@@ -175,8 +175,9 @@ describe("tees and conductors", () => {
     connect(p, pg, [x1.id, "2"], [s.id, "13"]);
     connect(p, pg, [rail.id, "40"], [h.id, "V+"]);
     const w = connect(p, pg, [s.id, "14"], [h.id, "V-"]);
-    // Rail, terminal X1 and the contact's 13 are one potential; 14 → lamp N is another.
-    expect(p.conductors).toHaveLength(2);
+    // Terminal X1 carries its wire through to the contact's 13; the busbar's
+    // other tap (to the lamp) is its own conductor, and 14 → lamp is another.
+    expect(p.conductors).toHaveLength(3);
     const before = p.conductors.find((c) => c.id === w.conductor)!;
     before.number = "11-22";
     deleteElements(p, pg, [x1.id]);
@@ -186,7 +187,7 @@ describe("tees and conductors", () => {
 
   test("connection dots on rail taps and three-way meetings", () => {
     const { p, pg, page } = setup();
-    const rail = addElement(p, pg, "rail", [0, 10], { params: { length: 100 } });
+    const rail = addElement(p, pg, "busbar", [0, 10], { params: { length: 100 } });
     const h = addElement(p, pg, "lamp", [20, 20]);
     connect(p, pg, [rail.id, "20"], [h.id, "V+"]);
     routePage(avoid, page);
@@ -197,7 +198,7 @@ describe("tees and conductors", () => {
 describe("rail taps", () => {
   test("a rail tap follows its symbol along the rung", () => {
     const { p, pg, page } = setup();
-    const rail = addElement(p, pg, "rail", [0, 70], { params: { length: 100 } });
+    const rail = addElement(p, pg, "busbar", [0, 70], { params: { length: 100 } });
     const h = addElement(p, pg, "lamp", [40, 60]);
     const w = connect(p, pg, [h.id, "V-"], [rail.id, "40"]);
     routePage(avoid, page);

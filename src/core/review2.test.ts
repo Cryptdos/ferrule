@@ -1,7 +1,9 @@
 /** Second review: rails across sheets, plant tags, renumber preview, link arrows, field wires, parts. */
+import { controlBusbars } from "./testing";
+import { netJoins } from "./conductors";
 import { describe, expect, test } from "bun:test";
 import { newProject } from "./model";
-import { addElement, addPage, addPlant, connect, linkContact, linkOffpage, placePlantView, updateElement } from "./ops";
+import { addDistribution, addElement, addPage, addPlant, connect, linkContact, linkOffpage, placePlantView, updateElement } from "./ops";
 import { renumber, renumberPreview } from "./renumber";
 import { slideRailTaps } from "./routing";
 import { localGeometry, terminalNames } from "./symbols";
@@ -15,20 +17,23 @@ function project() {
   return { p, pg };
 }
 
-describe("control rails across sheets", () => {
-  test("rails with the same name are one conductor, and each shows the other sheets", () => {
+describe("busbars across sheets", () => {
+  test("busbars on the same distribution are one net; numbering stops at each, and there's no list of sheets", () => {
     const { p, pg } = project();
     const pg2 = addPage(p, "Two").id;
-    const a = addElement(p, pg, "rail", [0, 80], { params: { name: "0V", length: 100 } });
-    const b = addElement(p, pg2, "rail", [0, 80], { params: { name: "0V", length: 100 } });
+    const ov = addDistribution(p, { name: "0V", kind: "dc0" });
+    const a = addElement(p, pg, "busbar", [0, 80], { params: { style: "control", dist: ov.id, length: 100 } });
+    const b = addElement(p, pg2, "busbar", [0, 80], { params: { style: "control", dist: ov.id, length: 100 } });
     const k1 = addElement(p, pg, "coil", [20, 60]);
     const k2 = addElement(p, pg2, "coil", [20, 60]);
     connect(p, pg, [k1.id, "A2"], [a.id, "20"]);
     connect(p, pg2, [k2.id, "A2"], [b.id, "20"]);
     const cond = (id: string) => p.conductors.find((c) => c.terminals.some(([x, t]) => x === id && t === "A2"))!.id;
-    expect(cond(k1.id)).toBe(cond(k2.id));
-    expect(xrefText(p, a, "")).toBe("/2");
-    expect(xrefText(p, b, "")).toBe("/1");
+    // Each wire is its own conductor (its own number)…
+    expect(cond(k1.id)).not.toBe(cond(k2.id));
+    // …but the distribution joins them.
+    expect(netJoins(p).some((j) => j.a[0] === a.id && j.b[0] === b.id)).toBe(true);
+    expect(xrefText(p, a, "")).toBe("");
   });
 });
 
@@ -175,8 +180,7 @@ describe("simulation: supplies", () => {
 describe("simulation: plant groups", () => {
   function plantRig(spec: string) {
     const { p, pg } = project();
-    const cct = addElement(p, pg, "rail", [0, 10], { params: { name: "CCT", length: 100 } });
-    const ov = addElement(p, pg, "rail", [0, 60], { params: { name: "0V", length: 100 } });
+    const { cct: cct, ov: ov } = controlBusbars(p, pg, 10, 60);
     const parsed = parseTerminalSpec(spec);
     const item = addPlant(p, "", "Fan", parsed.terminals, { groups: parsed.groups, prefix: "SF" });
     const v = placePlantView(p, pg, item.id, [20, 90]);
@@ -233,8 +237,7 @@ describe("simulation: plant groups", () => {
 describe("simulation: push buttons", () => {
   test("held for as long as they're held", () => {
     const { p, pg } = project();
-    const cct = addElement(p, pg, "rail", [0, 10], { params: { name: "CCT", length: 100 } });
-    const ov = addElement(p, pg, "rail", [0, 60], { params: { name: "0V", length: 100 } });
+    const { cct: cct, ov: ov } = controlBusbars(p, pg, 10, 60);
     const b = addElement(p, pg, "pb-no", [20, 25]);
     const h = addElement(p, pg, "lamp", [20, 45]);
     connect(p, pg, [cct.id, "20"], [b.id, "13"]);

@@ -7,7 +7,7 @@
 import { PLANT_VIEW_KEYS } from "./ops";
 import { parseProjectDevices } from "./devices";
 import { AREA_UNITS } from "./geometry";
-import { FORMAT, FORMAT_VERSION, type GaItem, type Page, type Project, emptyInfo } from "./model";
+import { DISTRIBUTION_KINDS, type DistributionKind, FORMAT, FORMAT_VERSION, type GaItem, type Page, type Project, emptyInfo } from "./model";
 import { getSymbol } from "./symbols";
 import { colourCode } from "./wirecolours";
 
@@ -57,6 +57,7 @@ export function parseProject(input: unknown): Project {
     titleBlock: strOr(input.titleBlock, "default-a4"),
     assets: {},
     plant: parsePlant(input.plant),
+    distributions: parseDistributions(input.distributions),
     pages: [],
     conductors: [],
     revisions: arr(input.revisions)
@@ -133,6 +134,7 @@ export function parseTemplate(t: Record<string, unknown>, i = 0): Project["templ
     name: strOr(t.name, "Template"),
     kind: t.kind === "section" ? "section" : "sheet",
     plant: parsePlant(t.plant),
+    ...(Array.isArray(t.distributions) ? { distributions: parseDistributions(t.distributions) } : {}),
     title: strOr(t.title),
     boundaryY: body.boundaryY,
     sections: body.sections,
@@ -159,6 +161,21 @@ function parseAssets(v: unknown): Project["assets"] {
     };
   }
   return out;
+}
+
+export function parseDistributions(v: unknown): Project["distributions"] {
+  const kinds = new Set(DISTRIBUTION_KINDS.map((k) => k.value));
+  return arr(v)
+    .filter(isObj)
+    .filter((d) => typeof d.id === "string" && d.id)
+    .map((d) => ({
+      id: d.id as string,
+      name: strOr(d.name),
+      kind: kinds.has(d.kind as DistributionKind) ? (d.kind as DistributionKind) : "line",
+      voltage: strOr(d.voltage),
+      ...(typeof d.colour === "string" && d.colour ? { colour: colourCode(d.colour) } : {}),
+      ...(typeof d.function === "string" && d.function ? { function: d.function } : {}),
+    }));
 }
 
 export function parsePlant(v: unknown): Project["plant"] {
