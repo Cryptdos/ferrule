@@ -15,7 +15,7 @@ const condOf = (p: ReturnType<typeof project>["p"], id: string, t: string) => p.
 describe("wire colour on creation", () => {
   test("a busbar's colour is picked from the wire colours; typed names become codes (T4)", () => {
     const { p, pg } = project();
-    const bar = addElement(p, pg, "busbar", [10, 10], { params: { style: "control", length: 40, colour: "blue" } });
+    const bar = addElement(p, pg, "rail", [10, 10], { params: { length: 40, colour: "blue" } });
     expect(bar.params.colour).toBe("Bu");
     const k = addElement(p, pg, "coil", [20, 30]);
     connect(p, pg, [bar.id, "10"], [k.id, "A1"]);
@@ -85,7 +85,7 @@ describe("wire numbers", () => {
 describe("pre-release files", () => {
   test("free-text busbar colours from the test builds become colour codes", () => {
     const { p, pg } = project();
-    const bar = addElement(p, pg, "busbar", [10, 10], { params: { style: "control", length: 40 } });
+    const bar = addElement(p, pg, "rail", [10, 10], { params: { length: 40 } });
     bar.params.colour = "black";
     const back = parseProject(JSON.parse(JSON.stringify(p)));
     expect(back.pages[0]!.elements.find((e) => e.id === bar.id)!.params.colour).toBe("Bk");

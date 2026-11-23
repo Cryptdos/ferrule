@@ -1,6 +1,6 @@
 import { STANDARDS } from "./designations";
 import type { Element, Project } from "./model";
-import { requireSymbol, type GeometryText } from "./symbols";
+import { isBar, requireSymbol, type GeometryText } from "./symbols";
 import { isTimed, masterOf, xrefText } from "./xref";
 import { resolveFields } from "./fields";
 import { controllerMapEntries, moduleTitle } from "./modules";
@@ -47,10 +47,10 @@ export function elementTexts(el: Element, project: Project): GeometryText {
   if (el.symbol === "ctrlmap") t.modules = controllerMapEntries(project, String(el.params.ctrl ?? ""));
   if (el.symbol === "revtable") t.rows = revisionRows(project);
   else if (el.symbol === "legend") t.legend = legendEntries(project);
-  else if (el.symbol === "busbar" || el.symbol === "offpage") {
+  else if (isBar(el) || el.symbol === "offpage") {
     // On a distribution: a busbar is named after it, an unlabelled arrow says which it carries.
     const d = typeof el.params.dist === "string" && el.params.dist ? project.distributions.find((x) => x.id === el.params.dist) : undefined;
-    if (el.symbol === "busbar") t.name = d?.name ?? String(el.params.name ?? "");
+    if (isBar(el)) t.name = d?.name ?? String(el.params.name ?? "");
     else {
       // A linked destination says what its source says, unless told not to (70).
       if (el.params.source === false && el.params.sameLabel !== false && el.links[0]) {

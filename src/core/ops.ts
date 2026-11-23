@@ -31,7 +31,7 @@ import {
   type TerminalRef,
   newId,
 } from "./model";
-import { benchOf, defaultParams, formatPoints, getSymbol, partPoints, poleMates, requireSymbol, terminalPoint } from "./symbols";
+import { benchOf, defaultParams, isBar, formatPoints, getSymbol, partPoints, poleMates, requireSymbol, terminalPoint } from "./symbols";
 import { moduleType, moduleTypeName } from "./modules";
 import { cleanPoints, formatQuickEntry, mergePoints, isInputForm, missingRefs, parseQuickEntry, pointOfPin, printedPin } from "./points";
 import { isOrthogonal, routeOf, simplifyRoute } from "./wires";
@@ -64,7 +64,7 @@ export interface AddElementOptions {
 /** Lamp colours written the usual way whatever the case they came in ("GN" → "Gn"). */
 function normaliseParams(symbol: string, params: Record<string, ParamValue>): Record<string, ParamValue> {
   if (symbol === "lamp" && typeof params.colour === "string") params.colour = lampColour(params.colour);
-  if (symbol === "busbar" && typeof params.colour === "string") params.colour = knownColour(params.colour);
+  if ((symbol === "busbar" || symbol === "rail") && typeof params.colour === "string") params.colour = knownColour(params.colour);
   // A selector's legend as it was written before its positions had names (v0.2.1 note 23).
   if (symbol === "selector" && typeof params.legend === "string") Object.assign(params, legendToPositions(params.legend, params.positions === "3"));
   if (symbol === "selector") delete params.legend;
@@ -323,7 +323,7 @@ function inheritBusbarColour(project: Project, page: Page, seg: Segment): void {
   if (!c || c.colour) return;
   for (const ref of [seg.from, seg.to]) {
     const el = page.elements.find((e) => e.id === ref[0]);
-    if (el?.symbol !== "busbar") continue;
+    if (!el || !isBar(el)) continue;
     const colour = String(el.params.colour || distributionOf(project, el)?.colour || "");
     if (colour) {
       c.colour = colourCode(colour);
@@ -1674,7 +1674,7 @@ export function setGaItemDevice(project: Project, pageId: string, itemId: string
 
 /** The params on an element that name a distribution: a busbar's or arrow's `dist`, an incoming supply's `dist_<terminal>`. */
 export function distParamKeys(el: Element): string[] {
-  if (el.symbol === "busbar" || el.symbol === "offpage") return ["dist"];
+  if (isBar(el) || el.symbol === "offpage") return ["dist"];
   if (el.symbol === "supply") return Object.keys(el.params).filter((k) => k.startsWith("dist_"));
   return [];
 }

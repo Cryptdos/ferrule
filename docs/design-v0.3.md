@@ -168,6 +168,12 @@ Each step is one PR with a build, `ferrule-windows-v0.3.0-pre.zip`. The working 
 
 - **One colour select** (`ColourSelect.svelte`) for a distribution and a wire's core colour, so they can't drift apart. Its empty choice reads *None* in both (the wire's said "–"), and each colour shows its code and name (`Bu blue`). The add row's colour is the same select.
 
+**Step 2 (busbars split)**
+
+- **Parts list:** *Distribution block* and *Control rail* sit side by side under Connection. They share their properties (length, distribution, name, name at both ends, core colour, function); only the weight and the tag differ.
+- **MCP:** `add_element` takes `rail` for a control rail; a `busbar` given `style: "control"` from MCP is a distribution block (the param is gone), so the MCP help says which is which.
+- **Local:** a block or rail on no distribution reads *Local (this one alone)* in Properties.
+
 ## 11. Director notes, as written (23/11/26)
 
 **On tiling (§7):**

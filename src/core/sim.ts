@@ -198,7 +198,8 @@ export function compile(project: Project): Circuit {
       // A selector is drawn turned whenever it's out of position 0.
       if (el.symbol === "selector") ops.set(el.id, (s) => (s.inputs[el.id] ?? 0) !== 0);
       switch (el.symbol) {
-        case "busbar": {
+        case "busbar":
+        case "rail": {
           const conds = project.conductors.filter((c) => c.terminals.some(([id]) => id === el.id)).map((c) => c.id);
           conds.forEach((c) => railNodes.add(c));
           // Without an Incoming supply part, busbars on a line or DC + distribution are the

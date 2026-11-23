@@ -10,7 +10,7 @@ import { applyStripLines, fitBlock } from "./blocks";
 import type { Avoid, ConnRef } from "libavoid-js";
 import type { Rect, Vec } from "./geometry";
 import type { Element, Page, Segment, TerminalRef } from "./model";
-import { benchOf, localGeometry, type Prim } from "./symbols";
+import { benchOf, isBar, localGeometry, type Prim } from "./symbols";
 import { endDir, endPoint, findElement, refitManual, removeLoops, simpleRoute, simplifyRoute } from "./wires";
 
 /** Gap kept between parallel wires, and between wires and symbol bodies. */
@@ -20,7 +20,7 @@ const BUFFER = 0.25;
 const INSET = 0.5;
 
 /** Symbols wires may cross or run along: conductors themselves, or a cable screen drawn over the cores. */
-const NOT_OBSTACLES = new Set(["junction", "busbar", "screen", "strip-line"]);
+const NOT_OBSTACLES = new Set(["junction", "busbar", "rail", "screen", "strip-line"]);
 
 /** Rough outline of a symbol's text, so wires keep off tags, labels and ratings. */
 function textRect(el: Element, p: Extract<Prim, { t: "text" }>): Rect | null {
@@ -60,7 +60,7 @@ function obstacleRect(el: Element): Rect | null {
 function dirFlags(avoid: Avoid, page: Page, ref: [string, string]): number {
   const F = avoid.ConnDirFlag;
   const el = findElement(page, ref[0]);
-  if (el && el.symbol === "busbar") {
+  if (el && isBar(el)) {
     // Busbars are tapped from above or below, never along their length.
     return el.rot % 180 === 0 ? F.ConnDirUp | F.ConnDirDown : F.ConnDirLeft | F.ConnDirRight;
   }
@@ -354,7 +354,7 @@ export function slideRailTaps(page: Page): void {
       [seg.to, seg.from],
     ] as [TerminalRef, TerminalRef][]) {
       const rail = findElement(page, railEnd[0]);
-      if (!rail || rail.symbol !== "busbar") continue;
+      if (!rail || !isBar(rail)) continue;
       if (otherEnd[0] === rail.id) continue;
       const p = endPoint(page, otherEnd);
       if (!p) continue;

@@ -21,7 +21,7 @@ function ladder() {
 describe("parts list", () => {
   test("timer contact, push button NO/NC and Notes are gone; one Push button and one Text", () => {
     const ids = listSymbols().map((s) => s.id);
-    for (const gone of ["timer-contact", "pb-no", "pb-nc", "notes", "rail"]) expect(ids).not.toContain(gone);
+    for (const gone of ["timer-contact", "pb-no", "pb-nc", "notes"]) expect(ids).not.toContain(gone);
     for (const kept of ["pushbutton", "text", "selector", "busbar"]) expect(ids).toContain(kept);
   });
 });

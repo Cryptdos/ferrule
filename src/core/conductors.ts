@@ -14,7 +14,7 @@
  * shares with its old self), so numbers don't jump about while drawing.
  */
 import { type Conductor, type Project, type TerminalRef, newId } from "./model";
-import { requireSymbol } from "./symbols";
+import { isBar, requireSymbol } from "./symbols";
 
 const key = (r: TerminalRef) => `${r[0]}\u0000${r[1]}`;
 const unkey = (k: string): TerminalRef => k.split("\u0000") as TerminalRef;
@@ -153,7 +153,7 @@ export function netJoins(project: Project): { a: TerminalRef; b: TerminalRef; el
   };
   for (const page of project.pages) {
     for (const el of page.elements) {
-      if (el.symbol === "busbar") {
+      if (isBar(el)) {
         // The wired taps, in order along the bar.
         const taps = [...new Set(page.segments.flatMap((s) => [s.from, s.to]).filter((r) => r[0] === el.id).map((r) => r[1]))].sort(
           (x, y) => Number(x) - Number(y),

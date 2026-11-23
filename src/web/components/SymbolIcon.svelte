@@ -9,6 +9,7 @@
   /** Parts drawn long or large are shown small, so their lines show at icon size. */
   const SMALL: Record<string, Record<string, ParamValue>> = {
     busbar: { length: 8 },
+    rail: { length: 8 },
     "strip-line": { length: 7 },
     box: { w: 7, h: 5 },
   };

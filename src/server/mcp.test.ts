@@ -64,8 +64,8 @@ describe("MCP tools", () => {
       (await call("add_element", { project, sheet: 1, symbol, x, y, ...extra })).data;
     const dists = (await call("add_distribution", { project, name: "CCT", kind: "dc+", voltage: "24 V DC" })).data;
     const ovd = (await call("add_distribution", { project, name: "0V", kind: "dc0" })).data.find((d: { name: string }) => d.name === "0V");
-    const cct = await add("busbar", 0, 10, { params: { style: "control", dist: dists[0].id, length: 140 } });
-    const ov = await add("busbar", 0, 60, { params: { style: "control", dist: ovd.id, length: 140 } });
+    const cct = await add("rail", 0, 10, { params: { dist: dists[0].id, length: 140 } });
+    const ov = await add("rail", 0, 60, { params: { dist: ovd.id, length: 140 } });
     const s1 = await add("pushbutton", 30, 30, { label: "START" });
     const k1 = await add("coil", 30, 57);
     expect(s1.terminals.map((t: { name: string }) => t.name)).toEqual(["13", "14"]);
@@ -144,8 +144,8 @@ describe("MCP simulation", () => {
       (await call("add_element", { project, sheet: 1, symbol, x, y, params })).data;
     const cd = (await call("add_distribution", { project, name: "CCT", kind: "dc+" })).data[0];
     const od = (await call("add_distribution", { project, name: "0V", kind: "dc0" })).data[1];
-    const cct = await add("busbar", 0, 10, { style: "control", dist: cd.id, length: 140 });
-    const ov = await add("busbar", 0, 80, { style: "control", dist: od.id, length: 140 });
+    const cct = await add("rail", 0, 10, { dist: cd.id, length: 140 });
+    const ov = await add("rail", 0, 80, { dist: od.id, length: 140 });
     const s1 = await add("selector", 20, 30);
     const s2 = await add("selector", 60, 30);
     const q1 = await add("coil", 20, 70, { type: "contactor" });

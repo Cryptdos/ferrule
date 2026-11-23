@@ -22,8 +22,8 @@ describe("busbars across sheets", () => {
     const { p, pg } = project();
     const pg2 = addPage(p, "Two").id;
     const ov = addDistribution(p, { name: "0V", kind: "dc0" });
-    const a = addElement(p, pg, "busbar", [0, 80], { params: { style: "control", dist: ov.id, length: 100 } });
-    const b = addElement(p, pg2, "busbar", [0, 80], { params: { style: "control", dist: ov.id, length: 100 } });
+    const a = addElement(p, pg, "rail", [0, 80], { params: { dist: ov.id, length: 100 } });
+    const b = addElement(p, pg2, "rail", [0, 80], { params: { dist: ov.id, length: 100 } });
     const k1 = addElement(p, pg, "coil", [20, 60]);
     const k2 = addElement(p, pg2, "coil", [20, 60]);
     connect(p, pg, [k1.id, "A2"], [a.id, "20"]);

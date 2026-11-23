@@ -121,7 +121,7 @@ export interface SymbolDef {
 
 // Sizes come from the named styles in geometry.ts (millimetres on paper).
 const W = lineUnits("thin");
-/** Busbars: distribution (thick) and control (a touch heavier than a wire). */
+/** Distribution blocks (thick) and control rails (a touch heavier than a wire). */
 const BAR_W = lineUnits("thick");
 const CONTROL_W = 0.35 / UNIT_MM;
 /** Part tags, labels and names. */
@@ -1206,50 +1206,23 @@ const SYMBOLS: SymbolDef[] = [
   },
   {
     id: "busbar",
-    name: "Busbar",
+    name: "Distribution block",
     group: "Connection",
     palette: true,
-    params: [
-      {
-        key: "style",
-        label: "Style",
-        type: "select",
-        default: "distribution",
-        options: [
-          { value: "distribution", label: "Distribution (thick)" },
-          { value: "control", label: "Control (thin)" },
-        ],
-      },
-      { key: "length", label: "Length (units)", type: "number", min: 2, max: 150, default: 20 },
-      // Picked from the project's distribution list (Props); empty: Local, this busbar alone.
-      { key: "dist", label: "Distribution", type: "text", default: "", hidden: true },
-      { key: "name", label: "Name", type: "text", default: "", when: (el) => !el.params.dist, fixed: "From its distribution", placeholder: "e.g. La" },
-      { key: "bothEnds", label: "Name at both ends", type: "bool", default: false },
-      // The same colours as a wire (T4); its wires take it when they're drawn.
-      { key: "colour", label: "Core colour", type: "select", default: "", options: BUSBAR_COLOUR_OPTIONS },
-      { key: "function", label: "Function", type: "text", default: "", placeholder: "from its distribution" },
-    ],
-    // Control busbars (CCT, 0V) carry no tag; distribution busbars are tagged like other parts.
-    kind: (el) => (el.params.style === "control" ? null : "busbar"),
-    draw(el, t) {
-      const len = num(el, "length", 20, 2, 150);
-      const name = t?.name ?? str(el, "name", "");
-      const control = el.params.style === "control";
-      const label = t?.label ?? el.label;
-      return {
-        prims: [
-          heavy(control ? CONTROL_W : BAR_W, [0, 0], [len, 0]),
-          // The name at the left end and the tag just before it, on the bar's line, clear
-          // of the wires tapping it and of busbars stacked above and below.
-          ...(name ? [text(-0.8, 0.45, name, TAG, "end", "note")] : []),
-          ...(name && el.params.bothEnds === true ? [text(len + 0.8, 0.45, name, TAG, "start", "note")] : []),
-          ...(control ? [] : [text(name ? -1.6 - textWidth(name, TAG) : -0.8, 0.45, "{tag}", TAG, "end", "tag")]),
-          ...(label ? [text(len / 2, 2.2, "{label}", TAG, "middle", "label")] : []),
-        ],
-        terminals: railTerminals(el),
-        body: { x: 0, y: -0.3, w: len, h: 0.6 },
-      };
-    },
+    params: barParams(),
+    // The physical busbar or distribution block (v0.3 §1): tagged W, placed on the GA, in the bill of materials.
+    kind: () => "busbar",
+    draw: (el, t) => drawBar(el, t, BAR_W, true),
+  },
+  {
+    id: "rail",
+    name: "Control rail",
+    group: "Connection",
+    palette: true,
+    params: barParams(),
+    // A drawing convention (CCT, 0V), not a part: no tag, not on the GA.
+    kind: () => null,
+    draw: (el, t) => drawBar(el, t, CONTROL_W, false),
   },
   {
     id: "earth",
@@ -1885,6 +1858,44 @@ const SYMBOLS: SymbolDef[] = [
     },
   },
 ];
+
+/** Distribution blocks and control rails: whole-unit taps, a name, a distribution. */
+function barParams(): ParamDef[] {
+  return [
+    { key: "length", label: "Length (units)", type: "number", min: 2, max: 150, default: 20 },
+    // Picked from the project's distribution list (Props); empty: Local, this bar alone.
+    { key: "dist", label: "Distribution", type: "text", default: "", hidden: true },
+    { key: "name", label: "Name", type: "text", default: "", when: (el) => !el.params.dist, fixed: "From its distribution", placeholder: "e.g. La" },
+    { key: "bothEnds", label: "Name at both ends", type: "bool", default: false },
+    // The same colours as a wire (T4); its wires take it when they're drawn.
+    { key: "colour", label: "Core colour", type: "select", default: "", options: BUSBAR_COLOUR_OPTIONS },
+    { key: "function", label: "Function", type: "text", default: "", placeholder: "from its distribution" },
+  ];
+}
+
+function drawBar(el: Element, t: GeometryText | undefined, weight: number, tagged: boolean): Omit<Geometry, "bbox"> {
+  const len = num(el, "length", 20, 2, 150);
+  const name = t?.name ?? str(el, "name", "");
+  const label = t?.label ?? el.label;
+  return {
+    prims: [
+      heavy(weight, [0, 0], [len, 0]),
+      // The name at the left end and the tag just before it, on the bar's line, clear
+      // of the wires tapping it and of bars stacked above and below.
+      ...(name ? [text(-0.8, 0.45, name, TAG, "end", "note")] : []),
+      ...(name && el.params.bothEnds === true ? [text(len + 0.8, 0.45, name, TAG, "start", "note")] : []),
+      ...(tagged ? [text(name ? -1.6 - textWidth(name, TAG) : -0.8, 0.45, "{tag}", TAG, "end", "tag")] : []),
+      ...(label ? [text(len / 2, 2.2, "{label}", TAG, "middle", "label")] : []),
+    ],
+    terminals: railTerminals(el),
+    body: { x: 0, y: -0.3, w: len, h: 0.6 },
+  };
+}
+
+/** A distribution block or a control rail: both join everything on them (v0.3 §1). */
+export function isBar(el: { symbol: string } | undefined): boolean {
+  return el?.symbol === "busbar" || el?.symbol === "rail";
+}
 
 /** Rails and busbars can be tapped at any whole unit along their length. */
 function railTerminals(el: Element): TerminalDef[] {

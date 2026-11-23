@@ -4,7 +4,7 @@
  */
 import { lineUnits, type Vec } from "./geometry";
 import type { Element, Project } from "./model";
-import { getSymbol, listSymbols, localGeometry, type Prim } from "./symbols";
+import { getSymbol, isBar, listSymbols, localGeometry, type Prim } from "./symbols";
 import { CAP_HEIGHT, textWidth } from "./textwidth";
 
 const THIN = lineUnits("thin");
@@ -401,7 +401,7 @@ export function legendEntries(project: Project): LegendEntry[] {
       delete params.xrefDy;
       delete params.onBlock;
       // Rails and busbars are drawn short: the line is the symbol.
-      if (el.symbol === "busbar") {
+      if (isBar(el)) {
         params.length = 10;
         delete params.name;
         delete params.dist;

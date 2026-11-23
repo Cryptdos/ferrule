@@ -122,7 +122,7 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
   const bus = (d: Distribution | null, x: number, y: number, length: number, label = "") =>
     add("busbar", x, y, { label, params: { dist: d?.id ?? "", length } });
   const ctl = (d: Distribution | null, x: number, y: number, length: number, name = "") =>
-    add("busbar", x, y, { params: { style: "control", dist: d?.id ?? "", name, length, bothEnds: true } });
+    add("rail", x, y, { params: { dist: d?.id ?? "", name, length, bothEnds: true } });
   const arrowOut = (x: number, y: number, label = "") => add("offpage", x, y, { label });
   const arrowIn = (x: number, y: number, label = "") => add("offpage", x, y, { rot: 180, label, params: { source: false } });
   // Text sizes are Markdown headings (# Title, ## Heading); body text is Note.
@@ -205,8 +205,8 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
   w([cctIn, "1"], [qFan, "13"]);
   w([ovIn, "1"], [qFan, "23"]);
   // After the isolator's auxiliary poles: this starter's own control busbars.
-  const cctLocal = add("busbar", 36, 30, { params: { style: "control", length: 50 } });
-  const ovLocal = add("busbar", 36, 58, { params: { style: "control", length: 50 } });
+  const cctLocal = add("rail", 36, 30, { params: { length: 50 } });
+  const ovLocal = add("rail", 36, 58, { params: { length: 50 } });
   w([qFan, "14"], tap(cctLocal, 36));
   w([qFan, "24"], tap(ovLocal, 36));
   // Destinations show their source's label, so the starter's arrows say whose they are.

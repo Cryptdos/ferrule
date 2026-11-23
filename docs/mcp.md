@@ -44,7 +44,7 @@ An open editor tab follows changes Claude makes: it reloads the project and says
 | `connect`, `disconnect` | Wires: terminal to terminal, or tee into a wire |
 | `label_wire` | A wire's number, core colour (IEC 60757, e.g. Bu) and function (e.g. 0V), printed along it |
 | `link` | Contact → coil, or pair off-page arrows |
-| `add_distribution` | The project's distributions (L1, N, CCT, 0V…): busbars, link arrows and the incoming supply pick one with `params.dist` (supply: `dist_<terminal>`) |
+| `add_distribution` | The project's distributions (L1, N, CCT, 0V…): distribution blocks, control rails, link arrows and the incoming supply pick one with `params.dist` (supply: `dist_<terminal>`) |
 | `add_plant`, `place_plant_view` | Field equipment (prefix or fixed tag, pins and points by quick entry or in full: forms, what outputs follow, supply out distributions, pin ids and groups; information lines, power by others) and its views |
 | `add_section` | Labelled section boxes |
 | `controller`, `add_module` | Controllers: list them (each module's tag, type, points as `A3-23:DI2` and where it's drawn), add, rename or delete one; add modules by type and channel count with their pins generated from a pattern (ids, first pin, names, shared commons), set each point's job label, add spare slots, move, readdress or delete modules. Module views are placed with `place_plant_view`; `saveModel` keeps a module as a model in the device table and `device` adds one from it |

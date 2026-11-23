@@ -10,7 +10,7 @@
   import { coreCss } from "../../core/wirecolours";
   import { cloudPath } from "../../core/titleblock";
   import ElementView from "./ElementView.svelte";
-  import { benchOf } from "../../core/symbols";
+  import { benchOf, isBar } from "../../core/symbols";
   import GaLayer from "./GaLayer.svelte";
   import type { GaItem } from "../../core/model";
   import Frame from "./Frame.svelte";
@@ -82,7 +82,7 @@
   /** Field wires (out to plant) are drawn dashed and don't print their number unless asked to. */
   const field = $derived(new Set(page.segments.filter((s) => isFieldWire(page, s)).map((s) => s.id)));
 
-  const onBusbar = (ref: [string, string]) => page.elements.find((e) => e.id === ref[0])?.symbol === "busbar";
+  const onBusbar = (ref: [string, string]) => isBar(page.elements.find((e) => e.id === ref[0]));
   /** Wires from a cable screen are dashed like the screen (26). */
   const screen = $derived(new Set(page.segments.filter((s) => isScreenWire(page, s)).map((s) => s.id)));
 
@@ -119,7 +119,7 @@
   {@render under?.()}
   {#if colourCheck}
     <!-- Busbars in their colour: their own, else their distribution's. -->
-    {#each page.elements.filter((e) => e.symbol === "busbar") as el (el.id)}
+    {#each page.elements.filter((e) => isBar(e)) as el (el.id)}
       {@const len = Number(el.params.length) || 0}
       {@const v = el.rot === 90 ? [0, 1] : el.rot === 180 ? [-1, 0] : el.rot === 270 ? [0, -1] : [1, 0]}
       {@const own = String(el.params.colour ?? "")}

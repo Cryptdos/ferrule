@@ -40,7 +40,7 @@
     type WireEnd,
   } from "../../core/ops";
   import { settings } from "../settings.svelte";
-  import { benchOf, localGeometry, defaultParams, formatPoints, partPoints, plantViewLayout, type Geometry } from "../../core/symbols";
+  import { benchOf, isBar, localGeometry, defaultParams, formatPoints, partPoints, plantViewLayout, type Geometry } from "../../core/symbols";
   import { isInputForm, parsePointRef, pointRef } from "../../core/points";
   import {
     GA_ORIGIN,
@@ -1281,11 +1281,11 @@
     if (!sim || !simLive) return [];
     const out: { x1: number; y1: number; x2: number; y2: number; bar: boolean }[] = [];
     for (const el of page.elements) {
-      if (el.symbol !== "busbar") continue;
+      if (!isBar(el)) continue;
       if (!editor.project.conductors.some((x) => x.terminals.some(([id]) => id === el.id) && simLive.has(x.id))) continue;
       const len = Number(el.params.length) || 0;
       const v = el.rot === 90 ? [0, 1] : el.rot === 180 ? [-1, 0] : el.rot === 270 ? [0, -1] : [1, 0];
-      out.push({ x1: el.pos[0], y1: el.pos[1], x2: el.pos[0] + v[0]! * len, y2: el.pos[1] + v[1]! * len, bar: el.params.style !== "control" });
+      out.push({ x1: el.pos[0], y1: el.pos[1], x2: el.pos[0] + v[0]! * len, y2: el.pos[1] + v[1]! * len, bar: el.symbol === "busbar" });
     }
     return out;
   });
@@ -1564,7 +1564,7 @@
       {#if editor.tool === "wire"}
         {#each page.elements as el (el.id)}
           {@const g = geoms.get(el.id)}
-          {#if g && el.symbol !== "busbar"}
+          {#if g && !isBar(el)}
             {#each g.terminals as t (t.name)}
               <circle class="term" cx={el.pos[0] + t.at[0]} cy={el.pos[1] + t.at[1]} r="0.3" />
             {/each}
