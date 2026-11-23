@@ -7,7 +7,7 @@
 import { existsSync } from "node:fs";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 
 export interface PdfRenderer {
   /** Print a page to PDF. */
@@ -87,12 +87,25 @@ export function headlessBrowserRenderer(timeoutMs = 90_000): PdfRenderer {
         ],
         { stdout: "ignore", stderr: "pipe" },
       );
-      const timer = setTimeout(() => proc.kill(), timeoutMs);
+      let timedOut = false;
+      const timer = setTimeout(() => {
+        timedOut = true;
+        proc.kill();
+      }, timeoutMs);
       const code = await proc.exited;
       clearTimeout(timer);
       if (!existsSync(out)) {
-        const err = (await new Response(proc.stderr).text()).trim().split("\n").slice(-3).join(" ");
-        throw new PdfError(`The browser didn't produce the ${ext.toUpperCase()} (exit ${code}). ${err}`.trim());
+        // Name the cause as well as we can (design-v0.2 §11): which browser, and what it said.
+        const said = (await new Response(proc.stderr).text())
+          .split("\n")
+          .map((l) => l.trim())
+          .filter((l) => l && !/^\[\d+:\d+:/.test(l) && !/DevTools listening/.test(l))
+          .slice(-2)
+          .join(" ");
+        const cause = timedOut
+          ? `it was still running after ${Math.round(timeoutMs / 1000)} s and was stopped`
+          : `it stopped with code ${code} without writing a file${said ? `: ${said}` : ""}`;
+        throw new PdfError(`${basename(browser)} (${browser}) couldn't make the ${ext.toUpperCase()}: ${cause}.`);
       }
       return new Uint8Array(await readFile(out));
     } finally {

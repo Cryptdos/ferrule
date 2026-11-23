@@ -12,17 +12,23 @@
     page,
     view,
     viewH,
+    sheet = "",
+    store = "ferrule.atlas",
     onmove,
   }: {
     project: Project;
     page: Page;
     view: { x: number; y: number; w: number };
     viewH: number;
+    /** Which sheet this is, e.g. "3 / 14", shown under the overview (note 10). */
+    sheet?: string;
+    /** Where it remembers being folded away. */
+    store?: string;
     onmove: (x: number, y: number) => void;
   } = $props();
 
   const W = 190;
-  const KEY = "ferrule.atlas";
+  const KEY = store;
   let shown = $state(load());
   function load(): boolean {
     try {
@@ -92,6 +98,7 @@
       {/if}
     </svg>
   {/if}
+  {#if sheet}<div class="sheetno" class:folded={!shown}>Sheet {sheet}</div>{/if}
   <button class="fold" onclick={toggle} title={shown ? "Hide the sheet overview" : "Show the sheet overview"}>{shown ? "–" : "Overview"}</button>
 </div>
 
@@ -111,10 +118,20 @@
   .atlas.folded {
     padding: 0;
   }
+  .sheetno {
+    line-height: 1;
+    font-size: 11px;
+    color: #556;
+    text-align: center;
+    padding: 4px 0 1px;
+  }
+  .sheetno.folded {
+    padding: 4px 70px 4px 8px;
+  }
   svg {
     display: block;
     cursor: pointer;
-    background: #fff;
+    background: var(--paper, #fff);
     overflow: hidden;
   }
   .mini {

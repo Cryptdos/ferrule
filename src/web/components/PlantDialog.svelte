@@ -11,6 +11,8 @@
   let terminals = $state("");
   let info = $state("");
   let pbo = $state(false);
+  /** New plant… opens its own window to fill in (note 52). */
+  let adding = $state(false);
 
   function add(e: SubmitEvent) {
     e.preventDefault();
@@ -25,6 +27,7 @@
       terminals = "";
       info = "";
       pbo = false;
+      adding = false;
     }
   }
 
@@ -58,10 +61,10 @@
     shows. Its tag is its prefix and where its first view is (SEF-3-13, U3-13), given by Renumber like every other tag;
     type a tag yourself to fix it. In labels, <code>{"{plant:SF-01.tag}"}</code> fills in the tag.
   </p>
-  <p class="hint">
-    Group terminals by function with <code>|</code> and a name: <code>L N E | ENABLE: 1 2 | R1: C NO NC | R2: C NO NC</code>.
-    The same terminal names can be used in different groups.
-  </p>
+  <div class="top"><button onclick={() => (adding = true)}>New plant…</button></div>
+  {#if !editor.project.plant.length}
+    <p class="hint">No plant yet. <em>New plant…</em> adds one.</p>
+  {:else}
   <table>
     <thead>
       <tr>
@@ -167,15 +170,31 @@
       {/each}
     </tbody>
   </table>
-  <form onsubmit={add}>
-    <input bind:value={prefix} placeholder="Prefix, e.g. SEF" required />
-    <input bind:value={description} placeholder="Description, e.g. Safety extract fan" />
-    <input bind:value={terminals} placeholder="Terminals, e.g. L N E | ENABLE: 1 2" />
-    <textarea bind:value={info} rows="1" placeholder="Information, e.g. model, 400V 7.5kW"></textarea>
-    <label class="pbo"><input type="checkbox" bind:checked={pbo} /> Power by others</label>
-    <button type="submit">Add plant</button>
-  </form>
+  {/if}
 </Modal>
+
+{#if adding}
+  <Modal title="New plant" store="new-plant" width={520} onclose={() => (adding = false)}>
+    <form onsubmit={add}>
+      <label>Prefix <input bind:value={prefix} placeholder="e.g. SEF" required /></label>
+      <label>Description <input bind:value={description} placeholder="e.g. Safety extract fan" /></label>
+      <label>
+        Terminals and groups
+        <input bind:value={terminals} placeholder="e.g. L N E | ENABLE: 1 2" />
+      </label>
+      <p class="hint">
+        Group terminals by function with <code>|</code> and a name: <code>L N E | ENABLE: 1 2 | R1: C NO NC | R2: C NO NC</code>.
+        The same terminal names can be used in different groups.
+      </p>
+      <label>Information (under the box) <textarea bind:value={info} rows="2" placeholder="e.g. model, 400V 7.5kW"></textarea></label>
+      <label class="pbo"><input type="checkbox" bind:checked={pbo} /> Power by others (its power isn't on these drawings)</label>
+      <div class="buttons">
+        <button type="submit">Add plant</button>
+        <button type="button" onclick={() => (adding = false)}>Cancel</button>
+      </div>
+    </form>
+  </Modal>
+{/if}
 
 <style>
   table {
@@ -237,9 +256,26 @@
     white-space: nowrap;
   }
   form {
-    display: grid;
-    grid-template-columns: 0.6fr 1.5fr 2fr 1.5fr auto auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  form label {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 12px;
+    color: #445;
+  }
+  form label.pbo {
+    flex-direction: row;
+  }
+  .buttons {
+    display: flex;
     gap: 6px;
+  }
+  .top {
+    margin-bottom: 8px;
   }
   .hint {
     font-size: 12px;

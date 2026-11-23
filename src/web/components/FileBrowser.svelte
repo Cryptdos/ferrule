@@ -14,7 +14,8 @@
   }: {
     mode: "open" | "save";
     initialName?: string;
-    onpick: (path: string) => void;
+    /** `replace`: the file is there already and the user said to replace it. */
+    onpick: (path: string, replace?: boolean) => void;
     onclose: () => void;
   } = $props();
 
@@ -48,11 +49,14 @@
   const sepOf = (p: string) => (p.includes("\\") ? "\\" : "/");
   const join = (dir: string, n: string) => (dir.endsWith("/") || dir.endsWith("\\") ? dir + n : dir + sepOf(dir) + n);
 
+  /** A file of that name is already in the folder: ask before replacing it (follow-up 16). */
+  let replacing = $state("");
   function save(e: SubmitEvent) {
     e.preventDefault();
     if (!listing || !name.trim()) return;
     const n = name.trim().replace(/\.ferrule$/i, "") + ".ferrule";
-    onpick(join(listing.path, n));
+    if (listing.files.some((f) => f.name.toLowerCase() === n.toLowerCase())) replacing = n;
+    else onpick(join(listing.path, n));
   }
 </script>
 
@@ -89,6 +93,13 @@
         <span class="ext">.ferrule</span>
         <button type="submit" disabled={!name.trim()}>Save here</button>
       </form>
+      {#if replacing}
+        <div class="replace">
+          <span><strong>{replacing}</strong> is already there. Replace it? The file that's there now is kept as a .bak beside it.</span>
+          <button onclick={() => listing && onpick(join(listing.path, replacing), true)}>Replace it</button>
+          <button onclick={() => (replacing = "")}>Cancel</button>
+        </div>
+      {/if}
     {:else}
       <p class="muted">Ferrule project files end in .ferrule. Click one to open it.</p>
     {/if}
@@ -97,6 +108,20 @@
 </Modal>
 
 <style>
+  .replace {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-top: 8px;
+    padding: 6px 8px;
+    background: #fff6d6;
+    border: 1px solid #d9b84a;
+    border-radius: 4px;
+    font-size: 13px;
+  }
+  .replace span {
+    flex: 1;
+  }
   .places {
     display: flex;
     flex-wrap: wrap;

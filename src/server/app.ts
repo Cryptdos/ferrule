@@ -20,6 +20,10 @@ export interface AppOptions {
   mcp?: McpServer;
   /** Example projects that can be added to the projects folder, by name. */
   examples?: Record<string, () => Promise<import("../core/model").Project>>;
+  /** The command that starts Ferrule, for the Claude Desktop settings on the Status page. */
+  command?: { command: string; args: string[] };
+  /** Stop the server (the Status page's Quit Ferrule). */
+  quit?: () => void;
 }
 
 /** Only pages served from this machine may call /mcp from a browser (DNS-rebinding guard). */
@@ -38,7 +42,7 @@ function fileName(s: string): string {
   return s.replace(/[^A-Za-z0-9._ -]+/g, "-").trim() || "drawing";
 }
 
-export function createApp({ storage, library, devices, assets, version = "dev", pdf, selfUrl, mcp, examples }: AppOptions): Hono {
+export function createApp({ storage, library, devices, assets, version = "dev", pdf, selfUrl, mcp, examples, command, quit }: AppOptions): Hono {
   const app = new Hono();
 
   app.onError((err, c) => {
@@ -50,6 +54,27 @@ export function createApp({ storage, library, devices, assets, version = "dev", 
   });
 
   app.get("/api/health", (c) => c.json({ ok: true, version }));
+
+  // The Status page (design-v0.2 §11): what's running where, and whether Claude is connected.
+  app.get("/api/status", (c) => {
+    const address = selfUrl?.() ?? new URL(c.req.url).origin;
+    return c.json({
+      version,
+      projects: storage.dir,
+      address,
+      mcpUrl: `${address}/mcp`,
+      mcp: mcp?.activity ?? null,
+      command: command ?? null,
+      canQuit: !!quit,
+    });
+  });
+  app.post("/api/quit", (c) => {
+    if (!localOrigin(c.req.header("origin"))) return c.json({ error: "Forbidden origin" }, 403);
+    if (!quit) return c.json({ error: "Quit isn't available here" }, 404);
+    // Answer first, then stop.
+    setTimeout(quit, 200);
+    return c.json({ ok: true });
+  });
 
   app.get("/api/projects", async (c) => c.json(await storage.list()));
 

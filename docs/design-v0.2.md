@@ -432,3 +432,18 @@ Each step is one pull request, with a build to test.
 - **In-line colour (T5)** covers fuses, contacts, isolator and breaker poles (and their auxiliaries), terminals, push buttons and selectors. A busbar's colour wins if the wire also lands on one.
 - **Label width (28):** any part with a label has *Label width* in its properties (0: one line). The incoming supply's label is centred on its arrows when upright and grows upwards from above the conductor names; turned sideways it stays where it was.
 - **Link arrows (71):** on a vertical wire the label starts just right of the tip, with the reference after its first line; on a horizontal wire both go under the arrow, running on the way it points. A destination with *Same label as its source* ticked shows the source's label instead of its own. *Link to a new arrow* points the new one the opposite way to the source, so a wire leaving down the page arrives from the top of the next.
+
+**Step 6 (windows and interface)**
+
+- **Windows:** every dialog (Plant, Distribution, Check, Schedules, Templates, Renumber, Device table, Project…, Save as, the new Settings) is one floating window. Several can be open at once; a new one opens a little down and right of the last. `Esc` closes the window that has the focus; with the focus on the drawing, keys work on the drawing as usual. Properties, Simulation and Help keep their lighter see-through boxes.
+- **Settings and Status** share one window, opened from a gear at the top right. *Project…* is now a text button (its icon was the gear's). The Claude Desktop settings shown are for the program actually running (the .exe's own path), so they can be pasted as they are. "Connected" means a client has said hello since Ferrule started; MCP over HTTP has no open connection to watch.
+- **Top bar:** *Place parts…* isn't a menu: GA's parts to place stay in the browser's *To place*, where they're picked. Simulate shows only the view group and its note. Annotate's tools are all in its parts list (T2), so its tools group is just Select.
+- **Picture and logo (T2):** *Picture* and *Logo* are parts in Annotate's list. A placed picture shows *Picture: choose its file in Properties* until a file is chosen; its properties can switch it between a picture and the project's logo. Paste and drop still work.
+- **Plant view label:** a view that already has a label keeps it, with a note saying to move it, rather than losing what was typed. New views have no label field.
+- **Greyed workbench (8):** drawn at 55% opacity on screen (sections and clouds in Draft; parts, wires and the terminal block in Annotate). Print, PDF and previews are unaffected.
+- **Split (14):** the other half pans by dragging, so it's double-click (or *Edit this sheet*) to work on it, rather than a single click. The divider position is remembered.
+- **Number boxes (42):** scrolling steps a number box only while it has the focus, so the panel still scrolls under the pointer.
+- **Dark interface:** the chrome is turned dark by inverting it (pictures and previews inside are turned back), rather than a second set of colours; the sheet stays paper-coloured.
+- **Export PDF (56):** the error names the browser it tried and why it failed (stopped after 90 s, or what it said), in a window with *Print → Save as PDF*.
+- **Example:** the starter sheets' outgoing link arrows are labelled with the fan's tag (`SF-01 ENABLE`, `SF-01 RUN`), since destinations now show their source's label.
+- **README screenshots** retaken.

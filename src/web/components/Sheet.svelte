@@ -9,6 +9,7 @@
   import { cloudsOn } from "../../core/ops";
   import { cloudPath } from "../../core/titleblock";
   import ElementView from "./ElementView.svelte";
+  import { benchOf } from "../../core/symbols";
   import GaLayer from "./GaLayer.svelte";
   import type { GaItem } from "../../core/model";
   import Frame from "./Frame.svelte";
@@ -27,6 +28,7 @@
     gaPreview = null,
     under,
     over,
+    focus = null,
   }: {
     project: Project;
     page: Page;
@@ -49,7 +51,14 @@
     under?: Snippet;
     /** Extra drawing in grid units, over the elements (ghosts, handles). */
     over?: Snippet;
+    /**
+     * On screen, the workbench being worked in: what can't be picked in it is
+     * drawn grey (note 8). Unset for print and previews.
+     */
+    focus?: "draft" | "annotate" | null;
   } = $props();
+  const dimDraft = $derived(focus === "annotate");
+  const dimAnnotate = $derived(focus === "draft");
 
   // Line weights and text sizes, in grid units, for the styles below.
   const STYLE_VARS = [
@@ -84,7 +93,7 @@
   {/if}
   {#each page.sections as sec (sec.id)}
     {@const r = sectionRects?.get(sec.id) ?? sec.rect}
-    <g class="section">
+    <g class="section" class:dim={dimAnnotate}>
       <rect x={r[0]} y={r[1]} width={r[2]} height={r[3]} />
       {#if sec.label}
         <text x={r[0] + 0.8} y={r[1] + 2}>{resolveFields(sec.label, project)}</text>
@@ -93,13 +102,13 @@
   {/each}
   {#if boundaryY !== null}
     <!-- Panel boundary: the terminal block, full width; its terminals are cells in it. -->
-    <rect class="block" x={BLOCK_INSET} y={boundaryY - blockHalf(page)} width={AREA_UNITS.w - BLOCK_INSET * 2} height={blockHalf(page) * 2} />
+    <rect class="block" class:dim={dimDraft} x={BLOCK_INSET} y={boundaryY - blockHalf(page)} width={AREA_UNITS.w - BLOCK_INSET * 2} height={blockHalf(page) * 2} />
     {#each blockLabels(page) as l (l.x)}
-      <text class="strip" x={l.x} y={boundaryY + 0.42} text-anchor={l.anchor}>{l.text}</text>
+      <text class="strip" class:dim={dimDraft} x={l.x} y={boundaryY + 0.42} text-anchor={l.anchor}>{l.text}</text>
     {/each}
   {/if}
   {@render under?.()}
-  <g class="wires">
+  <g class="wires" class:dim={dimDraft}>
     {#each page.segments as seg (seg.id)}
       {@const pts = routes?.get(seg.id) ?? routeOf(page, seg)}
       {@const c = condById.get(seg.conductor)}
@@ -131,11 +140,13 @@
   {#if page.ga}<GaLayer {project} {page} preview={gaPreview} />{/if}
   {#each page.elements as el (el.id)}
     {@const o = offset?.(el.id)}
-    <ElementView el={ops?.[el.id] ? { ...el, params: { ...el.params, __op: true } } : el} {project} dx={o?.[0] ?? 0} dy={o?.[1] ?? 0} />
+    <g class:dim={focus && benchOf(el) !== focus}>
+      <ElementView el={ops?.[el.id] ? { ...el, params: { ...el.params, __op: true } } : el} {project} dx={o?.[0] ?? 0} dy={o?.[1] ?? 0} />
+    </g>
   {/each}
   {#each clouds as c (c.id)}
     {@const [x, y, w] = c.rect}
-    <g class="cloud">
+    <g class="cloud" class:dim={dimAnnotate}>
       <path d={cloudPath(c.rect)} />
       <polygon points="{x + w + 0.2},{y - 3.2} {x + w + 2.2},{y - 0.2} {x + w - 1.8},{y - 0.2}" />
       <text x={x + w + 0.2} y={y - 0.75} text-anchor="middle">{c.rev}</text>
@@ -146,7 +157,11 @@
 
 <style>
   .paper {
-    fill: #fff;
+    fill: var(--paper, #fff);
+  }
+  /* Not pickable in this workbench: grey, about 55% black, still easy to read. */
+  .dim {
+    opacity: 0.55;
   }
   .wires polyline {
     fill: none;

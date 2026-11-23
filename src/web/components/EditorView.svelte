@@ -34,20 +34,22 @@
   import SplitPane from "./SplitPane.svelte";
   import TemplatesDialog from "./TemplatesDialog.svelte";
   import SimPanel from "./SimPanel.svelte";
+  import SettingsDialog from "./SettingsDialog.svelte";
+  import Modal from "./Modal.svelte";
   import { Simulator } from "../sim.svelte";
 
   let { editor, onclose, onopen }: { editor: Editor; onclose: () => void; onopen?: (id: string) => void } = $props();
   let savingAs = $state(false);
 
-  async function saveAs(path: string) {
+  async function saveAs(path: string, replace = false) {
     savingAs = false;
     await editor.saveNow();
     try {
       let id: string;
       try {
-        id = (await api.saveAs(editor.project.id, path)).id;
+        id = (await api.saveAs(editor.project.id, path, replace)).id;
       } catch (e) {
-        // Already a file there: replace it if asked to (the old one is kept as .bak).
+        // Already a file there (made since the folder was listed): replace it if asked to (the old one is kept as .bak).
         if (!(e instanceof ApiError && e.status === 409)) throw e;
         if (!confirm(`${e.message}. Replace it? (The file that's there now is kept as a .bak beside it.)`)) return;
         id = (await api.saveAs(editor.project.id, path, true)).id;
@@ -60,6 +62,19 @@
   }
 
   let canvas: Canvas | undefined = $state();
+  let mainEl: HTMLElement | undefined = $state();
+  let dividerDrag = false;
+  /** Share of the width the working sheet takes in the split view. */
+  let splitAt = $state(
+    (() => {
+      try {
+        const v = Number(localStorage.getItem("ferrule.split"));
+        return v > 0.1 && v < 0.9 ? v : 0.5;
+      } catch {
+        return 0.5;
+      }
+    })(),
+  );
 
   // Text left empty disappears when you click away from it: an empty box is invisible on the sheet.
   let lastSelected: { page: string; ids: string[] } = { page: "", ids: [] };
@@ -77,7 +92,11 @@
     });
   });
   let showProject = $state(false);
-  let dialog: "plant" | "distribution" | "checks" | "schedules" | "templates" | "renumber" | "devices" | null = $state(null);
+  /** Open windows: they don't block the drawing, and several can be open at once. */
+  type DialogName = "plant" | "distribution" | "checks" | "schedules" | "templates" | "renumber" | "devices" | "settings";
+  let open: Partial<Record<DialogName, boolean>> = $state({});
+  /** Export PDF failed: what went wrong, with the Print way round it. */
+  let pdfError = $state("");
   let tableView = $state(false);
   let help = $state(false);
   let browserWidth = $state(0);
@@ -130,6 +149,8 @@
     const pages = editor.project.pages;
     const next = pages[editor.pageIndex + 1] ?? pages[editor.pageIndex - 1] ?? pages[editor.pageIndex]!;
     editor.splitPageId = next.id;
+    // The working half is narrower now: fit the sheet to it.
+    setTimeout(() => canvas?.fit(), 60);
   }
   let exporting = $state(false);
 
@@ -150,7 +171,7 @@
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
     } catch (e) {
-      editor.flash(`PDF export failed: ${(e as Error).message}`);
+      pdfError = (e as Error).message;
     } finally {
       exporting = false;
     }
@@ -158,7 +179,7 @@
 
   function doRenumber() {
     // Show what would change first; nothing changes until it's applied.
-    dialog = "renumber";
+    open.renumber = true;
   }
 
   async function print() {
@@ -171,8 +192,11 @@
   );
 
 
+  const inWindow = (t: EventTarget | null) => t instanceof Element && !!t.closest('[role="dialog"]');
+
   function onKey(e: KeyboardEvent) {
-    if (isTyping(e.target) || showProject || dialog || tableView || savingAs) return;
+    // Windows don't block the drawing: keys work on it unless a window has the focus.
+    if (isTyping(e.target) || inWindow(e.target) || tableView) return;
     const ctrl = e.ctrlKey || e.metaKey;
     // GA: move, turn and delete layout items.
     if (editor.mode === "ga") {
@@ -301,7 +325,7 @@
   onkeydown={onKey}
   onpaste={(e) => {
     // Ctrl+V with a picture on the clipboard puts it on the sheet (Annotate).
-    if (editor.mode === "simulate" || editor.mode === "ga" || isTyping(e.target) || showProject || dialog) return;
+    if (editor.mode === "simulate" || editor.mode === "ga" || isTyping(e.target) || inWindow(e.target) || showProject) return;
     const files = [...(e.clipboardData?.files ?? [])].filter((f) => f.type.startsWith("image/"));
     if (!files.length) return;
     e.preventDefault();
@@ -329,22 +353,19 @@
       </div>
       <span class="grow"></span>
       <div class="group">
-        <button class="icon" onclick={() => (showProject = true)} title="Project details, logo and revisions (title block)"><Icon name="settings" /></button>
+        <button onclick={() => (showProject = true)} title="Project details, logo and revisions (title block)">Project…</button>
         <button class="icon" onclick={() => (savingAs = true)} title="Save as… (a copy of this project, to a file anywhere)"><Icon name="saveAs" /></button>
         <button class="icon" onclick={exportPdf} disabled={exporting} title={exporting ? "Exporting…" : "Export PDF: every sheet as an A4 PDF"}><Icon name="pdf" /></button>
         <button class="icon" onclick={print} title="Print (opens the print view)"><Icon name="print" /></button>
         <span class="sep"></span>
         <button class="icon" class:active={help} onclick={() => (help = !help)} title="Keyboard and mouse help"><Icon name="help" /></button>
+        <button class="icon" class:active={!!open.settings} onclick={() => (open.settings = !open.settings)} title="Settings, and Status: Claude's connection, Quit Ferrule"><Icon name="gear" /></button>
       </div>
       <span class="status" class:error={editor.saveState === "error"}>{saveText}</span>
     </div>
     <div class="row two">
-      {#if editor.mode === "simulate"}
-        <button class="icon" onclick={() => canvas?.fit()} title="Fit sheet (tap Space)"><Icon name="fit" /></button>
-        <button class="icon" class:active={!!editor.splitPageId} onclick={toggleSplit} title="Show another sheet alongside"><Icon name="split" /></button>
-        <span class="sep"></span>
-        <span class="simnote">Simulating: click switches and buttons on the drawing; double-click to follow a link. Editing is off.</span>
-      {:else}
+      <!-- The same order on every workbench (§10): tools, undo and redo, view, menus. -->
+      {#if editor.mode !== "simulate"}
         <button class="icon" class:active={editor.tool === "select"} onclick={() => ((editor.tool = "select"), (editor.placeSymbol = null), (editor.gaPlace = null))} title="Select (S)">
           <Icon name="select" />
         </button>
@@ -359,56 +380,64 @@
           <button class="tool" class:active={editor.tool === "ga-trunking"} onclick={() => ((editor.tool = "ga-trunking"), (editor.gaPlace = null))} title="Drag out a run of trunking">
             <Icon name="trunking" /> Trunking
           </button>
-          <span class="sep"></span>
-          <button class="tool" onclick={() => (dialog = "devices")} title="Real devices with their sizes, datasheets and pictures">
-            <Icon name="library" /> Device table
-          </button>
-        {:else if editor.mode === "annotate"}
-          <button class="tool" class:active={editor.tool === "section"} onclick={() => ((editor.tool = "section"), (editor.placeSymbol = null))} title="Draw a section box (B)">
-            <Icon name="section" /> Section
-          </button>
-          <button class="tool" class:active={editor.tool === "cloud"} onclick={() => ((editor.tool = "cloud"), (editor.placeSymbol = null))} title="Cloud a change for the latest revision">
-            <Icon name="cloud" /> Cloud
-          </button>
-          <label class="tool" title="Add a picture (or paste one with Ctrl+V, or drop one on the sheet)">
-            <Icon name="picture" /> Picture
-            <input
-              type="file"
-              accept="image/*"
-              hidden
-              onchange={(e) => {
-                const files = [...(e.currentTarget.files ?? [])];
-                e.currentTarget.value = "";
-                if (files.length) void canvas?.placePictures(files);
-              }}
-            />
-          </label>
         {/if}
         <span class="sep"></span>
         <button class="icon" disabled={!editor.canUndo} onclick={() => editor.undo()} title="Undo (Ctrl+Z)"><Icon name="undo" /></button>
         <button class="icon" disabled={!editor.canRedo} onclick={() => editor.redo()} title="Redo (Ctrl+Y)"><Icon name="redo" /></button>
         <span class="sep"></span>
-        <button class="icon" onclick={() => canvas?.fit()} title="Fit sheet (tap Space)"><Icon name="fit" /></button>
-        <button class="icon" class:active={!!editor.splitPageId} onclick={toggleSplit} title="Show another sheet alongside"><Icon name="split" /></button>
-        {#if editor.mode === "draft"}
-          <button class="icon" class:active={tableView} onclick={() => (tableView = !tableView)} title="Table: every element in the project"><Icon name="table" /></button>
-          <span class="sep"></span>
-          <button onclick={doRenumber} title="See what Renumber would change to tags, terminal and wire numbers, then apply">Renumber</button>
-          <button onclick={() => (dialog = "templates")} title="Save and stamp sheet and section templates">Templates</button>
-          <button onclick={() => (dialog = "plant")} title="Field equipment: define plant and place views">Plant</button>
-          <button onclick={() => (dialog = "distribution")} title="The supplies busbars, link arrows and the incoming supply pick from">Distribution</button>
-          <button onclick={() => (dialog = "checks")} title="Check the drawing for problems">Check</button>
-          <button onclick={() => (dialog = "schedules")} title="Terminal and cable schedules">Schedules</button>
-        {/if}
+      {/if}
+      <button class="icon" onclick={() => canvas?.fit()} title="Fit sheet (tap Space)"><Icon name="fit" /></button>
+      <button class="icon" class:active={!!editor.splitPageId} onclick={toggleSplit} title="Show another sheet alongside"><Icon name="split" /></button>
+      {#if editor.mode === "draft"}
+        <button class="icon" class:active={tableView} onclick={() => (tableView = !tableView)} title="Table: every element in the project"><Icon name="table" /></button>
+      {/if}
+      {#if editor.mode === "simulate"}
+        <span class="sep"></span>
+        <span class="simnote">Simulating: click switches and buttons on the drawing; double-click to follow a link. Editing is off.</span>
+      {:else if editor.mode === "draft"}
+        <span class="sep"></span>
+        <button onclick={doRenumber} title="See what Renumber would change to tags, terminal and wire numbers, then apply">Renumber</button>
+        <button onclick={() => (open.templates = true)} title="Save and stamp sheet and section templates">Templates</button>
+        <button onclick={() => (open.plant = true)} title="Field equipment: define plant and place views">Plant</button>
+        <button onclick={() => (open.distribution = true)} title="The supplies busbars, link arrows and the incoming supply pick from">Distribution</button>
+        <button onclick={() => (open.checks = true)} title="Check the drawing for problems">Check</button>
+        <button onclick={() => (open.schedules = true)} title="Terminal and cable schedules">Schedules</button>
+      {:else if editor.mode === "ga"}
+        <span class="sep"></span>
+        <button onclick={() => (open.devices = true)} title="Real devices with their sizes, datasheets and pictures">Device table…</button>
       {/if}
     </div>
   </header>
-  <main class:split={!!editor.splitPageId && !tableView}>
+  <main class:split={!!editor.splitPageId && !tableView} style:--split={splitAt} bind:this={mainEl}>
     {#if tableView}
       <TableView {editor} onclose={() => (tableView = false)} />
     {:else}
       <div class="pane"><Canvas bind:this={canvas} {editor} {sim} insetLeft={browserWidth} atlas /></div>
       {#if editor.splitPageId}
+        <!-- Drag the divider to share the width between the two sheets (note 14). -->
+        <div
+          class="divider"
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Drag to resize the split"
+          onpointerdown={(e) => {
+            e.currentTarget.setPointerCapture(e.pointerId);
+            dividerDrag = true;
+          }}
+          onpointermove={(e) => {
+            if (!dividerDrag || !mainEl) return;
+            const r = mainEl.getBoundingClientRect();
+            splitAt = Math.min(0.85, Math.max(0.15, (e.clientX - r.left) / r.width));
+          }}
+          onpointerup={() => {
+            dividerDrag = false;
+            try {
+              localStorage.setItem("ferrule.split", String(splitAt));
+            } catch {
+              /* storage may be unavailable */
+            }
+          }}
+        ></div>
         <div class="pane"><SplitPane {editor} /></div>
       {/if}
       <Browser {editor} bind:width={browserWidth} />
@@ -418,7 +447,7 @@
         {#if gaSelected || editor.sheetSettings}
           <FloatBox title={gaSelected ? "Properties" : "Sheet"} store="props" onclose={closeProps}>
             {#if editor.sheetSettings && !gaSelected}<SheetProps {editor} />{/if}
-            <GaProps {editor} ondevices={() => (dialog = "devices")} />
+            <GaProps {editor} ondevices={() => (open.devices = true)} />
           </FloatBox>
         {/if}
       {:else if editor.selection.length || editor.sheetSettings}
@@ -429,7 +458,7 @@
       {#if help}
         <FloatBox title="Help" store="help" top={162} right={344} width={280} onclose={() => (help = false)}>
           <div class="help">
-            <p>Pick a part in the browser and click to place it. Drag to move, <kbd>R</kbd> rotate, <kbd>Del</kbd> delete, <kbd>Ctrl</kbd>+<kbd>D</kbd> duplicate, arrows nudge.</p>
+            <p>Pick a part in the browser and click to place it; then it's back to Select (or keep placing until <kbd>Esc</kbd>: Settings). Drag to move, <kbd>R</kbd> rotate, <kbd>Del</kbd> delete, <kbd>Ctrl</kbd>+<kbd>D</kbd> duplicate, arrows nudge.</p>
             <p>Scroll to zoom, middle-drag or <kbd>Space</kbd>+drag to pan; tap <kbd>Space</kbd> to fit the sheet. <kbd>R</kbd> rotates, <kbd>F</kbd> flips top to bottom. Drag the outline in the overview (top right) to move about.</p>
             <p><kbd>W</kbd> wire tool: click a terminal, then another; click on a wire to tee into it. <kbd>Esc</kbd> cancels, <kbd>S</kbd> back to select.</p>
             <p><kbd>PgUp</kbd>/<kbd>PgDn</kbd> change sheet. Double-click a contact, coil or link arrow to jump to its partner.</p>
@@ -454,25 +483,49 @@
   <FileBrowser
     mode="save"
     initialName={editor.project.project.title}
-    onpick={(path) => void saveAs(path)}
+    onpick={(path, replace) => void saveAs(path, replace)}
     onclose={() => (savingAs = false)}
   />
 {/if}
-{#if dialog === "distribution"}
-  <DistributionDialog {editor} onclose={() => (dialog = null)} />
+{#if open.distribution}
+  <DistributionDialog {editor} onclose={() => (open.distribution = false)} />
 {/if}
-{#if dialog === "plant"}
-  <PlantDialog {editor} onclose={() => (dialog = null)} />
-{:else if dialog === "renumber"}
-  <RenumberDialog {editor} onclose={() => (dialog = null)} />
-{:else if dialog === "checks"}
-  <ChecksDialog {editor} onclose={() => (dialog = null)} />
-{:else if dialog === "templates"}
-  <TemplatesDialog {editor} onclose={() => (dialog = null)} />
-{:else if dialog === "devices"}
-  <DevicesDialog {editor} onclose={() => (dialog = null)} />
-{:else if dialog === "schedules"}
-  <SchedulesDialog {editor} onclose={() => (dialog = null)} />
+{#if open.plant}
+  <PlantDialog {editor} onclose={() => (open.plant = false)} />
+{/if}
+{#if open.renumber}
+  <RenumberDialog {editor} onclose={() => (open.renumber = false)} />
+{/if}
+{#if open.checks}
+  <ChecksDialog {editor} onclose={() => (open.checks = false)} />
+{/if}
+{#if open.templates}
+  <TemplatesDialog {editor} onclose={() => (open.templates = false)} />
+{/if}
+{#if open.devices}
+  <DevicesDialog {editor} onclose={() => (open.devices = false)} />
+{/if}
+{#if open.schedules}
+  <SchedulesDialog {editor} onclose={() => (open.schedules = false)} />
+{/if}
+{#if open.settings}
+  <SettingsDialog onclose={() => (open.settings = false)} />
+{/if}
+{#if pdfError}
+  <Modal title="Export PDF" store="pdf-error" width={520} onclose={() => (pdfError = "")}>
+    <p>The PDF couldn't be made.</p>
+    <p class="cause">{pdfError}</p>
+    <p>The print view makes the same A4 sheets: choose <strong>Save as PDF</strong> as the printer.</p>
+    <div class="buttons">
+      <button
+        onclick={() => {
+          pdfError = "";
+          void print();
+        }}>Print → Save as PDF</button
+      >
+      <button onclick={() => (pdfError = "")}>Close</button>
+    </div>
+  </Modal>
 {/if}
 {#if showProject}
   <ProjectDialog {editor} onclose={() => (showProject = false)} />
@@ -505,8 +558,7 @@
     background: #fbfbfc;
     border-top: 1px solid #e3e6e9;
   }
-  header button,
-  header label.tool {
+  header button {
     white-space: nowrap;
     flex: none;
   }
@@ -608,7 +660,30 @@
     min-height: 0;
   }
   main.split {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, calc(var(--split) * 100%)) 6px minmax(0, 1fr);
+  }
+  .divider {
+    cursor: col-resize;
+    background: var(--chrome, #e4e7ea);
+    border-left: 1px solid #b9c0c6;
+    border-right: 1px solid #b9c0c6;
+    touch-action: none;
+  }
+  .divider:hover {
+    background: #c9d3e0;
+  }
+  .cause {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 12px;
+    background: #f4f5f6;
+    border: 1px solid #dde1e5;
+    border-radius: 4px;
+    padding: 6px 8px;
+    word-break: break-word;
+  }
+  .buttons {
+    display: flex;
+    gap: 6px;
   }
   .pane {
     position: relative;

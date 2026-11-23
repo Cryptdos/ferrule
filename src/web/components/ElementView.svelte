@@ -39,7 +39,7 @@
   {:else}
     <rect class="missing" x={el.pos[0] + dx} y={el.pos[1] + dy} width={geom.body.w} height={geom.body.h} />
     <text class="missing-text" x={el.pos[0] + dx + geom.body.w / 2} y={el.pos[1] + dy + geom.body.h / 2} text-anchor="middle"
-      >{el.params.asset === "@logo" ? "Logo: add one under Project…" : "Picture missing"}</text
+      >{el.params.asset === "@logo" ? "Logo: add one under Project…" : el.params.asset ? "Picture missing" : "Picture: choose its file in Properties"}</text
     >
   {/if}
 {:else}

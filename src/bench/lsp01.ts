@@ -189,7 +189,8 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
   const ovLocal = add("busbar", 36, 58, { params: { style: "control", length: 50 } });
   w([qFan, "14"], tap(cctLocal, 36));
   w([qFan, "24"], tap(ovLocal, 36));
-  const enOut = arrowOut(46, 33, "ENABLE");
+  // Destinations show their source's label, so the starter's arrows say whose they are.
+  const enOut = arrowOut(46, 33, `${tag(SF1.id)}\nENABLE`);
   const enIn = arrowIn(46, 40, "ENABLE");
   const kmCoil = add("coil", 46, 50, { label: `${tag(SF1.id)}\nCONTACTOR`, params: { type: "contactor" } });
   w(tap(cctLocal, 46), [enOut, "1"]);
@@ -203,7 +204,7 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
   w([hRun, "-V"], tap(ovLocal, 62));
   linkContact(p, kmRun.id, kmCoil.id);
   const kmSig = add("contact-no", 78, 35);
-  const runOut = arrowOut(78, 45, "RUN SIGNAL");
+  const runOut = arrowOut(78, 45, `${tag(SF1.id)}\nRUN`);
   w(tap(cctLocal, 78), [kmSig, "13"]);
   w([kmSig, "14"], [runOut, "1"]);
   linkContact(p, kmSig.id, kmCoil.id);

@@ -1570,8 +1570,8 @@ const SYMBOLS: SymbolDef[] = [
     bench: "annotate",
     name: "Picture",
     group: "Drawing",
-    // Pasted (Ctrl+V) or dropped onto the sheet; not placed from the palette.
-    palette: false,
+    // Placed from the list like any part (its file chosen in its properties), or pasted or dropped onto the sheet.
+    palette: true,
     params: [
       { key: "asset", label: "Picture", type: "text", default: "", hidden: true },
       { key: "w", label: "Width (units)", type: "number", min: 2, max: 200, default: 30 },

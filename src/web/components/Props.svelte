@@ -22,7 +22,9 @@
     updateElement,
     type ElementPatch,
     plantLabel,
+    addAsset,
   } from "../../core/ops";
+  import { readImage } from "../images";
   import { address, contactMarks, contactType, isMaster, isSlave, masterOf, partnerOf, slavesOf } from "../../core/xref";
   import { paramApplies, requireSymbol, terminalNames } from "../../core/symbols";
   import { WIRE_COLOURS, WIRE_FUNCTIONS } from "../../core/wirecolours";
@@ -179,7 +181,48 @@
           ? "Lists the project's revisions: add and edit them under Project settings."
           : "One of each part drawn in the project, by name. It keeps itself up to date."}
       </p>
+    {:else if one.symbol === "image"}
+      <!-- A picture is placed like any part; its file is chosen here (T2). -->
+      {@const shown = String(one.params.asset ?? "")}
+      <label>
+        Shows
+        <select
+          value={shown === "@logo" ? "logo" : "picture"}
+          onchange={(e) => setParam("asset", e.currentTarget.value === "logo" ? "@logo" : "")}
+        >
+          <option value="picture">A picture</option>
+          <option value="logo">The project's logo (set under Project…)</option>
+        </select>
+      </label>
+      {#if shown !== "@logo"}
+        <label class="filepick">
+          {shown && editor.project.assets?.[shown] ? `Picture: ${editor.project.assets[shown]!.name ?? "chosen"}` : "No picture chosen yet"}
+          <span class="button">Choose a picture…</span>
+          <input
+            type="file"
+            accept="image/*"
+            hidden
+            onchange={async (e) => {
+              const f = e.currentTarget.files?.[0];
+              e.currentTarget.value = "";
+              if (!f) return;
+              try {
+                const img = await readImage(f);
+                const id = one.id;
+                editor.apply((p) => updateElement(p, editor.pageId, id, { params: { asset: addAsset(p, img) } }));
+              } catch (err) {
+                editor.flash((err as Error).message);
+              }
+            }}
+          />
+        </label>
+      {/if}
+    {:else if one.symbol === "plant-view" && !one.label}
+      <!-- No label of its own: the box shows the plant's tag, description and information, set in Plant. -->
     {:else if one.symbol !== "junction"}
+      {#if one.symbol === "plant-view"}
+        <p class="hint">Plant views no longer have their own label: what it says belongs in the plant's information (Plant) or a Text annotation. Clear it to remove it.</p>
+      {/if}
       <label>
         {one.symbol === "plate" ? "Text" : "Label"}
         <FieldInput
@@ -692,6 +735,16 @@
     display: flex;
     gap: 6px;
     margin-top: 4px;
+  }
+  .filepick .button {
+    display: inline-block;
+    margin-top: 3px;
+    border: 1px solid #b9c0c6;
+    border-radius: 4px;
+    padding: 3px 10px;
+    cursor: pointer;
+    font-size: 13px;
+    align-self: flex-start;
   }
   .hint {
     font-size: 12px;
