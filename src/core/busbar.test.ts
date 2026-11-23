@@ -122,3 +122,22 @@ describe("wire colour from the busbar", () => {
     expect(colourOf(w1)).toBe("Rd");
   });
 });
+
+describe("busbar colour on the drawing", () => {
+  test("a wire of its busbar's colour doesn't print it, unless the busbar shows it; a different colour prints", async () => {
+    const { setConductorInfo } = await import("./ops");
+    const { hiddenColours } = await import("./wires");
+    const { p, pg } = project();
+    const cct = addDistribution(p, { name: "CCT", kind: "line", colour: "Rd" });
+    const bus = addElement(p, pg, "busbar", [0, 10], { params: { style: "control", dist: cct.id, length: 60 } });
+    const h = addElement(p, pg, "lamp", [20, 40]);
+    const k = addElement(p, pg, "coil", [40, 40]);
+    const w1 = connect(p, pg, [bus.id, "20"], [h.id, "V+"]);
+    const w2 = connect(p, pg, [bus.id, "40"], [k.id, "A1"]);
+    expect(hiddenColours(p).has(w1.conductor)).toBe(true);
+    setConductorInfo(p, w2.conductor, { colour: "Bu" });
+    expect(hiddenColours(p).has(w2.conductor)).toBe(false);
+    bus.params.showColour = true;
+    expect(hiddenColours(p).has(w1.conductor)).toBe(false);
+  });
+});
