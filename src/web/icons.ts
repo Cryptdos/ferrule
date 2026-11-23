@@ -35,6 +35,8 @@ export const ICONS = {
   picture: '<rect x="3" y="5" width="18" height="14" rx="1"/><circle cx="9" cy="10" r="1.6"/><path d="M4 18l5-5 4 4 3-3 4 4"/>',
   rail: '<path d="M3 10h18M3 14h18"/><path d="M6 10v4M10 10v4M14 10v4M18 10v4"/>',
   trunking: '<rect x="3" y="8" width="18" height="8"/><path d="M6 8v8M9 8v8M12 8v8M15 8v8M18 8v8"/>',
+  dimension: '<path d="M4 7v10M20 7v10M4 12h16"/><path d="M3 13l2-2M19 13l2-2"/>',
+  plate: '<rect x="3" y="8" width="18" height="8" rx="1"/><rect x="5" y="10" width="14" height="4"/>',
   note: '<path d="M5 4h14v12l-4 4H5z"/><path d="M15 20v-4h4"/><path d="M8 9h8M8 12.5h5"/>',
   library: '<path d="M4 4h4v16H4zM10 4h4v16h-4z"/><path d="M16 5l3.5-1 3 15.5-3.5 1z"/>',
 } as const;

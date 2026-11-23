@@ -9,7 +9,7 @@
    * The floating browser over the left of the drawing: sheets (each folding
    * open to what's on it) and the workbench's parts. Folds away to a tab.
    */
-  let { editor, width = $bindable(0) }: { editor: Editor; width?: number } = $props();
+  let { editor, width = $bindable(0), onplace }: { editor: Editor; width?: number; onplace?: () => void } = $props();
 
   const KEY = "ferrule.browser";
   type State = { shown: boolean; sheets: boolean; parts: boolean };
@@ -39,7 +39,7 @@
     if (!st.shown) width = 0;
   });
 
-  const partsTitle = $derived(editor.mode === "ga" ? "To place" : editor.mode === "annotate" ? "Annotations" : "Parts");
+  const partsTitle = $derived(editor.mode === "ga" ? "GA tools" : editor.mode === "annotate" ? "Annotations" : "Parts");
   const hasParts = $derived(editor.mode !== "simulate");
 </script>
 
@@ -58,7 +58,7 @@
         <button class="sec" onclick={() => ((st.parts = !st.parts), save())}>{st.parts ? "▾" : "▸"} {partsTitle}</button>
         {#if st.parts}
           <div class="scroll">
-            {#if editor.mode === "ga"}<GaPanel {editor} />{:else}<Palette {editor} />{/if}
+            {#if editor.mode === "ga"}<GaPanel {editor} {onplace} />{:else}<Palette {editor} />{/if}
           </div>
         {/if}
       </section>

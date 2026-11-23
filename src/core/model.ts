@@ -112,22 +112,47 @@ export interface Page {
 export interface GaSettings {
   /** Drawn at 1:scale. */
   scale: number;
-  /** Inside of the enclosure (or the door), mm. */
+  /** Inside of the enclosure, or the door, mm. A door view of another sheet's door takes that door's size. */
   enclosure: { w: number; h: number };
-  view: "backplate" | "door";
+  /**
+   * What the sheet shows: the backplate, the door from the front (what the
+   * operator sees) or the door from inside (mirrored: what's mounted through
+   * it, and any rail or trunking on the door).
+   */
+  view: GaView;
+  /** Door front: its leaves, left to right as seen from the front (one or two). Unset: one leaf, hinged on the left. */
+  leaves?: DoorLeaf[];
+  /** Door views: the leaf this sheet shows (0: the left one from the front, 1: the right one). Unset: the whole door. */
+  leaf?: 0 | 1;
+  /**
+   * A door view of the door drawn on another sheet: that door-front sheet's id.
+   * Always set on a door back; on a door front it shows one leaf of a door
+   * laid out elsewhere. The door's devices and label plates come from there.
+   */
+  of?: string;
 }
 
-/** Something on a GA sheet, in real mm from the enclosure's top-left corner. */
+export type GaView = "backplate" | "door-front" | "door-back";
+
+export interface DoorLeaf {
+  /** Width, mm. The leaves add up to the door's width. */
+  w: number;
+  hinge: "left" | "right";
+}
+
+/** Something on a GA sheet, in real mm from the enclosure's (or door's) top-left corner, as the sheet sees it. */
 export interface GaItem {
   id: string;
-  kind: "rail" | "trunking" | "device";
+  kind: "rail" | "trunking" | "device" | "label" | "dim";
   x: number;
   y: number;
   w: number;
   h: number;
   /** Schematic elements this is (a device, or every terminal of a strip). */
   refs?: string[];
-  /** A label for a device, instead of its tag. */
+  /** Which part of the device: its door handle (an isolator worked through the door) rather than its body. */
+  part?: "handle";
+  /** A label for a device, instead of its tag; a label plate's engraving. */
   text?: string;
   /** The device from the project's device table it is (its size came from there). */
   device?: string;
@@ -135,6 +160,35 @@ export interface GaItem {
   strip?: string;
   /** A strip's terminals when its GA sheet was last open: Check reports a strip that has changed since. */
   seen?: string[];
+  /** A door device's cut-out, as written: "22.3" (a round hole, mm) or "92 x 92". Shown on the door back. */
+  cutout?: string;
+  /** A label plate's engraved text height, mm. */
+  textMm?: number;
+  /** A dimension: what it measures and where its line is (x, y, w and h are its extent, worked out). */
+  dim?: GaDim;
+}
+
+/** A horizontal or vertical dimension on a GA, in mm from the GA's own scale. */
+export interface GaDim {
+  axis: "h" | "v";
+  /** Chain: the gaps along a run. Baseline: each point's distance from the first. */
+  style: "chain" | "baseline";
+  /** The points measured, in order along the axis. */
+  points: GaDimPoint[];
+  /** Where the (first) dimension line is, across the axis, mm. */
+  at: number;
+}
+
+/**
+ * A point a dimension measures to: an edge or the middle of an item (so the
+ * dimension follows it when it moves), or the enclosure's edge ("@encl").
+ * `v` is the position along the axis, kept for a point on nothing or an
+ * item that has gone.
+ */
+export interface GaDimPoint {
+  v: number;
+  item?: string;
+  edge?: "start" | "mid" | "end";
 }
 
 /** A piece of field equipment, defined once with all its terminals (DESIGN.md §6). */

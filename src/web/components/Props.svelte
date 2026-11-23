@@ -217,6 +217,14 @@
           />
         </label>
       {/if}
+    {:else if ["arrow", "highlight", "callout", "polygon"].includes(one.symbol)}
+      <p class="hint">
+        {one.symbol === "polygon" || one.symbol === "arrow"
+          ? "Drag a corner's square to move it."
+          : one.symbol === "highlight"
+            ? "Drag the corner square to size it."
+            : "Call-outs number 1, 2, 3… on each sheet as they're placed."}
+      </p>
     {:else if one.symbol === "plant-view" && !one.label}
       <!-- No label of its own: the box shows the plant's tag, description and information, set in Plant. -->
     {:else if one.symbol !== "junction"}

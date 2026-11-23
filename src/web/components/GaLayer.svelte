@@ -1,10 +1,25 @@
 <script lang="ts">
-  import type { GaItem, Page, Project } from "../../core/model";
-  import { GA_ORIGIN, mmToUnits } from "../../core/ga";
+  import type { Element, GaItem, Page, Project } from "../../core/model";
+  import {
+    GA_ORIGIN,
+    cutoutText,
+    dimLayout,
+    doorOwner,
+    drawnGaItems,
+    gaFrame,
+    gaSize,
+    isDoorView,
+    mmToUnits,
+    parseCutout,
+    scaleText,
+    sheetLeaves,
+    type DrawnGaItem,
+  } from "../../core/ga";
   import { textUnits } from "../../core/geometry";
   import { displayTag } from "../../core/tags";
+  import { resolveFields } from "../../core/fields";
 
-  /** A GA sheet's enclosure and items, drawn at its scale (grid units, like the rest of the sheet). */
+  /** A GA sheet's enclosure (or door) and items, drawn at its scale (grid units, like the rest of the sheet). */
   let {
     project,
     page,
@@ -17,10 +32,20 @@
   } = $props();
 
   const ga = $derived(page.ga!);
-  const u = (mm: number) => mmToUnits(ga, mm);
-  const W = $derived(u(ga.enclosure.w));
-  const H = $derived(u(ga.enclosure.h));
+  const frame = $derived(gaFrame(project, page));
+  const size = $derived(gaSize(project, page));
+  const u = (mm: number) => mmToUnits(frame, mm);
+  const X = (mm: number) => GA_ORIGIN[0] + u(mm - frame.x0);
+  const Y = (mm: number) => GA_ORIGIN[1] + u(mm);
+  const W = $derived(u(frame.w));
+  const H = $derived(u(frame.h));
   const byId = $derived(new Map(project.pages.flatMap((pg) => pg.elements.map((e) => [e.id, e]))));
+  const drawn = $derived(
+    drawnGaItems(project, page).map((d): DrawnGaItem => (d.own && preview?.get(d.it.id) ? { ...d, it: preview.get(d.it.id)! } : d)),
+  );
+  const door = $derived(isDoorView(ga.view));
+  const leaves = $derived(sheetLeaves(project, page).filter((l) => l.x + l.w > frame.x0 + 0.01 && l.x < frame.x0 + frame.w - 0.01));
+  const owner = $derived(doorOwner(project, page));
 
   /** What a device says: its tag(s), or its own text. */
   function label(it: GaItem): string {
@@ -29,6 +54,13 @@
     if (!els.length) return it.refs?.length ? "(deleted)" : "";
     if (els[0]!.symbol === "terminal") return String(els[0]!.params.strip ?? "X1");
     return displayTag(els[0]!, project);
+  }
+  /** The schematic part a door device is drawn from, if it's one. */
+  function doorPart(it: GaItem): { el: Element; kind: "lamp" | "pushbutton" | "selector" | "handle" } | null {
+    const el = it.refs?.length === 1 ? byId.get(it.refs[0]!) : undefined;
+    if (!el) return null;
+    if (it.part === "handle") return { el, kind: "handle" };
+    return el.symbol === "lamp" || el.symbol === "pushbutton" || el.symbol === "selector" ? { el, kind: el.symbol } : null;
   }
   /**
    * How a device's label fits: centred, across the longer side if it won't fit
@@ -39,16 +71,22 @@
   const CHAR = 0.62;
   const BEST = textUnits("tag");
   const SMALLEST = textUnits("detail");
-  function fitLabel(text: string, w: number, h: number): { size: number; vertical: boolean; halo: boolean } {
+  function fitLabel(text: string, w: number, h: number, best = BEST): { size: number; vertical: boolean; halo: boolean } {
     const n = Math.max(1, text.length);
-    const fits = (len: number, across: number) => Math.min(BEST, (len * 0.9) / (n * CHAR), across * 1.15);
+    const fits = (len: number, across: number) => Math.min(best, (len * 0.9) / (n * CHAR), across * 1.15);
     const flat = fits(w, h);
     const up = fits(h, w);
     const vertical = up > flat + 0.05;
     const size = vertical ? up : flat;
     return { size: Math.max(SMALLEST, size), vertical, halo: size < SMALLEST };
   }
-  const scaleText = $derived(Number.isInteger(ga.scale) ? `1:${ga.scale}` : `1:${ga.scale}`);
+  const LENS: Record<string, string> = { Rd: "#e03131", Ye: "#fcc419", Gn: "#2f9e44", Bu: "#1c7ed6", Wh: "#ffffff", Cl: "#f1f3f5" };
+  const title = $derived.by(() => {
+    const what = ga.view === "door-front" ? "DOOR FRONT" : ga.view === "door-back" ? "DOOR BACK, FROM INSIDE" : "BACKPLATE";
+    const leaf = ga.leaf !== undefined && sheetLeaves(project, page).length > 1 ? (ga.leaf === 0 ? " · LEFT LEAF" : " · RIGHT LEAF") : "";
+    const of = owner && owner !== page ? ` · DOOR ON SHEET ${owner.number}` : "";
+    return `${what}${leaf}${of}: ${frame.w} W × ${frame.h} H mm · SCALE ${scaleText(ga.scale)}`;
+  });
 </script>
 
 <defs>
@@ -61,27 +99,55 @@
 <g class="ga">
   <!-- The enclosure (or door), with its size. -->
   <rect class="encl" x={GA_ORIGIN[0]} y={GA_ORIGIN[1]} width={W} height={H} />
-  <text class="title" x={GA_ORIGIN[0]} y={GA_ORIGIN[1] - 5.5}
-    >{ga.view === "door" ? "DOOR" : "BACKPLATE"}: {ga.enclosure.w} W × {ga.enclosure.h} H mm · SCALE {scaleText}</text
-  >
+  <text class="title" x={GA_ORIGIN[0]} y={GA_ORIGIN[1] - 5.5}>{title}</text>
   <line class="dim" x1={GA_ORIGIN[0]} y1={GA_ORIGIN[1] - 2} x2={GA_ORIGIN[0] + W} y2={GA_ORIGIN[1] - 2} />
   <line class="tick" x1={GA_ORIGIN[0]} y1={GA_ORIGIN[1] - 3} x2={GA_ORIGIN[0]} y2={GA_ORIGIN[1] - 1} />
   <line class="tick" x1={GA_ORIGIN[0] + W} y1={GA_ORIGIN[1] - 3} x2={GA_ORIGIN[0] + W} y2={GA_ORIGIN[1] - 1} />
-  <text class="dimtext" x={GA_ORIGIN[0] + W / 2} y={GA_ORIGIN[1] - 2.5} text-anchor="middle">{ga.enclosure.w}</text>
+  <text class="dimtext" x={GA_ORIGIN[0] + W / 2} y={GA_ORIGIN[1] - 2.5} text-anchor="middle">{frame.w}</text>
   <line class="dim" x1={GA_ORIGIN[0] - 2} y1={GA_ORIGIN[1]} x2={GA_ORIGIN[0] - 2} y2={GA_ORIGIN[1] + H} />
   <line class="tick" x1={GA_ORIGIN[0] - 3} y1={GA_ORIGIN[1]} x2={GA_ORIGIN[0] - 1} y2={GA_ORIGIN[1]} />
   <line class="tick" x1={GA_ORIGIN[0] - 3} y1={GA_ORIGIN[1] + H} x2={GA_ORIGIN[0] - 1} y2={GA_ORIGIN[1] + H} />
   <text class="dimtext" transform="rotate(-90 {GA_ORIGIN[0] - 2.5} {GA_ORIGIN[1] + H / 2})" x={GA_ORIGIN[0] - 2.5} y={GA_ORIGIN[1] + H / 2} text-anchor="middle"
-    >{ga.enclosure.h}</text
+    >{frame.h}</text
   >
 
-  {#each page.gaItems ?? [] as base (base.id)}
-    {@const it = preview?.get(base.id) ?? base}
-    {@const x = GA_ORIGIN[0] + u(it.x)}
-    {@const y = GA_ORIGIN[1] + u(it.y)}
+  {#if door}
+    <!-- Each leaf: the split between two, and the hinge side shown by the usual converging swing lines. -->
+    {#each leaves as l (l.index)}
+      {@const x0 = X(Math.max(l.x, frame.x0))}
+      {@const hingeX = l.hinge === "left" ? X(l.x) : X(l.x + l.w)}
+      {@const openX = l.hinge === "left" ? X(l.x + l.w) : X(l.x)}
+      <polyline class="swing" points="{openX},{Y(0)} {hingeX},{Y(size.h / 2)} {openX},{Y(size.h)}" />
+      {#each [0.15, 0.85] as f (f)}
+        <rect class="hinge" x={hingeX - 0.35} y={Y(size.h * f) - 1.2} width="0.7" height="2.4" />
+      {/each}
+      {#if l.x > 0.01 && l.x > frame.x0 + 0.01}
+        <line class="split" x1={x0} y1={Y(0)} x2={x0} y2={Y(size.h)} />
+      {/if}
+    {/each}
+  {/if}
+
+  {#each drawn as d (d.it.id + (d.own ? "" : "~"))}
+    {@const it = d.it}
+    {@const x = X(it.x)}
+    {@const y = Y(it.y)}
     {@const w = u(it.w)}
     {@const h = u(it.h)}
-    {#if it.kind === "rail"}
+    {#if it.kind === "dim"}
+      {@const lay = dimLayout(project, page, it, drawn)}
+      <g class="dimension">
+        {#each lay.lines as l, i (i)}<line x1={l[0]} y1={l[1]} x2={l[2]} y2={l[3]} />{/each}
+        {#each lay.texts as t, i (i)}
+          <text
+            class="dimtext"
+            x={t.at[0]}
+            y={t.at[1]}
+            text-anchor="middle"
+            transform={t.vertical ? `rotate(-90 ${t.at[0]} ${t.at[1]})` : undefined}>{t.text}</text
+          >
+        {/each}
+      </g>
+    {:else if it.kind === "rail"}
       <!-- DIN rail: the rail with its slots' centre line. -->
       <rect class="rail" {x} {y} width={w} height={h} />
       {#if w >= h}
@@ -92,41 +158,120 @@
     {:else if it.kind === "trunking"}
       <rect class="trunking" {x} {y} width={w} height={h} />
       <rect class="trunking-in" x={x + Math.min(w, h) * 0.15} y={y + Math.min(w, h) * 0.15} width={Math.max(0, w - Math.min(w, h) * 0.3)} height={Math.max(0, h - Math.min(w, h) * 0.3)} />
-    {:else if it.kind === "device"}
-      {@const text = label(it)}
-      {@const n = it.refs?.length ?? 0}
-      {@const fit = fitLabel(text, w, h)}
-      <rect class="device" {x} {y} width={w} height={h} />
-      <!-- Earth terminals are green-yellow, in their place in the strip (9). -->
-      {#each (it.refs ?? []).map((r) => byId.get(r)) as t, i (i)}
-        {#if t?.symbol === "terminal" && t.params.function === "earth"}
-          {#if w >= h}
-            <rect class="earth" x={x + (w / n) * i} {y} width={w / n} height={h} />
-          {:else}
-            <rect class="earth" {x} y={y + (h / n) * i} width={w} height={h / n} />
-          {/if}
-        {/if}
-      {/each}
-      {#if n > 1}
-        <!-- A terminal strip: each terminal. -->
-        {#each Array.from({ length: n - 1 }, (_, i) => i + 1) as i (i)}
-          {#if w >= h}
-            <line class="slice" x1={x + (w / n) * i} y1={y} x2={x + (w / n) * i} y2={y + h} />
-          {:else}
-            <line class="slice" x1={x} y1={y + (h / n) * i} x2={x + w} y2={y + (h / n) * i} />
-          {/if}
+    {:else if it.kind === "label"}
+      {#if !d.back}
+        <!-- A label plate at true size: its engraving, as large as it really is where that reads. -->
+        {@const text = it.text || "LABEL"}
+        {@const lines = text.split("\n")}
+        {@const fit = fitLabel(lines.reduce((a, b) => (a.length >= b.length ? a : b), ""), w * 0.92, h / lines.length, Math.max(SMALLEST, u(it.textMm ?? 5)))}
+        <rect class="plate" {x} {y} width={w} height={h} />
+        <rect class="plate-in" x={x + Math.min(0.3, w * 0.05)} y={y + Math.min(0.3, h * 0.08)} width={Math.max(0, w - 2 * Math.min(0.3, w * 0.05))} height={Math.max(0, h - 2 * Math.min(0.3, h * 0.08))} />
+        {#each lines as line, i (i)}
+          <text class="tag" class:halo={fit.halo} x={x + w / 2} y={y + h / 2 + (i - (lines.length - 1) / 2) * fit.size * 1.25} font-size={fit.size} text-anchor="middle" dominant-baseline="central"
+            >{line}</text
+          >
         {/each}
       {/if}
-      <text
-        class="tag"
-        class:halo={fit.halo}
-        x={x + w / 2}
-        y={y + h / 2}
-        font-size={fit.size}
-        text-anchor="middle"
-        dominant-baseline="central"
-        transform={fit.vertical ? `rotate(-90 ${x + w / 2} ${y + h / 2})` : undefined}>{text}</text
-      >
+    {:else if it.kind === "device"}
+      {@const text = label(it)}
+      {@const dp = door && !d.back && ga.view === "door-front" ? doorPart(it) : null}
+      {@const bp = d.back ? doorPart(it) : null}
+      {#if dp}
+        <!-- A door device drawn from its schematic part: bezel, then the lens, button, knob or handle; its legend below. -->
+        {@const plateH = dp.kind === "handle" ? 0 : Math.min(h * 0.3, Math.max(h - w, h * 0.22))}
+        {@const top = h - plateH}
+        {@const r = (Math.min(w, top) / 2) * 0.9}
+        {@const cx = x + w / 2}
+        {@const cy = y + top / 2}
+        {@const legend = dp.el.label?.trim() ? resolveFields(dp.el.label, project).replace(/\n/g, " ") : text}
+        {@const lf = fitLabel(legend, w * 0.94, plateH)}
+        <!-- Too small at this scale for its legend to read: just its tag, under it. -->
+        {@const small = lf.halo || w < SMALLEST * 3}
+        {#if dp.kind === "handle"}
+          <rect class="device" {x} {y} width={w} height={h} />
+          <circle class="bezel" {cx} {cy} r={r * 0.85} />
+          <rect class="knob" x={cx - r * 0.12} y={cy - r * 0.75} width={r * 0.24} height={r * 1.5} rx={r * 0.08} />
+          <text class="mark" x={cx} y={cy - r * 0.95} font-size={SMALLEST} text-anchor="middle">0</text>
+          <text class="mark" x={cx + r * 0.95} y={cy + SMALLEST * 0.35} font-size={SMALLEST}>I</text>
+          <text class="tag halo" x={cx} y={y + h + SMALLEST * 1.05} font-size={SMALLEST} text-anchor="middle">{text}</text>
+        {:else}
+          <rect class="legend" {x} y={y + top} width={w} height={plateH} />
+          <circle class="bezel" {cx} {cy} {r} />
+          {#if dp.kind === "lamp"}
+            <circle class="lens" {cx} {cy} r={r * 0.72} style:fill={LENS[String(dp.el.params.colour)] ?? "#ffffff"} />
+          {:else if dp.kind === "pushbutton"}
+            <circle class="button" {cx} {cy} r={r * 0.72} />
+            <circle class="button-in" {cx} {cy} r={r * 0.55} />
+          {:else}
+            <circle class="button" {cx} {cy} r={r * 0.72} />
+            {#if dp.el.params.key}
+              <rect class="knob" x={cx - r * 0.08} y={cy - r * 0.35} width={r * 0.16} height={r * 0.7} />
+            {:else}
+              <rect class="knob" x={cx - r * 0.14} y={cy - r * 0.68} width={r * 0.28} height={r * 1.36} rx={r * 0.1} />
+            {/if}
+          {/if}
+          {#if small}
+            <text class="tag halo" x={cx} y={y + h + SMALLEST * 1.05} font-size={SMALLEST} text-anchor="middle">{text}</text>
+          {:else}
+            {#if legend !== text}
+              <!-- The tag on the device when the legend says what it does. -->
+              {@const tf = fitLabel(text, r * 1.4, r * 0.7)}
+              <text class="tag halo" x={cx} y={cy} font-size={tf.size} text-anchor="middle" dominant-baseline="central">{text}</text>
+            {/if}
+            <text class="tag" x={cx} y={y + top + plateH / 2} font-size={lf.size} text-anchor="middle" dominant-baseline="central">{legend}</text>
+          {/if}
+        {/if}
+      {:else if d.back}
+        <!-- Seen from inside: what's mounted through the door (dashed), and its cut-out. -->
+        {@const c = parseCutout(it.cutout)}
+        {@const top = bp && bp.kind !== "handle" ? h * 0.7 : h}
+        {@const cx = x + w / 2}
+        {@const cy = y + top / 2}
+        <rect class="behind" {x} {y} width={w} height={h} />
+        {#if c && "d" in c}
+          <circle class="cutout" {cx} {cy} r={u(c.d) / 2} />
+        {:else if c}
+          <rect class="cutout" x={cx - u(c.w) / 2} y={cy - u(c.h) / 2} width={u(c.w)} height={u(c.h)} />
+        {/if}
+        <text class="tag halo" x={cx} y={y + h + SMALLEST * 1.05} font-size={SMALLEST} text-anchor="middle">{text}</text>
+        {#if c}
+          <text class="dimtext halo" x={cx} y={y + h + SMALLEST * 2.3} text-anchor="middle">{cutoutText(it.cutout)}</text>
+        {/if}
+      {:else}
+        {@const n = it.refs?.length ?? 0}
+        {@const fit = fitLabel(text, w, h)}
+        <rect class="device" {x} {y} width={w} height={h} />
+        <!-- Earth terminals are green-yellow, in their place in the strip (9). -->
+        {#each (it.refs ?? []).map((r) => byId.get(r)) as t, i (i)}
+          {#if t?.symbol === "terminal" && t.params.function === "earth"}
+            {#if w >= h}
+              <rect class="earth" x={x + (w / n) * i} {y} width={w / n} height={h} />
+            {:else}
+              <rect class="earth" {x} y={y + (h / n) * i} width={w} height={h / n} />
+            {/if}
+          {/if}
+        {/each}
+        {#if n > 1}
+          <!-- A terminal strip: each terminal. -->
+          {#each Array.from({ length: n - 1 }, (_, i) => i + 1) as i (i)}
+            {#if w >= h}
+              <line class="slice" x1={x + (w / n) * i} y1={y} x2={x + (w / n) * i} y2={y + h} />
+            {:else}
+              <line class="slice" x1={x} y1={y + (h / n) * i} x2={x + w} y2={y + (h / n) * i} />
+            {/if}
+          {/each}
+        {/if}
+        <text
+          class="tag"
+          class:halo={fit.halo}
+          x={x + w / 2}
+          y={y + h / 2}
+          font-size={fit.size}
+          text-anchor="middle"
+          dominant-baseline="central"
+          transform={fit.vertical ? `rotate(-90 ${x + w / 2} ${y + h / 2})` : undefined}>{text}</text
+        >
+      {/if}
     {/if}
   {/each}
 </g>
@@ -150,12 +295,26 @@
     font-size: var(--tag);
   }
   .dim,
-  .tick {
+  .tick,
+  .dimension line {
     stroke: #000;
     stroke-width: 0.1;
   }
   .dimtext {
     font-size: var(--detail);
+  }
+  .swing {
+    fill: none;
+    stroke: #000;
+    stroke-width: 0.07;
+    stroke-dasharray: 1.2 0.5 0.2 0.5;
+  }
+  .hinge {
+    fill: #000;
+  }
+  .split {
+    stroke: #000;
+    stroke-width: 0.3;
   }
   .rail {
     fill: #eef0f2;
@@ -177,23 +336,64 @@
     stroke: #888;
     stroke-width: 0.08;
   }
-  .device {
+  .device,
+  .legend,
+  .plate {
     fill: #fff;
     stroke: #000;
     stroke-width: 0.15;
+  }
+  .plate-in {
+    fill: none;
+    stroke: #000;
+    stroke-width: 0.06;
+  }
+  .bezel,
+  .button,
+  .button-in {
+    fill: #fff;
+    stroke: #000;
+    stroke-width: 0.12;
+  }
+  .button-in {
+    stroke-width: 0.07;
+  }
+  .lens {
+    stroke: #000;
+    stroke-width: 0.1;
+  }
+  .knob {
+    fill: #444;
+    stroke: #000;
+    stroke-width: 0.06;
+  }
+  .behind {
+    fill: none;
+    stroke: #000;
+    stroke-width: 0.1;
+    stroke-dasharray: 0.6 0.4;
+  }
+  .cutout {
+    fill: #fff;
+    stroke: #000;
+    stroke-width: 0.18;
   }
   .slice {
     stroke: #000;
     stroke-width: 0.06;
   }
-  .tag {
+  .tag,
+  .halo {
     /* A thin white edge keeps it clean where it crosses a terminal's slice line. */
     paint-order: stroke;
     stroke: #fff;
     stroke-width: 0.12;
     stroke-linejoin: round;
   }
-  .tag.halo {
+  .halo {
     stroke-width: 0.35;
+  }
+  .mark {
+    font-size: var(--detail);
   }
 </style>

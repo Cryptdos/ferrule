@@ -20,6 +20,7 @@ import {
   addDistribution,
   addCloud,
   addElement,
+  addGaDim,
   addGaItem,
   addGaPage,
   addSparePage,
@@ -36,7 +37,7 @@ import {
   wire,
 } from "../core/ops";
 import { renumber } from "../core/renumber";
-import { fitScale, gaCandidates, gaToSheet, type GaCandidate } from "../core/ga";
+import { ENCL, fitScale, gaCandidates, gaToSheet, type GaCandidate } from "../core/ga";
 import { routePage } from "../core/routing";
 import { saveSheetTemplate, stampTemplate } from "../core/templates";
 import { placePlantView } from "../core/ops";
@@ -143,7 +144,7 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
   const incoming = add("supply", 22, 11, { label: "415V 3PH+N 50Hz SUPPLY (BY OTHERS)", params: { system: "3ph-n" } });
   const x0 = [22, 25, 28, 31].map((x, i) => add("terminal", x, 14, { label: ["L1", "L2", "L3", "N"][i], params: { strip: "X0" } }));
   x0.forEach((t, i) => w([incoming, ["L1", "L2", "L3", "N"][i]!], [t, "1"]));
-  const qMain = add("isolator", 22, 24, { label: "63A DOOR\nINTERLOCKED", params: { poles: 4, aux: 0, operator: "turn" } });
+  const qMain = add("isolator", 22, 24, { label: "63A DOOR\nINTERLOCKED", params: { poles: 4, aux: 0, operator: "door" } });
   x0.forEach((t, i) => w([t, "2"], [qMain, String(2 * i + 1)]));
   const busL1 = bus(D.L1, 14, 34, 124, "80A DISTRIBUTION BLOCKS");
   const busL2 = bus(D.L2, 14, 38, 124);
@@ -545,6 +546,74 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
       addGaItem(p, gaPg.id, { kind: "device", x, y: rails[rail]! - c.h / 2, w: c.w, h: c.h, refs: c.refs });
       x += c.w + 5;
     }
+  }
+
+  // ===========================================================================
+  // Sheets 14 and 15: the door, front and back. Two leaves; the lamps, push
+  // buttons and keyswitches drawn from the schematic parts on the left leaf,
+  // the main isolator's handle on the right, a label plate at true size, and
+  // dimensions setting out the rows. The back is the same door from inside,
+  // mirrored, with the 22.3 mm cut-outs.
+  {
+    const encl = { w: 1000, h: 1600 };
+    const last = p.pages[p.pages.length - 1]!.id;
+    const front = addGaPage(
+      p,
+      "General arrangement: door front",
+      {
+        scale: fitScale(encl.w, encl.h),
+        enclosure: encl,
+        view: "door-front",
+        leaves: [
+          { w: 500, hinge: "left" },
+          { w: 500, hinge: "right" },
+        ],
+      },
+      last,
+    );
+    const door = gaCandidates(p, (el) => el.tag).filter((c) => c.door);
+    const rows = [300, 420, 540, 660];
+    const xs = [100, 160, 220, 280, 340];
+    const placed: string[] = [];
+    door
+      .filter((c) => !c.part)
+      .forEach((c, i) => {
+        const x = xs[i % xs.length]!;
+        const y = rows[Math.floor(i / xs.length)];
+        if (y === undefined) return;
+        placed.push(addGaItem(p, front.id, { kind: "device", x, y, w: c.w, h: c.h, refs: c.refs, cutout: "22.3" }).id);
+      });
+    const handle = door.find((c) => c.part === "handle");
+    let handleId = "";
+    if (handle) handleId = addGaItem(p, front.id, { kind: "device", x: 720, y: 300, w: handle.w, h: handle.h, refs: handle.refs, part: "handle", cutout: "22.5" }).id;
+    addGaItem(p, front.id, { kind: "label", x: 100, y: 150, w: 300, h: 60, text: "LSP-01\nLIFE SAFETY PANEL", textMm: 12 });
+    // Dimensions: the columns across the top row from the door's edge, and the rows from its top.
+    const top = (p.pages.find((x) => x.id === front.id)!.gaItems ?? []).filter((it) => placed.includes(it.id) && it.y === rows[0]);
+    addGaDim(p, front.id, {
+      axis: "h",
+      style: "chain",
+      points: [{ v: 0, item: ENCL, edge: "start" }, ...top.map((it) => ({ v: it.x + it.w / 2, item: it.id, edge: "mid" as const }))],
+      at: 250,
+    });
+    const firstCol = (p.pages.find((x) => x.id === front.id)!.gaItems ?? []).filter((it) => placed.includes(it.id) && it.x === xs[0]);
+    addGaDim(p, front.id, {
+      axis: "v",
+      style: "chain",
+      points: [{ v: 0, item: ENCL, edge: "start" }, ...firstCol.map((it) => ({ v: it.y, item: it.id, edge: "start" as const }))],
+      at: -90,
+    });
+    if (handleId) {
+      addGaDim(p, front.id, {
+        axis: "h",
+        style: "chain",
+        points: [
+          { v: 500, item: handleId, edge: "mid" },
+          { v: 1000, item: ENCL, edge: "end" },
+        ],
+        at: 420,
+      });
+    }
+    addGaPage(p, "General arrangement: door back", { scale: fitScale(encl.w, encl.h), enclosure: encl, view: "door-back", of: front.id }, front.id);
   }
 
   // --- Revision B: the proving and timer area on sheet 8 is clouded ----------

@@ -7,7 +7,7 @@
 import { PLANT_VIEW_KEYS } from "./ops";
 import { parseProjectDevices } from "./devices";
 import { AREA_UNITS } from "./geometry";
-import { DISTRIBUTION_KINDS, type DistributionKind, FORMAT, FORMAT_VERSION, type GaItem, type Page, type Project, emptyInfo } from "./model";
+import { DISTRIBUTION_KINDS, type DistributionKind, FORMAT, FORMAT_VERSION, type GaDim, type GaDimPoint, type GaItem, type Page, type Project, emptyInfo } from "./model";
 import { defaultParams, getSymbol } from "./symbols";
 import { gaToSheet } from "./ga";
 import { colourCode, knownColour } from "./wirecolours";
@@ -269,11 +269,21 @@ function parsePage(pg: Record<string, unknown>, i: number): Project["pages"][num
   let ga: Page["ga"];
   if (isObj(pg.ga) && isObj(pg.ga.enclosure)) {
     const e = pg.ga.enclosure;
+    const v = pg.ga.view;
     ga = {
       scale: typeof pg.ga.scale === "number" && pg.ga.scale > 0 ? pg.ga.scale : 5,
       enclosure: { w: typeof e.w === "number" && e.w > 0 ? e.w : 600, h: typeof e.h === "number" && e.h > 0 ? e.h : 800 },
-      view: pg.ga.view === "door" ? "door" : "backplate",
+      // "door" from the 0.2 test builds is the door front.
+      view: v === "door" || v === "door-front" ? "door-front" : v === "door-back" ? "door-back" : "backplate",
     };
+    const leaves = arr(pg.ga.leaves)
+      .filter(isObj)
+      .filter((l) => typeof l.w === "number" && l.w > 0)
+      .slice(0, 2)
+      .map((l) => ({ w: l.w as number, hinge: l.hinge === "right" ? ("right" as const) : ("left" as const) }));
+    if (ga.view === "door-front" && leaves.length) ga.leaves = leaves;
+    if (ga.view !== "backplate" && (pg.ga.leaf === 0 || pg.ga.leaf === 1)) ga.leaf = pg.ga.leaf;
+    if (ga.view !== "backplate" && typeof pg.ga.of === "string" && pg.ga.of) ga.of = pg.ga.of;
   }
   // GA notes are gone (note 46): one from a test build becomes a Text annotation where it was.
   for (const it of arr(pg.gaItems).filter(isObj)) {
@@ -293,8 +303,8 @@ function parsePage(pg: Record<string, unknown>, i: number): Project["pages"][num
   }
   const gaItems = arr(pg.gaItems)
     .filter(isObj)
-    .filter((it) => typeof it.id === "string" && ["rail", "trunking", "device"].includes(String(it.kind)))
-    .map((it) => ({
+    .filter((it) => typeof it.id === "string" && ["rail", "trunking", "device", "label", "dim"].includes(String(it.kind)))
+    .map((it): GaItem => ({
       id: it.id as string,
       kind: it.kind as GaItem["kind"],
       x: typeof it.x === "number" ? it.x : 0,
@@ -302,11 +312,16 @@ function parsePage(pg: Record<string, unknown>, i: number): Project["pages"][num
       w: typeof it.w === "number" && it.w > 0 ? it.w : 20,
       h: typeof it.h === "number" && it.h > 0 ? it.h : 20,
       ...(Array.isArray(it.refs) ? { refs: it.refs.filter((r): r is string => typeof r === "string") } : {}),
+      ...(it.part === "handle" ? { part: "handle" as const } : {}),
       ...(typeof it.text === "string" ? { text: it.text } : {}),
       ...(typeof it.device === "string" && it.device ? { device: it.device } : {}),
       ...(typeof it.strip === "string" && it.strip ? { strip: it.strip } : {}),
       ...(Array.isArray(it.seen) ? { seen: it.seen.filter((r): r is string => typeof r === "string") } : {}),
-    }));
+      ...(typeof it.cutout === "string" && it.cutout.trim() ? { cutout: it.cutout.trim() } : {}),
+      ...(typeof it.textMm === "number" && it.textMm > 0 ? { textMm: it.textMm } : {}),
+      ...(it.kind === "dim" ? { dim: parseDim(it.dim) } : {}),
+    }))
+    .filter((it) => it.kind !== "dim" || it.dim!.points.length >= 2);
   const boundaryY = typeof pg.boundaryY === "number" && Number.isFinite(pg.boundaryY) ? pg.boundaryY : null;
   return {
     id: pg.id as string,
@@ -318,6 +333,24 @@ function parsePage(pg: Record<string, unknown>, i: number): Project["pages"][num
     segments,
     ...(ga ? { ga, gaItems } : {}),
     ...(pg.spare === true && !ga ? { spare: true } : {}),
+  };
+}
+
+function parseDim(v: unknown): GaDim {
+  const o = isObj(v) ? v : {};
+  const points = arr(o.points)
+    .filter(isObj)
+    .filter((p) => typeof p.v === "number" && Number.isFinite(p.v))
+    .map((p): GaDimPoint => ({
+      v: p.v as number,
+      ...(typeof p.item === "string" && p.item ? { item: p.item } : {}),
+      ...(p.edge === "start" || p.edge === "mid" || p.edge === "end" ? { edge: p.edge } : {}),
+    }));
+  return {
+    axis: o.axis === "v" ? "v" : "h",
+    style: o.style === "baseline" ? "baseline" : "chain",
+    points,
+    at: typeof o.at === "number" && Number.isFinite(o.at) ? o.at : 0,
   };
 }
 

@@ -28,25 +28,25 @@ Click switches, selectors, push buttons and field contacts on the drawing. Coils
 
 ### GA: the panel at true scale
 
-![A GA backplate at 1:15: DIN rails, trunking and devices placed from the schematic, with a device's properties open](docs/images/ga.png)
+![A GA door front at 1:12.5: two leaves, lamps, push buttons and keyswitches drawn from the schematic, a label plate and dimensions, with the GA tools in the browser](docs/images/ga.png)
 
-General arrangement sheets laid out to scale. Draw DIN rails and trunking, then place every relay, timer, breaker and terminal strip from the schematic: each keeps its tag, snaps onto a rail, and **Check** tells you what's still to place. Sizes start generic; pick real devices from the **device table**, a shared library with sizes, datasheets and pictures that every project can use.
+General arrangement sheets laid out to scale: the **backplate**, the **door front** and the **door back** (seen from inside, mirrored, with the cut-outs). Draw DIN rails and trunking, then use **Place parts…** to put every relay, timer, breaker and terminal strip from the schematic on the backplate: each keeps its tag, snaps onto a rail, and **Check** tells you what's still to place and how full each rail is. On the door, lamps, push buttons, keyswitches and an isolator's handle are drawn from their schematic parts, so the door can't drift from the drawing; doors have one or two leaves, and a sheet can show either leaf on its own. Add **label plates** at true size and **dimensions** (chain or baseline) that snap to what they measure and follow it when it moves. Sizes start generic; pick real devices from the **device table**, a shared library with sizes, datasheets and pictures that every project can use, and export the **bill of materials** as CSV.
 
 ### Annotate: everything the reader needs
 
 ![A notes sheet: formatted notes with a cable size table, a revision list and a symbol legend built from the parts used](docs/images/annotate.png)
 
-Text, boxes, label plates, pictures (paste or drag them in), section boxes and revision clouds live in their own workbench, so they never get in the way of the drawing. **Notes** take a small Markdown (headings, bold, lists, tables) for general notes and cable sizes. The **revision list** and **symbol legend** fill themselves from the project. **Spare sheets** hold annotations only, for spacing and organisation.
+Text, boxes, label plates, arrows, highlights, numbered call-outs, polygons, pictures (paste or drag them in), section boxes and revision clouds live in their own workbench, so they never get in the way of the drawing. **Notes** take a small Markdown (headings, bold, lists, tables) for general notes and cable sizes. The **revision list** and **symbol legend** fill themselves from the project. **Spare sheets** hold annotations only, for spacing and organisation.
 
 ### The output
 
 ![A finished A4 sheet: title block, column numbers, cross-references, terminal block and field equipment](docs/images/drawing-sheet.png)
 
-Every sheet exports as one A4 landscape PDF, in [osifont](https://github.com/hikikomori82/osifont) (ISO 3098 lettering) throughout, with your title block, logo and revision table. Terminal and field cable schedules export as CSV.
+Every sheet exports as one A4 landscape PDF, in [osifont](https://github.com/hikikomori82/osifont) (ISO 3098 lettering) throughout, with your title block, logo and revision table. Terminal and field cable schedules and the bill of materials export as CSV.
 
 ### Claude can draft for you
 
-Ferrule is also an [MCP server](docs/mcp.md): connect Claude to it and ask for a starter sheet, a set of plant, or a whole controls section, and watch it appear in the editor. The [LSP-01 example](docs/benchmark-lsp01.md) (on the project list) is a 14-sheet life safety panel drawn entirely with Ferrule's own tools.
+Ferrule is also an [MCP server](docs/mcp.md): connect Claude to it and ask for a starter sheet, a set of plant, or a whole controls section, and watch it appear in the editor. The [LSP-01 example](docs/benchmark-lsp01.md) (on the project list) is a 16-sheet life safety panel drawn entirely with Ferrule's own tools.
 
 ## More
 

@@ -19,6 +19,7 @@
   import SheetProps from "./SheetProps.svelte";
   import DevicesDialog from "./DevicesDialog.svelte";
   import GaProps from "./GaProps.svelte";
+  import PlacePartsDialog from "./PlacePartsDialog.svelte";
   import { deleteGaItems, moveGaItems, rotateGaItems } from "../../core/ops";
   import { isTyping } from "../typing";
   import type { Editor } from "../editor.svelte";
@@ -93,7 +94,7 @@
   });
   let showProject = $state(false);
   /** Open windows: they don't block the drawing, and several can be open at once. */
-  type DialogName = "plant" | "distribution" | "checks" | "schedules" | "templates" | "renumber" | "devices" | "settings";
+  type DialogName = "plant" | "distribution" | "checks" | "schedules" | "templates" | "renumber" | "devices" | "settings" | "place";
   let open: Partial<Record<DialogName, boolean>> = $state({});
   /** Export PDF failed: what went wrong, with the Print way round it. */
   let pdfError = $state("");
@@ -221,6 +222,7 @@
           e.key === "ArrowLeft" ? [-step, 0] : e.key === "ArrowRight" ? [step, 0] : e.key === "ArrowUp" ? [0, -step] : [0, step];
         editor.apply((p) => moveGaItems(p, editor.pageId, gaIds, d));
       } else if (e.key === "Escape") {
+        if (canvas?.cancel()) return;
         editor.gaPlace = null;
         editor.tool = "select";
         editor.selection = [];
@@ -373,13 +375,6 @@
           <button class="tool" class:active={editor.tool === "wire"} onclick={() => ((editor.tool = "wire"), (editor.placeSymbol = null))} title="Draw wires (W)">
             <Icon name="wire" /> Wire
           </button>
-        {:else if editor.mode === "ga"}
-          <button class="tool" class:active={editor.tool === "ga-rail"} onclick={() => ((editor.tool = "ga-rail"), (editor.gaPlace = null))} title="Drag along where a DIN rail goes">
-            <Icon name="rail" /> DIN rail
-          </button>
-          <button class="tool" class:active={editor.tool === "ga-trunking"} onclick={() => ((editor.tool = "ga-trunking"), (editor.gaPlace = null))} title="Drag out a run of trunking">
-            <Icon name="trunking" /> Trunking
-          </button>
         {/if}
         <span class="sep"></span>
         <button class="icon" disabled={!editor.canUndo} onclick={() => editor.undo()} title="Undo (Ctrl+Z)"><Icon name="undo" /></button>
@@ -404,6 +399,9 @@
         <button onclick={() => (open.schedules = true)} title="Terminal and cable schedules">Schedules</button>
       {:else if editor.mode === "ga"}
         <span class="sep"></span>
+        <button onclick={() => (open.checks = true)} title="Check the drawing for problems, with how full each DIN rail is">Check</button>
+        <button onclick={() => (open.schedules = true)} title="Terminal and cable schedules, and the bill of materials">Schedules</button>
+        <button class:active={!!open.place} onclick={() => (open.place = !open.place)} title="Parts from the schematic not on a GA yet: pick one, then click on the sheet">Place parts…</button>
         <button onclick={() => (open.devices = true)} title="Real devices with their sizes, datasheets and pictures">Device table…</button>
       {/if}
     </div>
@@ -440,7 +438,7 @@
         ></div>
         <div class="pane"><SplitPane {editor} /></div>
       {/if}
-      <Browser {editor} bind:width={browserWidth} />
+      <Browser {editor} bind:width={browserWidth} onplace={() => (open.place = true)} />
       {#if sim}
         <FloatBox title="Simulation" store="sim"><SimPanel {editor} {sim} /></FloatBox>
       {:else if editor.mode === "ga"}
@@ -501,6 +499,9 @@
 {/if}
 {#if open.templates}
   <TemplatesDialog {editor} onclose={() => (open.templates = false)} />
+{/if}
+{#if open.place && editor.mode === "ga"}
+  <PlacePartsDialog {editor} onclose={() => ((open.place = false), (editor.gaPlace = null))} />
 {/if}
 {#if open.devices}
   <DevicesDialog {editor} onclose={() => (open.devices = false)} />

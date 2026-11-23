@@ -4,9 +4,8 @@ Read this first. The design record is `docs/DESIGN.md`; the plan being built is 
 
 ## Where the sprint is
 
-v0.2 sprint, version `0.2.0-pre`. Steps 1–6 and 7a are merged. Next:
+v0.2 sprint, version `0.2.0-pre`. Steps 1–7 (7a and 7b) are merged. Next:
 
-- **7b**: Annotate tools (arrow, highlight, numbered call-outs, polygon); GA door front and door back views, one or two doors, door devices drawn from the schematic parts; Dimension tool (chain and baseline, snapping, mm from the GA scale); GA tools (DIN rail, trunking, dimension, label) move into the browser's lower section and *To place* becomes a **Place parts…** window (top bar menu, with search); bill of materials CSV; rail and trunking fill in Check; door cut-out sizes. The GA **label** tool is a label plate placed at true size on the door (decided 23/11/26).
 - **8**: field IO and controllers per `docs/controller.md` (likely split), then the logo sketches.
 - At the 0.2.0 release, remove `preRelease()` in `src/core/validate.ts` (maps test-build files).
 
