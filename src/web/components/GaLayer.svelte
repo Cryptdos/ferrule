@@ -10,8 +10,8 @@
     gaFrame,
     gaSize,
     detailLabel,
-    detailOf,
     frameCaption,
+    frameView,
     isDoorView,
     mmToUnits,
     parseCutout,
@@ -23,7 +23,6 @@
   import { displayTag } from "../../core/tags";
   import { resolveFields } from "../../core/fields";
   import { lampGlow } from "../lamps";
-  import { UNIT_MM } from "../../core/geometry";
   import GaLayer from "./GaLayer.svelte";
 
   /** A GA sheet's enclosure (or door) and items, drawn at its scale (grid units, like the rest of the sheet). */
@@ -33,6 +32,7 @@
     preview = null,
     lit = null,
     zoomScale,
+    frameDims = [],
   }: {
     project: Project;
     page: Page;
@@ -41,6 +41,8 @@
      * instead of its own, without its title, size, dimensions or detail boxes.
      */
     zoomScale?: number;
+    /** In a frame: the dimensions that belong to it, measuring this sheet (its mm). */
+    frameDims?: GaItem[];
     /** Items being dragged or sized: their temporary place, by id. */
     preview?: Map<string, GaItem> | null;
     /**
@@ -156,7 +158,7 @@
     {/each}
   {/if}
 
-  {#each drawn.filter((d) => !inFrame || (d.it.kind !== "dim" && d.it.kind !== "detail")) as d (d.it.id + (d.own ? "" : "~"))}
+  {#each drawn.filter((d) => (!inFrame || (d.it.kind !== "dim" && d.it.kind !== "detail")) && !(d.it.kind === "dim" && d.it.frame)) as d (d.it.id + (d.own ? "" : "~"))}
     {@const it = d.it}
     {@const x = X(it.x)}
     {@const y = Y(it.y)}
@@ -168,17 +170,13 @@
       <text class="detaillabel halo" x={x} y={y - 0.6}>{detailLabel(project, it)}</text>
     {:else if it.kind === "frame"}
       <!-- What's inside the detail, at the frame's scale, cut off at its edge (design-v0.3 §6). -->
-      {@const det = detailOf(project, it)}
-      {#if det && det.page.ga}
-        {@const k = it.zoom ?? 1}
-        {@const src = { ...det.page, ga: { ...det.page.ga, scale: 1 / k } }}
-        {@const sx0 = gaFrame(project, src).x0}
-        {@const qx = GA_ORIGIN[0] + ((det.it.x - sx0) * k) / UNIT_MM}
-        {@const qy = GA_ORIGIN[1] + (det.it.y * k) / UNIT_MM}
+      {@const fv = frameView(project, it)}
+      {#if fv}
         <clipPath id="frame-clip-{it.id}"><rect {x} {y} width={w} height={h} /></clipPath>
         <g clip-path="url(#frame-clip-{it.id})">
-          <g transform="translate({x - qx} {y - qy})">
-            <GaLayer {project} page={det.page} zoomScale={1 / k} {lit} />
+          <g transform="translate({fv.dx} {fv.dy})">
+            <!-- Edits made through the frame show while they're dragged; its own dimensions are drawn with it. -->
+            <GaLayer {project} page={fv.page} zoomScale={1 / fv.k} {lit} {preview} frameDims={(page.gaItems ?? []).filter((x) => x.kind === "dim" && x.frame === it.id).map((x) => preview?.get(x.id) ?? x)} />
           </g>
         </g>
       {/if}
@@ -333,6 +331,15 @@
         >
       {/if}
     {/if}
+  {/each}
+  {#each frameDims as it (it.id)}
+    {@const lay = dimLayout(project, page, it, drawn)}
+    <g class="dimension">
+      {#each lay.lines as l, i (i)}<line x1={l[0]} y1={l[1]} x2={l[2]} y2={l[3]} />{/each}
+      {#each lay.texts as t, i (i)}
+        <text class="dimtext" x={t.at[0]} y={t.at[1]} text-anchor="middle" transform={t.vertical ? `rotate(-90 ${t.at[0]} ${t.at[1]})` : undefined}>{t.text}</text>
+      {/each}
+    </g>
   {/each}
 </g>
 

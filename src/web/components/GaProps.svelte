@@ -35,7 +35,9 @@
   let { editor, ondevices }: { editor: Editor; ondevices?: () => void } = $props();
 
   const page = $derived(editor.page);
-  const items = $derived((page.gaItems ?? []).filter((i) => editor.selection.includes(i.id)));
+  /** The sheet the picked items are on: this one, or one a frame shows (design-v0.3 §6). */
+  const ip = $derived(editor.gaSelectionPage);
+  const items = $derived((ip.gaItems ?? []).filter((i) => editor.selection.includes(i.id)));
   const one = $derived(items.length === 1 ? items[0]! : null);
   const byId = $derived(new Map(editor.project.pages.flatMap((pg) => pg.elements.map((e) => [e.id, { e, pg }]))));
   const sizes = $derived(gaSizes(editor.project));
@@ -81,13 +83,13 @@
     }
     if (!value) {
       const g = generic;
-      if (g) editor.apply((p) => setGaItemDevice(p, editor.pageId, id, null, g));
+      if (g) editor.apply((p) => setGaItemDevice(p, ip.id, id, null, g));
       return;
     }
     const lib = value.startsWith("lib:") ? deviceLibrary.get(value.slice(4)) : undefined;
     editor.apply((p) => {
       const devId = lib ? useLibraryDevice(p, lib).id : value;
-      setGaItemDevice(p, editor.pageId, id, devId);
+      setGaItemDevice(p, ip.id, id, devId);
     });
   }
   const num = (v: string) => Number(v);
@@ -99,7 +101,7 @@
   const doorFronts = $derived(editor.project.pages.filter((p) => p.ga?.view === "door-front" && !p.ga.of && p.id !== page.id));
   const frame = $derived(page.ga ? gaFrame(editor.project, page) : null);
   const fits = $derived(frame ? fitScale(frame.w, frame.h) : 1);
-  const fill = $derived(one?.kind === "rail" ? railFill(page).find((f) => f.rail.id === one.id) : undefined);
+  const fill = $derived(one?.kind === "rail" ? railFill(ip).find((f) => f.rail.id === one.id) : undefined);
   const doorDevice = $derived(!!first && one?.kind === "device" && (one.part === "handle" || isDoorDevice(editor.project, first)));
   function setLeaves(next: DoorLeaf[]) {
     editor.apply((p) => setGaSettings(p, editor.pageId, { leaves: next }));
@@ -112,12 +114,13 @@
     <h3>GA workbench</h3>
     <p class="hint">Pick a GA sheet from the list, or add one on the left.</p>
   {:else if one}
-    <h3>{one.kind === "rail" ? `DIN rail ${railNumber(page, one)}` : one.kind === "trunking" ? "Trunking" : one.kind === "label" ? "Label plate" : one.kind === "dim" ? "Dimension" : one.kind === "detail" ? `Detail ${one.letter ?? ""}` : one.kind === "frame" ? "Detail frame" : one.part === "handle" ? "Door handle" : "Device"}</h3>
+    {#if ip.id !== page.id}<p class="hint">On sheet {ip.number}, seen through a frame: changes are made there.</p>{/if}
+    <h3>{one.kind === "rail" ? `DIN rail ${railNumber(ip, one)}` : one.kind === "trunking" ? "Trunking" : one.kind === "label" ? "Label plate" : one.kind === "dim" ? "Dimension" : one.kind === "detail" ? `Detail ${one.letter ?? ""}` : one.kind === "frame" ? "Detail frame" : one.part === "handle" ? "Door handle" : "Device"}</h3>
     {#if one.kind === "detail"}
       {@const f = frameOf(editor.project, one.id)}
       <div class="grid">
-        <label>Letter<input value={one.letter ?? ""} onchange={(e) => editor.apply((p) => updateGaItem(p, editor.pageId, one.id, { letter: e.currentTarget.value }))} /></label>
-        <label>Title<input placeholder="e.g. SUPPLY FAN" value={one.text ?? ""} onchange={(e) => editor.apply((p) => updateGaItem(p, editor.pageId, one.id, { text: e.currentTarget.value }))} /></label>
+        <label>Letter<input value={one.letter ?? ""} onchange={(e) => editor.apply((p) => updateGaItem(p, ip.id, one.id, { letter: e.currentTarget.value }))} /></label>
+        <label>Title<input placeholder="e.g. SUPPLY FAN" value={one.text ?? ""} onchange={(e) => editor.apply((p) => updateGaItem(p, ip.id, one.id, { text: e.currentTarget.value }))} /></label>
       </div>
       <p class="hint">
         {#if f}Shown on sheet {f.page.number} at {zoomText(f.it.zoom ?? 1)}. <button class="link-btn" onclick={() => editor.goTo(f.it.id)}>Show it →</button>
@@ -129,7 +132,7 @@
       <p class="hint">{frameCaption(editor.project, one)}</p>
       <label>
         Scale
-        <select value={String(one.zoom ?? 1)} onchange={(e) => editor.apply((p) => updateGaItem(p, editor.pageId, one.id, { zoom: Number(e.currentTarget.value) }))}>
+        <select value={String(one.zoom ?? 1)} onchange={(e) => editor.apply((p) => updateGaItem(p, ip.id, one.id, { zoom: Number(e.currentTarget.value) }))}>
           {#each DETAIL_ZOOMS as k (k)}<option value={String(k)}>{zoomText(k)}</option>{/each}
         </select>
       </label>
@@ -146,7 +149,7 @@
       {@const dim = one.dim}
       <label>
         Style
-        <select value={dim.style} onchange={(e) => editor.apply((p) => updateGaItem(p, editor.pageId, one.id, { dim: { ...dim, style: e.currentTarget.value as "chain" | "baseline" } }))}>
+        <select value={dim.style} onchange={(e) => editor.apply((p) => updateGaItem(p, ip.id, one.id, { dim: { ...dim, style: e.currentTarget.value as "chain" | "baseline" } }))}>
           <option value="chain">Chain: the gaps along a run</option>
           <option value="baseline">Baseline: each distance from the first point</option>
         </select>
@@ -158,11 +161,11 @@
     {#if one.kind === "label"}
       <label>
         Text (a line break for a second line)
-        <textarea rows="2" value={one.text ?? ""} onchange={(e) => editor.apply((p) => updateGaItem(p, editor.pageId, one.id, { text: e.currentTarget.value }))}></textarea>
+        <textarea rows="2" value={one.text ?? ""} onchange={(e) => editor.apply((p) => updateGaItem(p, ip.id, one.id, { text: e.currentTarget.value }))}></textarea>
       </label>
       <label>
         Engraved text height (mm)
-        <input type="number" min="1" step="0.5" value={one.textMm ?? 5} onchange={(e) => editor.apply((p) => updateGaItem(p, editor.pageId, one.id, { textMm: num(e.currentTarget.value) }))} />
+        <input type="number" min="1" step="0.5" value={one.textMm ?? 5} onchange={(e) => editor.apply((p) => updateGaItem(p, ip.id, one.id, { textMm: num(e.currentTarget.value) }))} />
       </label>
     {/if}
     {#if one.kind === "device" && one.refs?.length}
@@ -216,34 +219,34 @@
     {#if doorDevice}
       <label>
         Door cut-out (mm: 22.3 round, or 92 x 92)
-        <input placeholder="e.g. 22.3" value={one.cutout ?? ""} onchange={(e) => editor.apply((p) => updateGaItem(p, editor.pageId, one.id, { cutout: e.currentTarget.value }))} />
+        <input placeholder="e.g. 22.3" value={one.cutout ?? ""} onchange={(e) => editor.apply((p) => updateGaItem(p, ip.id, one.id, { cutout: e.currentTarget.value }))} />
       </label>
     {/if}
     {#if one.kind === "device"}
       <label>
         Label (instead of its tag)
-        <input value={one.text ?? ""} onchange={(e) => editor.apply((p) => updateGaItem(p, editor.pageId, one.id, { text: e.currentTarget.value }))} />
+        <input value={one.text ?? ""} onchange={(e) => editor.apply((p) => updateGaItem(p, ip.id, one.id, { text: e.currentTarget.value }))} />
       </label>
     {/if}
     {#if one.kind !== "dim"}
     <div class="grid">
       {#if one.kind === "frame"}
-        <label>X (mm)<input type="number" step="5" value={one.x} onchange={(e) => editor.apply((p) => updateGaItem(p, editor.pageId, one.id, { x: num(e.currentTarget.value) }))} /></label>
-        <label>Y (mm)<input type="number" step="5" value={one.y} onchange={(e) => editor.apply((p) => updateGaItem(p, editor.pageId, one.id, { y: num(e.currentTarget.value) }))} /></label>
+        <label>X (mm)<input type="number" step="5" value={one.x} onchange={(e) => editor.apply((p) => updateGaItem(p, ip.id, one.id, { x: num(e.currentTarget.value) }))} /></label>
+        <label>Y (mm)<input type="number" step="5" value={one.y} onchange={(e) => editor.apply((p) => updateGaItem(p, ip.id, one.id, { y: num(e.currentTarget.value) }))} /></label>
       {:else}
-      <label>X (mm)<input type="number" step="5" value={one.x} onchange={(e) => editor.apply((p) => updateGaItem(p, editor.pageId, one.id, { x: num(e.currentTarget.value) }))} /></label>
-      <label>Y (mm)<input type="number" step="5" value={one.y} onchange={(e) => editor.apply((p) => updateGaItem(p, editor.pageId, one.id, { y: num(e.currentTarget.value) }))} /></label>
-      <label>Width (mm)<input type="number" step="5" value={one.w} onchange={(e) => editor.apply((p) => updateGaItem(p, editor.pageId, one.id, { w: num(e.currentTarget.value) }))} /></label>
-      <label>Height (mm)<input type="number" step="5" value={one.h} onchange={(e) => editor.apply((p) => updateGaItem(p, editor.pageId, one.id, { h: num(e.currentTarget.value) }))} /></label>
+      <label>X (mm)<input type="number" step="5" value={one.x} onchange={(e) => editor.apply((p) => updateGaItem(p, ip.id, one.id, { x: num(e.currentTarget.value) }))} /></label>
+      <label>Y (mm)<input type="number" step="5" value={one.y} onchange={(e) => editor.apply((p) => updateGaItem(p, ip.id, one.id, { y: num(e.currentTarget.value) }))} /></label>
+      <label>Width (mm)<input type="number" step="5" value={one.w} onchange={(e) => editor.apply((p) => updateGaItem(p, ip.id, one.id, { w: num(e.currentTarget.value) }))} /></label>
+      <label>Height (mm)<input type="number" step="5" value={one.h} onchange={(e) => editor.apply((p) => updateGaItem(p, ip.id, one.id, { h: num(e.currentTarget.value) }))} /></label>
       {/if}
     </div>
     {/if}
     <div class="buttons">
-      {#if one.kind !== "dim" && one.kind !== "frame" && one.kind !== "detail"}<button onclick={() => editor.apply((p) => rotateGaItems(p, editor.pageId, [one.id]))} title="R">Rotate</button>{/if}
+      {#if one.kind !== "dim" && one.kind !== "frame" && one.kind !== "detail"}<button onclick={() => editor.apply((p) => rotateGaItems(p, ip.id, [one.id]))} title="R">Rotate</button>{/if}
       <button
         class="danger"
         onclick={() => {
-          editor.apply((p) => deleteGaItems(p, editor.pageId, [one.id]));
+          editor.apply((p) => deleteGaItems(p, ip.id, [one.id]));
           editor.selection = [];
         }}>Delete</button
       >
@@ -257,7 +260,7 @@
         class="danger"
         onclick={() => {
           const ids = items.map((i) => i.id);
-          editor.apply((p) => deleteGaItems(p, editor.pageId, ids));
+          editor.apply((p) => deleteGaItems(p, ip.id, ids));
           editor.selection = [];
         }}>Delete</button
       >

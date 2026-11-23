@@ -398,3 +398,29 @@ describe("GA detail sheets (design-v0.3 §6)", () => {
     expect(q.pages.find((x) => x.id === door.id)!.gaItems![0]).toMatchObject({ kind: "detail", letter: "A" });
   });
 });
+
+describe("editing through a frame (design-v0.3 §6)", () => {
+  test("a frame maps its sheet to the source's mm and back; a frame's dimension stays with the frame", async () => {
+    const ops = await import("./ops");
+    const ga = await import("./ga");
+    const { p } = project();
+    const door = ops.addGaPage(p, "", { scale: 12.5, enclosure: { w: 600, h: 800 }, view: "door-front" });
+    const det = ops.addGaPage(p, "", { scale: 1, enclosure: { w: 1, h: 1 }, view: "detail" });
+    const lamp = ops.addGaItem(p, door.id, { kind: "label", x: 120, y: 80, w: 60, h: 15 });
+    const a = ops.addGaItem(p, door.id, { kind: "detail", x: 100, y: 50, w: 120, h: 60 });
+    const f = ops.addGaItem(p, det.id, { kind: "frame", detail: a.id, x: 20, y: 30, w: 1, h: 1, zoom: 1 });
+    const v = ga.frameView(p, f)!;
+    // The frame's corner is the detail's corner.
+    expect(ga.toSourceMm(v, [20, 30])).toEqual([100, 50]);
+    expect(ga.toFrameMm(v, lamp)).toEqual({ x: 40, y: 60, w: 60, h: 15 });
+    // A dimension on a detail sheet must be in a frame; deleting the frame deletes it.
+    const dim = { axis: "h" as const, style: "chain" as const, points: [{ v: 120, item: lamp.id, edge: "start" as const }, { v: 180, item: lamp.id, edge: "end" as const }], at: 70 };
+    expect(() => ops.addGaDim(p, det.id, dim)).toThrow();
+    const d = ops.addGaDim(p, det.id, dim, f.id);
+    expect(d.frame).toBe(f.id);
+    // Not drawn on the door: it belongs to the frame.
+    expect(door.gaItems!.some((i) => i.kind === "dim")).toBe(false);
+    ops.deleteGaItems(p, det.id, [f.id]);
+    expect(det.gaItems!.some((i) => i.id === d.id)).toBe(false);
+  });
+});
