@@ -432,6 +432,7 @@ function parsePage(pg: Record<string, unknown>, i: number): Project["pages"][num
       ...(it.kind === "detail" && typeof it.letter === "string" && it.letter.trim() ? { letter: it.letter.trim() } : {}),
       ...(it.kind === "frame" && typeof it.detail === "string" ? { detail: it.detail } : {}),
       ...(it.kind === "frame" && typeof it.zoom === "number" && it.zoom > 0 ? { zoom: it.zoom } : {}),
+      ...(it.kind === "dim" && typeof it.frame === "string" && it.frame ? { frame: it.frame } : {}),
       ...(it.kind === "dim" ? { dim: parseDim(it.dim) } : {}),
     }))
     .filter((it) => it.kind !== "dim" || it.dim!.points.length >= 2);

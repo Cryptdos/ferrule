@@ -110,7 +110,7 @@ export function gaFrame(project: Project, page: Page): GaFrame {
 /** Which kinds of GA item go on a view. */
 export function viewTakes(view: GaView, kind: GaItem["kind"]): boolean {
   // A detail sheet holds frames, and nothing else; a detail rectangle goes on any other GA sheet (design-v0.3 §6).
-  if (view === "detail") return kind === "frame";
+  if (view === "detail") return kind === "frame" || kind === "dim";
   if (kind === "frame") return false;
   if (kind === "detail") return true;
   if (kind === "dim") return true;
@@ -823,3 +823,45 @@ export function syncDetailFrames(project: Project): boolean {
   }
   return changed;
 }
+
+/**
+ * How a frame draws its detail's sheet (design-v0.3 §6): that sheet at the
+ * frame's scale (`src`, a copy with its scale changed), and the shift, in
+ * sheet units, that puts the detail's corner on the frame's. Also maps
+ * points between the detail sheet's mm and the source sheet's.
+ */
+export interface FrameView {
+  frame: GaItem;
+  det: GaItem;
+  /** The source sheet as it is in the project. */
+  page: Page;
+  /** The source sheet drawn at the frame's scale. */
+  src: Page;
+  k: number;
+  /** Add to the zoomed source sheet's units to get the detail sheet's. */
+  dx: number;
+  dy: number;
+}
+
+export function frameView(project: Project, frame: GaItem): FrameView | null {
+  const d = detailOf(project, frame);
+  if (!d?.page.ga) return null;
+  const k = frame.zoom ?? 1;
+  const src: Page = { ...d.page, ga: { ...d.page.ga, scale: 1 / k } };
+  const x0 = gaFrame(project, src).x0;
+  const qx = GA_ORIGIN[0] + ((d.it.x - x0) * k) / UNIT_MM;
+  const qy = GA_ORIGIN[1] + (d.it.y * k) / UNIT_MM;
+  const fx = GA_ORIGIN[0] + frame.x / UNIT_MM;
+  const fy = GA_ORIGIN[1] + frame.y / UNIT_MM;
+  return { frame, det: d.it, page: d.page, src, k, dx: fx - qx, dy: fy - qy };
+}
+
+/** A point on a detail sheet (its mm) to the source sheet's mm, through a frame. */
+export const toSourceMm = (v: FrameView, mm: Vec): Vec => [v.det.x + (mm[0] - v.frame.x) / v.k, v.det.y + (mm[1] - v.frame.y) / v.k];
+/** A rectangle on the source sheet (mm) to the detail sheet's mm. */
+export const toFrameMm = (v: FrameView, r: { x: number; y: number; w: number; h: number }) => ({
+  x: v.frame.x + (r.x - v.det.x) * v.k,
+  y: v.frame.y + (r.y - v.det.y) * v.k,
+  w: r.w * v.k,
+  h: r.h * v.k,
+});

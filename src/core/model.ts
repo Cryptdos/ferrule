@@ -174,6 +174,8 @@ export interface GaItem {
   letter?: string;
   /** A frame: the detail it shows (that item's id, on another GA sheet). */
   detail?: string;
+  /** A dimension added in a frame: that frame's id. It measures the source sheet (its mm) and shows only in the frame. */
+  frame?: string;
   /** A frame: its scale, paper mm per real mm (2 for 2:1, 0.5 for 1:2). Its w and h follow its detail × this. */
   zoom?: number;
   /** A label plate's engraved text height, mm. */

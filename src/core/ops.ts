@@ -1525,11 +1525,13 @@ export function addGaItem(project: Project, pageId: string, item: Omit<GaItem, "
 }
 
 /** Put a dimension on a GA sheet: its points along the axis, its line at `at` across it. */
-export function addGaDim(project: Project, pageId: string, dim: GaDim): GaItem {
+export function addGaDim(project: Project, pageId: string, dim: GaDim, frame?: string): GaItem {
   if (dim.points.length < 2) throw new OpError("A dimension needs two points at least");
   const page = gaPage(project, pageId);
   if (!sheetTakes(project, page, "dim")) throw new OpError("A dimension doesn't go here");
-  const it: GaItem = { id: newId("g"), kind: "dim", x: 0, y: 0, w: 1, h: 1, dim: { ...dim, points: dim.points.map((p) => ({ ...p })) } };
+  // On a detail sheet a dimension belongs to a frame: it measures what the frame shows (design-v0.3 §6).
+  if (page.ga.view === "detail" && !page.gaItems.some((f) => f.kind === "frame" && f.id === frame)) throw new OpError("On a detail sheet, a dimension goes in a frame");
+  const it: GaItem = { id: newId("g"), kind: "dim", x: 0, y: 0, w: 1, h: 1, dim: { ...dim, points: dim.points.map((p) => ({ ...p })) }, ...(frame && page.ga.view === "detail" ? { frame } : {}) };
   page.gaItems.push(it);
   return it;
 }
@@ -1590,10 +1592,15 @@ export function rotateGaItems(project: Project, pageId: string, ids: string[]): 
 
 export function deleteGaItems(project: Project, pageId: string, ids: string[]): void {
   const page = gaPage(project, pageId);
-  page.gaItems = page.gaItems.filter((x) => !ids.includes(x.id));
-  detachDims(project, new Set(ids));
+  // A frame's dimensions go with it.
+  const gone = new Set([...ids, ...page.gaItems.filter((x) => x.frame && ids.includes(x.frame)).map((x) => x.id)]);
+  page.gaItems = page.gaItems.filter((x) => !gone.has(x.id));
+  detachDims(project, gone);
   // A detail's frame goes with it.
-  for (const pg of project.pages) if (pg.gaItems?.some((it) => it.kind === "frame" && it.detail && ids.includes(it.detail))) pg.gaItems = pg.gaItems.filter((it) => !(it.kind === "frame" && it.detail && ids.includes(it.detail)));
+  for (const pg of project.pages) {
+    const frames = new Set((pg.gaItems ?? []).filter((it) => it.kind === "frame" && it.detail && ids.includes(it.detail)).map((it) => it.id));
+    if (frames.size) pg.gaItems = pg.gaItems!.filter((it) => !frames.has(it.id) && !(it.frame && frames.has(it.frame)));
+  }
 }
 
 /** Dimension points on items that have gone stay where they were. */

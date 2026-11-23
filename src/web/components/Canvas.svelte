@@ -46,6 +46,10 @@
     GA_ORIGIN,
     CAPTION_MM,
     detailSpace,
+    frameView,
+    toFrameMm,
+    toSourceMm,
+    type FrameView,
     dimLayout,
     dimTargets,
     drawnGaItems,
@@ -112,9 +116,9 @@
     | { kind: "cloudmove"; id: string; start: Vec; rect: Rect4; delta: Vec }
     | { kind: "elsize"; id: string; start: Vec; size: Vec; delta: Vec; keepShape: boolean }
     | { kind: "point"; id: string; index: number; start: Vec; points: Vec[]; delta: Vec }
-    | { kind: "gadrag"; ids: string[]; start: Vec; delta: Vec }
-    | { kind: "gasize"; id: string; start: Vec; size: Vec; delta: Vec }
-    | { kind: "ganew"; what: "rail" | "trunking" | "detail"; start: Vec; cur: Vec }
+    | { kind: "gadrag"; ids: string[]; start: Vec; delta: Vec; pageId?: string; through?: FrameView }
+    | { kind: "gasize"; id: string; start: Vec; size: Vec; delta: Vec; pageId?: string; through?: FrameView }
+    | { kind: "ganew"; what: "rail" | "trunking" | "detail"; start: Vec; cur: Vec; through?: FrameView }
     | { kind: "cloudsize"; id: string; start: Vec; rect: Rect4; delta: Vec; edges: string }
     | { kind: "table"; coil: string; start: Vec; at: Vec; delta: Vec; row: number }
     | { kind: "boundary"; y: number }
@@ -150,6 +154,7 @@
     pending = null;
     polyDraft = [];
     dimDraft = [];
+    dimThrough = null;
   });
 
   /** How much of this canvas the floating browser covers: none unless the tile is at the left of the main area. */
@@ -176,6 +181,7 @@
       gesture = null;
       polyDraft = [];
       dimDraft = [];
+      dimThrough = null;
       return true;
     }
     return false;
@@ -410,25 +416,92 @@
     return null;
   }
 
+  // -------------------------------------------------------------------------
+  // Through a frame (design-v0.3 §6): on a detail sheet, what's inside a frame
+  // is the source sheet's, and is picked, moved, sized and added to there.
+
+  const frameViews = $derived(
+    page.ga?.view === "detail"
+      ? (page.gaItems ?? []).filter((i) => i.kind === "frame").flatMap((f) => {
+          const v = frameView(editor.project, f);
+          return v ? [v] : [];
+        })
+      : [],
+  );
+  /** The frame a point (sheet units) is in. */
+  function throughAt(pt: Vec): FrameView | null {
+    for (const v of frameViews) {
+      const r = gaRect(v.frame);
+      if (r && pointInRect(pt, r, 0)) return v;
+    }
+    return null;
+  }
+  /** What can be picked through a frame: the source sheet's own items, and the frame's dimensions. */
+  function throughItems(v: FrameView): GaItem[] {
+    return [...(v.page.gaItems ?? []).filter((i) => i.kind !== "dim" && i.kind !== "detail"), ...(page.gaItems ?? []).filter((i) => i.kind === "dim" && i.frame === v.frame.id)];
+  }
+  /** An item seen through a frame, in this sheet's units. */
+  function throughRect(v: FrameView, it: GaItem) {
+    if (it.kind === "dim" && it.dim) {
+      const b = dimLayout(editor.project, v.src, it, drawnGaItems(editor.project, v.src)).box;
+      return { x: b.x + v.dx, y: b.y + v.dy, w: b.w, h: b.h };
+    }
+    return gaRect(toFrameMm(v, it));
+  }
+  function hitThrough(pt: Vec): { it: GaItem; v: FrameView } | null {
+    const v = throughAt(pt);
+    if (!v) return null;
+    const items = throughItems(v);
+    const order = [...items.filter((i) => i.kind === "dim"), ...items.filter((i) => i.kind === "device" || i.kind === "label"), ...items.filter((i) => i.kind === "rail" || i.kind === "trunking")];
+    for (const it of order) {
+      const r = throughRect(v, it);
+      if (r && pointInRect(pt, r, 0.3)) return { it, v };
+    }
+    return null;
+  }
+  /** The frame a selected item is seen through, if it is. */
+  function throughOf(id: string): FrameView | null {
+    return frameViews.find((v) => throughItems(v).some((i) => i.id === id)) ?? null;
+  }
+  /** The sheet an item seen through a frame is edited on: the source sheet, or this one for a frame's dimension. */
+  const throughPage = (v: FrameView, it: GaItem) => (it.kind === "dim" ? editor.pageId : v.page.id);
+
   /** The one selected GA item's corner handle, for sizing rails, trunking, devices and label plates. */
   function gaCorner(): { it: GaItem; at: Vec } | null {
     if (editor.selection.length !== 1) return null;
     const it = (page.gaItems ?? []).find((x) => x.id === editor.selection[0]);
     // A frame's size comes from its detail and its scale.
-    if (!it || it.kind === "dim" || it.kind === "frame") return null;
+    if (it && (it.kind === "dim" || it.kind === "frame")) return null;
+    if (!it) return null;
     const r = gaRect(it);
     return it && r ? { it, at: [r.x + r.w, r.y + r.h] } : null;
+  }
+  /** The same, for one item selected through a frame. */
+  function throughCorner(): { it: GaItem; v: FrameView; at: Vec } | null {
+    if (editor.selection.length !== 1) return null;
+    const v = throughOf(editor.selection[0]!);
+    const it = v ? throughItems(v).find((x) => x.id === editor.selection[0]) : undefined;
+    if (!v || !it || it.kind === "dim") return null;
+    const r = throughRect(v, it);
+    return r ? { it, v, at: [r.x + r.w, r.y + r.h] } : null;
   }
 
   // Dimensions: click each point (it snaps to the enclosure and to items'
   // edges and middles), then double-click or Enter where the line goes.
   type DimClick = { mm: Vec; h: DimTarget | null; v: DimTarget | null };
   let dimDraft: DimClick[] = $state([]);
+  /** A dimension being drawn in a frame: it measures that frame's source sheet. */
+  let dimThrough: FrameView | null = $state(null);
   let lastDimPress = 0;
-  const dimReach = () => (frame ? 1.2 * UNIT_MM * frame.scale : 5);
+  const dimReach = () => (dimThrough ? (1.2 * UNIT_MM) / dimThrough.k : frame ? 1.2 * UNIT_MM * frame.scale : 5);
   function dimSnap(mm: Vec): DimClick {
-    const drawn = drawnGaItems(editor.project, page);
-    const size = gaSize(editor.project, page);
+    const on = dimThrough ? dimThrough.page : page;
+    // In a frame: only what the frame shows can be measured.
+    const det = dimThrough?.det;
+    const drawn = drawnGaItems(editor.project, on).filter(
+      (d) => !det || (d.own && d.it.x < det.x + det.w && d.it.x + d.it.w > det.x && d.it.y < det.y + det.h && d.it.y + d.it.h > det.y),
+    );
+    const size = gaSize(editor.project, on);
     return {
       mm,
       h: nearestDimTarget(dimTargets(drawn, size, "h"), mm[0], mm[1], dimReach()),
@@ -458,16 +531,27 @@
       return;
     }
     let id = "";
-    const ok = editor.apply((p) => (id = addGaDim(p, editor.pageId, it.dim!).id));
+    const fr = dimThrough?.frame.id;
+    dimThrough = null;
+    const ok = editor.apply((p) => (id = addGaDim(p, editor.pageId, it.dim!, fr).id));
     if (ok) editor.selection = [id];
   }
   const dimPreview = $derived.by(() => {
     if (!dimDraft.length || !pointer || !frame) return null;
-    const mm = sheetToGa(frame, pointer);
+    const mm = dimThrough ? toSourceMm(dimThrough, sheetToGa(frame, pointer)) : sheetToGa(frame, pointer);
     const clicks = [...dimDraft, dimSnap(mm)];
     const it = dimFrom(dimDraft.length >= 2 ? dimDraft : clicks, null);
     if (!it) return { layout: null, snap: clicks[clicks.length - 1]! };
     if (dimDraft.length >= 2) it.dim!.at = Math.round((it.dim!.axis === "h" ? mm[1] : mm[0]) * 2) / 2;
+    if (dimThrough) {
+      const l = dimLayout(editor.project, dimThrough.src, it, drawnGaItems(editor.project, dimThrough.src));
+      const dx = dimThrough.dx;
+      const dy = dimThrough.dy;
+      return {
+        layout: { ...l, lines: l.lines.map((q) => [q[0] + dx, q[1] + dy, q[2] + dx, q[3] + dy] as typeof q), texts: l.texts.map((t) => ({ ...t, at: [t.at[0] + dx, t.at[1] + dy] as Vec })) },
+        snap: clicks[clicks.length - 1]!,
+      };
+    }
     return { layout: dimLayout(editor.project, page, it), snap: clicks[clicks.length - 1]! };
   });
 
@@ -475,6 +559,9 @@
     if (!frame) return;
     const mm = sheetToGa(frame, pt);
     const fine = e.shiftKey;
+    // In a frame on a detail sheet: the source sheet, in its mm (design-v0.3 §6).
+    const thru = page.ga?.view === "detail" && !editor.gaPlace ? throughAt(pt) : null;
+    const sm = thru ? toSourceMm(thru, mm) : mm;
     if (editor.gaPlace) {
       const pl = editor.gaPlace;
       // A detail's frame, centred where you click (design-v0.3 §6).
@@ -524,6 +611,29 @@
       gesture = { kind: "ganew", what: "detail", start: s, cur: s };
       return;
     }
+    if ((editor.tool === "ga-rail" || editor.tool === "ga-trunking") && thru) {
+      const what = editor.tool === "ga-rail" ? "rail" : "trunking";
+      if (!sheetTakes(editor.project, thru.page, what)) {
+        editor.flash(`DIN rail and trunking go on the backplate or the door back: this frame shows sheet ${thru.page.number}`);
+        return;
+      }
+      const s0: Vec = [snapMm(sm[0], fine), snapMm(sm[1], fine)];
+      gesture = { kind: "ganew", what, start: s0, cur: s0, through: thru };
+      return;
+    }
+    if (editor.tool === "ga-label" && thru) {
+      if (!sheetTakes(editor.project, thru.page, "label")) {
+        editor.flash(`Label plates go on a door front: this frame shows sheet ${thru.page.number}`);
+        return;
+      }
+      let id = "";
+      const ok = editor.apply((p) => (id = addGaItem(p, thru.page.id, { kind: "label", x: snapMm(sm[0] - 30, fine), y: snapMm(sm[1] - 7.5, fine), w: 60, h: 15 }).id));
+      if (ok) {
+        editor.selection = [id];
+        editor.tool = "select";
+      }
+      return;
+    }
     if (editor.tool === "ga-rail" || editor.tool === "ga-trunking") {
       const what = editor.tool === "ga-rail" ? "rail" : "trunking";
       if (!sheetTakes(editor.project, page, what)) {
@@ -551,9 +661,18 @@
       }
       return;
     }
+    if (editor.tool === "ga-dim" && page.ga?.view === "detail") {
+      // On a detail sheet a dimension is drawn in a frame, measuring what it shows.
+      if (!dimDraft.length) dimThrough = thru;
+      if (!dimThrough) {
+        editor.flash("On a detail sheet, a dimension goes in a frame");
+        return;
+      }
+    }
     if (editor.tool === "ga-dim") {
+      const mmD = dimThrough ? toSourceMm(dimThrough, mm) : mm;
       const last = dimDraft[dimDraft.length - 1];
-      const near = !!last && Math.hypot(last.mm[0] - mm[0], last.mm[1] - mm[1]) < dimReach() * 0.5;
+      const near = !!last && Math.hypot(last.mm[0] - mmD[0], last.mm[1] - mmD[1]) < dimReach() * 0.5;
       // pointerdown carries no click count: a second press soon after, in the same place, is a double-click.
       const now = performance.now();
       const double = near && now - lastDimPress < 450;
@@ -563,10 +682,28 @@
         const clicks = near ? dimDraft.slice(0, -1) : dimDraft;
         const it = dimFrom(clicks, null);
         dimDraft = clicks;
-        finishDim(it ? (it.dim!.axis === "h" ? mm[1] : mm[0]) : null);
+        finishDim(it ? (it.dim!.axis === "h" ? mmD[1] : mmD[0]) : null);
         return;
       }
-      if (!near) dimDraft = [...dimDraft, dimSnap(mm)];
+      if (!near) dimDraft = [...dimDraft, dimSnap(mmD)];
+      return;
+    }
+    const tc = throughCorner();
+    if (tc && Math.abs(pt[0] - tc.at[0]) < 0.9 && Math.abs(pt[1] - tc.at[1]) < 0.9) {
+      gesture = { kind: "gasize", id: tc.it.id, start: toSourceMm(tc.v, mm), size: [tc.it.w, tc.it.h], delta: [0, 0], pageId: tc.v.page.id, through: tc.v };
+      return;
+    }
+    // Through a frame: pick and drag what it shows; it moves on its own sheet (design-v0.3 §6).
+    const ht = page.ga?.view === "detail" ? hitThrough(pt) : null;
+    if (ht) {
+      const pid = throughPage(ht.v, ht.it);
+      const same = editor.selection.every((id) => throughItems(ht.v).some((i) => i.id === id && throughPage(ht.v, i) === pid));
+      if ((e.shiftKey || e.ctrlKey) && same) {
+        editor.selection = selected.has(ht.it.id) ? editor.selection.filter((x) => x !== ht.it.id) : [...editor.selection, ht.it.id];
+        return;
+      }
+      if (!selected.has(ht.it.id) || !same) editor.selection = [ht.it.id];
+      gesture = { kind: "gadrag", ids: [...editor.selection], start: toSourceMm(ht.v, mm), delta: [0, 0], pageId: pid, through: ht.v };
       return;
     }
     const corner = gaCorner();
@@ -592,7 +729,8 @@
   const gaPreview = $derived.by((): Map<string, GaItem> | null => {
     const g = gesture as Gesture;
     if (!g) return null;
-    const items = page.gaItems ?? [];
+    const on = (g.kind === "gadrag" || g.kind === "gasize") && g.pageId ? (editor.project.pages.find((x) => x.id === g.pageId) ?? page) : page;
+    const items = on.gaItems ?? [];
     if (g.kind === "gadrag" && (g.delta[0] || g.delta[1])) {
       const moved = items.filter((i) => g.ids.includes(i.id)).map((i) => {
         // A dimension's line moves across its axis; its points stay on what they measure.
@@ -600,7 +738,7 @@
         const n = { ...i, x: i.x + g.delta[0], y: i.y + g.delta[1] };
         // A lone device snaps onto a rail.
         if (g.ids.length === 1 && n.kind === "device") {
-          const ry = snapToRail(page, n);
+          const ry = snapToRail(on, n);
           if (ry !== null) n.y = ry;
         }
         return n;
@@ -619,8 +757,8 @@
     if (g?.kind !== "ganew" || !frame) return null;
     const x = Math.min(g.start[0], g.cur[0]);
     const y = Math.min(g.start[1], g.cur[1]);
-    const r = gaRect({ id: "", kind: "rail", x, y, w: Math.abs(g.cur[0] - g.start[0]), h: Math.abs(g.cur[1] - g.start[1]) });
-    return r;
+    const box = { x, y, w: Math.abs(g.cur[0] - g.start[0]), h: Math.abs(g.cur[1] - g.start[1]) };
+    return gaRect(g.through ? toFrameMm(g.through, box) : { id: "", kind: "rail", ...box });
   });
 
   // -------------------------------------------------------------------------
@@ -861,11 +999,11 @@
       g.delta = snapVec([pointer[0] - g.start[0], pointer[1] - g.start[1]]);
     } else if (g.kind === "gadrag" || g.kind === "gasize") {
       if (!frame) return;
-      const mm = sheetToGa(frame, pointer);
+      const mm = g.through ? toSourceMm(g.through, sheetToGa(frame, pointer)) : sheetToGa(frame, pointer);
       g.delta = [snapMm(mm[0] - g.start[0], e.shiftKey), snapMm(mm[1] - g.start[1], e.shiftKey)];
     } else if (g.kind === "ganew") {
       if (!frame) return;
-      const mm = sheetToGa(frame, pointer);
+      const mm = g.through ? toSourceMm(g.through, sheetToGa(frame, pointer)) : sheetToGa(frame, pointer);
       g.cur = [snapMm(mm[0], e.shiftKey), snapMm(mm[1], e.shiftKey)];
     } else if (g.kind === "point") {
       g.delta = snapVec([pointer[0] - g.start[0], pointer[1] - g.start[1]]);
@@ -997,15 +1135,16 @@
       editor.apply((p) => updateSection(p, editor.pageId, g.id, { rect }));
     } else if (g.kind === "gadrag" && (g.delta[0] || g.delta[1])) {
       const moved = gaPreview;
+      const pid = g.pageId ?? editor.pageId;
       editor.apply((p) => {
-        moveGaItems(p, editor.pageId, g.ids, g.delta);
+        moveGaItems(p, pid, g.ids, g.delta);
         // Keep a device's snap onto a rail.
-        if (g.ids.length === 1 && moved?.get(g.ids[0]!)) updateGaItem(p, editor.pageId, g.ids[0]!, { y: moved.get(g.ids[0]!)!.y });
+        if (g.ids.length === 1 && moved?.get(g.ids[0]!)) updateGaItem(p, pid, g.ids[0]!, { y: moved.get(g.ids[0]!)!.y });
       });
     } else if (g.kind === "gasize" && (g.delta[0] || g.delta[1])) {
       const w = Math.max(5, g.size[0] + g.delta[0]);
       const h = Math.max(5, g.size[1] + g.delta[1]);
-      editor.apply((p) => updateGaItem(p, editor.pageId, g.id, { w, h }));
+      editor.apply((p) => updateGaItem(p, g.pageId ?? editor.pageId, g.id, { w, h }));
     } else if (g.kind === "ganew" && g.what === "detail") {
       // A detail: the dashed box as dragged, lettered (design-v0.3 §6).
       const x = Math.min(g.start[0], g.cur[0]);
@@ -1029,8 +1168,9 @@
       const across = what === "rail" ? 35 : Math.max(40, horizontal ? dy : dx);
       const len = Math.max(20, horizontal ? dx : dy);
       let id = "";
+      const onPage = g.through?.page.id ?? editor.pageId;
       editor.apply((p) => {
-        id = addGaItem(p, editor.pageId, {
+        id = addGaItem(p, onPage, {
           kind: what,
           x: horizontal ? x : x - (what === "rail" ? across / 2 : 0),
           y: horizontal ? y - (what === "rail" ? across / 2 : 0) : y,
@@ -1514,6 +1654,19 @@
           {/each}
         {/if}
       {/each}
+      {#each frameViews as v (v.frame.id)}
+        {#each throughItems(v) as it (it.id)}
+          {#if selected.has(it.id)}
+            {@const r = throughRect(v, gaPreview?.get(it.id) ?? it)}
+            {#if r}
+              <rect class="sel" x={r.x - 0.3} y={r.y - 0.3} width={r.w + 0.6} height={r.h + 0.6} />
+              {#if editor.selection.length === 1 && it.kind !== "dim"}
+                <rect class="handle" x={r.x + r.w - 0.5} y={r.y + r.h - 0.5} width="1" height="1" />
+              {/if}
+            {/if}
+          {/if}
+        {/each}
+      {/each}
       {#each page.gaItems ?? [] as it (it.id)}
         {#if selected.has(it.id)}
           {@const r = gaRect(gaPreview?.get(it.id) ?? it)}
@@ -1602,11 +1755,13 @@
         {/if}
         {#if frame}
           {#each dimDraft as c, i (i)}
-            {@const at = gaRect({ x: c.h?.v ?? c.mm[0], y: c.v?.v ?? c.mm[1], w: 0, h: 0 })}
+            {@const p0 = { x: c.h?.v ?? c.mm[0], y: c.v?.v ?? c.mm[1], w: 0, h: 0 }}
+            {@const at = gaRect(dimThrough ? toFrameMm(dimThrough, p0) : p0)}
             {#if at}<circle class="hover start" cx={at.x} cy={at.y} r="0.5" />{/if}
           {/each}
           {@const sn = dimPreview.snap}
-          {@const sp = gaRect({ x: sn.h?.v ?? sn.mm[0], y: sn.v?.v ?? sn.mm[1], w: 0, h: 0 })}
+          {@const s0 = { x: sn.h?.v ?? sn.mm[0], y: sn.v?.v ?? sn.mm[1], w: 0, h: 0 }}
+          {@const sp = gaRect(dimThrough ? toFrameMm(dimThrough, s0) : s0)}
           {#if sp && (sn.h || sn.v)}<circle class="hover" cx={sp.x} cy={sp.y} r="0.5" />{/if}
         {/if}
       {/if}

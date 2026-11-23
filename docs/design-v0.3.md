@@ -246,6 +246,13 @@ Each step is one PR with a build, `ferrule-windows-v0.3.0-pre.zip`. The working 
 - **A detail sheet** can't be turned into another view, nor another view into one: it's added as a detail sheet.
 - **Place detail…** is the Place parts window on a detail sheet; its top-bar button reads *Place detail…* there.
 
+**Step 10b (editing through a frame)**
+
+- **What's picked in a frame** is the source sheet's own item under the pointer; empty space in a frame picks the frame itself, so it can be moved. Picking through a frame and picking frames don't mix in one selection.
+- **Tools in a frame:** DIN rail, trunking and label plates go on the source sheet where the frame shows them, if that sheet takes them. Parts from the schematic are placed on their own GA sheet (Place parts…), not through a frame.
+- **Dimensions in a frame** snap only to what the frame shows, and are drawn only in the frame. The source sheet's own dimensions aren't drawn in frames (10a).
+- **Properties** says when what's picked is on another sheet, seen through a frame.
+
 ## 11. Director notes, as written (23/11/26)
 
 **On tiling (§7):**

@@ -7,6 +7,8 @@ Read this first. The design record is `docs/DESIGN.md`; the plan being built is 
 v0.3, version `0.3.0-pre`: planned in `docs/design-v0.3.md` (§10 *Order of work* and its *Changed during build*, §11 the review notes as written). It takes in what v0.2.1 didn't build (busbar split, terminals and numbering, link arrows); v0.2.1 ended at its step 2 (PRs 43–45).
 
 - **v0.3 steps:** 1 start (version, docs) and distribution colour as a select; 2 busbars split into distribution block and control rail; 3 terminals (2-unit spacing, 2.5 mm text, earth terminals, strip order on the GA); 4 wire numbers from terminals; 5 link arrows (wire number and bracketed reference); 6 tiling windows and the live split view (more than one PR); 7 icons on buttons and the Buttons setting; 8 alignment tools; 9 door lamps lit in Simulate; 10 GA detail sheets. Network drawings are v0.4.
+- **Built:** every step, as PRs 46–58 (step 6 as 6a–6c, step 10 as 10a–10b). What's left is the user's testing of the builds; fixes go in as small PRs the same way, noted under *Changed during build*.
+- Tiles: `src/web/tiles.ts` (the tree), `Tiles.svelte`; the active tile's sheet is `editor.pageId`. Detail frames: `frameView` (`ga.ts`) maps a frame to its source sheet.
 - Modules are plant items with `module` set (`src/core/modules.ts` helpers, `src/core/controllers.ts` ops); a module view is a `plant-view` with `params.pmod`.
 - Builds made off Windows have no exe icon (Bun sets it only on Windows); CI's exe job runs on Windows and its artifact has it.
 - At the next release, remove `preRelease()` in `src/core/validate.ts` (maps test-build files).

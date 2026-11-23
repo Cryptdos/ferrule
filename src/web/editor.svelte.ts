@@ -109,6 +109,16 @@ export class Editor {
     return this.project.pages.find((p) => p.id === this.pageId) ?? this.project.pages[0]!;
   }
 
+  /**
+   * The sheet the selected GA items are on: this one, or the sheet a frame
+   * on this detail sheet shows, for items picked through it (design-v0.3 §6).
+   */
+  get gaSelectionPage() {
+    const id = this.selection[0];
+    if (!id || (this.page.gaItems ?? []).some((i) => i.id === id)) return this.page;
+    return this.project.pages.find((pg) => (pg.gaItems ?? []).some((i) => i.id === id)) ?? this.page;
+  }
+
   get selectedElements() {
     const ids = new Set(this.selection);
     return this.page.elements.filter((e) => ids.has(e.id));

@@ -102,7 +102,7 @@
   let pdfError = $state("");
   let help = $state(false);
   let browserWidth = $state(0);
-  const gaSelected = $derived((editor.page.gaItems ?? []).some((i) => editor.selection.includes(i.id)));
+  const gaSelected = $derived((editor.gaSelectionPage.gaItems ?? []).some((i) => editor.selection.includes(i.id)));
 
   function closeProps() {
     editor.selection = [];
@@ -230,7 +230,9 @@
     const ctrl = e.ctrlKey || e.metaKey;
     // GA: move, turn and delete layout items.
     if (editor.mode === "ga") {
-      const gaIds = (editor.page.gaItems ?? []).filter((i) => editor.selection.includes(i.id)).map((i) => i.id);
+      // Items picked through a frame on a detail sheet are on the sheet it shows (design-v0.3 §6).
+      const gaPage = editor.gaSelectionPage;
+      const gaIds = (gaPage.gaItems ?? []).filter((i) => editor.selection.includes(i.id)).map((i) => i.id);
       if (ctrl && e.key.toLowerCase() === "z") {
         e.preventDefault();
         if (e.shiftKey) editor.redo();
@@ -240,16 +242,16 @@
         editor.redo();
       } else if ((e.key === "Delete" || e.key === "Backspace") && gaIds.length) {
         e.preventDefault();
-        editor.apply((p) => deleteGaItems(p, editor.pageId, gaIds));
+        editor.apply((p) => deleteGaItems(p, gaPage.id, gaIds));
         editor.selection = [];
       } else if ((e.key === "r" || e.key === "R") && gaIds.length) {
-        editor.apply((p) => rotateGaItems(p, editor.pageId, gaIds));
+        editor.apply((p) => rotateGaItems(p, gaPage.id, gaIds));
       } else if (e.key.startsWith("Arrow") && gaIds.length) {
         e.preventDefault();
         const step = e.shiftKey ? 1 : 5;
         const d: [number, number] =
           e.key === "ArrowLeft" ? [-step, 0] : e.key === "ArrowRight" ? [step, 0] : e.key === "ArrowUp" ? [0, -step] : [0, step];
-        editor.apply((p) => moveGaItems(p, editor.pageId, gaIds, d));
+        editor.apply((p) => moveGaItems(p, gaPage.id, gaIds, d));
       } else if (e.key === "Escape") {
         if (canvas?.cancel()) return;
         // Then the window on top (13), then what's picked.
