@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { moduleTypeName } from "../../core/modules";
   import type { Element, GaItem, Page, Project } from "../../core/model";
   import {
     GA_ORIGIN,
@@ -50,6 +51,11 @@
   /** What a device says: its tag(s), or its own text. */
   function label(it: GaItem): string {
     if (it.text) return it.text;
+    // A controller's module: its tag and type.
+    if (it.module) {
+      const m = project.plant.find((p) => p.id === it.module);
+      return m?.module ? `${m.tag || `${m.prefix || "A"}?`} ${moduleTypeName(m.module)}` : "(deleted)";
+    }
     const els = (it.refs ?? []).map((r) => byId.get(r)).filter((e) => !!e);
     if (!els.length) return it.refs?.length ? "(deleted)" : "";
     if (els[0]!.symbol === "terminal") return String(els[0]!.params.strip ?? "X1");

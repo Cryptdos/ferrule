@@ -25,7 +25,7 @@
     addAsset,
     updatePoint,
   } from "../../core/ops";
-  import { moduleTitle } from "../../core/modules";
+  import { controllerName, moduleTitle } from "../../core/modules";
   import { readImage } from "../images";
   import { address, contactMarks, contactType, isMaster, isSlave, masterOf, partnerOf, slavesOf } from "../../core/xref";
   import { paramApplies, requireSymbol, terminalNames } from "../../core/symbols";
@@ -257,6 +257,18 @@
           />
         </label>
       {/if}
+    {/if}
+    {#if one.symbol === "ctrlmap"}
+      <label>
+        Controller
+        <select value={String(one.params.ctrl ?? "")} onchange={(e) => setParam("ctrl", e.currentTarget.value)}>
+          <option value="">The first one</option>
+          {#each editor.project.controllers ?? [] as c (c.id)}
+            <option value={c.id}>{controllerName(editor.project, c)}</option>
+          {/each}
+        </select>
+      </label>
+      <p class="hint">Its modules in rail order: tag, bus address, maker, model, type and where each is drawn; spare slots dashed. It keeps up by itself.</p>
     {/if}
     {#if one.symbol === "busbar" || one.symbol === "offpage"}
       <label>

@@ -4,6 +4,7 @@
  */
 import { changedGaStrips, doorOwner, gaCandidates, railFill, railNumber } from "./ga";
 import { compile, pinNode } from "./sim";
+import { controllerName, modulesOf, moduleTypeName, slotAddress, viewsOf } from "./modules";
 import { contactPins, isAnalogueForm, isInputForm, missingRefs, describeExpectation, things } from "./points";
 import type { Element, Page, Project } from "./model";
 import { terminalNames } from "./symbols";
@@ -142,6 +143,7 @@ export function checkProject(project: Project): Finding[] {
   if (unnumbered) out.push({ level: "info", message: `${unnumbered} items not numbered yet: press Renumber`, ids: [] });
   out.push(...supplyBypasses(project));
   out.push(...pointChecks(project));
+  out.push(...controllerChecks(project));
 
   // With a GA drawn, say what isn't on it yet; and GA devices whose schematic part has gone.
   if (project.pages.some((p) => p.ga)) {
@@ -174,6 +176,9 @@ export function checkProject(project: Project): Finding[] {
     const all = new Set(project.pages.flatMap((p) => p.elements.map((e) => e.id)));
     for (const page of project.pages) {
       for (const it of page.gaItems ?? []) {
+        if (it.module && !project.plant.some((x) => x.id === it.module)) {
+          out.push({ level: "warning", message: `Sheet ${page.number}: a controller module on the GA has been deleted`, pageId: page.id, ids: [it.id] });
+        }
         if (it.refs?.length && !it.refs.some((r) => all.has(r))) {
           out.push({ level: "warning", message: `Sheet ${page.number}: a device on the GA is no longer on the schematic`, pageId: page.id, ids: [it.id] });
         }
@@ -316,6 +321,37 @@ export function supplyBypasses(project: Project): Finding[] {
           ids: [el.id],
         });
       }
+    }
+  }
+  return out;
+}
+
+/**
+ * Controller checks (controller.md §10, with the field IO checks above for
+ * their points): two slots at one bus address, modules not drawn or with no
+ * pins, a controller with nothing on its rail.
+ */
+export function controllerChecks(project: Project): Finding[] {
+  const out: Finding[] = [];
+  for (const c of project.controllers ?? []) {
+    const name = controllerName(project, c);
+    if (!c.slots.length) {
+      out.push({ level: "info", message: `Controller ${name} has no modules yet`, ids: [] });
+      continue;
+    }
+    const at = new Map<number, number[]>();
+    c.slots.forEach((_, i) => {
+      const a = slotAddress(project, c, i);
+      at.set(a, [...(at.get(a) ?? []), i + 1]);
+    });
+    for (const [a, slots] of at) {
+      if (slots.length > 1) out.push({ level: "error", message: `Controller ${name}: slots ${slots.join(" and ")} are both at bus address ${a}`, ids: [] });
+    }
+    for (const m of modulesOf(project, c)) {
+      const views = viewsOf(project, m.id);
+      const tag = m.tag || `${m.prefix || "A"}?`;
+      if (!views.length) out.push({ level: "warning", message: `Module ${tag} (${moduleTypeName(m.module)}) of ${name} isn't drawn on any sheet`, ids: [] });
+      if (!m.terminals.length) out.push({ level: "warning", message: `Module ${tag} (${moduleTypeName(m.module)}) has no pins: Generate… or Pins and points…`, ids: views.map((v) => v.el.id) });
     }
   }
   return out;

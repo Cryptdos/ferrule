@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { setModuleDevice } from "../../core/controllers";
+  import { moduleTypeName } from "../../core/modules";
   import { deleteGaItems, rotateGaItems, setGaItemDevice, setGaSettings, setGaSize, updateGaItem, useLibraryDevice } from "../../core/ops";
   import {
     GA_SCALES,
@@ -10,6 +12,7 @@
     gaFrame,
     gaSizes,
     isDoorDevice,
+    moduleGaSize,
     railFill,
     railNumber,
     sheetLeaves,
@@ -39,9 +42,12 @@
     if (useLib) void deviceLibrary.load();
   });
   const first = $derived(one?.refs?.[0] ? byId.get(one.refs[0])?.e : undefined);
-  const kind = $derived(first ? suitsKey(editor.project, first) : "");
+  /** A controller's module on the GA. */
+  const mod = $derived(one?.module ? editor.project.plant.find((x) => x.id === one.module) : undefined);
+  const kind = $derived(mod ? "module" : first ? suitsKey(editor.project, first) : "");
   /** The size the part would have without a device from the table. */
   const generic = $derived.by(() => {
+    if (mod?.module) return moduleGaSize(editor.project, { ...mod, module: { ...mod.module, device: undefined } });
     if (!first || !one) return null;
     if (first.symbol === "terminal") return stripSize(editor.project, one.refs ?? []);
     return deviceSize(editor.project, first);
@@ -61,6 +67,13 @@
   function pickDevice(value: string) {
     if (!one) return;
     const id = one.id;
+    // A module is its model everywhere it's placed.
+    if (mod) {
+      const lib = value.startsWith("lib:") ? deviceLibrary.get(value.slice(4)) : undefined;
+      const mid = mod.id;
+      editor.apply((p) => setModuleDevice(p, mid, value ? (lib ? useLibraryDevice(p, lib).id : value) : null));
+      return;
+    }
     if (!value) {
       const g = generic;
       if (g) editor.apply((p) => setGaItemDevice(p, editor.pageId, id, null, g));
@@ -138,7 +151,10 @@
         {#if one.refs.length > 12}<span class="hint">and {one.refs.length - 12} more</span>{/if}
       </div>
     {/if}
-    {#if one.kind === "device" && one.refs?.length}
+    {#if mod?.module}
+      <p class="hint">{mod.tag || `${mod.prefix || "A"}?`} · {moduleTypeName(mod.module)}{mod.module.maker || mod.module.model ? ` · ${[mod.module.maker, mod.module.model].filter(Boolean).join(" ")}` : ""}, a controller's module (Controllers… in Draft).</p>
+    {/if}
+    {#if one.kind === "device" && (one.refs?.length || mod)}
       <label>
         Device
         <select value={one.device ?? ""} onchange={(e) => pickDevice(e.currentTarget.value)}>

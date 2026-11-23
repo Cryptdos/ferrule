@@ -3,10 +3,12 @@
  */
 import { describe, expect, test } from "bun:test";
 import { checkProject } from "./checks";
-import { addController, addModule, addSpareSlot, deleteController, generateModule, moveSlot, removeSlot, updateController, updateModule } from "./controllers";
+import { addController, addModule, addModuleFromDevice, addSpareSlot, deleteController, generateModule, moveSlot, placeModulesOnGa, removeSlot, saveModuleDevice, setModuleDevice, updateController, updateModule } from "./controllers";
+import { gaCandidates } from "./ga";
+import { billOfMaterials, ioSchedule, plantPointsSchedule } from "./schedules";
 import { newProject, type Project } from "./model";
 import { defaultPattern, generatePins, moduleTitle, moduleTypeName, slotAddress, controllerTag } from "./modules";
-import { addElement, addPlant, connect, addPage, linkContact, placePlantView, setExpectation, updatePoint } from "./ops";
+import { addElement, addGaItem, addGaPage, addPlant, connect, addPage, linkContact, linkOffpage, placePlantView, setExpectation, updatePoint } from "./ops";
 import { describeExpectation, findThing, pointRef, things } from "./points";
 import { renumber } from "./renumber";
 import { compile, initialState, judge, toggle } from "./sim";
@@ -207,5 +209,121 @@ describe("controllers and modules", () => {
     const t = saveSheetTemplate(p, pg, "T");
     expect(t.elements.map((e) => e.symbol)).toEqual(["coil"]);
     expect(t.plant).toEqual([]);
+  });
+});
+
+describe("8b2: controller map, schedules, GA, library models, checks", () => {
+  function job() {
+    const p = newProject("t");
+    const pg = p.pages[0]!.id;
+    const pg2 = addPage(p, "Sheet 2").id;
+    const c = addController(p, "AHU-1 outstation");
+    const host = addModule(p, c.id, { type: "host", pattern: null });
+    const di = addModule(p, c.id, { type: "di", channels: 4, maker: "Maker", model: "DI4" });
+    const dout = addModule(p, c.id, { type: "do", channels: 8 });
+    addSpareSlot(p, c.id);
+    placePlantView(p, pg, host.id, [8, 20]);
+    const dv = placePlantView(p, pg, di.id, [44, 20]);
+    const half = (a: number, b: number) => dout.points!.slice(a, b).flatMap((x) => x.pins);
+    placePlantView(p, pg, dout.id, [100, 20], half(0, 4));
+    const ov = placePlantView(p, pg2, dout.id, [18, 20], half(4, 8));
+    const fan = addPlant(p, "", "Supply fan", ["C", "NO"], { prefix: "SF", points: [{ name: "Running", form: "contact", pins: ["C", "NO"] }] });
+    const fv = placePlantView(p, pg, fan.id, [44, 70]);
+    const [sig, com] = di.points![0]!.pins;
+    connect(p, pg, [dv.id, sig!], [fv.id, "NO"]);
+    connect(p, pg, [dv.id, com!], [fv.id, "C"]);
+    // DO5 goes out through a link arrow.
+    const a1 = addElement(p, pg2, "offpage", [18, 50]);
+    const a2 = addElement(p, pg, "offpage", [80, 60]);
+    linkOffpage(p, a1.id, a2.id);
+    connect(p, pg2, [ov.id, dout.points![4]!.pins[1]!], [a1.id, "1"]);
+    updatePoint(p, di.id, "DI1", { label: "SF-01 running" });
+    renumber(p);
+    return { p, pg, pg2, c, host, di, dout, fan };
+  }
+
+  test("the controller map: modules in rail order, addresses, where each is drawn, spare slots", () => {
+    const { p, pg, c } = job();
+    const map = addElement(p, pg, "ctrlmap", [10, 60], { params: { ctrl: c.id } });
+    const t = elementTexts(map, p);
+    expect(t.modules!.map((m) => [m.tag, m.address, m.type, m.where, !!m.spare])).toEqual([
+      ["A1-5", 1, "Host", "1-5", false],
+      ["A1-23", 2, "DI-4", "1-23", false],
+      ["A1-51", 3, "DO-8", "1-51, 2-10", false],
+      ["", 4, "", "", true],
+    ]);
+    const g = localGeometry(map, t);
+    const texts = g.prims.flatMap((x) => (x.t === "text" ? [x.text] : []));
+    expect(texts).toContain("MAKER");
+    expect(texts).toContain("SPARE");
+    expect(g.prims.some((x) => x.t === "line" && x.dash)).toBe(true);
+    // Narrow: it wraps onto more rows.
+    map.params.width = 30;
+    expect(localGeometry(map, elementTexts(map, p)).body.h).toBeGreaterThan(g.body.h);
+  });
+
+  test("the IO schedule and plant points schedule say what each point is wired to", () => {
+    const { p } = job();
+    const io = ioSchedule(p);
+    expect(io).toHaveLength(4 + 8);
+    const di1 = io.find((r) => r.module === "A1-23 (DI-4)" && r.point === "DI1")!;
+    expect(di1.controller).toBe("A1-5 AHU-1 outstation");
+    expect(di1.form).toBe("Dry input");
+    expect(di1.label).toBe("SF-01 running");
+    expect(di1.wiredTo).toBe("SF-1-23 Running (1-23)");
+    // DI2 shares DI1's common, but nothing's wired to its own input.
+    expect(io.find((r) => r.point === "DI2")!.wiredTo).toBe("");
+    const do5 = io.find((r) => r.point.startsWith("DO5"))!;
+    expect(do5.point).toBe("DO5 (2-10)");
+    expect(do5.wiredTo).toBe("via link 2-10 → 1-41");
+    const plant = plantPointsSchedule(p);
+    expect(plant).toEqual([{ device: "SF-1-23", description: "Supply fan", point: "Running", form: "Contact", pins: "C, NO", wiredTo: "A1-23:DI1" }]);
+  });
+
+  test("on the GA a controller is one item: its modules side by side on a rail, sized by type or model", () => {
+    const { p, c, host, di, dout } = job();
+    const ga = addGaPage(p, "GA", { scale: 10, enclosure: { w: 800, h: 1000 }, view: "backplate" });
+    addGaItem(p, ga.id, { kind: "rail", x: 50, y: 195, w: 600, h: 35 });
+    const cand = gaCandidates(p, () => "").find((x) => x.modules)!;
+    expect(cand.label).toBe("A1-5 AHU-1 outstation (3 modules)");
+    expect(cand.modules!.map((m) => m.w)).toEqual([90, 18, 36]);
+    const items = placeModulesOnGa(p, ga.id, cand.modules!.map((m) => m.id), [60, 150]);
+    expect(items.map((i) => [i.x, i.w])).toEqual([[60, 90], [150, 18], [168, 36]]);
+    // On the rail: middles on its centre line.
+    expect(items.every((i) => i.y + i.h / 2 === 212.5)).toBe(true);
+    expect(gaCandidates(p, () => "").some((x) => x.modules)).toBe(false);
+    expect(() => placeModulesOnGa(p, ga.id, [di.id], [0, 0])).toThrow();
+    // Bill of materials: by type until a model's picked.
+    const bom = billOfMaterials(p);
+    expect(bom.find((r) => r.item.startsWith("Controller module DI-4"))!.tags).toBe("A1-23");
+    // Saved as a model: the GA takes its size, the BOM its name.
+    const dev = saveModuleDevice(p, di.id, { w: 45, h: 110 });
+    setModuleDevice(p, di.id, dev.id);
+    expect(items[1]!.w).toBe(45);
+    expect(billOfMaterials(p).find((r) => r.item === "Maker DI4")!.tags).toBe("A1-23");
+    // A model makes the next module in seconds.
+    const again = addModuleFromDevice(p, c.id, p.devices!.find((d) => d.id === dev.id)!);
+    expect(again.terminals).toEqual(di.terminals);
+    expect(again.points!.map((x) => x.name)).toEqual(di.points!.map((x) => x.name));
+    expect(again.points![0]!.label).toBeUndefined();
+    expect(again.module!.device).toBe(dev.id);
+    expect(again.module!.model).toBe("DI4");
+    void host;
+    void dout;
+    // The device table round trip keeps the model's pins.
+    expect(roundTrip(p).devices!.find((d) => d.id === dev.id)!.module!.terminals).toEqual(di.terminals);
+  });
+
+  test("controller checks: bus addresses, modules not drawn or with no pins, GA modules gone", () => {
+    const { p, c, di } = job();
+    const host2 = addModule(p, c.id, { type: "host", pattern: null });
+    updateModule(p, di.id, { address: 1 });
+    const msgs = checkProject(p).map((f) => `${f.level}: ${f.message}`);
+    expect(msgs).toContain("error: Controller A1-5 AHU-1 outstation: slots 1 and 2 are both at bus address 1");
+    expect(msgs.some((m) => m.startsWith("warning: Module A? (Host) of A1-5 AHU-1 outstation isn't drawn"))).toBe(true);
+    expect(msgs.some((m) => m.startsWith("warning: Module A? (Host) has no pins"))).toBe(true);
+    void host2;
+    const empty = addController(p, "Spare outstation");
+    expect(checkProject(p).some((f) => f.message === `Controller ${controllerTag(p, empty)} Spare outstation has no modules yet`)).toBe(true);
   });
 });

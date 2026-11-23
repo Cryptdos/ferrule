@@ -208,6 +208,7 @@ function parseModule(v: unknown): { module?: ModuleInfo } {
       ...(typeof v.maker === "string" && v.maker ? { maker: v.maker } : {}),
       ...(typeof v.model === "string" && v.model ? { model: v.model } : {}),
       ...(address ? { address } : {}),
+      ...(typeof v.device === "string" && v.device ? { device: v.device } : {}),
     },
   };
 }
@@ -405,6 +406,7 @@ function parsePage(pg: Record<string, unknown>, i: number): Project["pages"][num
       w: typeof it.w === "number" && it.w > 0 ? it.w : 20,
       h: typeof it.h === "number" && it.h > 0 ? it.h : 20,
       ...(Array.isArray(it.refs) ? { refs: it.refs.filter((r): r is string => typeof r === "string") } : {}),
+      ...(typeof it.module === "string" && it.module ? { module: it.module } : {}),
       ...(it.part === "handle" ? { part: "handle" as const } : {}),
       ...(typeof it.text === "string" ? { text: it.text } : {}),
       ...(typeof it.device === "string" && it.device ? { device: it.device } : {}),

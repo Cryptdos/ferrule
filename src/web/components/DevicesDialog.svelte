@@ -107,12 +107,13 @@
 
   async function toLibrary(d: ProjectDevice) {
     await run(`up:${d.id}`, async () => {
-      const e = await api.devices.add({ name: d.name, maker: d.maker, part: d.part, kind: d.kind, w: d.w, h: d.h, d: d.d });
+      const e = await api.devices.add({ name: d.name, maker: d.maker, part: d.part, kind: d.kind, w: d.w, h: d.h, d: d.d, ...(d.module ? { module: d.module } : {}) });
       deviceLibrary.put(e);
       // The project now uses the library entry in place of its own.
       editor.apply((p) => {
         useLibraryDevice(p, e);
         for (const pg of p.pages) for (const it of pg.gaItems ?? []) if (it.device === d.id) it.device = e.id;
+        for (const it of p.plant) if (it.module?.device === d.id) it.module.device = e.id;
         removeProjectDevice(p, d.id);
       });
     });

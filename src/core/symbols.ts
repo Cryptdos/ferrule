@@ -1528,6 +1528,23 @@ const SYMBOLS: SymbolDef[] = [
     },
   },
   {
+    id: "ctrlmap",
+    bench: "annotate",
+    name: "Controller map",
+    group: "Tables",
+    palette: true,
+    params: [
+      // Picked from the project's controllers (Props); empty: the first one.
+      { key: "ctrl", label: "Controller", type: "text", default: "", hidden: true },
+      { key: "width", label: "Width (units; wraps onto more rows)", type: "number", min: 20, max: 150, default: 120 },
+    ],
+    kind: () => null,
+    draw(el, t) {
+      const r = controllerMap(t?.modules ?? [], num(el, "width", 120, 20, 150));
+      return { prims: r.prims, terminals: [], body: { x: 0, y: 0, w: r.w, h: r.h } };
+    },
+  },
+  {
     id: "legend",
     bench: "annotate",
     name: "Symbol legend",
@@ -1887,6 +1904,57 @@ export function parsePlantPins(s: string): { pin: string; printed: string; id: s
   }
 }
 
+/** One box of a controller map: a module in rail order, or a spare slot. */
+export interface MapEntry {
+  tag: string;
+  address: number;
+  maker: string;
+  model: string;
+  type: string;
+  /** Every view's sheet-column. */
+  where: string;
+  spare?: boolean;
+}
+
+/**
+ * A controller map (controller.md §5): one box per module in rail order,
+ * each with its tag and bus address (in a circle), maker, model, type and
+ * where it's drawn; spare slots dashed. Wraps onto more rows to fit.
+ */
+export function controllerMap(entries: MapEntry[], width: number): { prims: Prim[]; w: number; h: number } {
+  if (!entries.length) return { prims: [text(0, 2, "CONTROLLER MAP: no modules yet (Controllers…)", TAG, "start", "label")], w: 40, h: 3 };
+  const lh = DETAIL * 1.45;
+  const pad = 0.8;
+  const r = 1.1;
+  const lines = (e: MapEntry) => (e.spare ? ["SPARE", "I/O"] : [e.maker.toUpperCase(), e.model.toUpperCase(), e.type, e.where]);
+  const boxW = Math.ceil(
+    Math.max(
+      14,
+      ...entries.map((e) => Math.max(textWidth(e.spare ? "" : e.tag, TAG) + 2 * r + 1.5, ...lines(e).map((l) => textWidth(l, DETAIL)))) ,
+    ) + 2 * pad,
+  );
+  const boxH = Math.ceil(pad * 2 + TAG * 1.4 + 4 * lh);
+  const per = Math.max(1, Math.floor((width + 0.5) / boxW));
+  const prims: Prim[] = [];
+  entries.forEach((e, i) => {
+    const x = (i % per) * boxW;
+    const y = Math.floor(i / per) * (boxH + 1);
+    const pts: Vec[] = [[x, y], [x + boxW, y], [x + boxW, y + boxH], [x, y + boxH], [x, y]];
+    prims.push(e.spare ? { t: "line", pts, dash: true, w: W } : line(...pts));
+    const ty = y + pad + TAG * CAP_HEIGHT;
+    if (!e.spare) prims.push(text(x + pad, ty, e.tag, TAG, "start", "tag"));
+    // The bus address, circled, top right.
+    const cx = x + boxW - pad - r;
+    const cy = y + pad + r;
+    prims.push(circle(cx, cy, r), text(cx, cy + (DETAIL * CAP_HEIGHT) / 2, String(e.address), DETAIL, "middle", "note"));
+    lines(e).forEach((l, k) => {
+      if (l) prims.push(text(x + pad, y + pad + TAG * 1.4 + (k + 1) * lh - 0.3, l, DETAIL, "start", "note"));
+    });
+  });
+  const rows = Math.ceil(entries.length / per);
+  return { prims, w: Math.min(entries.length, per) * boxW, h: rows * boxH + (rows - 1) };
+}
+
 /** Module view sizes, grid units. */
 export const MODULE = {
   /** Room for the channel names (AO1) over the id boxes. */
@@ -2192,6 +2260,8 @@ export interface GeometryText {
   name?: string;
   /** A contact timed by its timer coil: the coil's function (on, off, on-off…), so the delay mark is drawn. */
   timed?: string;
+  /** A controller map's boxes. */
+  modules?: MapEntry[];
   /** Revision list rows (revision table). */
   rows?: string[][];
   /** One of each part used (symbol legend). */

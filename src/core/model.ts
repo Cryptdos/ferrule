@@ -150,6 +150,8 @@ export interface GaItem {
   h: number;
   /** Schematic elements this is (a device, or every terminal of a strip). */
   refs?: string[];
+  /** A controller's module (a plant item's id) rather than a schematic element. */
+  module?: string;
   /** Which part of the device: its door handle (an isolator worked through the door) rather than its body. */
   part?: "handle";
   /** A label for a device, instead of its tag; a label plate's engraving. */
@@ -240,6 +242,8 @@ export interface ModuleInfo {
   model?: string;
   /** Its position on the controller's bus, set by hand to match its DIP switches. Unset: from rail order. */
   address?: number;
+  /** The model it is from the device table (its size on the GA, its pins as entered from the datasheet). */
+  device?: string;
 }
 
 /**

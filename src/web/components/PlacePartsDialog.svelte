@@ -25,13 +25,13 @@
   /** Parts that go on the other kind of sheet: counted, not listed. */
   const elsewhere = $derived(all.filter((c) => !fits(c)));
   const doorElsewhere = $derived(elsewhere.filter((c) => c.door).length);
-  const key = (c: GaCandidate) => c.refs.join(",") + (c.part ? `#${c.part}` : "");
-  const picked = $derived(editor.gaPlace ? editor.gaPlace.refs.join(",") + (editor.gaPlace.part ? `#${editor.gaPlace.part}` : "") : "");
+  const key = (c: Pick<GaCandidate, "refs" | "part" | "modules">) => (c.modules ? c.modules.map((m) => m.id).join(",") : c.refs.join(",")) + (c.part ? `#${c.part}` : "");
+  const picked = $derived(editor.gaPlace ? key(editor.gaPlace) : "");
 
   function pick(c: GaCandidate) {
     if (!fits(c)) return;
     editor.tool = "select";
-    editor.gaPlace = picked === key(c) ? null : { refs: c.refs, w: c.w, h: c.h, label: c.label, ...(c.part ? { part: c.part } : {}) };
+    editor.gaPlace = picked === key(c) ? null : { refs: c.refs, w: c.w, h: c.h, label: c.label, ...(c.part ? { part: c.part } : {}), ...(c.modules ? { modules: c.modules } : {}) };
     if (editor.gaPlace) editor.flash(`Click on the sheet to place ${c.label}. Devices snap onto a DIN rail.`);
   }
 </script>

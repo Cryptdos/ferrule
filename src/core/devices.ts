@@ -4,6 +4,53 @@
  * uses one, so a project file always has the sizes it needs.
  */
 
+import type { IoPoint, ModuleType, PinInfo } from "./model";
+
+/**
+ * A controller module's model as entered from its datasheet (controller.md
+ * §4): its type, channels and pins table, so the next one takes seconds.
+ */
+export interface ModuleTemplate {
+  type: ModuleType;
+  channels?: number;
+  terminals: string[];
+  pins?: Record<string, PinInfo>;
+  /** Its points: name, form, pins (what they follow and job labels belong to the job, not the model). */
+  points?: IoPoint[];
+}
+
+const MODULE_TYPES = new Set(["psu", "host", "di", "do", "uio", "ai", "ao"]);
+const FORM_SET = new Set(["contact", "powered-out", "dry-in", "powered-in", "analogue-in", "analogue-out", "supply-in", "supply-out", "comms"]);
+
+export function parseModuleTemplate(v: unknown): ModuleTemplate | undefined {
+  if (typeof v !== "object" || v === null) return undefined;
+  const o = v as Record<string, unknown>;
+  if (!MODULE_TYPES.has(o.type as string)) return undefined;
+  const strs = (x: unknown) => (Array.isArray(x) ? x.filter((t): t is string => typeof t === "string") : []);
+  const terminals = strs(o.terminals);
+  const out: ModuleTemplate = { type: o.type as ModuleType, terminals };
+  if (typeof o.channels === "number" && o.channels >= 1) out.channels = Math.min(64, Math.floor(o.channels));
+  if (typeof o.pins === "object" && o.pins !== null) {
+    const pins: Record<string, PinInfo> = {};
+    for (const [k, p] of Object.entries(o.pins as Record<string, unknown>)) {
+      if (!terminals.includes(k) || typeof p !== "object" || p === null) continue;
+      const q = p as Record<string, unknown>;
+      const id = typeof q.id === "string" ? q.id : "";
+      const group = typeof q.group === "string" ? q.group : "";
+      if (id || group) pins[k] = { ...(id ? { id } : {}), ...(group ? { group } : {}) };
+    }
+    if (Object.keys(pins).length) out.pins = pins;
+  }
+  if (Array.isArray(o.points)) {
+    const points = o.points
+      .filter((p): p is Record<string, unknown> => typeof p === "object" && p !== null && typeof (p as Record<string, unknown>).name === "string")
+      .map((p) => ({ name: p.name as string, form: (FORM_SET.has(p.form as string) ? p.form : "dry-in") as IoPoint["form"], pins: strs(p.pins).filter((t) => terminals.includes(t)) }))
+      .filter((p) => p.name && p.pins.length);
+    if (points.length) out.points = points;
+  }
+  return out;
+}
+
 /** "door" (all door devices) from before "suits" listed schematic parts: now any part. */
 const suitsFrom = (k: unknown) => {
   const v = typeof k === "string" ? k : "";
@@ -32,6 +79,8 @@ export interface DeviceEntry {
   d: number;
   notes: string;
   files: DeviceFile[];
+  /** A controller module's model: its pins as entered from the datasheet. */
+  module?: ModuleTemplate;
 }
 
 /** A device a project uses: a copy of the library entry's details (or the project's own). */
@@ -46,6 +95,8 @@ export interface ProjectDevice {
   d: number;
   /** Came from the shared library (true) or was made in this project only. */
   library: boolean;
+  /** A controller module's model: its pins as entered from the datasheet. */
+  module?: ModuleTemplate;
 }
 
 const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
@@ -74,8 +125,14 @@ export function parseDeviceEntry(v: unknown, id?: string): DeviceEntry {
     d: typeof o.d === "number" && o.d > 0 ? mm(o.d, 0) : 0,
     notes: typeof o.notes === "string" ? o.notes : "",
     files: Array.isArray(o.files) ? o.files.map(parseDeviceFile).filter((f): f is DeviceFile => !!f) : [],
+    ...withModule(o.module),
   };
 }
+
+const withModule = (v: unknown): { module?: ModuleTemplate } => {
+  const m = parseModuleTemplate(v);
+  return m ? { module: m } : {};
+};
 
 export function parseProjectDevices(v: unknown): ProjectDevice[] {
   if (!Array.isArray(v)) return [];
@@ -96,6 +153,7 @@ export function parseProjectDevices(v: unknown): ProjectDevice[] {
       h: mm(o.h, 90),
       d: typeof o.d === "number" && o.d > 0 ? mm(o.d, 0) : 0,
       library: o.library === true,
+      ...withModule(o.module),
     });
   }
   return out;
@@ -103,7 +161,7 @@ export function parseProjectDevices(v: unknown): ProjectDevice[] {
 
 /** The project's copy of a library entry. */
 export function projectCopy(e: DeviceEntry): ProjectDevice {
-  return { id: e.id, name: e.name, maker: e.maker, part: e.part, kind: e.kind, w: e.w, h: e.h, d: e.d, library: true };
+  return { id: e.id, name: e.name, maker: e.maker, part: e.part, kind: e.kind, w: e.w, h: e.h, d: e.d, library: true, ...(e.module ? { module: structuredClone(e.module) } : {}) };
 }
 
 /** "Relay 4CO (Weidmüller DRM 7760…) 30.6 × 101.8" for lists. */

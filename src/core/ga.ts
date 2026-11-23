@@ -10,8 +10,9 @@
  * top-left corner; they're drawn at the sheet's scale.
  */
 import { AREA_UNITS, UNIT_MM, type Vec } from "./geometry";
-import type { DoorLeaf, Element, GaDimPoint, GaItem, GaSettings, GaView, Page, Project } from "./model";
+import type { DoorLeaf, Element, GaDimPoint, GaItem, GaSettings, GaView, Page, PlantItem, Project } from "./model";
 import { getSymbol } from "./symbols";
+import { controllerName, modulesOf, viewsOf } from "./modules";
 import { isSlave, slavesOf } from "./xref";
 
 /** Where the enclosure's top-left corner sits on the sheet, in grid units. */
@@ -194,7 +195,22 @@ export const GA_SIZES: Record<string, GaSize> = {
   block: { w: 60, h: 50, label: "Distribution block" },
   door: { w: 30, h: 40, label: "Door device (22 mm) with legend" },
   handle: { w: 65, h: 65, label: "Door handle (isolator worked through the door)" },
+  ctrlPsu: { w: 36, h: 90, label: "Controller power supply" },
+  ctrlHost: { w: 90, h: 100, label: "Controller host" },
+  ctrlIo: { w: 9, h: 100, label: "Controller IO module, per 2 channels", perPole: true },
 };
+
+/** A controller module's size on the GA: its device from the table, else a generic one by type and channels. */
+export function moduleGaSize(project: Project, item: PlantItem): { w: number; h: number } {
+  const m = item.module;
+  const dev = m?.device ? project.devices?.find((d) => d.id === m.device) : undefined;
+  if (dev) return { w: dev.w, h: dev.h };
+  const sizes = gaSizes(project);
+  if (m?.type === "psu") return { w: sizes.ctrlPsu!.w, h: sizes.ctrlPsu!.h };
+  if (!m || m.type === "host") return { w: sizes.ctrlHost!.w, h: sizes.ctrlHost!.h };
+  const io = sizes.ctrlIo!;
+  return { w: Math.round(io.w * Math.ceil(Math.max(4, m.channels ?? 8) / 2) * 10) / 10, h: io.h };
+}
 
 /** Sizes for this project: the generic ones with any the project has changed. */
 export function gaSizes(project: Project): Record<string, GaSize> {
@@ -257,6 +273,7 @@ export const SUITS: { key: string; label: string }[] = [
   { key: "lamp", label: "Indicator lamp" },
   { key: "pushbutton", label: "Push button" },
   { key: "selector", label: "Selector / keyswitch" },
+  { key: "module", label: "Controller module" },
 ];
 
 /** Which entry of SUITS a schematic part is, or "" if it isn't a panel device. */
@@ -293,13 +310,19 @@ export const placeKey = (ref: string, part?: string) => (part ? `${ref}#${part}`
 /** Every element (and door handle) already on some GA sheet. */
 export function placedOnGa(project: Project): Set<string> {
   const out = new Set<string>();
-  for (const pg of project.pages) for (const it of pg.gaItems ?? []) for (const r of it.refs ?? []) out.add(placeKey(r, it.part));
+  for (const pg of project.pages)
+    for (const it of pg.gaItems ?? []) {
+      for (const r of it.refs ?? []) out.add(placeKey(r, it.part));
+      if (it.module) out.add(it.module);
+    }
   return out;
 }
 
 export interface GaCandidate {
   /** One element, or a whole terminal strip on a sheet. */
   refs: string[];
+  /** A controller: its modules still to place, in rail order, each with its size. */
+  modules?: { id: string; w: number; h: number; device?: string }[];
   /** Its door handle rather than its body. */
   part?: "handle";
   label: string;
@@ -341,6 +364,22 @@ export function gaCandidates(project: Project, tagOf: (el: Element) => string): 
   for (const [strip, s] of strips) {
     const { w, h } = stripSize(project, s.refs);
     out.push({ refs: s.refs, label: `${strip} (${s.refs.length} terminals)`, sheet: s.sheet, door: false, w, h });
+  }
+  // A controller is one item: its modules side by side on a rail, in rail order (controller.md §8).
+  for (const c of project.controllers ?? []) {
+    const mods = modulesOf(project, c).filter((m) => !placed.has(m.id));
+    if (!mods.length) continue;
+    const sized = mods.map((m) => ({ id: m.id, ...moduleGaSize(project, m), ...(m.module.device ? { device: m.module.device } : {}) }));
+    const sheet = Math.min(...mods.map((m) => viewsOf(project, m.id)[0]?.page.number ?? Infinity));
+    out.push({
+      refs: [],
+      modules: sized,
+      label: `${controllerName(project, c)} (${mods.length} module${mods.length === 1 ? "" : "s"})`,
+      sheet: Number.isFinite(sheet) ? sheet : 0,
+      door: false,
+      w: Math.round(sized.reduce((a, m) => a + m.w, 0) * 10) / 10,
+      h: Math.max(...sized.map((m) => m.h)),
+    });
   }
   return out.sort((a, b) => a.sheet - b.sheet || a.label.localeCompare(b.label, undefined, { numeric: true }));
 }

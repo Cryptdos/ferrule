@@ -2,6 +2,8 @@
   import {
     addController,
     addModule,
+    addModuleFromDevice,
+    saveModuleDevice,
     addSpareSlot,
     deleteController,
     generateModule,
@@ -15,6 +17,7 @@
   import { MODULE_TYPES, controllerTag, defaultPattern, moduleType, slotAddress, viewsOf, type ModulePattern } from "../../core/modules";
   import { moduleParam, plantLabel, plantPinsParam } from "../../core/ops";
   import type { Editor } from "../editor.svelte";
+  import { deviceLibrary } from "../devices.svelte";
   import Modal from "./Modal.svelte";
   import PointsDialog from "./PointsDialog.svelte";
 
@@ -36,6 +39,22 @@
   /** The module whose generator is open, with its pattern. */
   let gen = $state<{ id: string; p: ModulePattern } | null>(null);
 
+  // Models from the device table (this project's, then the shared library's) that are controller modules.
+  const useLib = $derived(editor.project.useDeviceLibrary !== false);
+  $effect(() => {
+    if (useLib) void deviceLibrary.load();
+  });
+  const models = $derived([
+    ...(editor.project.devices ?? []).filter((d) => d.module).map((d) => ({ value: d.id, label: d.name })),
+    ...(useLib ? deviceLibrary.list.filter((d) => d.module && !editor.project.devices?.some((m) => m.id === d.id)).map((d) => ({ value: `lib:${d.id}`, label: `${d.name} (library)` })) : []),
+  ]);
+  function addFromModel(ctrlId: string, value: string) {
+    const lib = value.startsWith("lib:") ? deviceLibrary.get(value.slice(4)) : undefined;
+    const own = editor.project.devices?.find((d) => d.id === value);
+    const dev = lib ?? own;
+    if (dev) editor.apply((p) => void addModuleFromDevice(p, ctrlId, lib ?? p.devices!.find((d) => d.id === value)!));
+  }
+  const deviceName = (id: string | undefined) => (id ? editor.project.devices?.find((d) => d.id === id)?.name : undefined);
   const moduleOf = (id: string | undefined): PlantItem | undefined => (id ? editor.project.plant.find((p) => p.id === id) : undefined);
   const where = (id: string) => viewsOf(editor.project, id).map((v) => v.address).join(", ");
 
@@ -159,6 +178,12 @@
                 <td class="actions">
                   <button onclick={() => place(item)} title="Place a view of this module on the current sheet, at the top">Place view</button>
                   <button class:active={gen?.id === item.id} onclick={() => (gen?.id === item.id ? (gen = null) : openGenerator(item))} title="Fill in its pins from a pattern">Generate…</button>
+                  {#if !m.device}
+                    <button title="Save it as a model in the device table, pins and all, so the next one takes seconds (and from there to the shared library with its datasheet)"
+                      onclick={() => editor.apply((p) => void saveModuleDevice(p, item.id))}>Save model</button>
+                  {:else}
+                    <span class="model" title="Its model in the device table: its size on the GA">{deviceName(m.device) ?? "model"}</span>
+                  {/if}
                   <button class:active={pointsOf === item.id} onclick={() => (pointsOf = pointsOf === item.id ? null : item.id)} title="Its pins and points, and each point's label">Pins and points…</button>
                   <button disabled={i === 0} title="Move left along the rail" onclick={() => editor.apply((p) => moveSlot(p, c.id, i, i - 1))}>↑</button>
                   <button disabled={i === c.slots.length - 1} title="Move right along the rail" onclick={() => editor.apply((p) => moveSlot(p, c.id, i, i + 1))}>↓</button>
@@ -216,6 +241,20 @@
             editor.apply((p) => addModule(p, c.id, { type, channels, pattern: type === "host" ? null : undefined }));
           }}>Add module</button
         >
+        {#if models.length}
+          <select
+            value=""
+            title="A model entered before, from the device table or the shared library"
+            onchange={(e) => {
+              const v = e.currentTarget.value;
+              e.currentTarget.value = "";
+              if (v) addFromModel(c.id, v);
+            }}
+          >
+            <option value="">Add a saved model…</option>
+            {#each models as d (d.value)}<option value={d.value}>{d.label}</option>{/each}
+          </select>
+        {/if}
         <button onclick={() => editor.apply((p) => addSpareSlot(p, c.id))} title="A slot left for later: drawn dashed on the controller map">Add spare slot</button>
       </div>
     </section>
@@ -305,6 +344,11 @@
     gap: 6px;
     align-items: center;
     margin-top: 6px;
+  }
+  .model {
+    font-size: 11px;
+    color: #556;
+    padding: 0 4px;
   }
   .narrowin {
     width: 56px;
