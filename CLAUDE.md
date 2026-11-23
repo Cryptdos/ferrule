@@ -1,12 +1,12 @@
 # Working on Ferrule
 
-Read this first. The design record is `docs/DESIGN.md`; the plan being built is `docs/design-v0.2.1.md` (the v0.2 sprint's record and working agreement are in `docs/design-v0.2.md`). Controllers and field IO are designed in `docs/controller.md`.
+Read this first. The design record is `docs/DESIGN.md`; the plan being built is `docs/design-v0.3.md` (earlier plans: `docs/design-v0.2.md`, the v0.2 sprint, and `docs/design-v0.2.1.md`, which ended at its step 2). Controllers and field IO are designed in `docs/controller.md`.
 
 ## Where the work is
 
-v0.2.1, version `0.2.1-pre`: fixes and changes from QA of the v0.2 builds, planned in `docs/design-v0.2.1.md` (§7 *Order of work*, §9 *Changed during build*). The v0.2 sprint (`docs/design-v0.2.md`) is merged; v0.3 (tiling windows and a live split view, alignment tools, icon-only buttons) is outlined in the user's notes and will get its own design doc here before it's built.
+v0.3, version `0.3.0-pre`: planned in `docs/design-v0.3.md` (§10 *Order of work* and its *Changed during build*, §11 the review notes as written). It takes in what v0.2.1 didn't build (busbar split, terminals and numbering, link arrows); v0.2.1 ended at its step 2 (PRs 43–45).
 
-- **v0.2.1 steps:** 1 windows and top bar; 2 parts and Annotate (with the logo); 3 busbars split into distribution block and control rail; 4 terminals and numbering (2-unit terminals and 2.5 mm text, terminals drive wire numbers, link arrows show wire number and bracketed reference).
+- **v0.3 steps:** 1 start (version, docs) and distribution colour as a select; 2 busbars split into distribution block and control rail; 3 terminals (2-unit spacing, 2.5 mm text, earth terminals, strip order on the GA); 4 wire numbers from terminals; 5 link arrows (wire number and bracketed reference); 6 tiling windows and the live split view (more than one PR); 7 icons on buttons and the Buttons setting; 8 alignment tools; 9 door lamps lit in Simulate; 10 GA detail sheets. Network drawings are v0.4.
 - Modules are plant items with `module` set (`src/core/modules.ts` helpers, `src/core/controllers.ts` ops); a module view is a `plant-view` with `params.pmod`.
 - Builds made off Windows have no exe icon (Bun sets it only on Windows); CI's exe job runs on Windows and its artifact has it.
 - At the next release, remove `preRelease()` in `src/core/validate.ts` (maps test-build files).
@@ -15,9 +15,9 @@ v0.2.1, version `0.2.1-pre`: fixes and changes from QA of the v0.2 builds, plann
 
 - One step, one PR, from a branch. CI (`check`, `exe`) must pass; the PR is set to auto-merge (`PUT repos/Cryptdos/ferrule/pulls/<n>/ccr/auto_merge`, squash). GraphQL isn't available; use REST (`gh api`).
 - Stop only at a PR boundary. The PR body ends by saying what's next.
-- Small judgement calls: decide, and note them under *Changed during build* in the design doc being built (`docs/design-v0.2.1.md` §9). Anything costly to reverse: push-notify and wait.
-- Each code PR: build `dist/ferrule-windows-v<version>.zip` (`bun scripts/build-exe.ts`, then `cd dist && zip -q -9 ferrule-windows-v<version>.zip ferrule.exe`) and send it to the user.
-- After each PR, sync the design doc being built (`docs/design-v0.2.1.md`) to the user's `C:\Temp\eCAD\UPCOMING\` (same name): copy it to `/mnt/user-data/outputs/<unique name>.md`, list the folder for a fresh `mtimeMs`, then `device_commit_files` with `expectedMtimeMs`. Never `force`.
+- Small judgement calls: decide, and note them under *Changed during build* in the design doc being built (`docs/design-v0.3.md` §10). Anything costly to reverse: push-notify and wait.
+- Each code PR: build `dist/ferrule-windows-v<version>.zip`, now `ferrule-windows-v0.3.0-pre.zip` (`bun scripts/build-exe.ts`, then `cd dist && zip -q -9 ferrule-windows-v<version>.zip ferrule.exe`), and send it to the user.
+- After each PR, sync the design doc being built (`docs/design-v0.3.md`) to the user's `C:\Temp\eCAD\v0.3.0-pre Notes\design-v0.3.md`: copy it to `/mnt/user-data/outputs/<unique name>.md`, list the folder for a fresh `mtimeMs`, then `device_commit_files` with `expectedMtimeMs`. Never `force`.
 - Update `README.md` and add a row to the decisions table in `docs/DESIGN.md` for what changed; retake README screenshots when the interface changes.
 - Before a PR: `bun test`, `bun run typecheck`, and look at the result (print view screenshots or the browser).
 

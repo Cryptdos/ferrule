@@ -1,7 +1,8 @@
 <script lang="ts">
   import { addDistribution, deleteDistribution, distParamKeys, updateDistribution } from "../../core/ops";
   import { DISTRIBUTION_KINDS, type DistributionKind } from "../../core/model";
-  import { WIRE_COLOURS, WIRE_FUNCTIONS } from "../../core/wirecolours";
+  import { WIRE_FUNCTIONS } from "../../core/wirecolours";
+  import ColourSelect from "./ColourSelect.svelte";
   import type { Editor } from "../editor.svelte";
   import Modal from "./Modal.svelte";
 
@@ -54,7 +55,7 @@
               </select>
             </td>
             <td><input value={d.voltage} placeholder="e.g. 230 V" onchange={(e) => update(d.id, { voltage: e.currentTarget.value })} /></td>
-            <td class="narrow"><input value={d.colour ?? ""} list="dist-colours" onchange={(e) => update(d.id, { colour: e.currentTarget.value })} /></td>
+            <td class="narrow"><ColourSelect value={d.colour} onchange={(v) => update(d.id, { colour: v })} /></td>
             <td class="narrow"><input value={d.function ?? ""} list="dist-functions" onchange={(e) => update(d.id, { function: e.currentTarget.value })} /></td>
             <td class="sheets">{usedOn(d.id).join(", ") || "–"}</td>
             <td>
@@ -79,13 +80,10 @@
       {#each DISTRIBUTION_KINDS as k (k.value)}<option value={k.value}>{k.label}</option>{/each}
     </select>
     <input bind:value={voltage} placeholder="Voltage, e.g. 24 V DC" />
-    <input bind:value={colour} placeholder="Colour" list="dist-colours" />
+    <ColourSelect value={colour} title="Colour" onchange={(v) => (colour = v)} />
     <input bind:value={func} placeholder="Function" list="dist-functions" />
     <button type="submit">Add</button>
   </form>
-  <datalist id="dist-colours">
-    {#each WIRE_COLOURS as c (c.code)}<option value={c.code}>{c.name}</option>{/each}
-  </datalist>
   <datalist id="dist-functions">
     {#each WIRE_FUNCTIONS as f (f)}<option value={f}></option>{/each}
   </datalist>
@@ -108,7 +106,10 @@
     width: 100%;
   }
   td.narrow {
-    width: 90px;
+    width: 120px;
+  }
+  td :global(select) {
+    width: 100%;
   }
   td.sheets {
     font-size: 12px;

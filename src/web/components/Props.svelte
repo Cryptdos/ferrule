@@ -29,7 +29,8 @@
   import { readImage } from "../images";
   import { address, contactMarks, contactType, isMaster, isSlave, masterOf, partnerOf, slavesOf } from "../../core/xref";
   import { paramApplies, requireSymbol, terminalNames } from "../../core/symbols";
-  import { WIRE_COLOURS, WIRE_FUNCTIONS } from "../../core/wirecolours";
+  import { WIRE_FUNCTIONS } from "../../core/wirecolours";
+  import ColourSelect from "./ColourSelect.svelte";
   import { displayTag, tagPrefix } from "../../core/tags";
   import type { ParamValue } from "../../core/model";
   import { describeExpectation, formLabel, isInputForm, pointOfPin, pointRef, printedPin } from "../../core/points";
@@ -512,22 +513,13 @@
       <div class="pair">
         <label>
           Core colour
-          <select
-            value={cond.colour ?? ""}
-            onchange={(e) => {
-              const v = e.currentTarget.value;
+          <ColourSelect
+            value={cond.colour}
+            onchange={(v) => {
               const id = cond.id;
               editor.apply((p) => setConductorInfo(p, id, { colour: v }));
             }}
-          >
-            <option value="">–</option>
-            {#each WIRE_COLOURS as c (c.code)}
-              <option value={c.code}>{c.code} {c.name}</option>
-            {/each}
-            {#if cond.colour && !WIRE_COLOURS.some((c) => c.code === cond.colour)}
-              <option value={cond.colour}>{cond.colour}</option>
-            {/if}
-          </select>
+          />
         </label>
         <label>
           Function

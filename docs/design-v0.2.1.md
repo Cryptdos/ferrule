@@ -1,6 +1,8 @@
 # Ferrule v0.2.1: design
 
-**Status:** agreed in discussion (23/11/26) from the QA notes in `v0.2.1-pre Notes/working-points.md`. Version `0.2.1-pre`. Split view and tiling, alignment tools and icon-only buttons have moved to v0.3 (`v0.3.0-pre Notes/design-v0.3.md`).
+**Status: ended at step 2** (PRs 43–45, merged 23/11/26). Steps 3 and 4 (busbars, terminals and numbering) moved to v0.3 as §1 and §2 of `docs/design-v0.3.md`, which is the plan now being built.
+
+**Agreed** in discussion (23/11/26) from the QA notes in `v0.2.1-pre Notes/working-points.md`. Version `0.2.1-pre`. Split view and tiling, alignment tools and icon-only buttons have moved to v0.3 (`docs/design-v0.3.md`).
 
 Numbers in brackets are the note numbers in `working-points.md`.
 
@@ -71,8 +73,8 @@ Each step is one PR with a build (`ferrule-windows-v0.2.1-pre.zip`), as in the v
 
 1. **Windows and top bar** (§1). First, so v0.3's tiling work can build on it.
 2. **Parts and Annotate** (§2), with the logo (§5).
-3. **Busbars split** (§3).
-4. **Terminals and numbering** (§4): 2-unit terminals and text sizes first (with the test print), then terminal-driven wire numbers, then link arrows.
+3. **Busbars split** (§3). *Moved to v0.3 §1.*
+4. **Terminals and numbering** (§4): 2-unit terminals and text sizes first (with the test print), then terminal-driven wire numbers, then link arrows. *Moved to v0.3 §2.*
 
 ## 8. Moved to v0.3
 
