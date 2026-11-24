@@ -187,7 +187,7 @@ describe("terminal block on the panel boundary", () => {
     expect(t.pos[1]).toBe(80); // dropped near it: snapped in
     expect(t.params.onBlock).toBe(true);
     const g = localGeometry(t, elementTexts(t, p));
-    expect(g.body).toEqual({ x: -1, y: -1.5, w: 2, h: 3 });
+    expect(g.body).toEqual({ x: -1, y: -2, w: 2, h: 4 });
     setBoundary(p, pg, 90);
     expect(t.pos[1]).toBe(90);
     moveElements(p, pg, [t.id], [0, -10]);
@@ -214,9 +214,9 @@ describe("terminal block on the panel boundary", () => {
     const k = addElement(p, pg, "coil", [20, 60]);
     const t = addElement(p, pg, "terminal", [20, 80]);
     connect(p, pg, [k.id, "A2"], [t.id, "1"]);
-    expect(terminalPoint(t, "1")).toEqual([20, 78.5]);
+    expect(terminalPoint(t, "1")).toEqual([20, 78]);
     updateElement(p, pg, t.id, { params: { function: "fuse" } });
-    expect(terminalPoint(t, "1")).toEqual([20, 76.5]);
+    expect(terminalPoint(t, "1")).toEqual([20, 76]);
     expect(routesStale(p.pages[0]!)).toBe(true); // the editor and the print view route it again
     const lines = localGeometry(t, elementTexts(t, p)).prims.filter((x) => x.t === "line");
     expect(lines.length).toBeGreaterThan(2);
@@ -224,7 +224,7 @@ describe("terminal block on the panel boundary", () => {
     updateElement(p, pg, t.id, { params: { function: "fuse-disconnect" } });
     const sw = localGeometry(t, elementTexts(t, p)).prims.filter((x) => x.t === "line");
     expect(sw.length).toBeGreaterThan(lines.length);
-    expect(terminalPoint(t, "1")).toEqual([20, 76.5]);
+    expect(terminalPoint(t, "1")).toEqual([20, 76]);
   });
 
   test("older files: terminals already on a boundary go into the block when loaded", () => {
@@ -244,7 +244,7 @@ describe("sprint 1: hand-routed wires on half-unit terminals", () => {
     const t = addElement(p, pg, "terminal", [30, 80]);
     const w = connect(p, pg, [k.id, "A2"], [t.id, "1"]);
     const end = terminalPoint(t, "1")!;
-    expect(end[1]).toBe(78.5);
+    expect(end[1]).toBe(78);
     const start = terminalPoint(k, "A2")!;
     // A dragged route: down from the coil, across, down onto the half-unit terminal.
     setManualRoute(p, pg, w.id, [start, [start[0], 70.2], [end[0], 70.2], end]);

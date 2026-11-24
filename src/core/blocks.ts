@@ -4,12 +4,13 @@ import type { Page } from "./model";
 import { textWidth } from "./textwidth";
 
 /**
- * Half a cell's height, at its smallest: cells are 3 units tall. A terminal
- * number is written up the cell in the `tag` style (2.5 mm, v0.3 §2) and
- * never smaller; a number that won't fit makes every cell in the block
+ * Half a cell's height, at its smallest: cells are 4 units tall, so a
+ * five-character number (`20-19`) fits without growing (v0.4.x F8). A
+ * terminal number is written up the cell in the `tag` style (2.5 mm, v0.3 §2)
+ * and never smaller; a number that won't fit makes every cell in the block
  * taller instead.
  */
-export const BLOCK_HALF = 1.5;
+export const BLOCK_HALF = 2;
 /** White space left clear at each end of the sheet. */
 export const BLOCK_INSET = 2;
 

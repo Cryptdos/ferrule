@@ -7,7 +7,7 @@
  * change what was stamped. Plant is re-pointed when stamping: each plant
  * item the template refers to is mapped to an existing item or a new one.
  */
-import { spreadBlock } from "./blocks";
+import { fitBlock, spreadBlock } from "./blocks";
 import { tidyDesign } from "./design";
 import { refreshConductors } from "./conductors";
 import { fieldPlantRefs, remapFields } from "./fields";
@@ -247,6 +247,7 @@ export function stampTemplate(project: Project, templateId: string, opts: StampO
   page.sections.push(...sections);
   updateZones(page);
   spreadBlock(page);
+  fitBlock(page);
   syncPlantViews(project);
   refreshConductors(project);
   tidyDesign(project);

@@ -9,6 +9,7 @@ import { PLANT_VIEW_KEYS, labelWidthFor, legendToPositions } from "./ops";
 import { parseProjectDevices } from "./devices";
 import { AREA_UNITS } from "./geometry";
 import { tidyDesign } from "./design";
+import { RELEASES_URL, VERSION } from "./version";
 import { DISTRIBUTION_KINDS, type DistributionKind, POINT_FORMS, type Condition, type Controller, type ControllerSlot, type DesignTemplate, type ModuleInfo, type ModuleType, type PlantItem, type Expectation, type IoPoint, type Interlock, type Network, type PinInfo, type PointForm, FORMAT, FORMAT_VERSION, type GaDim, type GaDimPoint, type GaItem, type Page, type Project, emptyInfo } from "./model";
 import { defaultParams, getSymbol } from "./symbols";
 import { gaToSheet } from "./ga";
@@ -28,8 +29,12 @@ export function parseProject(input: unknown): Project {
   if (input.format !== FORMAT) throw new ProjectFormatError('Not a Ferrule project (missing format: "ferrule")');
   const version = typeof input.version === "number" ? input.version : 0;
   if (version > FORMAT_VERSION) {
+    // The version that saved it (v0.4.x T19), when the file says; otherwise only its format.
+    const by = typeof input.savedBy === "string" && input.savedBy.trim() ? input.savedBy.trim() : "";
     throw new ProjectFormatError(
-      `Project was saved by a newer Ferrule (format ${version}); this build reads format ${FORMAT_VERSION}`,
+      by
+        ? `Saved by Ferrule ${by} (format ${version}). This is ${VERSION} (format ${FORMAT_VERSION}). Open it in ${by} or later: ${RELEASES_URL}`
+        : `Project was saved by a newer Ferrule (format ${version}); this build reads format ${FORMAT_VERSION}`,
     );
   }
   if (version < FORMAT_VERSION) {
