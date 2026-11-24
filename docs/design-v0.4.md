@@ -468,6 +468,7 @@ The first entries come from an integration test: a 36-sheet BMS panel (incomer a
 - [ ] **T14. Part labels can be moved.** A lamp's, coil's or other part's label can be dragged clear by hand, as a relay's contact table can; solving every collision automatically isn't worth it. Takes the place of T7's moving labels (a hint in Check can stay). v0.4.x or v0.5.
 - [ ] **T15. Terminal groups face up or down.** A plant view's terminals are along its top and a module view's along its bottom, fixed. Either should be able to face the other way (a setting on the view, or per group), so plant can sit above what it wires to and a module below, without wires looping round. Helps F6. v0.4.x or v0.5.
 - [ ] **T16. A module view says which module it is.** The view's title gives its tag, type, maker and model, but not its number on the rail (the number in the circle on the controller map, its slot or bus address). Show it by the type: *Module 9 · DO-8*. Small; v0.4.x.
+- [ ] **T17. Socket drawn as three contacts in a dashed box.** Draft's socket is a half-round with L and N at the top and its earth out of the side, which makes the earth awkward to wire. Redraw it as a dashed box with three socket contacts side by side (each the female contact mark: a cup open downwards), L, N and E all entering from the top, a column apart, so the earth runs down beside L and N. The label sits under the box. Old projects keep their wires: L and N stay where they are, and the earth's wire is re-routed to its new place. v0.4.x.
 
 **Missing (for later versions)**
 
