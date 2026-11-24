@@ -165,6 +165,11 @@ export function checkProject(project: Project, opts: { proofs?: Proofs | null } 
   out.push(...controllerChecks(project));
   out.push(...designChecks(project, { proofs: opts.proofs }));
   out.push(...labelOverlaps(project));
+  // A socket from an older file: its earth now enters from the top (v0.4.x T17).
+  for (const page of project.pages)
+    for (const el of page.elements)
+      if (el.symbol === "socket" && el.params.eMoved === true)
+        out.push({ level: "info", message: `Sheet ${page.number}: ${displayTag(el, project) || "a socket"}'s earth now enters from the top, beside L and N: check its wire, which was routed by hand`, pageId: page.id, ids: [el.id] });
   // What supplies give and loads take (v0.4.x M11), and distributions nothing supplies (F2).
   if (project.pages.some((pg) => pg.segments.length)) {
     const circuit = compile(project);

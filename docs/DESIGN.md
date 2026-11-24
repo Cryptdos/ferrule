@@ -365,6 +365,7 @@ Reference drawings from other companies are proprietary. They are never committe
 | Terminals on a side, v0.4.x step 7b (2026-11-24) | T15: `params.side`, `viewSides`, `usesSides`, `sideViewLayout` and `drawSideView` (`symbols.ts`, used when a view leaves its usual side); `setViewSide` (`ops.ts`); *Terminals on* in Properties |
 | Sides per group, v0.4.x step 7b (2026-11-24) | T15: `params.sides` (JSON, group → side), `setGroupSide` (`ops.ts`), *Groups* in a view's Properties; laid out by `sideViewLayout` |
 | Routing clear of strips and pin rows, v0.4.x step 8 (2026-11-24) | F6: `blockRect` (`routing.ts`): the terminal block one obstacle out to `ROW_CLEAR`; a view's obstacle pushed out past its pin rows; `lessStubs` so the repair pass lets stubs cross the clearance |
+| Connector block, socket, motors, v0.4.x step 9a (2026-11-24) | M9: `connector-block` (terminals 2–12, `connectorNames`, `bridged` as one potential, E1/E2 border points, upright text), `GA_SIZES.connBlock`; T17: the socket redrawn with E from the top, `etop` / `eMoved` for older files and their Check line; M8: the motor's `phases` and `picture` |
 
 ## 16. Open questions
 

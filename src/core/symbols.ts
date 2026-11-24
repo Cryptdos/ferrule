@@ -1122,32 +1122,77 @@ const SYMBOLS: SymbolDef[] = [
     name: "Socket outlet",
     group: "Loads",
     palette: true,
-    params: [],
+    // etop: drawn with its earth entering from the top (v0.4.x T17); a socket from an older file gets it when opened.
+    params: [{ key: "etop", label: "Earth from the top", type: "bool", default: true, hidden: true }],
     kind: () => "socket",
     draw(el) {
-      // L and N 3 units apart, straight down from a two-pole MCB; the earth
-      // comes out of the side, to go to an earth symbol.
-      const cx = 1.5;
-      const r = 2.6;
+      // A solid box with three socket contacts side by side (v0.4.x T17), each
+      // a cup open downwards; L, N and E all enter from the top, a column apart,
+      // so the earth runs down beside L and N. The label is under the box.
+      const cup = (x: number): Prim[] => [line([x, -4], [x, -0.6]), { t: "arc", from: [x - 0.8, 0.2], to: [x + 0.8, 0.2], r: 0.8, sweep: 1 }];
       return {
         prims: [
-          line([0, -4], [0, -1]),
-          line([3, -4], [3, -1]),
-          line([cx - r, -1], [cx + r, -1]),
-          { t: "arc", from: [cx - r, -1], to: [cx + r, -1], r, sweep: 0 },
-          line([cx + r, -1], [cx + r, -2], [6, -2]),
+          rect(-1.5, -1.5, 9, 3),
+          ...cup(0),
+          ...cup(3),
+          ...cup(6),
           term(-0.45, -2.6, "L", "end"),
-          term(0.45, -2.6, "N"),
-          term(5.6, -2.4, "E", "end"),
-          ...tagAndLabel(-1.4, el),
+          term(3.45, -2.6, "N"),
+          term(6.45, -2.6, "E"),
+          text(-2, 0.5, "{tag}", TAG, "end", "tag"),
+          { ...text(-2, 1.75, "{xref}", DETAIL, "end", "xref"), block: true } as Prim,
+          ...(el.label ? [text(3, 4.4, "{label}", TAG, "middle", "label")] : []),
         ],
         terminals: [
           { name: "L", at: [0, -4], dir: "up" },
           { name: "N", at: [3, -4], dir: "up" },
-          { name: "E", at: [6, -2], dir: "right" },
+          { name: "E", at: [6, -4], dir: "up" },
         ],
-        body: { x: cx - r, y: -1, w: 2 * r, h: r },
+        body: { x: -1.5, y: -1.5, w: 9, h: 3 },
       };
+    },
+  },
+  {
+    id: "connector-block",
+    name: "Connector block",
+    group: "Connection",
+    palette: true,
+    params: [{ key: "terminals", label: "Terminals", type: "number", min: 2, max: 12, default: 2 }],
+    // One potential throughout (v0.4.x M9): an earth block, a 0 V or 24 V block, a screen connector.
+    kind: () => "terminal",
+    bridged: (el) => [[...connectorNames(el), "E1", "E2"]],
+    draw(el) {
+      // Upright it's a column, a row for each pair: the odd terminal of a row in on the
+      // left, the even one out on the right, in line, so a conductor passes straight
+      // through. The border's middle top and bottom are E1 and E2, for an earth sign
+      // or a link on to another block. Turned a quarter, it's a wide block with its
+      // terminals along the top and bottom and E1, E2 at its ends. Text stays upright.
+      const names = connectorNames(el);
+      const rows = Math.ceil(names.length / 2);
+      const W = 2;
+      const H = rows * 2;
+      const rot = el.rot;
+      const up = (at: Vec, s: string, size: number, anchor: Anchor, role: TextRole): Prim => {
+        const p = rotate(at, rot);
+        return { t: "text", at: [p[0], p[1] + (rot % 180 ? size * CAP_HEIGHT * 0.5 : 0)], text: s, size, anchor, role, placed: true };
+      };
+      const prims: Prim[] = [rect(-W, -1, 2 * W, H)];
+      const terminals: TerminalDef[] = [];
+      names.forEach((n, i) => {
+        const row = Math.floor(i / 2);
+        const left = i % 2 === 0;
+        const y = row * 2;
+        terminals.push({ name: n, at: [left ? -W : W, y], dir: left ? "left" : "right" });
+        prims.push(up([left ? -W + 0.4 : W - 0.4, y + (rot % 180 ? 0 : DETAIL * CAP_HEIGHT * 0.5)], n, DETAIL, rot % 180 ? "middle" : left ? "start" : "end", "term"));
+      });
+      terminals.push({ name: "E1", at: [0, -1], dir: "up" }, { name: "E2", at: [0, H - 1], dir: "down" });
+      const tagP: Prim = { t: "text", at: rot % 180 ? [rotate([0, -1], rot)[0] - 1.2, -W - 1.0] : [-W - 0.5, 0.5], text: "{tag}", size: TAG, anchor: "end", role: "tag", placed: true };
+      prims.push(tagP);
+      if (el.label) {
+        const at: Vec = rot % 180 ? [(rotate([0, H - 1], rot)[0] + rotate([0, -1], rot)[0]) / 2, W + 2.6] : [-W - 0.5, 1.75];
+        prims.push({ t: "text", at, text: "{label}", size: TAG, anchor: rot % 180 ? "middle" : "end", role: "label", placed: true });
+      }
+      return { prims, terminals, body: { x: -W, y: -1, w: 2 * W, h: H } };
     },
   },
   {
@@ -1197,35 +1242,63 @@ const SYMBOLS: SymbolDef[] = [
   },
   {
     id: "motor",
-    name: "Motor (3-phase)",
+    name: "Motor",
     group: "Loads",
     palette: true,
-    params: [{ key: "rating", label: "Rating", type: "text", default: "", placeholder: "e.g. 1.5kW 3.4A FLC" }],
+    params: [
+      { key: "rating", label: "Rating", type: "text", default: "", placeholder: "e.g. 1.5kW 3.4A FLC" },
+      // v0.4.x M8: single phase (L N) as well as three (U V W); the picture only changes the drawing.
+      {
+        key: "phases",
+        label: "Phases",
+        type: "select",
+        default: "3",
+        options: [
+          { value: "3", label: "Three (U V W)" },
+          { value: "1", label: "Single (L N)" },
+        ],
+      },
+      {
+        key: "picture",
+        label: "Picture",
+        type: "select",
+        default: "motor",
+        options: [
+          { value: "motor", label: "Motor" },
+          { value: "fan", label: "Fan" },
+          { value: "pump", label: "Pump" },
+        ],
+      },
+    ],
     kind: () => "motor",
     draw(el) {
-      // U V W 3 units apart, in line with the poles of the contactor above.
+      // U V W 3 units apart, in line with the poles of the contactor above; single phase L N 3 apart.
       const r = 3.6;
       const e = Math.sqrt(r * r - 9);
       const rating = str(el, "rating", "");
+      const one = str(el, "phases", "3") === "1";
+      const pic = str(el, "picture", "motor");
+      const prims: Prim[] = [circle(0, 0, r)];
+      const names = one ? ["L", "N"] : ["U", "V", "W"];
+      const xs = one ? [-1.5, 1.5] : [-3, 0, 3];
+      xs.forEach((x, i) => {
+        const edge = Math.abs(x) >= 3 ? e : Math.sqrt(r * r - x * x);
+        prims.push(line([x, -6], [x, -edge]), term(x + (i === 0 ? -0.45 : 0.45), -4.4, names[i]!, i === 0 ? "end" : "start"));
+      });
+      if (pic === "fan") {
+        // Two blades across the circle, and the motor's M small at the hub.
+        prims.push({ t: "ellipse", c: [-1.4, 0], rx: 1.3, ry: 0.55 }, { t: "ellipse", c: [1.4, 0], rx: 1.3, ry: 0.55 }, circle(0, 0, 0.3, true));
+      } else if (pic === "pump") {
+        // The pump's triangle, pointing the way it pumps.
+        prims.push(line([-1.6, -2.4], [3.2, 0], [-1.6, 2.4], [-1.6, -2.4]));
+      } else {
+        prims.push(text(0, 0.3, "M", 2.2, "middle", "note"), text(0, 2, one ? "1~" : "3~", 1.3, "middle", "note"));
+      }
+      if (rating) prims.push({ ...text(4.1, 2.5, rating, DETAIL, "start", "note"), block: true } as Prim);
+      prims.push(...tagAndLabel(-4.2, el));
       return {
-        prims: [
-          circle(0, 0, r),
-          line([-3, -6], [-3, -e]),
-          line([0, -6], [0, -r]),
-          line([3, -6], [3, -e]),
-          text(0, 0.3, "M", 2.2, "middle", "note"),
-          text(0, 2, "3~", 1.3, "middle", "note"),
-          term(-3.45, -4.4, "U", "end"),
-          term(0.45, -4.4, "V"),
-          term(3.45, -4.4, "W"),
-          ...(rating ? [{ ...text(4.1, 2.5, rating, DETAIL, "start", "note"), block: true } as Prim] : []),
-          ...tagAndLabel(-4.2, el),
-        ],
-        terminals: [
-          { name: "U", at: [-3, -6], dir: "up" },
-          { name: "V", at: [0, -6], dir: "up" },
-          { name: "W", at: [3, -6], dir: "up" },
-        ],
+        prims,
+        terminals: names.map((n, i) => ({ name: n, at: [xs[i]!, -6] as Vec, dir: "up" as Dir })),
         body: { x: -r, y: -r, w: 2 * r, h: 2 * r },
       };
     },
@@ -2550,6 +2623,12 @@ export function localGeometry(el: Element, texts: string | GeometryText): Geomet
   // A plant view's text under its box is part of its extent (v0.4.x F4), so the router and checks see it.
   if (el.symbol === "plant-view" && !el.params.pmod) for (const p of prims) if (p.t === "text" && p.block && p.text) bbox = unionRect(bbox, textBounds(p));
   return { prims, terminals, body, bbox };
+}
+
+/** A connector block's terminals, 1 to n (2–12). */
+export function connectorNames(el: Element): string[] {
+  const n = num(el, "terminals", 2, 2, 12);
+  return Array.from({ length: Math.round(n) }, (_, i) => String(i + 1));
 }
 
 /** Is a text prim part of its element's label block (v0.4.x T14)? Tags and labels, and what's marked. */

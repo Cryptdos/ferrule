@@ -346,6 +346,7 @@ export const GA_SIZES: Record<string, GaSize> = {
   ctrlHost: { w: 90, h: 100, label: "Controller host" },
   ctrlIo: { w: 9, h: 100, label: "Controller IO module, per 2 channels", perPole: true },
   panelPlant: { w: 50, h: 90, label: "Panel device (power supply, UPS, battery)" },
+  connBlock: { w: 6, h: 45, label: "Connector block, per 2 terminals", perPole: true },
 };
 
 /** A controller module's size on the GA: its device from the table, else a generic one by type and channels. */
@@ -390,6 +391,9 @@ export function sizeKey(project: Project, el: Element): { key: string; poles: nu
       return { key: "transformer", poles: 1 };
     case "socket":
       return { key: "socket", poles: 1 };
+    case "connector-block":
+      // Its length follows its terminal count (v0.4.x M9).
+      return { key: "connBlock", poles: Math.ceil((Number(el.params.terminals) || 2) / 2) };
     case "busbar":
       return { key: "block", poles: 1 };
     case "lamp":
@@ -419,6 +423,7 @@ export const SUITS: { key: string; label: string }[] = [
   { key: "earthTerminal", label: "Earth terminal" },
   { key: "transformer", label: "Transformer" },
   { key: "socket", label: "Socket outlet" },
+  { key: "connBlock", label: "Connector block" },
   { key: "block", label: "Busbar (distribution block)" },
   { key: "lamp", label: "Indicator lamp" },
   { key: "pushbutton", label: "Push button" },

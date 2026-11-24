@@ -12,16 +12,16 @@ import { describeInterlock, interlockExpectations, interlockStatus, proveInterlo
 import { parseSupplies, parseSupply } from "./supplies";
 import { refreshConductors } from "./conductors";
 import { newProject, type Element, type Project } from "./model";
-import { labelBlockRect, localGeometry, moduleViewLayout, plantViewLayout, terminalPoint, wrapTag, wrapTitle } from "./symbols";
+import { labelBlockRect, terminalNames, localGeometry, moduleViewLayout, plantViewLayout, terminalPoint, wrapTag, wrapTitle } from "./symbols";
 import { elementTexts } from "./tags";
 import { textWidth } from "./textwidth";
 import { AREA_UNITS, textUnits } from "./geometry";
 import { moduleTitle, viewsOf } from "./modules";
-import { addElement, addPlant, connect, deletePlant, linkContact, setGroupSide, setViewSide, setViewSpan, setWireTextAt, moveElements, placePlantView, addGaDim, addGaItem, addGaPage, addPlatesForDoors, joinDoorBelow, setPlateBehind, setBoundary, setGaSettings, splitDoor, updateElement } from "./ops";
+import { addElement, addPlant, connect, resetRoute, rotateElements, deletePlant, linkContact, setGroupSide, setViewSide, setViewSpan, setWireTextAt, moveElements, placePlantView, addGaDim, addGaItem, addGaPage, addPlatesForDoors, joinDoorBelow, setPlateBehind, setBoundary, setGaSettings, splitDoor, updateElement } from "./ops";
 import { earthConductors, removeLoops, fractionAlong, isFieldWire, numberByDefault, pointAlong, wireTexts } from "./wires";
 import { routePage } from "./routing";
 import { pointsSchedule } from "./schedules";
-import { ENCL, PLATE_MARGIN, gaCandidates, dimLayout, doorPanes, plateDoor, platesOf, drawnGaItems, gaFrame, paneOf, paneRef, sheetPanes } from "./ga";
+import { ENCL, PLATE_MARGIN, gaCandidates, sizeKey, dimLayout, doorPanes, plateDoor, platesOf, drawnGaItems, gaFrame, paneOf, paneRef, sheetPanes } from "./ga";
 import { renumber } from "./renumber";
 import { stampSaved } from "../server/storage";
 import { parseProject } from "./validate";
@@ -663,5 +663,67 @@ describe("step 8: routing clear of strips and pin rows (F6)", () => {
         }
       }
     }
+  });
+});
+
+describe("step 9a: connector block, socket, motors (M9, T17, M8)", () => {
+  test("M9: a connector block of n terminals is one potential, in line pairs, growing taller, tagged X, sized on the GA by its count", () => {
+    const p = newProject("c");
+    const pg = p.pages[0]!.id;
+    const b = addElement(p, pg, "connector-block", [40, 30], { label: "EARTH BLOCK", params: { terminals: 6 } });
+    const g = localGeometry(b, elementTexts(b, p));
+    const at = (n: string) => g.terminals.find((t) => t.name === n)!;
+    expect(g.terminals.map((t) => t.name)).toEqual(["1", "2", "3", "4", "5", "6", "E1", "E2"]);
+    // A pair in line: in on one side, out on the other.
+    expect(at("1").at[1]).toBe(at("2").at[1]);
+    expect([at("1").dir, at("2").dir]).toEqual(["left", "right"]);
+    expect(at("3").at[1] - at("1").at[1]).toBe(2);
+    const g2 = localGeometry(addElement(p, pg, "connector-block", [60, 30], { params: { terminals: 2 } }), "");
+    expect(g.body.h).toBeGreaterThan(g2.body.h);
+    // Turned a quarter: a wide block, its terminals top and bottom, its text upright.
+    rotateElements(p, pg, [b.id]);
+    const r = localGeometry(b, elementTexts(b, p));
+    expect(new Set(r.terminals.filter((t) => /^\d+$/.test(t.name)).map((t) => t.dir))).toEqual(new Set(["up", "down"]));
+    expect(r.prims.filter((x) => x.t === "text").every((x) => x.t === "text" && !x.vertical)).toBe(true);
+    // One conductor through every terminal.
+    const k = addElement(p, pg, "coil", [20, 20]);
+    const e = addElement(p, pg, "earth", [80, 40]);
+    connect(p, pg, [k.id, "A2"], [b.id, "1"]);
+    connect(p, pg, [b.id, "4"], [e.id, "E"]);
+    refreshConductors(p);
+    expect(p.conductors.find((c) => c.terminals.some(([id, t]) => id === k.id && t === "A2"))!.terminals.some(([id]) => id === e.id)).toBe(true);
+    renumber(p);
+    expect(b.tag.startsWith("X")).toBe(true);
+    expect(sizeKey(p, b)).toEqual({ key: "connBlock", poles: 3 });
+  });
+
+  test("T17: an old socket's earth moves to the top; a hand-routed earth wire is flagged until it's re-routed", () => {
+    const p = newProject("s");
+    const pg = p.pages[0]!.id;
+    const sk = addElement(p, pg, "socket", [20, 30]);
+    const pe = addElement(p, pg, "earth", [30, 20]);
+    const w = connect(p, pg, [sk.id, "E"], [pe.id, "E"]);
+    w.route = "manual";
+    const file = JSON.parse(JSON.stringify(p));
+    delete file.pages[0].elements.find((e: { id: string }) => e.id === sk.id).params.etop;
+    const back = parseProject(file);
+    const flagged = () => checkProject(back).filter((f) => /earth now enters from the top/.test(f.message));
+    expect(flagged().length).toBe(1);
+    resetRoute(back, back.pages[0]!.id, [w.id]);
+    expect(flagged().length).toBe(0);
+    // A new socket isn't flagged.
+    expect(checkProject(p).some((f) => /earth now enters from the top/.test(f.message))).toBe(false);
+  });
+
+  test("M8: a single-phase motor has L and N; fan and pump change the picture only", () => {
+    const p = newProject("m");
+    const pg = p.pages[0]!.id;
+    const m3 = addElement(p, pg, "motor", [20, 30]);
+    const m1 = addElement(p, pg, "motor", [40, 30], { params: { phases: "1" } });
+    expect(terminalNames(m3)).toEqual(["U", "V", "W"]);
+    expect(terminalNames(m1)).toEqual(["L", "N"]);
+    const pics = ["motor", "fan", "pump"].map((picture) => localGeometry(addElement(p, pg, "motor", [60, 30], { params: { picture } }), ""));
+    expect(new Set(pics.map((g) => JSON.stringify(g.prims))).size).toBe(3);
+    expect(new Set(pics.map((g) => JSON.stringify(g.terminals))).size).toBe(1);
   });
 });
