@@ -390,3 +390,9 @@ Judgement calls made while building, step by step.
 - Setting it: a handle at the middle of the selected view's right edge (a dashed line shows the edge while dragging); *Width* and *Fit to sheet* in Properties (`setViewSpan`, which stores nothing when the width asked for is no wider than natural). *Fit to sheet* is the usable width from the view's left edge to 2 units short of the drawing area's right edge.
 - Wires follow the pins like any change to the part: the editor re-routes the sheet after the change.
 - `span` isn't one of the keys cleared from parts that aren't plant views: the cable screen part has a parameter of the same name.
+
+**Step 7b, first PR (a whole view on a side).**
+- T15: `params.side` (top, bottom, left, right; unset is the usual side, plant top, module bottom). A view on its usual side is drawn by the old code, pin for pin; one that isn't goes through a new layout, `sideViewLayout` / `drawSideView`, which places every group by its side (so the per-group setting of the second PR is the same code). In that layout the view's origin is the box's top-left corner, so a view jumps when its side is first changed; its wires follow its pins.
+- Along the top and bottom, terminals are boxes 2 apart with numbers reading up, group names inside; down the left and right they stack 2 apart, numbers reading across in boxes as wide as the longest, ids beside them, group names beyond. The box is as wide and tall as its sides need. A module's heading sits inside the top unless terminals are there; its jobs run out along each point's first wire.
+- The text block (a plant view's tag and lines, a module's title row) is opposite the view's side, below for left and right. A break mark for a view showing only some terminals isn't drawn in this layout.
+- *Terminals on* in a view's Properties (`setViewSide`). T2's width applies along the top and bottom.

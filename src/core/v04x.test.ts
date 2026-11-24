@@ -17,7 +17,7 @@ import { elementTexts } from "./tags";
 import { textWidth } from "./textwidth";
 import { AREA_UNITS, textUnits } from "./geometry";
 import { moduleTitle, viewsOf } from "./modules";
-import { addElement, addPlant, deletePlant, linkContact, setViewSpan, setWireTextAt, moveElements, placePlantView, addGaDim, addGaItem, addGaPage, addPlatesForDoors, joinDoorBelow, setPlateBehind, setBoundary, setGaSettings, splitDoor, updateElement } from "./ops";
+import { addElement, addPlant, deletePlant, linkContact, setGroupSide, setViewSide, setViewSpan, setWireTextAt, moveElements, placePlantView, addGaDim, addGaItem, addGaPage, addPlatesForDoors, joinDoorBelow, setPlateBehind, setBoundary, setGaSettings, splitDoor, updateElement } from "./ops";
 import { earthConductors, fractionAlong, isFieldWire, numberByDefault, pointAlong, wireTexts } from "./wires";
 import { routePage } from "./routing";
 import { pointsSchedule } from "./schedules";
@@ -527,5 +527,51 @@ describe("step 7a: a view spans a width (T2)", () => {
       const t = terminalPoint(v, s.from[0] === v.id ? s.from[1] : s.to[1])!;
       expect(end).toEqual(t);
     }
+  });
+});
+
+describe("step 7b: terminal groups on any side (T15)", () => {
+  const drive = () => {
+    const p = newProject("s");
+    const it = addPlant(p, "VSD-1", "Drive", ["L", "N", "U", "V", "W", "DI1", "DCOM"], {
+      pins: { L: { group: "Mains" }, N: { group: "Mains" }, U: { group: "Motor" }, V: { group: "Motor" }, W: { group: "Motor" }, DI1: { group: "Control" }, DCOM: { group: "Control" } },
+    });
+    const v = placePlantView(p, p.pages[0]!.id, it.id, [40, 30]);
+    return { p, it, v, pg: p.pages[0]!.id };
+  };
+
+  test("whole view: terminals along the chosen edge facing out; left and right stack down the side and the box grows", () => {
+    const { p, v, pg } = drive();
+    const before = localGeometry(v, elementTexts(v, p));
+    for (const [side, dir] of [["bottom", "down"], ["left", "left"], ["right", "right"]] as const) {
+      setViewSide(p, pg, v.id, side);
+      const g = localGeometry(v, elementTexts(v, p));
+      expect(new Set(g.terminals.map((t) => t.dir))).toEqual(new Set([dir]));
+      const edge = side === "bottom" ? g.body.y + g.body.h : side === "left" ? g.body.x : g.body.x + g.body.w;
+      for (const t of g.terminals) expect(side === "bottom" ? t.at[1] : t.at[0]).toBe(edge);
+      if (side !== "bottom") {
+        // Stacked 2 apart down the side, numbers reading across.
+        const ys = g.terminals.map((t) => t.at[1]);
+        expect(ys[1]! - ys[0]!).toBe(2);
+        expect(g.body.h).toBeGreaterThanOrEqual(ys[ys.length - 1]! - ys[0]!);
+        expect(g.prims.some((x) => x.t === "text" && x.role === "term" && !x.vertical)).toBe(true);
+      }
+      // The text block: above for a bottom side, below for the others.
+      const tag = g.prims.find((x) => x.t === "text" && x.text === "VSD-1")!;
+      if (tag.t === "text") expect(side === "bottom" ? tag.at[1] < g.body.y : tag.at[1] > g.body.y + g.body.h).toBe(true);
+    }
+    setViewSide(p, pg, v.id, "top");
+    expect(v.params.side).toBeUndefined();
+    expect(localGeometry(v, elementTexts(v, p))).toEqual(before);
+  });
+
+  test("a module's default is the bottom; on top, its terminals face up", () => {
+    const { project: p, modules } = fresh();
+    const v = viewsOf(p, modules.ao.id)[0]!;
+    setViewSide(p, v.page.id, v.el.id, "top");
+    const g = localGeometry(v.el, elementTexts(v.el, p));
+    expect(new Set(g.terminals.map((t) => t.dir))).toEqual(new Set(["up"]));
+    setViewSide(p, v.page.id, v.el.id, "bottom");
+    expect(v.el.params.side).toBeUndefined();
   });
 });
