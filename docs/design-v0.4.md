@@ -476,7 +476,7 @@ The first entries come from an integration test: a 36-sheet BMS panel (incomer a
 
 **Missing**
 
-- [ ] **M1. Symbols:** power supply, DC UPS, battery, RCD (and RCD socket), resistor (end of line), screened cable or pair with screen earth, connector and flying leads, and field device marks inside plant views (temperature, ΔP, valve, damper actuator).
+- [ ] **M1. Symbols:** RCD (and RCD socket), resistor (end of line), screened cable or pair with screen earth, connector and flying leads, and marks inside plant views (temperature, ΔP, valve, damper actuator, power supply, battery). A power supply, a battery and a DC UPS are not symbols: they're plant in the panel (T3), set up once and kept as a Design template.
 - [ ] **M2. Cables** as objects: type, cores, screen (RS485 pair, fire-rated, Ethernet), rather than notes.
 - [ ] **M3. Wire colour by function,** not only from distributions: DC signal and external supply colours as the drawing's notes give them.
 - [ ] **M4. Relay pin numbering from the part:** a relay base's own terminal numbers rather than IEC 11/12/14.
