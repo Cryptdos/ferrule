@@ -104,6 +104,7 @@
     module is tagged by where its first view is drawn, prefix A (A3-23), and its points are referred to as
     <code>A3-23:DI2</code>. Its views go at the top of a sheet, terminals underneath.
   </p>
+  {#if !controllers.length}
   <form
     class="top"
     onsubmit={(e) => {
@@ -115,6 +116,7 @@
     <input bind:value={newDesc} placeholder="New controller, e.g. AHU-1 outstation" />
     <button type="submit">Add controller</button>
   </form>
+  {/if}
   {#if !controllers.length}
     <p class="hint">No controllers yet.</p>
   {/if}

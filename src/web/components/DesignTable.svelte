@@ -4,11 +4,12 @@
    * point, systems folding. Picking a row shows it in Properties; Ctrl or
    * Shift adds plant to what's picked.
    */
-  import { channelText, goesTo, pointType, systemGroups } from "../../core/design";
+  import { goesTo, pointType, systemGroups } from "../../core/design";
   import { POINT_FORMS, type PlantItem } from "../../core/model";
   import { plantLabel } from "../../core/ops";
   import type { Editor } from "../editor.svelte";
   import TypeBadge from "./TypeBadge.svelte";
+  import ChannelSelect from "./ChannelSelect.svelte";
 
   let { editor }: { editor: Editor } = $props();
 
@@ -95,7 +96,7 @@
                   <td>
                     {#if pt && t}
                       {#if goesTo(pt) === "panel"}<span class="dim">panel only</span>
-                      {:else}{channelText(editor.project, pt.channel) || "—"}{#if goesTo(pt) === "relay"}<span class="dim"> via relay</span>{/if}{/if}
+                      {:else}<ChannelSelect {editor} plant={p} point={pt} compact />{#if goesTo(pt) === "relay"}<span class="dim"> via relay</span>{/if}{/if}
                     {/if}
                   </td>
                 </tr>

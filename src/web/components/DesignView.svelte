@@ -7,15 +7,20 @@
   import DesignProps from "./DesignProps.svelte";
   import DesignTable from "./DesignTable.svelte";
   import NeedsLine from "./NeedsLine.svelte";
+  import ControllerView from "./ControllerView.svelte";
 
   let { editor }: { editor: Editor } = $props();
 </script>
 
 <div class="design">
-  <div class="views">
-    <div class="main"><DesignTable {editor} /></div>
-    <div class="side"><DesignProps {editor} /></div>
-  </div>
+  {#if editor.designView === "controller"}
+    <div class="views one"><ControllerView {editor} /></div>
+  {:else}
+    <div class="views">
+      <div class="main"><DesignTable {editor} /></div>
+      <div class="side"><DesignProps {editor} /></div>
+    </div>
+  {/if}
   <NeedsLine {editor} />
 </div>
 
@@ -33,6 +38,9 @@
     gap: 10px;
     padding: 10px;
     min-height: 0;
+  }
+  .views.one {
+    grid-template-columns: minmax(0, 1fr);
   }
   .main,
   .side {
