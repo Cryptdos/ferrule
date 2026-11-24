@@ -12,7 +12,7 @@ import { defaultPattern } from "./modules";
 import { addElement, addPage, addPlant, connect, deletePlant, linkContact, placePlantView, setQuickEntry, updatePin, updatePlant, updatePoint } from "./ops";
 import { refreshConductors } from "./conductors";
 import { confirmWiring, wiringOf } from "./wiring";
-import { checkProject, designChecks } from "./checks";
+import { designChecks } from "./checks";
 import { ioSchedule } from "./schedules";
 import { saveSheetTemplate } from "./templates";
 import { parseDesignTemplate, parseProject } from "./validate";
