@@ -10,6 +10,12 @@ It's one portable `.exe` for Windows: no install, nothing to configure. Your bro
 
 ## What it does
 
+### Design: what the panel has, before it's drawn
+
+![The Design workbench: plant grouped by system, one row per point with its form, signal and the controller channel type it needs, a flow switch's properties at the side, and the Needs line along the bottom](docs/images/design.png)
+
+Read the client's description of operations and list what this panel has: **systems** (*Chilled water*, *Ventilation*) group **plant**, and each plant item has its **points**, each with its form (from the plant's side: a fault is a contact, an enable an input), its signal (volt-free, 24 V, 0–10 V…) and where it goes: straight to a controller channel, to a channel through a relay, or only into the panel's own circuits. Every field device is plant on its own row, a pump's flow switch too. Ferrule works out the channel type each point needs (DI, DO, AI, AO), and the **Needs line** along the bottom counts them, so before there's a controller it already tells you how many inputs and outputs to buy. Nothing is drawn in Design, and there are no built-in plant types: rows and points are the only parts.
+
 ### Draft: the electrical drawing, and nothing else
 
 Pick parts from the browser and click to place them; wires route themselves at right angles around everything. Contacts link to their coils, and the coil gets a contact table showing where each one is. Tags and wire numbers follow the sheet-column scheme (`K9-54`, wire `9-41`), with **Renumber** showing you exactly what will change before it changes anything. Plant (fans, dampers, interfaces by others) is defined once with all its terminals and shown on as many sheets as needed. **Check** finds loose contacts, coils without contacts, unpaired links and wires that leave the panel without a terminal.
@@ -127,11 +133,13 @@ Everything else (Plant, Check, Schedules, Settings…) opens in a **window**: dr
 
 **Workbenches**: each shows only its own tools, so the palette stays short.
 
+- **Design**: the panel's systems, plant and points as a table (below). Nothing is drawn here; Draft draws what's listed.
 - **Draft**: the electro-mechanical drawing: parts, wires, busbars, plant, numbering, links. Everything a part needs to say (tag, rating, function, colour) is a property of the part, not loose text.
 - **Annotate**: text, boxes, pictures (or the logo), section boxes and revision clouds (all in its parts list), to explain the drawing to the reader. In Annotate only annotations can be selected, and in Draft only drawing parts, so a box round a group of parts never gets in the way; what you can't pick is drawn grey on screen.
 - **Layout**: general arrangement (GA) sheets drawn to scale (below). It was called GA until v0.4.
 - **Simulate**: the same sheets, live (below).
 
+- **Design's table:** *+ System* adds a system (pick its row to rename, move or delete it; its plant stays, with no system). *+ Plant* adds an empty row in the picked system, after the picked plant. *+ Point* gives the picked plant a point: its name, form and signal; it has no pins until the plant is specified or drawn (marked ○). Pick a row to edit it in Properties: tag (empty: Renumber tags it from where it's drawn), description, system, how it connects (hardwired, comms or both; comms adds the protocol and network), what enables it and where in the client's document it came from; and each point's name, form, signal and where it goes. Systems fold (▸), showing a count. `Ctrl`/`Shift`+click picks several plant rows, to move them to a system or delete them. Plant from older projects sits under *No system*.
 - Pick a part on the left (type in *Find a part…* to narrow the list) and click on the sheet to place it; then it's back to selecting. To place the same part again and again until `Esc`, tick *Keep placing* in Settings.
 - Drag to move (snaps to the grid), drag on empty paper to box-select, `Shift`/`Ctrl`+click to add to the selection.
 - `R` rotate, `F` flip top to bottom (a contact drawn upside down still reads right), `Del` delete, `Ctrl+D` duplicate, arrow keys nudge, `Ctrl+Z`/`Ctrl+Y` undo/redo; tap `Space` to fit the sheet (hold it and drag to pan).

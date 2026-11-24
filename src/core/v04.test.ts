@@ -6,7 +6,7 @@ import { AvoidLib } from "libavoid-js";
 import { buildLsp01 } from "../bench/lsp01";
 import { checkProject } from "./checks";
 import { addController, addModule, deleteController, generateModule } from "./controllers";
-import { allocate, channelsOf, needsLine, pointOnChannel, pointType } from "./design";
+import { addDesignPlant, addDesignPoint, addSystem, allocate, channelsOf, deleteDesignPoint, deleteSystem, moveSystem, movePlant, needsLine, pointOnChannel, pointType, renameSystem, setPlantDesign, systemGroups, updateDesignPoint } from "./design";
 import { newProject, type IoPoint, type Project } from "./model";
 import { defaultPattern } from "./modules";
 import { addPlant, deletePlant, updatePin, updatePlant } from "./ops";
@@ -221,5 +221,74 @@ describe("type, Needs and allocation (§2, §4)", () => {
     const t = saveSheetTemplate(p, p.pages[0]!.id, "Pump sheet");
     expect(t.plant.find((x) => x.id === pu.id)!.points![0]!.channel).toBeUndefined();
     expect(pu.points![0]!.channel).toBeDefined();
+  });
+});
+
+describe("the Design table (§2, §3)", () => {
+  test("systems: added with a free name, renamed with their plant, moved, and removed leaving their plant", () => {
+    const p = newProject("t");
+    expect(addSystem(p)).toBe("System 1");
+    expect(addSystem(p, "Ventilation")).toBe("Ventilation");
+    expect(() => addSystem(p, "Ventilation")).toThrow(/already/);
+    const a = addDesignPlant(p, "System 1");
+    renameSystem(p, "System 1", "Chilled water");
+    expect(a.system).toBe("Chilled water");
+    moveSystem(p, "Ventilation", -1);
+    expect(p.systems).toEqual(["Ventilation", "Chilled water"]);
+    deleteSystem(p, "Chilled water");
+    expect(a.system).toBeUndefined();
+    expect(p.plant).toContain(a);
+    // Plant with no system sits in the unnamed group, after the systems.
+    expect(systemGroups(p).map((g) => [g.name, g.plant.length])).toEqual([["Ventilation", 0], ["", 1]]);
+  });
+  test("+ Plant goes after the picked plant, or at the end of its system; modules aren't table rows", () => {
+    const { p } = panel();
+    addSystem(p, "A");
+    addSystem(p, "B");
+    const a1 = addDesignPlant(p, "A");
+    const b1 = addDesignPlant(p, "B");
+    const a2 = addDesignPlant(p, "A");
+    const a3 = addDesignPlant(p, "A", a1.id);
+    expect(systemGroups(p).map((g) => g.plant.map((x) => x.id))).toEqual([[a1.id, a3.id, a2.id], [b1.id]]);
+    movePlant(p, a2.id, b1.id);
+    expect(a2.system).toBe("B");
+    expect(systemGroups(p)[1]!.plant.map((x) => x.id)).toEqual([b1.id, a2.id]);
+    expect(() => addDesignPlant(p, "C")).toThrow(/No system/);
+  });
+  test("+ Point: a form, a name and a signal, no pins; names stay unique", () => {
+    const p = newProject("t");
+    const it = addDesignPlant(p);
+    expect(addDesignPoint(p, it.id, { name: "fault", form: "contact", signal: "volt-free" })).toEqual({ name: "fault", form: "contact", pins: [], signal: "volt-free" });
+    expect(addDesignPoint(p, it.id, { form: "dry-in" }).name).toBe("Point 2");
+    expect(() => addDesignPoint(p, it.id, { name: "fault", form: "contact" })).toThrow(/already has/);
+  });
+  test("a point renamed carries its references; a form or goes-to its channel can't serve lets the channel go", () => {
+    const { p, di } = panel();
+    const it = addDesignPlant(p);
+    addDesignPoint(p, it.id, { name: "fault", form: "contact" });
+    allocate(p, it.id, "fault", { module: di.id, point: "DI1" });
+    p.expectations.push({ id: "x", kind: "never", when: [{ ref: `plant:${it.id}:fault`, on: true }] });
+    updateDesignPoint(p, it.id, "fault", { name: "trip", signal: "volt-free" });
+    expect(p.expectations[0]!.when[0]!.ref).toBe(`plant:${it.id}:trip`);
+    expect(it.points![0]!.channel?.point).toBe("DI1");
+    updateDesignPoint(p, it.id, "trip", { goesTo: "relay" });
+    expect(it.points![0]!.channel?.point).toBe("DI1");
+    updateDesignPoint(p, it.id, "trip", { form: "dry-in" });
+    expect(it.points![0]!.channel).toBeUndefined();
+    allocate(p, it.id, "trip", { module: p.plant.find((x) => x.module?.type === "do")!.id, point: "DO1" });
+    updateDesignPoint(p, it.id, "trip", { goesTo: "panel" });
+    expect(it.points![0]!.channel).toBeUndefined();
+    deleteDesignPoint(p, it.id, "trip");
+    expect(it.points).toBeUndefined();
+  });
+  test("plant fields set and cleared; a network must exist", () => {
+    const p = newProject("t");
+    const it = addDesignPlant(p);
+    setPlantDesign(p, it.id, { connects: "comms", protocol: "Modbus RTU", enabledBy: "time zone", source: "4.2" });
+    expect([it.connects, it.protocol, it.enabledBy, it.source]).toEqual(["comms", "Modbus RTU", "time zone", "4.2"]);
+    setPlantDesign(p, it.id, { connects: "hardwired", source: "" });
+    expect(it.connects).toBeUndefined();
+    expect(it.source).toBeUndefined();
+    expect(() => setPlantDesign(p, it.id, { network: "n9" })).toThrow(/network/);
   });
 });

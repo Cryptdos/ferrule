@@ -45,6 +45,8 @@ export const ICONS = {
   note: '<path d="M5 4h14v12l-4 4H5z"/><path d="M15 20v-4h4"/><path d="M8 9h8M8 12.5h5"/>',
   library: '<path d="M4 4h4v16H4zM10 4h4v16h-4z"/><path d="M16 5l3.5-1 3 15.5-3.5 1z"/>',
   // Workbenches and menus (design-v0.3 §8).
+  // Design (design-v0.4): a table of rows under a heading, with a point coming off one.
+  design: '<rect x="3" y="4" width="18" height="16" rx="1"/><path d="M3 8.5h18M7 12h6M7 15.5h6M16 12h2M16 15.5h2"/>',
   draft: '<path d="M4 20l1-4L16 5l3 3L8 19z"/><path d="M14 7l3 3"/>',
   annotate: '<path d="M5 6h10M10 6v11"/><path d="M14 13h6M14 17h6M5 20h15"/>',
   ga: '<rect x="4" y="3" width="16" height="18" rx="1"/><circle cx="9" cy="8" r="1.5"/><circle cx="15" cy="8" r="1.5"/><path d="M8 13h8M8 16h8M17 11v2"/>',

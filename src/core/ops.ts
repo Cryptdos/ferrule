@@ -958,7 +958,7 @@ export function updatePlant(
 }
 
 /** Point refs that named plant:<id>:<old> now name plant:<id>:<new>. */
-function renamePointRefs(project: Project, plantId: string, from: string, to: string): void {
+export function renamePointRefs(project: Project, plantId: string, from: string, to: string): void {
   const a = `plant:${plantId}:${from}`;
   const b = `plant:${plantId}:${to}`;
   const fix = (cs: Condition[] | undefined) => cs?.forEach((c) => c.ref === a && (c.ref = b));
@@ -966,7 +966,10 @@ function renamePointRefs(project: Project, plantId: string, from: string, to: st
     if (e.point === a) e.point = b;
     fix(e.when);
   }
-  for (const it of project.plant) for (const p of it.points ?? []) fix(p.follows);
+  for (const it of project.plant) {
+    for (const p of it.points ?? []) fix(p.follows);
+    for (const x of it.interlocks ?? []) fix(x.when);
+  }
 }
 
 /** Quick entry edited: pins and points from one line, keeping what unchanged points had. */

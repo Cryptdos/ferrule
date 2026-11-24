@@ -35,6 +35,8 @@
   import RenumberDialog from "./RenumberDialog.svelte";
   import SchedulesDialog from "./SchedulesDialog.svelte";
   import TableView from "./TableView.svelte";
+  import DesignView from "./DesignView.svelte";
+  import { addDesignPlant, addSystem } from "../../core/design";
   import Tiles from "./Tiles.svelte";
   import { canvases } from "../canvases";
   import Dockable from "./Dockable.svelte";
@@ -114,7 +116,7 @@
   });
   let sim: Simulator | null = $state(null);
 
-  function setMode(mode: "draft" | "annotate" | "ga" | "simulate") {
+  function setMode(mode: "design" | "draft" | "annotate" | "ga" | "simulate") {
     if (mode === editor.mode) return;
     sim?.stop();
     sim = null;
@@ -138,6 +140,7 @@
   // A spare sheet holds annotations only.
   $effect(() => {
     const isGa = !!editor.page.ga;
+    if (editor.mode === "design") return;
     if (isGa && editor.mode === "draft") setMode("ga");
     else if (editor.page.spare && editor.mode === "draft") setMode("annotate");
   });
@@ -178,6 +181,24 @@
   function distribute(how: DistributeHow) {
     const ids = [...alignable];
     editor.apply((p) => (editor.mode === "ga" ? distributeGaItems(p, editor.pageId, ids, how) : distributeElements(p, editor.pageId, ids, how)));
+  }
+
+  /** + System: a new system, picked so it can be named at once. */
+  function newSystem() {
+    let name = "";
+    if (editor.apply((p) => (name = addSystem(p)))) editor.designPick = { plant: [], system: name };
+  }
+  /** + Plant: an empty row in the picked system, after the picked plant if there is one. */
+  function newPlant() {
+    const pick = editor.designPick;
+    const after = pick.plant[pick.plant.length - 1];
+    const sys = pick.system ?? editor.project.plant.find((p) => p.id === after)?.system ?? "";
+    let id = "";
+    if (editor.apply((p) => (id = addDesignPlant(p, sys, after).id))) {
+      editor.designPick = { plant: [id] };
+      editor.designAdding = false;
+      editor.designFolded = editor.designFolded.filter((n) => n !== sys);
+    }
   }
 
   let exporting = $state(false);
@@ -228,6 +249,25 @@
     // Windows don't block the drawing: keys work on it unless a window has the focus.
     if (isTyping(e.target) || inWindow(e.target)) return;
     const ctrl = e.ctrlKey || e.metaKey;
+    // Design: a table, not a sheet. Undo, redo and save; Esc lets go of what's picked.
+    if (editor.mode === "design") {
+      if (ctrl && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        if (e.shiftKey) editor.redo();
+        else editor.undo();
+      } else if (ctrl && e.key.toLowerCase() === "y") {
+        e.preventDefault();
+        editor.redo();
+      } else if (ctrl && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        void editor.saveNow();
+      } else if (e.key === "Escape") {
+        if (closeTopmost()) return;
+        editor.designAdding = false;
+        editor.designPick = { plant: [] };
+      }
+      return;
+    }
     // GA: move, turn and delete layout items.
     if (editor.mode === "ga") {
       // Items picked through a frame on a detail sheet are on the sheet it shows (design-v0.3 §6).
@@ -368,7 +408,7 @@
   onkeydown={onKey}
   onpaste={(e) => {
     // Ctrl+V with a picture on the clipboard puts it on the sheet (Annotate).
-    if (editor.mode === "simulate" || editor.mode === "ga" || isTyping(e.target) || inWindow(e.target) || showProject) return;
+    if (editor.mode === "simulate" || editor.mode === "ga" || editor.mode === "design" || isTyping(e.target) || inWindow(e.target) || showProject) return;
     const files = [...(e.clipboardData?.files ?? [])].filter((f) => f.type.startsWith("image/"));
     if (!files.length) return;
     e.preventDefault();
@@ -388,6 +428,8 @@
       <button class="icon" onclick={onclose} title="Back to the project list"><Icon name="projects" /></button>
       <strong class="title" title={editor.project.project.title}>{editor.project.project.title}</strong>
       <div class="workbench" role="group" aria-label="Workbench">
+        <LabelButton icon="design" label="Design" active={editor.mode === "design"} onclick={() => setMode("design")}
+          title="What the panel has: systems, plant and points, the controller. Nothing is drawn here" />
         <LabelButton icon="draft" label="Draft" active={editor.mode === "draft"} onclick={() => setMode("draft")} disabled={!!editor.page.spare}
           title={editor.page.spare ? "This is a spare sheet: annotations only" : "The electrical drawing: parts, wires, rails, plant"} />
         <LabelButton icon="annotate" label="Annotate" active={editor.mode === "annotate"} onclick={() => setMode("annotate")}
@@ -416,13 +458,23 @@
         <button class="icon" disabled={!editor.canRedo} onclick={() => editor.redo()} title="Redo (Ctrl+Y)"><Icon name="redo" /></button>
         <span class="sep"></span>
       {/if}
+      {#if editor.mode === "design"}
+        <div class="workbench" role="group" aria-label="Design view">
+          <button class:active={editor.designView === "table"} onclick={() => (editor.designView = "table")} title="Systems, plant and points">Table</button>
+        </div>
+        <span class="sep"></span>
+        <button onclick={newSystem} title="A name that groups plant: Chilled water, Ventilation">+ System</button>
+        <button onclick={newPlant} title="An empty plant row, in the picked system (or the picked plant's)">+ Plant</button>
+        <button onclick={() => (editor.designAdding = true)} disabled={editor.designPick.plant.length !== 1} title={editor.designPick.plant.length === 1 ? "A point on the picked plant: its form, name and signal" : "Pick one plant row first"}>+ Point</button>
+      {:else}
       <button class="icon" onclick={() => canvas?.fit()} title="Fit sheet (tap Space)"><Icon name="fit" /></button>
       <button class="icon" onclick={split} title="Split: the active tile in two, side by side, both showing its sheet. Each tile has its own bar to split right or down and to close"><Icon name="split" /></button>
       {#if editor.mode === "draft"}
         <button class="icon" class:active={editor.colourCheck} onclick={() => (editor.colourCheck = !editor.colourCheck)}
           title="Colour check: every wire and busbar in its core colour (grey dashes: no colour set). Print and PDF stay black"><Icon name="colours" /></button>
       {/if}
-      {#if editor.mode !== "simulate"}
+      {/if}
+      {#if editor.mode !== "simulate" && editor.mode !== "design"}
         <span class="sep"></span>
         <button class="icon" class:active={editor.tool === "select"} onclick={() => ((editor.tool = "select"), (editor.placeSymbol = null), (editor.gaPlace = null))} title="Select (S)">
           <Icon name="select" />
@@ -433,7 +485,7 @@
           </button>
         {/if}
       {/if}
-      {#if editor.mode !== "simulate"}
+      {#if editor.mode !== "simulate" && editor.mode !== "design"}
         <!-- Align and distribute (design-v0.3 §5): always icons, the name on hover. -->
         <span class="sep"></span>
         {#each ALIGN as a (a.how)}
@@ -467,9 +519,15 @@
     </div>
   </header>
   <main>
-    <div class="pane"><Tiles {editor} node={editor.tiles} {sim} insetLeft={browserWidth} window={tileWindow} /></div>
-    <Browser {editor} bind:width={browserWidth} onplace={() => (open.place = true)} />
-    {#if sim}
+    {#if editor.mode === "design"}
+      <div class="pane"><DesignView {editor} /></div>
+    {:else}
+      <div class="pane"><Tiles {editor} node={editor.tiles} {sim} insetLeft={browserWidth} window={tileWindow} /></div>
+      <Browser {editor} bind:width={browserWidth} onplace={() => (open.place = true)} />
+    {/if}
+    {#if editor.mode === "design"}
+      <!-- Design has its own Properties beside its table. -->
+    {:else if sim}
       <FloatBox title="Simulation" store="sim"><SimPanel {editor} {sim} onexpectations={() => (open.expectations = true)} /></FloatBox>
     {:else if editor.mode === "ga"}
       {#if gaSelected || editor.sheetSettings}

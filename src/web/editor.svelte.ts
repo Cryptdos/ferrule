@@ -37,9 +37,16 @@ export class Editor {
     return this.boxPicked.length > 0 && this.boxPicked.length === this.selection.length && this.boxPicked.every((id, i) => this.selection[i] === id);
   }
   tool: Tool = $state("select");
-  /** Workbench (DESIGN.md §9): drafting, or simulating the logic as drawn. */
-  /** Workbench: drafting the electrics, annotating, the panel layout (GA), or simulating. */
-  mode: "draft" | "annotate" | "ga" | "simulate" = $state("draft");
+  /** Workbench: Design (what the panel has, design-v0.4), drafting the electrics, annotating, the panel layout (GA), or simulating. */
+  mode: "design" | "draft" | "annotate" | "ga" | "simulate" = $state("draft");
+  /** Which of Design's views is showing. */
+  designView: "table" | "controller" | "network" | "todraw" = $state("table");
+  /** What's picked in Design: plant (ids, in the order picked), a point of the first, or a system by name. */
+  designPick: { plant: string[]; point?: string; system?: string } = $state({ plant: [] });
+  /** Systems folded in Design's table (by name; "" is the unnamed group). Not saved. */
+  designFolded: string[] = $state([]);
+  /** + Point: the new point's form is open in Properties. */
+  designAdding: boolean = $state(false);
   placeSymbol: string | null = $state(null);
   /** A section template waiting to be stamped where you click. */
   stamp: { templateId: string; plant: import("../core/templates").PlantMapping; size: [number, number]; name: string } | null =
