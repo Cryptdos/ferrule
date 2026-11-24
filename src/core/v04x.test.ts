@@ -20,7 +20,7 @@ import { moduleTitle, viewsOf } from "./modules";
 import { addElement, addGaDevice, addPlant, connect, portGroups, setGroupPort, resetRoute, rotateElements, deletePlant, linkContact, setGroupSide, setViewSide, setViewSpan, setWireTextAt, moveElements, placePlantView, addGaDim, addGaItem, addGaPage, addPlatesForDoors, joinDoorBelow, setPlateBehind, setBoundary, setGaSettings, splitDoor, updateElement } from "./ops";
 import { earthConductors, removeLoops, fractionAlong, isFieldWire, numberByDefault, pointAlong, wireTexts } from "./wires";
 import { routePage } from "./routing";
-import { billOfMaterials, pointsSchedule } from "./schedules";
+import { billOfMaterials, coresPerDevice, groupMarkers, pointsSchedule, wireMarkers } from "./schedules";
 import { compile, initialState, toggle } from "./sim";
 import { addController, addModule, setModuleCommons } from "./controllers";
 import { pointRef } from "./points";
@@ -1016,5 +1016,67 @@ describe("step 11: terminal strips by section (T4)", () => {
     syncGaStrips(p);
     expect(x1.refs).toEqual(all.filter((_, i) => i !== 3));
     expect(stripLabel(p, x1)).toBe("X1");
+  });
+});
+
+describe("step 12: cores per device, markers, enclosure fit (T18, M10, T20)", () => {
+  test("cores per field device: its wired terminals, earth included, in its own pin order", () => {
+    const { project: p, plant } = fresh();
+    const rows = coresPerDevice(p);
+    const row = (it: { tag: string }) => rows.find((r) => r.plant === it.tag);
+    expect(row(plant.DPS1!)).toMatchObject({ cores: 2, terminals: "C NO" });
+    expect(row(plant.SF!)).toMatchObject({ cores: 4, terminals: "U V W PE" });
+    expect(row(plant.VLV!)!.cores).toBe(3);
+    // Not a controller's module, and not comms-only plant with nothing drawn.
+    expect(rows.some((r) => r.plant.startsWith("A5-"))).toBe(false);
+    expect(row(plant.M1!)).toBeUndefined();
+  });
+
+  test("markers: two a wire; a terminal's number at a terminal, the device's tag at a core's field end; grouped counts", () => {
+    const { project: p, plant } = fresh();
+    const m = wireMarkers(p);
+    const ends = p.pages.reduce((a, pg) => a + pg.segments.length * 2, 0);
+    const junctionEnds = p.pages.reduce((a, pg) => a + pg.segments.flatMap((s) => [s.from, s.to]).filter(([id]) => pg.elements.find((e) => e.id === id)?.symbol === "junction").length, 0);
+    expect(m.length).toBe(ends - junctionEnds);
+    // The supply fan's airflow switch: a core from its terminal to the switch.
+    const di = p.pages.find((pg) => pg.title === "Controller: digital inputs")!;
+    const view = di.elements.find((e) => e.symbol === "plant-view" && e.params.plant === plant.DPS1!.id)!;
+    const core = di.segments.find((s) => s.to[0] === view.id || s.from[0] === view.id)!;
+    const term = di.elements.find((e) => e.id === (core.to[0] === view.id ? core.from[0] : core.to[0]))!;
+    expect(term.symbol).toBe("terminal");
+    const mine = m.filter((r) => r.what.startsWith("core") && (r.text === term.tag || r.text === plant.DPS1!.tag) && r.where.startsWith(`${di.number}-`));
+    expect(mine.map((r) => r.what)).toContain("core, field end");
+    expect(m).toContainEqual(expect.objectContaining({ text: plant.DPS1!.tag, what: "core, field end" }));
+    expect(m).toContainEqual(expect.objectContaining({ text: term.tag, what: "core, panel end" }));
+    // A wire numbered by hand still gets its terminal's number, and Check says so.
+    const c = p.conductors.find((x) => x.id === core.conductor)!;
+    c.number = "999";
+    expect(wireMarkers(p)).toContainEqual(expect.objectContaining({ text: term.tag, what: "core, panel end", wire: "999" }));
+    expect(checkProject(p).map((f) => f.message)).toContain(`Sheet ${di.number}: wire 999 lands on terminal ${term.params.strip ?? "X1"}:${term.tag}, so its markers say ${term.tag}: Renumber to match`);
+    renumber(p);
+    expect(checkProject(p).some((f) => /so its markers say/.test(f.message))).toBe(false);
+    // Grouped: each text and kind once, the counts adding up.
+    const g = groupMarkers(wireMarkers(p));
+    expect(g.reduce((a, x) => a + x.count, 0)).toBe(m.length);
+    expect(g.find((x) => x.text === plant.DPS1!.tag && x.what === "core, field end")!.count).toBe(2);
+  });
+
+  test("Check: GA items outside the backplate or the door, or across a door's two leaves; schematic parts not on a layout sheet", () => {
+    const { project: p } = fresh();
+    const msgs = () => checkProject(p).map((f) => f.message);
+    expect(msgs().filter((m) => /lies outside|across both leaves/.test(m))).toEqual([]);
+    expect(msgs()).toContain("3 schematic parts aren't on a layout sheet, so aren't on the bill of materials (see the Layout workbench)");
+    const back = p.pages.find((pg) => pg.ga?.view === "backplate")!;
+    const rail = back.gaItems!.find((it) => it.kind === "rail")!;
+    rail.w = 760;
+    expect(msgs()).toContain(`Sheet ${back.number}: a DIN rail lies outside the backplate (800 × 1200 mm)`);
+    rail.w = 640;
+    const door = p.pages.find((pg) => pg.ga?.view === "door-front")!;
+    door.ga!.leaves = [{ w: 400, hinge: "left" }, { w: 400, hinge: "right" }];
+    const plateText = door.gaItems!.find((it) => it.kind === "label")!;
+    plateText.x = 300;
+    expect(msgs()).toContain(`Sheet ${door.number}: a label plate lies across both leaves of the door`);
+    plateText.y = 1180;
+    expect(msgs()).toContain(`Sheet ${door.number}: a label plate lies outside the door (800 × 1200 mm)`);
   });
 });

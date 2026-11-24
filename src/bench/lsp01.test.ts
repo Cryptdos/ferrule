@@ -108,7 +108,7 @@ describe("LSP-01 benchmark", () => {
     // and the hints where its tight sheets 8 and 9 have labels over other parts (v0.4.x T7).
     expect(checkProject(p).filter((f) => f.level !== "info")).toEqual([]);
     const notes = checkProject(p).map((f) => f.message);
-    expect(notes.filter((m) => !/rail \d+: .* mm used/.test(m) && !/^Sheet [89]: .*'s label overlaps/.test(m))).toEqual([expect.stringMatching(/not on a GA yet/)]);
+    expect(notes.filter((m) => !/rail \d+: .* mm used/.test(m) && !/^Sheet [89]: .*'s label overlaps/.test(m))).toEqual([expect.stringMatching(/aren.t on a layout sheet/)]);
     expect(notes.some((m) => /rail \d+: .* mm used/.test(m))).toBe(true);
   });
 
