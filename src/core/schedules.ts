@@ -170,6 +170,11 @@ export function billOfMaterials(project: Project): BomRow[] {
         // A controller's module: by its type until a model's picked.
         if (it.module) {
           const m = project.plant.find((x) => x.id === it.module);
+          // Plant in the panel (v0.4.x T3): its generic size's name until a device is picked.
+          if (m && !m.module) {
+            add(`gen:panelPlant`, { item: `${sizes.panelPlant!.label} (no device picked)`, maker: "", part: "", quantity: 1, unit: "each" }, [m.tag]);
+            continue;
+          }
           const type = m?.module ? moduleTypeName(m.module) : "module";
           add(`mod:${type}`, { item: `Controller module ${type} (no device picked)`, maker: "", part: "", quantity: 1, unit: "each" }, [m?.tag ?? ""]);
           continue;
@@ -360,6 +365,8 @@ export function pointsSchedule(project: Project): PointsRow[] {
   const tag = (p: PlantItem) => p.tag || `${p.prefix || "U"}?`;
   for (const g of systemGroups(project)) {
     for (const plant of g.plant) {
+      // A panel device (v0.4.x T3) is in the points schedule only when one of its points is on a channel.
+      if (plant.inPanel && !(plant.points ?? []).some((q) => q.channel)) continue;
       const base = { system: g.name, tag: tag(plant), description: plant.description };
       const points = plant.points ?? [];
       if (!points.length) {

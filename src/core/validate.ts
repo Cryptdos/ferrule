@@ -117,6 +117,8 @@ export function parseProject(input: unknown): Project {
         if (!(typeof el.params.labelWidth === "number" && el.params.labelWidth > 0)) el.params.labelWidth = labelWidthFor(el.label, project);
         el.label = el.label.replace(/\s*\n\s*/g, " ");
       }
+      // A part is outside the panel only below a boundary (v0.4.x F7): plant on a sheet with none is panel wiring.
+      if (pg.boundaryY === null) el.zone = "internal";
       // Terminals on a panel boundary are cells of its terminal block.
       if (el.symbol !== "terminal") continue;
       if (pg.boundaryY !== null && el.pos[1] === pg.boundaryY && (el.rot === 0 || el.rot === 180)) el.params.onBlock = true;
@@ -216,6 +218,7 @@ export function parsePlant(v: unknown): Project["plant"] {
       prefix: strOr(pl.prefix) || "U",
       ...(pl.locked === true ? { locked: true } : {}),
       ...(pl.powerByOthers === true ? { powerByOthers: true } : {}),
+      ...(pl.inPanel === true ? { inPanel: true } : {}),
       description: strOr(pl.description),
       terminals: arr(pl.terminals).filter((t): t is string => typeof t === "string"),
       ...parsePoints(pl.points, pl.pins),

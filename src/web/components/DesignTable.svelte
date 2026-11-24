@@ -60,21 +60,24 @@
         <tr><th>Tag</th><th>Description</th><th>By</th><th>Point</th><th>Form</th><th>Signal</th><th>Type</th><th>Channel</th></tr>
       </thead>
       <tbody>
-        {#each groups as g (g.name)}
+        {#each groups as g (g.panel ? "\u0000panel" : g.name)}
+          {@const gk = g.panel ? "\u0000panel" : g.name}
           {#if !onlyUnnamed}
-            <tr class="system" class:picked={editor.designPick.system === g.name && !!g.name}>
+            <tr class="system" class:picked={editor.designPick.system === g.name && !!g.name && !g.panel}>
               <td colspan="8">
-                <button class="fold" onclick={() => fold(g.name)} title={folded(g.name) ? "Unfold" : "Fold"} aria-label={folded(g.name) ? "Unfold" : "Fold"}>{folded(g.name) ? "▸" : "▾"}</button>
-                {#if g.name}
+                <button class="fold" onclick={() => fold(gk)} title={folded(gk) ? "Unfold" : "Fold"} aria-label={folded(gk) ? "Unfold" : "Fold"}>{folded(gk) ? "▸" : "▾"}</button>
+                {#if g.panel}
+                  <span class="sysname" title="Plant marked In the panel: power supplies, UPSs, batteries">Panel</span>
+                {:else if g.name}
                   <button class="sysname" onclick={() => (editor.designPick = { plant: [], system: g.name })}>{g.name}</button>
                 {:else}
                   <span class="sysname none">No system</span>
                 {/if}
-                {#if folded(g.name)}<span class="sum">{summary(g.plant)}</span>{:else if !g.plant.length}<span class="sum">empty: + Plant adds a row here</span>{/if}
+                {#if folded(gk)}<span class="sum">{summary(g.plant)}</span>{:else if !g.plant.length}<span class="sum">empty: + Plant adds a row here</span>{/if}
               </td>
             </tr>
           {/if}
-          {#if !folded(g.name)}
+          {#if !folded(gk)}
             {#each g.plant as p (p.id)}
               {@const pts = p.points ?? []}
               {@const picked = editor.designPick.plant.includes(p.id)}

@@ -24,9 +24,10 @@
     const st = interlockStatus(editor.project, editor.proofs);
     return editor.project.plant.flatMap((plant) => (plant.interlocks ?? []).map((il) => ({ plant, il, st: st.get(il.id) })));
   });
-  const total = $derived(lists.plant.length + lists.modules.length);
+  const total = $derived(lists.plant.length + lists.panel.length + lists.modules.length);
+  const panelLeft = $derived(lists.panel.filter((x) => !x.sheets.length));
   const proveAll = () => void editor.proveInterlocks();
-  const left = $derived(plantLeft.length + modsLeft.length);
+  const left = $derived(plantLeft.length + panelLeft.length + modsLeft.length);
 
   /** The plant whose pins are being given, and the line being edited. */
   let pinning: { id: string; spec: string } | null = $state(null);
@@ -67,6 +68,18 @@
 <div class="todraw">
   <div class="head"><span class="title">To draw</span><span class="hint">{left} left of {total}</span></div>
   <div class="scroll">
+    {#if lists.panel.length}
+      <!-- Panel devices (v0.4.x T3), counted apart from field plant. -->
+      <div class="group">Panel <span class="hint">{lists.panel.length - panelLeft.length} of {lists.panel.length} drawn · in the panel: place above the boundary</span></div>
+      {#each lists.panel as t (t.item.id)}
+        <div class="row">
+          {#if t.sheets.length}<span class="tick">✓</span>{:else}<span class="dot" title="Not drawn yet">●</span>{/if}
+          <strong>{plantLabel(t.item)}</strong>
+          <span class="what">{t.item.description || "—"}{#if t.sheets.length}<span class="dim"> · {sheets(t.sheets)}</span>{/if}</span>
+          <button onclick={() => place(t)} title="Place a view of it on the open sheet in Draft, above the boundary">{t.sheets.length ? "Place another view" : "Place on sheet"}</button>
+        </div>
+      {/each}
+    {/if}
     <div class="group">Field plant <span class="hint">{plantLeft.length} of {lists.plant.length} left</span></div>
     {#each plantLeft as t (t.item.id)}
       <div class="row">
