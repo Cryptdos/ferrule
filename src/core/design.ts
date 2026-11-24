@@ -744,3 +744,49 @@ export function deleteInterlock(project: Project, plantId: string, id: string): 
   if (!it.interlocks.length) delete it.interlocks;
   syncInterlocks(project);
 }
+
+// ---------------------------------------------------------------------------
+// Suggest (design-v0.4 §4): a proposal, to accept, change or throw away. It
+// never runs by itself, and nothing is allocated until it's accepted.
+
+export interface Proposed {
+  plant: string;
+  point: string;
+  /** The channel proposed; unset when nothing free can take it. */
+  channel?: ChannelRef;
+}
+
+/**
+ * A proposed allocation for the points still to allocate, in table order:
+ * each onto the first free channel of its type in rail order, a module of
+ * its own type before a universal one, so universal channels are kept for
+ * what nothing else can take. Points already on channels are left alone.
+ */
+export function suggestAllocation(project: Project): Proposed[] {
+  const taken = new Set<string>();
+  for (const it of project.plant) for (const p of it.points ?? []) if (p.channel) taken.add(`${p.channel.module}\u0000${p.channel.point}`);
+  const channels = channelsOfInRailOrder(project);
+  const out: Proposed[] = [];
+  for (const { plant, point } of unallocated(project)) {
+    const t = pointType(point.form)!;
+    const free = (uio: boolean) =>
+      channels.find((c) => c.types.includes(t) && (c.module.module?.type === "uio") === uio && !taken.has(`${c.module.id}\u0000${c.channel.name}`));
+    const c = free(false) ?? free(true);
+    if (c) {
+      taken.add(`${c.module.id}\u0000${c.channel.name}`);
+      out.push({ plant: plant.id, point: point.name, channel: { module: c.module.id, point: c.channel.name } });
+    } else out.push({ plant: plant.id, point: point.name });
+  }
+  return out;
+}
+
+/** Accept a proposal, or the lines of it kept: each is allocated by hand, as if picked. */
+export function acceptSuggestion(project: Project, lines: Proposed[]): number {
+  let n = 0;
+  for (const l of lines) {
+    if (!l.channel) continue;
+    allocate(project, l.plant, l.point, l.channel);
+    n++;
+  }
+  return n;
+}

@@ -319,6 +319,13 @@ README screenshots are retaken when the interface changes. Small judgement calls
 - **Wired** is empty for a point with no channel, as there's nothing to be wired to; *Channel* is empty too, so unallocated points stand out.
 - **Module** is the module's tag (*A3-23*, or *A?* until drawn); its type is in the IO schedule.
 
+**Step 11 (Suggest)**
+
+- **What it proposes:** the points still to allocate, in table order, each on the first free channel of its type in rail order, a module of its own type before a universal one, so universal channels are left for what nothing else can take. Points already on channels are never moved. A point with no room is shown as such, not forced.
+- **A proposal, fixed when opened:** the window shows it line by line; untick a line, or pick another channel (only free channels of its type, not proposed for another line), then *Accept ticked*. *Throw away* closes it with nothing changed. Accepting is one undo step and allocates each line exactly as picking it by hand would.
+- **No grouping cleverness:** it doesn't try to keep a plant item's points on one module or leave spares per module. Those are design decisions (§4); the proposal is a quick start to change.
+- **Suggest…** is in the Controller view's top bar, with a controller.
+
 ---
 
 ## 11. Decisions, as discussed (24/11/26)

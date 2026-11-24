@@ -38,6 +38,7 @@
   import DesignView from "./DesignView.svelte";
   import DuplicateDialog from "./DuplicateDialog.svelte";
   import DesignTemplatesDialog from "./DesignTemplatesDialog.svelte";
+  import SuggestDialog from "./SuggestDialog.svelte";
   import { addDesignPlant, addSystem, allocate } from "../../core/design";
   import { addNetwork, placeNetworkSheet } from "../../core/network";
   import { POINTS_COLS, pointsSchedule, toCsv } from "../../core/schedules";
@@ -516,6 +517,8 @@
         {:else if editor.designView === "controller"}
           <LabelButton icon="controllers" label="Controller…" active={!!open.controllers} onclick={() => toggle("controllers")} title="Describe the controller; add modules in rail order, spares and addresses; their pins" />
           <button disabled={!pickedAllocated} onclick={unallocate} title={pickedAllocated ? "Take the picked point off its channel" : "Pick an allocated point first"}>Unallocate</button>
+          <span class="sep"></span>
+          <button class:active={!!editor.open.designSuggest} disabled={!editor.project.controllers?.length} onclick={() => (editor.open.designSuggest = !editor.open.designSuggest)} title="Propose channels for the points still to allocate: accept, change or throw away. Nothing is allocated until you accept">Suggest…</button>
         {:else}
         <button onclick={newSystem} title="A name that groups plant: Chilled water, Ventilation">+ System</button>
         <button onclick={newPlant} title="An empty plant row, in the picked system (or the picked plant's)">+ Plant</button>
@@ -612,6 +615,9 @@
     {/if}
     {#if editor.mode === "design" && editor.open.designDuplicate}
       <DuplicateDialog {editor} onclose={() => (editor.open.designDuplicate = false)} />
+    {/if}
+    {#if editor.mode === "design" && editor.open.designSuggest}
+      <SuggestDialog {editor} onclose={() => (editor.open.designSuggest = false)} />
     {/if}
     {#if editor.mode === "design" && editor.open.designTemplates}
       <DesignTemplatesDialog {editor} onclose={() => (editor.open.designTemplates = false)} />
