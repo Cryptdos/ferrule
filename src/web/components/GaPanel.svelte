@@ -7,7 +7,7 @@
   import Icon from "./Icon.svelte";
 
   /**
-   * GA workbench, the browser's lower section: on a GA sheet, the GA tools
+   * Layout workbench, the browser's lower section: on a GA sheet, the GA tools
    * (DIN rail, trunking, dimension, label plate); on any other sheet, a new
    * GA sheet. Parts from the schematic are placed from *Place parts…*.
    */

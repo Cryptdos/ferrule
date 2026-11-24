@@ -29,7 +29,7 @@ Both get **one model: IO points**, so they're drawn, wired, scheduled and simula
 
 Real kit labels its terminals in up to three layers, and the drawing should show the same:
 
-| Layer | Trend IQ5 IO module | Siemens DXR2 | Schneider AO module | Required? |
+| Layer | Universal IO module | Room controller | Analogue output module | Required? |
 |---|---|---|---|---|
 | Group | `IO1` | | `AO1` | No |
 | Id | `IO1`, `C` | `D1`, `X1`, `⊥`, `V+` | `VO`, `RET`, `CO` | No |
@@ -99,10 +99,10 @@ A controller is a device of kind **controller**:
   - pins per channel and their ids, e.g. `VO RET CO`, or `IO C`, or `Y ⊥` with the `⊥` shared by two channels;
   - the first pin number, and the group name pattern (`AO#` → AO1, AO2…).
 
-  After generating, the table can be edited by hand for oddities (the DXR2's `V+`, a shared `⊥`).
-- **From datasheets.** Real models (a Trend IQ5-IO/16UIO, a DXR2.E18) are entered once from the datasheet with the generator and table, then saved in the device library with their GA size and datasheet. Ferrule ships no makers' data.
+  After generating, the table can be edited by hand for oddities (a room controller's `V+`, a shared `⊥`).
+- **From datasheets.** Real models (a 16-channel UIO module, an 18-point room controller) are entered once from the datasheet with the generator and table, then saved in the device library with their GA size and datasheet. Ferrule ships no makers' data.
 - **Every module has its own tag**, by where its view is drawn, like any other part: a DI module drawn at sheet 3, column 23 is `A3-23`. The tag tells you straight away which sheet to turn to.
-- **Point references** are `module tag:point`, e.g. `A3-23:DI2`. That works whether the maker numbers channels per module (Trend) or per controller (Siemens), and matches how it's said on site: "this controller, DI2", with the tag saying where it is.
+- **Point references** are `module tag:point`, e.g. `A3-23:DI2`. That works whether the maker numbers channels per module or per controller, and matches how it's said on site: "this controller, DI2", with the tag saying where it is.
 - **A reference always lands where the point is.** Engineers learn to read `A3-23` as "sheet 3, column 23" and expect to find what they're after right there; that must never fail. So when a point is drawn on a continuation of its module (a split view, below), every reference to it adds where *that point* is drawn: `A3-23:DO5 (4-10)`. That applies on link arrows, contact tables, expectations and the IO schedule, and double-clicking jumps there. Points on the module's first view need nothing extra: `A3-23:DO2` is at 3-23.
 - **One module, one tag.** A split module is still one physical module with one label, so it keeps one tag (from its first view) on the GA, its label and the schedule. The continuation's title row says where it carries on from: `A3-23 · DO-8 · DO5–8, continued from 3-23`. (Considered and set aside for now: giving each part of a split module its own tag. It makes references land in the right place too, but names one module two ways. To be revisited if B doesn't work out in use.)
 - **The controller as a whole** is its modules together. It has a description (e.g. *AHU-1 outstation*) and is identified by its host module's tag; the modules list it in their title row (*part of A2-5, AHU-1 outstation*). The GA places its modules together.
@@ -215,7 +215,7 @@ An **IO schedule** (the job's points list) exported as CSV with the terminal and
 
 Plant points have a schedule of their own: device, point, pins, what they're wired to.
 
-## 8. GA
+## 8. Layout (GA)
 
 A controller is placed on the GA as its modules side by side on a rail, sized from their library entries (or generic sizes per type and channel count). *To place* lists the controller as one item that places all its modules.
 

@@ -133,7 +133,7 @@
   }
   $effect(() => () => sim?.stop());
 
-  // A GA sheet is laid out in the GA workbench, a schematic sheet drafted:
+  // A GA sheet is laid out in the Layout workbench, a schematic sheet drafted:
   // moving between them takes you to the right one (Annotate and Simulate stay).
   // A spare sheet holds annotations only.
   $effect(() => {
@@ -392,7 +392,7 @@
           title={editor.page.spare ? "This is a spare sheet: annotations only" : "The electrical drawing: parts, wires, rails, plant"} />
         <LabelButton icon="annotate" label="Annotate" active={editor.mode === "annotate"} onclick={() => setMode("annotate")}
           title="Text, boxes, label plates, sections, revision clouds and pictures" />
-        <LabelButton icon="ga" label="GA" active={editor.mode === "ga"} onclick={() => setMode("ga")}
+        <LabelButton icon="ga" label="Layout" active={editor.mode === "ga"} onclick={() => setMode("ga")}
           title="General arrangement: the panel laid out at true scale" />
         <LabelButton icon="simulate" label="Simulate" active={editor.mode === "simulate"} onclick={() => setMode("simulate")}
           title="Try the logic as drawn" />

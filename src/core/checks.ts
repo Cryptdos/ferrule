@@ -156,7 +156,7 @@ export function checkProject(project: Project): Finding[] {
   if (project.pages.some((p) => p.ga)) {
     const left = gaCandidates(project, (el) => el.tag);
     if (left.length) {
-      out.push({ level: "info", message: `${left.length} panel device${left.length === 1 ? "" : "s"} not on a GA yet (see the GA workbench)`, ids: [] });
+      out.push({ level: "info", message: `${left.length} panel device${left.length === 1 ? "" : "s"} not on a GA yet (see the Layout workbench)`, ids: [] });
     }
     // A placed strip whose terminals changed since its GA was last open (note 45).
     for (const c of changedGaStrips(project)) {
