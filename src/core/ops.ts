@@ -2072,6 +2072,10 @@ export function updateProjectDevice(project: Project, id: string, patch: Partial
   if (patch.w !== undefined && patch.w > 0) dev.w = patch.w;
   if (patch.h !== undefined && patch.h > 0) dev.h = patch.h;
   if (patch.d !== undefined && patch.d >= 0) dev.d = patch.d;
+  if (patch.va !== undefined) {
+    if (patch.va > 0) dev.va = patch.va;
+    else delete dev.va;
+  }
   if (old.w !== dev.w || old.h !== dev.h) resizeDeviceItems(project, id, old, dev);
 }
 

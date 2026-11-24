@@ -291,6 +291,7 @@ function parseModule(v: unknown): { module?: ModuleInfo } {
       ...(address ? { address } : {}),
       ...(typeof v.device === "string" && v.device ? { device: v.device } : {}),
       ...(commons.length ? { commons } : {}),
+      ...(typeof v.va === "number" && Number.isFinite(v.va) && v.va > 0 ? { va: v.va } : {}),
     },
   };
 }
@@ -353,6 +354,9 @@ function parsePoints(points: unknown, pins: unknown): { points?: IoPoint[]; pins
         ...(text(p.signal) ? { signal: text(p.signal) } : {}),
         ...(isSupplyType(p.gives) ? { gives: { v: p.gives.v, ac: p.gives.ac } } : {}),
         ...(arr(p.accepts).filter(isSupplyType).length ? { accepts: arr(p.accepts).filter(isSupplyType).map((x) => ({ v: x.v, ac: x.ac })) } : {}),
+        ...(typeof p.va === "number" && Number.isFinite(p.va) && p.va > 0 ? { va: p.va } : {}),
+        ...(typeof p.ratingVa === "number" && Number.isFinite(p.ratingVa) && p.ratingVa > 0 ? { ratingVa: p.ratingVa } : {}),
+        ...(typeof p.efficiency === "number" && p.efficiency > 0 && p.efficiency <= 1 ? { efficiency: p.efficiency } : {}),
         ...(p.goesTo === "relay" || p.goesTo === "panel" ? { goesTo: p.goesTo } : {}),
         ...(isObj(p.channel) && text(p.channel.module) && text(p.channel.point) ? { channel: { module: text(p.channel.module), point: text(p.channel.point) } } : {}),
         ...(text(p.confirmed) ? { confirmed: text(p.confirmed) } : {}),

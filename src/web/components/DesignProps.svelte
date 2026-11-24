@@ -251,8 +251,14 @@
           {/if}
           {#if pt.form === "supply-out" || pt.form === "powered-out"}
             <div class="line"><label class="supply">Gives <input value={pt.gives ? formatSupply(pt.gives) : ""} list="ferrule-supplies" placeholder="e.g. 24 V DC" onchange={(e) => setPoint(pt.name, { gives: e.currentTarget.value })} title="What it supplies; Check compares it with what its loads take" /></label></div>
+            <!-- Its rating and efficiency (v0.4.x M12): Simulate's load on it, and what it passes up. -->
+            <div class="line">
+              <label class="supply">Rating VA <input type="number" min="0" value={pt.ratingVa ?? ""} placeholder="—" onchange={(e) => setPoint(pt.name, { ratingVa: Number(e.currentTarget.value) || null })} title="What it can supply, VA; its load in Simulate turns red over this" /></label>
+              {#if pt.form === "supply-out"}<label class="supply">Efficiency % <input type="number" min="1" max="100" value={pt.efficiency ? Math.round(pt.efficiency * 100) : ""} placeholder="85" onchange={(e) => setPoint(pt.name, { efficiency: Number(e.currentTarget.value) / 100 || null })} title="What it gives out of what it takes in; its load is passed up to its supply in divided by this" /></label>{/if}
+            </div>
           {:else if pt.form === "supply-in" || pt.form === "powered-in"}
             <div class="line"><label class="supply">Takes <input value={pt.accepts ? formatSupplies(pt.accepts) : ""} list="ferrule-supplies" placeholder="e.g. 24 V AC, 24 V DC" onchange={(e) => setPoint(pt.name, { accepts: e.currentTarget.value })} title="What supply it takes; two, comma between, for either" /></label></div>
+            <div class="line"><label class="supply">Draw VA <input type="number" min="0" value={pt.va ?? ""} placeholder="—" onchange={(e) => setPoint(pt.name, { va: Number(e.currentTarget.value) || null })} title="Its expected draw from its data sheet, VA (a power supply's own, before what it gives out)" /></label></div>
           {/if}
           <div class="pins">{pt.pins.length ? `Pins ${pt.pins.map((x) => printedPin(x, pt.name)).join(" ")}` : "No pins yet"}</div>
           {#if pt.channel}

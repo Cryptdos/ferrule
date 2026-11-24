@@ -372,6 +372,8 @@ export interface ModuleInfo {
    * list per set that's linked. Set: *Commons are linked inside the module*.
    */
   commons?: string[][];
+  /** Its expected draw, VA (v0.4.x M12), carried by the controller's power supply module. Unset: its model's, or none. */
+  va?: number;
 }
 
 /**
@@ -476,6 +478,12 @@ export interface IoPoint {
   gives?: SupplyType;
   /** Supply in or powered in: what it accepts, any of these (v0.4.x M11). Unset: not stated. */
   accepts?: SupplyType[];
+  /** Supply in or powered in: its expected draw, VA (v0.4.x M12). */
+  va?: number;
+  /** Supply out or powered out: its rating, VA (v0.4.x M12). */
+  ratingVa?: number;
+  /** Supply out: the share of what it takes in that it gives out (0.85 unless set). */
+  efficiency?: number;
   /** What it does on this job, printed along its wire under a module's terminals: "SF-01 RUNNING". */
   label?: string;
   // Design (design-v0.4 §2, §4). A point made in Design may have no pins yet.
