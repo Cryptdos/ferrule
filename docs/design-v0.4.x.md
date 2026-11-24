@@ -396,3 +396,7 @@ Judgement calls made while building, step by step.
 - Along the top and bottom, terminals are boxes 2 apart with numbers reading up, group names inside; down the left and right they stack 2 apart, numbers reading across in boxes as wide as the longest, ids beside them, group names beyond. The box is as wide and tall as its sides need. A module's heading sits inside the top unless terminals are there; its jobs run out along each point's first wire.
 - The text block (a plant view's tag and lines, a module's title row) is opposite the view's side, below for left and right. A break mark for a view showing only some terminals isn't drawn in this layout.
 - *Terminals on* in a view's Properties (`setViewSide`). T2's width applies along the top and bottom.
+
+**Step 7b, second PR (sides per group).**
+- `params.sides`: a JSON map from group name (the pin's group, else its point) to side, set from *Groups* in a view's Properties (`setGroupSide`); a group on the view's own side isn't stored. Groups on the same side keep their order; each side's groups are centred along it, or spread along the top and bottom when the view has a width (T2). The box is as wide as its widest top or bottom run, or its left and right depths with 4 units between, and as tall as its tallest side run, or its top and bottom depths.
+- Acceptance as written: on the fixture's controller sheets every route is loop-free; a drive with its mains on top and its control on the bottom, wired up to a breaker and down to the boundary, has no wire crossing its body.
