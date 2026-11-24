@@ -6,7 +6,7 @@ import { AvoidLib } from "libavoid-js";
 import { buildLsp01 } from "../bench/lsp01";
 import { checkProject } from "./checks";
 import { addController, addModule, deleteController, generateModule } from "./controllers";
-import { addInterlock, deleteInterlock, updateInterlock, needsPins, suggestPins, toDraw, channelLabel, channelsFor, noChannelReason, unallocated, designTemplateOf, duplicatePlant, insertDesignTemplate, stepTag, tagPlan, templateCounts, addDesignPlant, addDesignPoint, addSystem, allocate, channelsOf, deleteDesignPoint, deleteSystem, moveSystem, movePlant, needsLine, pointOnChannel, pointType, renameSystem, setPlantDesign, systemGroups, updateDesignPoint } from "./design";
+import { acceptSuggestion, suggestAllocation, addInterlock, deleteInterlock, updateInterlock, needsPins, suggestPins, toDraw, channelLabel, channelsFor, noChannelReason, unallocated, designTemplateOf, duplicatePlant, insertDesignTemplate, stepTag, tagPlan, templateCounts, addDesignPlant, addDesignPoint, addSystem, allocate, channelsOf, deleteDesignPoint, deleteSystem, moveSystem, movePlant, needsLine, pointOnChannel, pointType, renameSystem, setPlantDesign, systemGroups, updateDesignPoint } from "./design";
 import { newProject, type IoPoint, type Project } from "./model";
 import { defaultPattern } from "./modules";
 import { addElement, addPage, addPlant, connect, deletePlant, linkContact, placePlantView, setQuickEntry, updatePin, updatePlant, updatePoint } from "./ops";
@@ -796,5 +796,37 @@ describe("points schedule (§9)", () => {
     // Motors with no points are a row each; CSV has the design's columns.
     expect(rows.some((r) => r.tag === "SF-01" && r.point === "")).toBe(true);
     expect(toCsv(rows, POINTS_COLS).split("\n")[0]).toBe("System,Tag,Description,Point,Form,Signal,Type,Goes to,Controller,Module,Channel,Via,Wired");
+  });
+});
+
+describe("Suggest (§4)", () => {
+  test("proposes, never allocates; own-type modules before universal; what's taken is left; no room is said", () => {
+    const { p, di, dout, uio } = panel();
+    const a = pump(p, "P1", [
+      { name: "fault", form: "contact" },
+      { name: "run", form: "contact" },
+      { name: "enable", form: "dry-in" },
+      { name: "speed", form: "analogue-in" },
+      { name: "trip", form: "contact", goesTo: "panel" },
+    ]);
+    allocate(p, a.id, "run", { module: di.id, point: "DI1" });
+    const before = JSON.stringify(p);
+    const s = suggestAllocation(p);
+    expect(JSON.stringify(p)).toBe(before);
+    expect(s.map((l) => [l.point, l.channel && `${l.channel.module === di.id ? "di" : l.channel.module === dout.id ? "do" : l.channel.module === uio.id ? "uio" : "?"} ${l.channel.point}`])).toEqual([
+      ["fault", "di DI2"],
+      ["enable", "do DO1"],
+      ["speed", "uio IO1"],
+    ]);
+    // Accepting what's kept is allocating by hand.
+    expect(acceptSuggestion(p, s.slice(0, 2))).toBe(2);
+    expect(a.points!.find((q) => q.name === "fault")!.channel?.point).toBe("DI2");
+    expect(a.points!.find((q) => q.name === "speed")!.channel).toBeUndefined();
+    // No room: said, not forced.
+    const q = newProject("q");
+    const c = addController(q, "Panel controller");
+    addModule(q, c.id, { type: "di", channels: 1 });
+    pump(q, "P1", [{ name: "a", form: "contact" }, { name: "b", form: "contact" }]);
+    expect(suggestAllocation(q).map((l) => !!l.channel)).toEqual([true, false]);
   });
 });
