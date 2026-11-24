@@ -12,12 +12,12 @@ import { describeInterlock, interlockExpectations, interlockStatus, proveInterlo
 import { parseSupplies, parseSupply } from "./supplies";
 import { refreshConductors } from "./conductors";
 import { newProject, type Element, type Project } from "./model";
-import { labelBlockRect, localGeometry, moduleViewLayout, plantViewLayout, wrapTag, wrapTitle } from "./symbols";
+import { labelBlockRect, localGeometry, moduleViewLayout, plantViewLayout, terminalPoint, wrapTag, wrapTitle } from "./symbols";
 import { elementTexts } from "./tags";
 import { textWidth } from "./textwidth";
-import { textUnits } from "./geometry";
+import { AREA_UNITS, textUnits } from "./geometry";
 import { moduleTitle, viewsOf } from "./modules";
-import { addElement, addPlant, deletePlant, linkContact, setWireTextAt, moveElements, placePlantView, addGaDim, addGaItem, addGaPage, addPlatesForDoors, joinDoorBelow, setPlateBehind, setBoundary, setGaSettings, splitDoor, updateElement } from "./ops";
+import { addElement, addPlant, deletePlant, linkContact, setViewSpan, setWireTextAt, moveElements, placePlantView, addGaDim, addGaItem, addGaPage, addPlatesForDoors, joinDoorBelow, setPlateBehind, setBoundary, setGaSettings, splitDoor, updateElement } from "./ops";
 import { earthConductors, fractionAlong, isFieldWire, numberByDefault, pointAlong, wireTexts } from "./wires";
 import { routePage } from "./routing";
 import { pointsSchedule } from "./schedules";
@@ -487,5 +487,45 @@ describe("step 6: movable labels (T14, T7, T13)", () => {
     expect(back.pages[1]!.segments[0]!.numberAt).toBe(0.8);
     setWireTextAt(p, pg.id, seg.id, { numberAt: null, colourAt: null });
     expect(seg.numberAt).toBeUndefined();
+  });
+});
+
+describe("step 7a: a view spans a width (T2)", () => {
+  test("an eight-channel module view at span 130 spreads its channel groups at least 14 apart; unset, it's as before", () => {
+    const { project: p, modules } = fresh();
+    const v = viewsOf(p, modules.ao.id)[0]!.el;
+    const before = plantViewLayout(v);
+    const pg = p.pages.find((x) => x.elements.includes(v))!;
+    setViewSpan(p, pg.id, v.id, 130);
+    const lay = plantViewLayout(v);
+    expect(lay.right - lay.left).toBe(130);
+    expect(lay.groups.length).toBe(8);
+    for (let i = 1; i < lay.groups.length; i++) expect(lay.groups[i]!.x0 - lay.groups[i - 1]!.x0).toBeGreaterThanOrEqual(14);
+    // Within a group the pitch stays 2.
+    for (const g of lay.groups) expect(g.x1 - g.x0).toBe(before.groups[0]!.x1 - before.groups[0]!.x0);
+    // Equal gaps, the first and last a margin in from the ends.
+    const gaps = lay.groups.slice(1).map((g, i) => g.x0 - lay.groups[i]!.x1);
+    expect(Math.max(...gaps) - Math.min(...gaps)).toBeLessThanOrEqual(1);
+    setViewSpan(p, pg.id, v.id, null);
+    expect(plantViewLayout(v)).toEqual(before);
+    // Narrower than it needs: no change.
+    setViewSpan(p, pg.id, v.id, 5);
+    expect(v.params.span).toBeUndefined();
+  });
+
+  test("Fit to sheet: as wide as the usable sheet from where it stands; wires follow its pins", () => {
+    const { project: p, modules } = fresh();
+    const v = viewsOf(p, modules.di.id)[0]!.el;
+    const pg = p.pages.find((x) => x.elements.includes(v))!;
+    setViewSpan(p, pg.id, v.id, "fit");
+    const lay = plantViewLayout(v);
+    expect(v.pos[0] + lay.right).toBeLessThanOrEqual(AREA_UNITS.w - 2 + 1e-9);
+    expect(v.pos[0] + lay.right).toBeGreaterThan(AREA_UNITS.w - 3);
+    routePage(AvoidLib.getInstance(), pg);
+    for (const s of pg.segments.filter((x) => x.from[0] === v.id || x.to[0] === v.id)) {
+      const end = s.from[0] === v.id ? s.points[0]! : s.points[s.points.length - 1]!;
+      const t = terminalPoint(v, s.from[0] === v.id ? s.from[1] : s.to[1])!;
+      expect(end).toEqual(t);
+    }
   });
 });
