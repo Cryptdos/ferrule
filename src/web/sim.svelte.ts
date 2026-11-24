@@ -3,6 +3,7 @@
  * switch operates it, coils pull in, lamps light and timers run.
  */
 import type { Expectation, Project } from "../core/model";
+import { proofsFromSearch } from "../core/interlocks";
 import {
   advance,
   compile,
@@ -117,6 +118,9 @@ export class Simulator {
     }
   }
 
+  /** What the last Check logic run says about interlocks. */
+  proofs: import("../core/interlocks").Proofs | null = $state(null);
+
   async check(project: Project): Promise<void> {
     this.searching = true;
     // Let the panel show "Searching…" first.
@@ -125,6 +129,8 @@ export class Simulator {
       limit: 20000,
       includeIsolators: this.includeIsolators,
     });
+    // Interlocks are proved by the same search (design-v0.4 §6): Design and Check show it.
+    this.proofs = proofsFromSearch(project, this.result.violations.map((v) => v.rule.id), this.result.truncated);
     this.searching = false;
   }
 

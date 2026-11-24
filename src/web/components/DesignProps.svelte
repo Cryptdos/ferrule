@@ -6,6 +6,10 @@
   import {
     addDesignPoint,
     deleteDesignPoint,
+    addInterlock,
+    updateInterlock,
+    deleteInterlock,
+    interlockable,
     deleteSystem,
     goesTo,
     moveSystem,
@@ -22,6 +26,7 @@
   import type { Editor } from "../editor.svelte";
   import TypeBadge from "./TypeBadge.svelte";
   import { confirmWiring, wiringOf } from "../../core/wiring";
+  import { interlockStatus, mergeProofs, proveInterlocks } from "../../core/interlocks";
   import ChannelSelect from "./ChannelSelect.svelte";
 
   let { editor }: { editor: Editor } = $props();
@@ -34,6 +39,30 @@
   const drawn = $derived(
     plant ? editor.project.pages.filter((pg) => pg.elements.some((e) => e.symbol === "plant-view" && e.params.plant === plant.id)).map((pg) => pg.number) : [],
   );
+
+  /** Points in the table an interlock can name: field plant's, that can be on or off. */
+  const tablePoints = $derived(
+    editor.project.plant
+      .filter((p) => !p.module)
+      .flatMap((p) => (p.points ?? []).filter((q) => interlockable(q.form)).map((q) => ({ ref: `plant:${p.id}:${q.name}`, name: `${plantLabel(p)} ${q.name}` }))),
+  );
+  /** Whether each of this plant's interlocks is proved (Check logic's search, kept short). */
+  const ilStatus = $derived(plant?.interlocks?.length ? interlockStatus(editor.project, editor.proofs, plant.interlocks.map((x) => x.id)) : new Map());
+  let proving = $state(false);
+  /** Prove this plant's interlocks now, as Check logic would: it can take a moment, so it's asked for. */
+  async function prove() {
+    if (!plant) return;
+    proving = true;
+    await new Promise((r) => setTimeout(r, 20));
+    editor.proofs = mergeProofs(editor.proofs, proveInterlocks($state.snapshot(editor.project) as typeof editor.project, plant.interlocks?.map((x) => x.id)));
+    proving = false;
+  }
+  function newInterlock() {
+    if (!plant) return;
+    const point = (plant.points ?? []).find((q) => interlockable(q.form));
+    const other = tablePoints.find((t) => t.ref !== `plant:${plant.id}:${point?.name}`);
+    if (point && other) editor.apply((p) => void addInterlock(p, plant.id, point.name, { ref: other.ref, on: true }));
+  }
 
   let newName = $state("");
   let newForm: PointForm = $state("contact");
@@ -123,6 +152,46 @@
       <label>Source
         <input value={plant.source ?? ""} placeholder="Where in the client's document it's from" onchange={(e) => setPlant({ source: e.currentTarget.value })} />
       </label>
+
+      <div class="section">Interlocks{plant.interlocks?.length ? ` (${plant.interlocks.length})` : ""}</div>
+      {#each plant.interlocks ?? [] as il (il.id)}
+        {@const st = ilStatus.get(il.id)}
+        {@const c = il.when[0]!}
+        <div class="interlock">
+          <div class="line">
+            <select value={il.point} aria-label="Point" onchange={(e) => editor.apply((p) => updateInterlock(p, plant.id, il.id, { point: e.currentTarget.value }))}>
+              {#each (plant.points ?? []).filter((q) => interlockable(q.form)) as q (q.name)}<option value={q.name}>{q.name}</option>{/each}
+            </select>
+            <span class="never">never on while</span>
+            <button class="x" title="Remove this interlock and its expectation" onclick={() => editor.apply((p) => deleteInterlock(p, plant.id, il.id))}>×</button>
+          </div>
+          <div class="line">
+            <select value={c.ref} aria-label="Condition" onchange={(e) => editor.apply((p) => updateInterlock(p, plant.id, il.id, { when: { ref: e.currentTarget.value, on: c.on } }))}>
+              {#if !tablePoints.some((t) => t.ref === c.ref)}<option value={c.ref}>(missing)</option>{/if}
+              {#each tablePoints.filter((t) => t.ref !== `plant:${plant.id}:${il.point}`) as t (t.ref)}<option value={t.ref}>{t.name}</option>{/each}
+            </select>
+            <select class="state" value={c.on ? "1" : "0"} aria-label="On or off" onchange={(e) => editor.apply((p) => updateInterlock(p, plant.id, il.id, { when: { ref: c.ref, on: e.currentTarget.value === "1" } }))}>
+              <option value="1">on</option>
+              <option value="0">off</option>
+            </select>
+          </div>
+          <div class="ilst {st?.kind ?? ''}">
+            {#if st?.kind === "proved"}✓ Proved: the drawing can't break it
+            {:else if st?.kind === "fails"}Not proved: it fails. Check logic in Simulate shows how
+            {:else if st?.kind === "not-drawn"}Not proved yet: {st.what} isn't drawn
+            {:else if st?.kind === "unknown"}Not proved: too many sequences to try them all
+            {:else if st?.kind === "unchecked"}Not proved yet: Prove, or Check logic in Simulate{/if}
+          </div>
+        </div>
+      {/each}
+      {#if [...ilStatus.values()].some((s) => s.kind === "unchecked")}
+        <button onclick={prove} disabled={proving} title="Try every sequence that can affect them, as Check logic in Simulate does">{proving ? "Proving…" : "Prove"}</button>
+      {/if}
+      {#if (plant.points ?? []).some((q) => interlockable(q.form)) && tablePoints.length > 1}
+        <button onclick={newInterlock} title="This plant's point is never on while a condition holds: a hardwired interlock, proved in Simulate">+ Interlock</button>
+      {:else if !plant.interlocks?.length}
+        <p class="hint">An interlock needs a point on this plant and another in the table.</p>
+      {/if}
 
       <label>Information (under its box on the drawing)
         <textarea rows="2" value={plant.info ?? ""} placeholder="Model, rating, supply…" onchange={(e) => editor.apply((p) => updatePlant(p, plant.id, { info: e.currentTarget.value }))}></textarea>
@@ -320,6 +389,33 @@
   .pins {
     font-size: 11px;
     color: #889;
+  }
+  .interlock {
+    border: 1px solid #e3e6e9;
+    border-radius: 5px;
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .never {
+    font-size: 12px;
+    color: #556;
+    white-space: nowrap;
+  }
+  .state {
+    flex: none !important;
+    width: 5em;
+  }
+  .ilst {
+    font-size: 12px;
+    color: #667;
+  }
+  .ilst.proved {
+    color: #1d6b2c;
+  }
+  .ilst.fails {
+    color: #b00;
   }
   .wired {
     font-size: 12px;

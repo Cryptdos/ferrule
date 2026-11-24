@@ -6,7 +6,7 @@
 
   let { editor, onclose }: { editor: Editor; onclose: () => void } = $props();
 
-  const findings = $derived(checkProject(editor.project));
+  const findings = $derived(checkProject(editor.project, { proofs: editor.proofs }));
   const counts = $derived({
     error: findings.filter((f) => f.level === "error").length,
     warning: findings.filter((f) => f.level === "warning").length,

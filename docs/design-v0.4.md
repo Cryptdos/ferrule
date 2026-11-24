@@ -284,6 +284,15 @@ README screenshots are retaken when the interface changes. Small judgement calls
 - **A relay is a coil or timer coil with its linked contacts**, matched exactly: the coil on one side's nets, one of its own contacts on the other's. A contactor's main poles (isolators driven by a coil) aren't counted as its contacts here; they switch power, not signals.
 - **First relay found wins** if more than one would do: each would be a true one hop, so the result can't pass anything wrong.
 
+**Step 8 (interlocks)**
+
+- **One condition per interlock**, made a *never* expectation of two conditions: the point on, and the condition. A second condition would need three conditions in one expectation, which expectations don't have (two at most); a second interlock says it instead, and reads more plainly.
+- **The condition is a point in the table** (field plant's on/off points), as §6 says; the point is one of the plant's own. Analogue and comms points can't be on or off, so they aren't offered, and a point changed to one of those loses its interlocks.
+- **Generated expectations follow their interlock entirely:** rewritten when it changes, removed when it goes, made for copies. This revises step 2's call: an expectation whose interlock has gone now goes too, rather than staying as a hand-written one. They show in Expectations… greyed, and can't be edited or deleted there.
+- **Proving is asked for, not run on every edit:** the search takes seconds on the example (2 s for a duty/standby interlock), too long to run as you type. So *Check logic* in Simulate, *Prove* in a plant's Properties and *Prove all* in To draw record results against a fingerprint of the drawing; Check, To draw and Properties read them, and say *not proved yet* when the drawing has changed since. The MCP `check` tool proves them as it runs.
+- **Proved means no sequence breaks it**, as for any expectation in Check logic: an interlock whose point is drawn but wired to nothing is proved, since nothing can turn it on. Not drawn is reported before anything is tried.
+- **Proved on the example:** *FA-SF SF-01 running never on while FA-SF SF-02 running* (duty and standby) proves; *… while FA Fire alarm off* fails.
+
 ---
 
 ## 11. Decisions, as discussed (24/11/26)

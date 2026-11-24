@@ -46,6 +46,12 @@
   {#if !editor.project.expectations.length}<p class="hint">None yet.</p>{/if}
   {#each editor.project.expectations as e (e.id)}
     {@const missing = missingRefs(editor.project, e, list).length > 0}
+    {#if e.interlock}
+      <div class="exp gen">
+        <div class="text">{describeExpectation(editor.project, e, list)}</div>
+        <div class="hint">Made by an interlock in Design: change or remove it there.</div>
+      </div>
+    {:else}
     <div class="exp" class:missing>
       <div class="text">{describeExpectation(editor.project, e, list)}</div>
       {#if e.kind === "should"}
@@ -71,6 +77,7 @@
       </div>
       {#if missing}<div class="warn">It names something that's no longer on the drawing.</div>{/if}
     </div>
+    {/if}
   {/each}
 </Modal>
 
@@ -84,6 +91,9 @@
     flex-direction: column;
     gap: 4px;
     font-size: 12px;
+  }
+  .exp.gen {
+    background: #f7f8fa;
   }
   .exp.missing {
     border-color: #e3a5a5;
