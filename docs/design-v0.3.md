@@ -253,6 +253,10 @@ Each step is one PR with a build, `ferrule-windows-v0.3.0-pre.zip`. The working 
 - **Dimensions in a frame** snap only to what the frame shows, and are drawn only in the frame. The source sheet's own dimensions aren't drawn in frames (10a).
 - **Properties** says when what's picked is on another sheet, seen through a frame.
 
+**Fixes found while building v0.4**
+
+- **An undrawn module was reported twice,** once properly (*Module A? (DI-8) … isn't drawn on any sheet*) and once as *Plant : terminal 1, 2, 3… not shown on any sheet*, with no tag. A module or plant with no view at all is now said once; terminals missing from a module that is drawn are named as the module's (*Module A3-23: terminal 7, 8 not shown on any sheet*), with *?* standing in for a tag Renumber hasn't given yet.
+
 ## 11. Director notes, as written (23/11/26)
 
 **On tiling (§7):**

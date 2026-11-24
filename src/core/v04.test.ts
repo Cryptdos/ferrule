@@ -540,3 +540,15 @@ describe("checks: a point wired to its channel (§5)", () => {
     expect(designChecks(q)).toEqual([]);
   });
 });
+
+describe("v0.3 fix: an undrawn module is reported once", () => {
+  test("no \"Plant : terminal … not shown\" for a module that isn't drawn; a part-drawn one is named", () => {
+    const { p, di } = panel();
+    const msgs = () => checkProject(p).map((f) => f.message);
+    expect(msgs().filter((m) => /terminal .* not shown/.test(m))).toEqual([]);
+    expect(msgs().some((m) => /Module A\? \(DI-4\).*isn't drawn/.test(m))).toBe(true);
+    const v = placePlantView(p, p.pages[0]!.id, di.id, [60, 4]);
+    v.params.show = di.terminals.slice(0, 2).join(",");
+    expect(msgs().some((m) => m.startsWith("Module A?: terminal") && m.endsWith("not shown on any sheet"))).toBe(true);
+  });
+});
