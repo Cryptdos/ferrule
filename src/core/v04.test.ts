@@ -6,12 +6,12 @@ import { AvoidLib } from "libavoid-js";
 import { buildLsp01 } from "../bench/lsp01";
 import { checkProject } from "./checks";
 import { addController, addModule, deleteController, generateModule } from "./controllers";
-import { addDesignPlant, addDesignPoint, addSystem, allocate, channelsOf, deleteDesignPoint, deleteSystem, moveSystem, movePlant, needsLine, pointOnChannel, pointType, renameSystem, setPlantDesign, systemGroups, updateDesignPoint } from "./design";
+import { designTemplateOf, duplicatePlant, insertDesignTemplate, stepTag, tagPlan, templateCounts, addDesignPlant, addDesignPoint, addSystem, allocate, channelsOf, deleteDesignPoint, deleteSystem, moveSystem, movePlant, needsLine, pointOnChannel, pointType, renameSystem, setPlantDesign, systemGroups, updateDesignPoint } from "./design";
 import { newProject, type IoPoint, type Project } from "./model";
 import { defaultPattern } from "./modules";
 import { addPlant, deletePlant, updatePin, updatePlant } from "./ops";
 import { saveSheetTemplate } from "./templates";
-import { parseProject } from "./validate";
+import { parseDesignTemplate, parseProject } from "./validate";
 
 const roundTrip = (p: Project) => parseProject(JSON.parse(JSON.stringify(p)));
 
@@ -290,5 +290,75 @@ describe("the Design table (§2, §3)", () => {
     expect(it.connects).toBeUndefined();
     expect(it.source).toBeUndefined();
     expect(() => setPlantDesign(p, it.id, { network: "n9" })).toThrow(/network/);
+  });
+});
+
+describe("Duplicate ×n and Design templates (§3)", () => {
+  function pumps() {
+    const { p, di } = panel();
+    addSystem(p, "Chilled water");
+    const p1 = addDesignPlant(p, "Chilled water");
+    p1.tag = "P1";
+    addDesignPoint(p, p1.id, { name: "enable", form: "powered-in", signal: "24 V" });
+    addDesignPoint(p, p1.id, { name: "fault", form: "contact" });
+    const f1 = addDesignPlant(p, "Chilled water");
+    f1.tag = "FS1";
+    addDesignPoint(p, f1.id, { name: "flow", form: "contact" });
+    // A link within the group (the pump's enable follows the flow switch) and one outside it.
+    p1.points![0]!.follows = [{ ref: `plant:${f1.id}:flow`, on: true }, { ref: "plant:elsewhere:x", on: true }];
+    f1.interlocks = [{ id: "il1", point: "flow", when: [{ ref: `plant:${p1.id}:fault`, on: true }] }];
+    allocate(p, p1.id, "fault", { module: di.id, point: "DI1" });
+    return { p, p1, f1 };
+  }
+  test("tags step on their last number, keeping zeros; no number, no tag", () => {
+    expect(stepTag("P1", 1)).toBe("P2");
+    expect(stepTag("AHU-01", 3)).toBe("AHU-04");
+    expect(stepTag("FCU1-2", 1)).toBe("FCU1-3");
+    expect(stepTag("FA", 1)).toBe("");
+    expect(stepTag("", 1)).toBe("");
+  });
+  test("one item: n copies after it, tags stepping, points with it but not its channel", () => {
+    const { p, p1 } = pumps();
+    const r = duplicatePlant(p, [p1.id], 3, 1);
+    expect(r.plant.map((x) => x.tag)).toEqual(["P2", "P3", "P4"]);
+    expect(systemGroups(p)[0]!.plant.map((x) => x.tag)).toEqual(["P1", "P2", "P3", "P4", "FS1"]);
+    expect(r.plant[0]!.system).toBe("Chilled water");
+    expect(r.plant[0]!.points!.map((q) => [q.name, q.signal, q.channel])).toEqual([["enable", "24 V", undefined], ["fault", undefined, undefined]]);
+    expect(p1.points![1]!.channel).toBeDefined();
+  });
+  test("a group: copies follow each other, not the originals; links outside the group stay", () => {
+    const { p, p1, f1 } = pumps();
+    const r = duplicatePlant(p, [p1.id, f1.id], 1, 1);
+    const [p2, f2] = r.plant;
+    expect([p2!.tag, f2!.tag]).toEqual(["P2", "FS2"]);
+    expect(p2!.points![0]!.follows).toEqual([{ ref: `plant:${f2!.id}:flow`, on: true }, { ref: "plant:elsewhere:x", on: true }]);
+    expect(f2!.interlocks![0]!.when[0]!.ref).toBe(`plant:${p2!.id}:fault`);
+    expect(f2!.interlocks![0]!.id).not.toBe("il1");
+  });
+  test("a taken tag is left empty, and counted", () => {
+    const { p, p1 } = pumps();
+    const p3 = addDesignPlant(p, "Chilled water");
+    p3.tag = "P3";
+    expect(tagPlan(p, ["P1"], 3, 1, 1).map((c) => c[0])).toEqual([{ tag: "P2", taken: false }, { tag: "P3", taken: true }, { tag: "P4", taken: false }]);
+    const r = duplicatePlant(p, [p1.id], 3, 1);
+    expect(r.plant.map((x) => x.tag)).toEqual(["P2", "", "P4"]);
+    expect(r.untagged).toBe(1);
+  });
+  test("a template keeps rows without channel, module or system; inserting makes ordinary rows in the system chosen", () => {
+    const { p, p1, f1 } = pumps();
+    const t = designTemplateOf(p, [f1.id, p1.id], "Pump, flow proved");
+    expect(t.plant.map((x) => x.tag)).toEqual(["P1", "FS1"]);
+    expect(t.plant.every((x) => !x.system && !x.module && (x.points ?? []).every((q) => !q.channel))).toBe(true);
+    expect(templateCounts(t).total).toEqual({ DI: 2, DO: 1, AI: 0, AO: 0, UIO: 0 });
+    // Into another project: the first copy has the template's tags, the next steps on.
+    const q = newProject("u");
+    addSystem(q, "Secondary");
+    const r = insertDesignTemplate(q, parseDesignTemplate(JSON.parse(JSON.stringify(t))), { system: "Secondary", copies: 2, step: 1 });
+    expect(r.plant.map((x) => x.tag)).toEqual(["P1", "FS1", "P2", "FS2"]);
+    expect(r.plant.every((x) => x.system === "Secondary")).toBe(true);
+    // Nothing links back: editing the template afterwards changes nothing inserted.
+    t.plant[0]!.description = "changed";
+    expect(r.plant[0]!.description).not.toBe("changed");
+    expect(() => insertDesignTemplate(q, t, { system: "Nope" })).toThrow(/No system/);
   });
 });

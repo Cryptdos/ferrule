@@ -230,6 +230,15 @@ README screenshots are retaken when the interface changes. Small judgement calls
 - **Interlocks** aren't in Properties yet: the field comes with step 8, where they're made.
 - **Modules aren't rows:** the table is field plant only from the start, ahead of step 5 taking modules out of Draft's Plant list.
 
+**Step 4 (Duplicate ×n, Design templates)**
+
+- **Where templates live:** in the shared library, `library/design` beside the projects folder (one `.ferrule-design.json` file each), not in the project. They're the engineer's own and move from job to job; Draft's templates live in the project and are imported from the library, and Design's are a separate list in a separate folder, so the two never mix.
+- **Tags step on their last number**, keeping leading zeros (`AHU-01` → `AHU-02`). A tag with no number gives an empty copy (*U?*), for typing or Renumber. **A tag that's taken is left empty**, not pushed on to the next free number: the window shows every copy's tags before you go, taken ones struck through in red, so a different step can be chosen.
+- **Duplicate** puts copy k at the original's numbers + k × step, after the last picked row. **Insert** puts copy 1 at the template's own tags, and the next ones step on from there.
+- **Only tags step.** Descriptions are copied as they are (the design says tags); they're one click away in Properties.
+- **Within a group, links follow the copies:** a point that follows another row's point, and interlocks between rows of the group, point at the copies; links to rows outside the group stay. Copies are never on a channel.
+- **A template keeps no system:** it's picked when inserting (*Into system*), defaulting to the picked system or the picked plant's.
+
 ---
 
 ## 11. Decisions, as discussed (24/11/26)

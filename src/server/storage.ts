@@ -7,14 +7,15 @@
  * place, and the previous version is kept as `.bak`, so a crash mid-save
  * can't lose a drawing. Deleting moves the file to a "Deleted" folder.
  */
-import { mkdir, readdir, readFile, rename, stat, writeFile, copyFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rename, rm, stat, writeFile, copyFile } from "node:fs/promises";
 import { existsSync, statSync, watch, type FSWatcher } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { homedir, platform } from "node:os";
 import { createHash } from "node:crypto";
 import { type Project, newProject } from "../core/model";
-import { parseProject, parseTemplate, ProjectFormatError } from "../core/validate";
-import type { Template } from "../core/model";
+import { parseDesignTemplate, parseProject, parseTemplate, ProjectFormatError } from "../core/validate";
+import type { DesignTemplate, Template } from "../core/model";
+import { templateCounts, type Counts } from "../core/design";
 
 /** The project file extension. */
 export const EXT = ".ferrule";
@@ -421,5 +422,74 @@ export class Library {
     await writeFile(tmp, JSON.stringify({ format: "ferrule-template", version: 1, template: t }, null, 1));
     await rename(tmp, path);
     return file;
+  }
+}
+
+const DESIGN_EXT = ".ferrule-design.json";
+
+export interface DesignLibraryEntry {
+  file: string;
+  name: string;
+  /** The rows' tags, and what they need from the controller in all. */
+  plant: string[];
+  total: Counts;
+}
+
+/**
+ * Design templates (design-v0.4 §3): the engineer's own, one file each in
+ * the library's "design" folder. A list of their own, apart from Draft's
+ * templates. Nothing is built in: the folder starts empty.
+ */
+export class DesignLibrary {
+  constructor(readonly dir: string) {}
+
+  async init(): Promise<void> {
+    await mkdir(this.dir, { recursive: true });
+  }
+
+  private path(file: string): string {
+    if (!ID_RE.test(file)) throw new StorageError(`Invalid template name "${file}"`);
+    return join(this.dir, file + DESIGN_EXT);
+  }
+
+  async list(): Promise<DesignLibraryEntry[]> {
+    await this.init();
+    const out: DesignLibraryEntry[] = [];
+    for (const name of (await readdir(this.dir)).filter((n) => n.endsWith(DESIGN_EXT))) {
+      const file = name.slice(0, -DESIGN_EXT.length);
+      try {
+        const t = await this.load(file);
+        out.push({ file, name: t.name, plant: t.plant.map((p) => p.tag), total: templateCounts(t).total });
+      } catch {
+        // Unreadable files are left alone.
+      }
+    }
+    return out.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  async load(file: string): Promise<DesignTemplate> {
+    const path = this.path(file);
+    if (!existsSync(path)) throw new StorageError(`No Design template "${file}"`, 404);
+    const data = JSON.parse(await readFile(path, "utf8"));
+    if (data?.format !== "ferrule-design-template") throw new ProjectFormatError("Not a Ferrule Design template file");
+    return parseDesignTemplate(data.template);
+  }
+
+  /** Save a template; returns its file name. One of the same name is replaced. */
+  async save(template: unknown): Promise<string> {
+    const t = parseDesignTemplate(template);
+    if (!t.plant.length) throw new ProjectFormatError("A Design template needs rows");
+    await this.init();
+    const file = slugify(t.name);
+    const path = this.path(file);
+    const tmp = path + ".tmp";
+    await writeFile(tmp, JSON.stringify({ format: "ferrule-design-template", version: 1, template: t }, null, 1));
+    await rename(tmp, path);
+    return file;
+  }
+
+  async remove(file: string): Promise<void> {
+    const path = this.path(file);
+    if (existsSync(path)) await rm(path);
   }
 }

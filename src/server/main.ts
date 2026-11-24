@@ -12,7 +12,7 @@ import { dirname, join, resolve } from "node:path";
 import { spawn } from "node:child_process";
 import { createApp } from "./app";
 import { type AssetSource, directoryAssets } from "./assets";
-import { Library, Storage } from "./storage";
+import { DesignLibrary, Library, Storage } from "./storage";
 import { DeviceLibrary } from "./devices";
 import { headlessBrowserRenderer, type PdfRenderer } from "./pdf";
 import { mkdir, writeFile } from "node:fs/promises";
@@ -113,6 +113,8 @@ export async function start(opts: StartOptions = {}): Promise<void> {
   const library = new Library(resolve(join(storage.dir, "..", "library")));
   // The GA device table lives in the library too, with its datasheets and pictures.
   const devices = new DeviceLibrary(join(library.dir, "devices"));
+  // Design templates there too, a folder of their own.
+  const designs = new DesignLibrary(join(library.dir, "design"));
   const assets = opts.assets ?? directoryAssets(resolve(import.meta.dir, "../../dist/web"));
   // Use the requested port, or the next free one.
   let server: ReturnType<typeof Bun.serve> | null = null;
@@ -139,7 +141,7 @@ export async function start(opts: StartOptions = {}): Promise<void> {
     server?.stop(true);
     process.exit(0);
   };
-  const app = createApp({ storage, library, devices, assets, version: VERSION, pdf, selfUrl, mcp, examples, command, quit });
+  const app = createApp({ storage, library, designs, devices, assets, version: VERSION, pdf, selfUrl, mcp, examples, command, quit });
   for (let port = args.port; port < args.port + 20 && !server; port++) {
     try {
       server = Bun.serve({ port, hostname: args.host, fetch: app.fetch, idleTimeout: 120 });

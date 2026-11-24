@@ -257,3 +257,28 @@ describe("status page", () => {
     expect(quit).toBe(1);
   });
 });
+
+describe("Design templates (design-v0.4 §3)", () => {
+  test("start empty; saved, listed with their counts, loaded and deleted, in a folder of their own", async () => {
+    const { DesignLibrary } = await import("./storage");
+    const lib = new DesignLibrary(join(dir, "library", "design"));
+    const a = createApp({ storage: new Storage(dir), designs: lib });
+    expect(await (await a.request("/api/design-templates")).json()).toEqual([]);
+    const t = {
+      name: "Pump, flow proved",
+      plant: [{ id: "p1", tag: "P1", prefix: "P", description: "Pump", terminals: [], system: "X", points: [{ name: "fault", form: "contact", pins: [], channel: { module: "m", point: "DI1" } }] }],
+    };
+    const res = await a.request("/api/design-templates", { method: "POST", body: JSON.stringify(t) });
+    expect(res.status).toBe(201);
+    const { file } = await res.json();
+    const list = await (await a.request("/api/design-templates")).json();
+    expect(list).toEqual([{ file, name: "Pump, flow proved", plant: ["P1"], total: { DI: 1, DO: 0, AI: 0, AO: 0, UIO: 0 } }]);
+    const back = await (await a.request(`/api/design-templates/${file}`)).json();
+    expect(back.plant[0].system).toBeUndefined();
+    expect(back.plant[0].points[0].channel).toBeUndefined();
+    expect((await readdir(join(dir, "library", "design"))).length).toBe(1);
+    await a.request(`/api/design-templates/${file}`, { method: "DELETE" });
+    expect(await (await a.request("/api/design-templates")).json()).toEqual([]);
+    expect((await a.request("/api/design-templates/nope")).status).toBe(404);
+  });
+});
