@@ -126,6 +126,10 @@ So plant drawn above the boundary, or on a sheet without one, has solid, numbere
 
 **F4. Text under a plant view wraps.** In the plant view's `draw` (`symbols.ts`), the tag, description and information lines wrap to a width of *the box plus 1.5 units each side*, and never less than 12 units. Words break at spaces; a tag breaks only at a hyphen and only when it's wider than the limit by itself. Lines are centred under the box. The view's `bbox` grows with the lines, so the router and F6 see them. Width is measured with `textWidth` (`textwidth.ts`), not the character count the code uses now.
 
+**F4, text size.** The description and information lines under a plant view are drawn at the detail size, 1.8 mm. They become 2.5 mm, the same as the tag (`TAG` in place of `DETAIL` for those lines). Pin ids and contact tables stay at 1.8 mm. Wrapping is measured at the new size.
+
+**F4, group names.** A group's name over its terminals (*FIRE ALARM HEALTHY* over two pins) is drawn on one line today, and `plantViewLayout` pushes the next group along to make room, which is what makes views so wide. Instead the name wraps to its group's width plus one unit each side, and never to less than 8 units; the room under the boxes for group names (`PLANT.below`, `MODULE.groups`) grows with the tallest name. Groups then sit as close as their terminals allow, or where T2's span puts them.
+
 **F5. A module view's title wraps.** The same rule for the title row (tag · module number and type · maker model · *part n of m*): wrap at the separators to the view's width, the heading band growing by a line each time. Two module views side by side never overprint.
 
 ### Step 6: movable labels
