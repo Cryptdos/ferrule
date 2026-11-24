@@ -7,10 +7,12 @@ import { compile, pinNode } from "./sim";
 import { controllerName, modulesOf, moduleTypeName, slotAddress, viewsOf } from "./modules";
 import { contactPins, isAnalogueForm, isInputForm, missingRefs, describeExpectation, things } from "./points";
 import type { Element, Page, Project } from "./model";
-import { isBar, terminalNames } from "./symbols";
+import { benchOf, isBar, terminalNames } from "./symbols";
 import { numberingTerminal } from "./renumber";
 import { displayTag } from "./tags";
 import { isMaster, isSlave, masterOf, partnerOf, slavesOf } from "./xref";
+import { drawnOn, fieldPlant, needsChannel } from "./design";
+import { Nets, wiringOf } from "./wiring";
 
 export interface Finding {
   level: "error" | "warning" | "info";
@@ -18,6 +20,10 @@ export interface Finding {
   /** Page the finding is on, when it's about one place. */
   pageId?: string;
   ids: string[];
+  /** A row in Design's table it's about (design-v0.4 §5): Show goes there. */
+  design?: { plant: string; point?: string };
+  /** A point whose wiring to its channel is to review: it can be confirmed by hand. */
+  confirm?: { plant: string; point: string };
 }
 
 const NO_TERMINAL_CHECK = new Set(["busbar", "rail", "junction", "plant-view", "isolator", "transformer", "motor", "socket"]);
@@ -151,6 +157,7 @@ export function checkProject(project: Project): Finding[] {
   out.push(...supplyBypasses(project));
   out.push(...pointChecks(project));
   out.push(...controllerChecks(project));
+  out.push(...designChecks(project));
 
   // With a GA drawn, say what isn't on it yet; and GA devices whose schematic part has gone.
   if (project.pages.some((p) => p.ga)) {
@@ -390,5 +397,61 @@ export function terminalNumberChecks(project: Project): Finding[] {
   }
   for (const [n, names] of seen)
     if (names.length > 1) out.push({ level: "warning", message: `Wire number ${n} is on ${names.length} wires (terminals ${names.join(", ")}): move one of the terminals`, ids: [] });
+  return out;
+}
+
+/** A project worked on in Design: it has systems, a controller, or plant with Design's fields. */
+export function usesDesign(project: Project): boolean {
+  if (project.systems?.length || project.controllers?.length || project.networks?.length) return true;
+  return project.plant.some((p) => p.system || p.connects || p.source || p.enabledBy || (p.points ?? []).some((q) => q.signal || q.goesTo || q.channel));
+}
+
+/** Parts that are wiring or drawing furniture, not equipment: never "field plant not in the table". */
+const NOT_EQUIPMENT = new Set(["terminal", "plant-view", "junction", "offpage", "busbar", "rail", "isolator", "supply"]);
+
+/**
+ * Design's checks (design-v0.4 §5): a point that should have a channel and
+ * hasn't; plant in the table not drawn, and equipment drawn in the field
+ * that isn't plant in the table; and every allocated point's wiring to its
+ * channel (direct, via one relay, confirmed, or to review). Modules not
+ * drawn are in controllerChecks.
+ */
+export function designChecks(project: Project, oneHop = false): Finding[] {
+  const out: Finding[] = [];
+  if (!usesDesign(project)) return out;
+  const hasController = !!project.controllers?.length;
+  const nets = new Nets(project);
+  const tagOf = (p: { tag: string; prefix?: string }) => p.tag || `${p.prefix || "U"}?`;
+  for (const plant of fieldPlant(project)) {
+    if (!drawnOn(project, plant.id).length) {
+      out.push({ level: "info", message: `${tagOf(plant)} ${plant.description}: in Design, not drawn yet (To draw)`.replace("  ", " "), ids: [], design: { plant: plant.id } });
+    }
+    for (const point of plant.points ?? []) {
+      if (!needsChannel(point)) continue;
+      if (!point.channel) {
+        if (hasController) out.push({ level: "warning", message: `${tagOf(plant)} ${point.name} goes to a channel and has none`, ids: [], design: { plant: plant.id, point: point.name } });
+        continue;
+      }
+      const w = wiringOf(project, plant, point, nets, oneHop);
+      const on = `${tagOf(project.plant.find((p) => p.id === point.channel!.module) ?? { tag: "", prefix: "A" })} ${point.channel.point}`;
+      if (w.kind === "review") {
+        out.push({
+          level: "warning",
+          message: `${tagOf(plant)} ${point.name} isn't wired straight to its channel ${on}: check the drawing, then confirm by hand`,
+          ids: viewsOf(project, plant.id).map((v) => v.el.id),
+          design: { plant: plant.id, point: point.name },
+          confirm: { plant: plant.id, point: point.name },
+        });
+      }
+    }
+  }
+  // Equipment drawn below the panel boundary is field plant: it should be in the table (principle 1).
+  for (const pg of project.pages) {
+    if (pg.ga || pg.spare) continue;
+    for (const el of pg.elements) {
+      if (el.zone !== "external" || NOT_EQUIPMENT.has(el.symbol) || benchOf(el) !== "draft") continue;
+      out.push({ level: "info", message: `Sheet ${pg.number}: ${displayTag(el, project) || el.symbol} is drawn in the field but isn't plant in Design's table`, pageId: pg.id, ids: [el.id] });
+    }
+  }
   return out;
 }

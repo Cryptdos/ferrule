@@ -328,6 +328,7 @@ function parsePoints(points: unknown, pins: unknown): { points?: IoPoint[]; pins
         ...(text(p.signal) ? { signal: text(p.signal) } : {}),
         ...(p.goesTo === "relay" || p.goesTo === "panel" ? { goesTo: p.goesTo } : {}),
         ...(isObj(p.channel) && text(p.channel.module) && text(p.channel.point) ? { channel: { module: text(p.channel.module), point: text(p.channel.point) } } : {}),
+        ...(text(p.confirmed) ? { confirmed: text(p.confirmed) } : {}),
       };
       return q;
     })

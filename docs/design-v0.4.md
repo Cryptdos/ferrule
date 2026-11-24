@@ -267,6 +267,17 @@ README screenshots are retaken when the interface changes. Small judgement calls
 - **Draft's Plant window** keeps *Place view*, the pins line and *Pins and points…*; tag, description, prefix, information, *power by others*, *New plant…* and delete moved to Design (prefix, information and *power by others* are new in Design's Properties).
 - **Interlocks in To draw** come with step 8, where interlocks are made.
 
+**Step 7 is two PRs:** 7a the plain findings, direct wiring and confirm by hand; 7b the one-hop trace, proved on the example project.
+
+**Step 7a (checks: findings, direct, confirm by hand)**
+
+- **Design's findings run once a project uses Design** (systems, a controller, networks, or plant with Design's fields), so a v0.3 project opens to the same Check as before.
+- **"Goes to a channel and has none"** is reported only when there's a controller: before one exists, every point would say it, and the Needs line already counts them.
+- **"Drawn in the field, not in the table"** means a part below the panel boundary that's equipment, not wiring: terminals, link arrows, junctions, busbars, the incoming supply and plant views are wiring or Design's own; **local isolators** are left out too, as they're drawn as switches at the motor and simulate as such (the example has four). It's information, not a warning.
+- **Reaching** is through conductors (wire, terminals passed straight through, link arrows) and plant views to their device's pins. A net with only a shared pin in common doesn't count: a point's own pins are those it doesn't share with another point of its device, and the same for the channel.
+- **What's kept for a confirmation** is a short fingerprint (`confirmed` on the point) of every terminal on the nets of the point's own pins and the channel's own pins, and which channel. Wiring added or taken away at either end changes it; anything else doesn't. Allocating it elsewhere, or taking it off, drops the confirmation.
+- **Where it's shown:** each allocated point in Design's Properties says how it's wired (✓ straight, ✓ confirmed, not drawn yet, or to review with *Confirm by hand*); Check lists only what's to review. Check is in Design's top bar too.
+
 ---
 
 ## 11. Decisions, as discussed (24/11/26)

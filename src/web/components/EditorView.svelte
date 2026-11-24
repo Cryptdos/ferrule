@@ -479,6 +479,7 @@
           <button class:active={editor.designView === "controller"} onclick={() => (editor.designView = "controller")} title="The panel's controller: its modules, their channels, and the points on them">Controller</button>
           <button class:active={editor.designView === "todraw"} onclick={() => (editor.designView = "todraw")} title="What Design has that isn't on a sheet yet: place it from here">To draw</button>
         </div>
+        <LabelButton icon="check" label="Check" active={!!open.checks} onclick={() => toggle("checks")} title="Check the design and the drawing: points with no channel, plant not drawn, points not wired to their channel" />
         <span class="sep"></span>
         {#if editor.designView === "todraw"}
           <span class="hint">Pick a line and place it: Draft opens with it ready to drop on the sheet.</span>

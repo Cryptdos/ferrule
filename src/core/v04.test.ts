@@ -9,7 +9,10 @@ import { addController, addModule, deleteController, generateModule } from "./co
 import { needsPins, suggestPins, toDraw, channelLabel, channelsFor, noChannelReason, unallocated, designTemplateOf, duplicatePlant, insertDesignTemplate, stepTag, tagPlan, templateCounts, addDesignPlant, addDesignPoint, addSystem, allocate, channelsOf, deleteDesignPoint, deleteSystem, moveSystem, movePlant, needsLine, pointOnChannel, pointType, renameSystem, setPlantDesign, systemGroups, updateDesignPoint } from "./design";
 import { newProject, type IoPoint, type Project } from "./model";
 import { defaultPattern } from "./modules";
-import { addPlant, deletePlant, placePlantView, setQuickEntry, updatePin, updatePlant, updatePoint } from "./ops";
+import { addElement, addPage, addPlant, connect, deletePlant, linkContact, placePlantView, setQuickEntry, updatePin, updatePlant, updatePoint } from "./ops";
+import { refreshConductors } from "./conductors";
+import { confirmWiring, wiringOf } from "./wiring";
+import { designChecks } from "./checks";
 import { ioSchedule } from "./schedules";
 import { saveSheetTemplate } from "./templates";
 import { parseDesignTemplate, parseProject } from "./validate";
@@ -460,5 +463,80 @@ describe("To draw (§8)", () => {
     setQuickEntry(p, it.id, "run: 1 2 3");
     expect(it.points!.map((q) => [q.name, q.pins])).toEqual([["run", ["1", "2", "3"]], ["fault", []]]);
     expect(needsPins(addDesignPlant(p))).toBe(true);
+  });
+});
+
+describe("checks: a point wired to its channel (§5)", () => {
+  /** A flow switch and a DI module drawn on one sheet; DI1 is pins 1 (I) and 2 (C, shared with DI2). */
+  function rig() {
+    const { p, di } = panel();
+    const fs = addPlant(p, "FS1", "Flow switch", ["C", "NO"], { points: [{ name: "flow", form: "contact", pins: ["C", "NO"] }] });
+    allocate(p, fs.id, "flow", { module: di.id, point: "DI1" });
+    const pg = p.pages[0]!.id;
+    const mv = placePlantView(p, pg, di.id, [60, 4]);
+    const fv = placePlantView(p, pg, fs.id, [20, 70]);
+    const wire = (a: [string, string], b: [string, string]) => {
+      connect(p, pg, a, b);
+      refreshConductors(p);
+    };
+    return { p, di, fs, pg, mv, fv, wire, point: () => fs.points![0]! };
+  }
+  test("direct: the point's wire reaches the channel's own pin", () => {
+    const { p, fs, mv, fv, wire, point } = rig();
+    expect(wiringOf(p, fs, point()).kind).toBe("review");
+    wire([fv.id, "NO"], [mv.id, "1"]);
+    expect(wiringOf(p, fs, point()).kind).toBe("direct");
+  });
+  test("a shared common doesn't count as reaching", () => {
+    const { p, fs, mv, fv, wire, point } = rig();
+    wire([fv.id, "C"], [mv.id, "2"]);
+    expect(wiringOf(p, fs, point()).kind).toBe("review");
+  });
+  test("not drawn until it and its channel are on a sheet", () => {
+    const { p, di } = panel();
+    const fs = addPlant(p, "FS1", "Flow switch", ["C", "NO"], { points: [{ name: "flow", form: "contact", pins: ["C", "NO"] }] });
+    allocate(p, fs.id, "flow", { module: di.id, point: "DI1" });
+    expect(wiringOf(p, fs, fs.points![0]!).kind).toBe("not-drawn");
+  });
+  test("confirmed by hand holds while the wiring at both ends is unchanged, and drops back when it changes", () => {
+    const { p, fs, mv, fv, pg, wire, point } = rig();
+    // Through a link arrow pair would be direct; through a switch it's to review.
+    const sw = addElement(p, pg, "contact-no", [40, 40]);
+    wire([fv.id, "NO"], [sw.id, "13"]);
+    wire([sw.id, "14"], [mv.id, "1"]);
+    expect(wiringOf(p, fs, point()).kind).toBe("review");
+    confirmWiring(p, fs.id, "flow");
+    expect(wiringOf(p, fs, point()).kind).toBe("confirmed");
+    // Something elsewhere changes: still confirmed.
+    const lamp = addElement(p, pg, "lamp", [120, 40]);
+    const other = addElement(p, pg, "contact-no", [130, 40]);
+    wire([other.id, "14"], [lamp.id, "+V"]);
+    expect(wiringOf(p, fs, point()).kind).toBe("confirmed");
+    // A wire added at the point's end: back to review.
+    wire([fv.id, "NO"], [other.id, "13"]);
+    expect(wiringOf(p, fs, point()).kind).toBe("review");
+    // A confirmation goes with its channel.
+    confirmWiring(p, fs.id, "flow");
+    allocate(p, fs.id, "flow", null);
+    expect(point().confirmed).toBeUndefined();
+  });
+  test("Check lists what's to review with Confirm by hand, a point with no channel, and plant not drawn", () => {
+    const { p, fs, di } = rig();
+    const pu = pump(p, "P1", [{ name: "fault", form: "contact" }]);
+    const f = designChecks(p);
+    expect(f.find((x) => x.confirm?.plant === fs.id)?.message).toMatch(/isn't wired straight to its channel A\? DI1/);
+    expect(f.find((x) => x.design?.point === "fault")?.message).toBe("P1 fault goes to a channel and has none");
+    expect(f.find((x) => x.design?.plant === pu.id && !x.design.point)?.message).toMatch(/not drawn yet/);
+    expect(di.module).toBeDefined();
+  });
+  test("equipment drawn in the field that isn't plant is named; older projects without Design get none of these", () => {
+    const { p, pg } = rig();
+    p.pages[0]!.boundaryY = 60;
+    const k = addElement(p, pg, "coil", [100, 80]);
+    k.zone = "external";
+    expect(designChecks(p).some((x) => x.ids.includes(k.id))).toBe(true);
+    const q = newProject("q");
+    addPlant(q, "P1", "Pump", ["1", "2"], { points: [{ name: "run", form: "contact", pins: ["1", "2"] }] });
+    expect(designChecks(q)).toEqual([]);
   });
 });
