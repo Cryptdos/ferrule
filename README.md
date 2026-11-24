@@ -8,6 +8,8 @@ It's one portable `.exe` for Windows: no install, nothing to configure. Your bro
 
 **[Download the latest release](https://github.com/Cryptdos/ferrule/releases/latest)**: unzip `ferrule.exe` anywhere (e.g. `C:\Temp\eCAD`) and double-click it. Status: **0.1.0 preview**, for feature testing.
 
+Ferrule is provided free, as is, with no support. Issues and pull requests are welcome, with no promise of a response.
+
 ## What it does
 
 ### Design: what the panel has, before it's drawn

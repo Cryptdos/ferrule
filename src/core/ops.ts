@@ -4,7 +4,7 @@
  * §3, §12). They change the project in place; callers that want undo take
  * a copy first.
  */
-import { freeCellX, spreadBlock } from "./blocks";
+import { fitBlock, freeCellX, spreadBlock } from "./blocks";
 import { projectCopy, type DeviceEntry, type ProjectDevice } from "./devices";
 import { resolveFields } from "./fields";
 import { textWidth } from "./textwidth";
@@ -253,6 +253,8 @@ export function updateElement(project: Project, pageId: string, id: string, patc
   if (patch.zone !== undefined) el.zone = patch.zone;
   if (patch.rot !== undefined) el.rot = patch.rot;
   if (patch.params) el.params = normaliseParams(el.symbol, { ...el.params, ...patch.params });
+  // A terminal's number changed: the block fits its numbers at once, not at the next route (F8).
+  if (el.symbol === "terminal") fitBlock(getPage(project, pageId));
   // A linked arrow's partner is always the other way round: one source, one destination.
   if (el.symbol === "offpage" && patch.params && "source" in patch.params) {
     for (const other of el.links) {

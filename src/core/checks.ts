@@ -11,7 +11,7 @@ import { benchOf, isBar, terminalNames } from "./symbols";
 import { numberingTerminal } from "./renumber";
 import { displayTag } from "./tags";
 import { isMaster, isSlave, masterOf, partnerOf, slavesOf } from "./xref";
-import { drawnOn, fieldPlant, needsChannel } from "./design";
+import { drawnOn, fieldPlant, needsChannel, onNetworkOnly } from "./design";
 import { Nets, wiringOf } from "./wiring";
 import { describeInterlock, interlockStatus, type Proofs } from "./interlocks";
 
@@ -429,7 +429,7 @@ export function designChecks(project: Project, opts: { oneHop?: boolean; proofs?
   const nets = new Nets(project);
   const tagOf = (p: { tag: string; prefix?: string }) => p.tag || `${p.prefix || "U"}?`;
   for (const plant of fieldPlant(project)) {
-    if (!drawnOn(project, plant.id).length) {
+    if (!drawnOn(project, plant.id).length && !onNetworkOnly(plant)) {
       out.push({ level: "info", message: `${tagOf(plant)} ${plant.description}: in Design, not drawn yet (To draw)`.replace("  ", " "), ids: [], design: { plant: plant.id } });
     }
     for (const point of plant.points ?? []) {

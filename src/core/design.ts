@@ -637,16 +637,32 @@ export interface ToDraw {
   sheets: number[];
 }
 
-/** Field plant and modules, each with the sheets it's drawn on (none: still to draw), in table and rail order. */
-export function toDraw(project: Project): { plant: ToDraw[]; modules: ToDraw[] } {
-  const plant = systemGroups(project).flatMap((g) => g.plant).map((item) => ({ item, sheets: drawnOn(project, item.id) }));
+/**
+ * Comms-only plant (design-v0.4.x F3): connected by comms and with no point
+ * that has pins. It belongs on the network sheet, not a schematic, so it
+ * isn't "not drawn".
+ */
+export const onNetworkOnly = (item: PlantItem): boolean => item.connects === "comms" && !(item.points ?? []).some((p) => p.pins.length);
+
+/**
+ * Field plant and modules, each with the sheets it's drawn on (none: still
+ * to draw), in table and rail order; comms-only plant apart, under `network`,
+ * with its network's name (unset: not on a network).
+ */
+export function toDraw(project: Project): { plant: ToDraw[]; modules: ToDraw[]; network: { item: PlantItem; net?: string }[] } {
+  const all = systemGroups(project).flatMap((g) => g.plant);
+  const network = all.filter(onNetworkOnly).map((item) => {
+    const net = (project.networks ?? []).find((n) => n.id === item.network)?.name;
+    return net ? { item, net } : { item };
+  });
+  const plant = all.filter((it) => !onNetworkOnly(it)).map((item) => ({ item, sheets: drawnOn(project, item.id) }));
   const order: string[] = [];
   for (const c of project.controllers ?? []) for (const s of c.slots) if (s.module) order.push(s.module);
   const modules = order
     .map((id) => project.plant.find((p) => p.id === id))
     .filter((p): p is PlantItem => !!p?.module)
     .map((item) => ({ item, sheets: drawnOn(project, item.id) }));
-  return { plant, modules };
+  return { plant, modules, network };
 }
 
 /** How many pins a point of each form is given when none were: what's usual, numbered. */

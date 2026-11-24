@@ -74,7 +74,7 @@ describe("controllers and modules", () => {
     expect(di.points![1]!.pins[1]).toBe(di.points![0]!.pins[1]);
     // The title row: tag, type, the controller it's part of.
     const v = p.pages[2]!.elements[0]!;
-    expect(moduleTitle(p, v)).toBe("A3-23 · DI-8 · part of A1-5, AHU-1 outstation");
+    expect(moduleTitle(p, v)).toBe("A3-23 · Module 2 · DI-8 · part of A1-5, AHU-1 outstation");
     expect(elementTexts(v, p).xref).toBe(moduleTitle(p, v));
     // A prefix is the project's to change.
     updateController(p, c.id, { prefix: "ac" });
@@ -98,7 +98,7 @@ describe("controllers and modules", () => {
     expect(texts).toContain("AO1");
     expect(texts).toContain("RET");
     expect(texts).toContain("SF-01 SPEED");
-    expect(texts.find((t) => t.startsWith("A1-11 · AO-2 · Maker AO-2X"))).toBeTruthy();
+    expect(texts.find((t) => t.startsWith("A1-11 · Module 1 · AO-2 · Maker AO-2X"))).toBeTruthy();
     // The job label runs down from under the terminals, beside its first wire.
     const lay = moduleViewLayout(v);
     expect(lay.labels).toEqual([{ x: -0.55, text: "SF-01 SPEED" }]);
@@ -115,7 +115,7 @@ describe("controllers and modules", () => {
     const b = placePlantView(p, pg4, dout.id, [18, 20], half(4, 8));
     renumber(p);
     expect(dout.tag).toBe("A1-23");
-    expect(moduleTitle(p, b)).toBe("A1-23 · DO-8 · DO5–8, continued from 1-23");
+    expect(moduleTitle(p, b)).toBe("A1-23 · Module 1 · DO-8 · DO5–8, continued from 1-23");
     expect(moduleViewLayout(a).cutRight).toBe(true);
     expect(moduleViewLayout(b).cutLeft).toBe(true);
     const list = things(p);

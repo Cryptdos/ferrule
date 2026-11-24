@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { ProjectFormatError } from "../core/validate";
-import { type DesignLibrary, type Library, type Storage, StorageError } from "./storage";
+import { type DesignLibrary, type Library, type Storage, StorageError, stampSaved } from "./storage";
 import type { DeviceLibrary } from "./devices";
 import { routePage } from "../core/routing";
 import { routesStale } from "../core/wires";
@@ -106,7 +106,7 @@ export function createApp({ storage, library, designs, devices, assets, version 
     const id = c.req.param("id");
     const project = await storage.load(id);
     const name = fileName(project.project.title || id) + ".ferrule";
-    return new Response(JSON.stringify(project, null, 1), {
+    return new Response(JSON.stringify(stampSaved(project), null, 1), {
       headers: { "content-type": "application/json", "content-disposition": `attachment; filename="${name}"`, "cache-control": "no-store" },
     });
   });

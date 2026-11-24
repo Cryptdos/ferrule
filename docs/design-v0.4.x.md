@@ -332,3 +332,10 @@ Judgement calls made while building, step by step.
 - Dampers are 24 V spring return: *Open* follows *Power* after 5 s and *Closed* follows it off, so proofs have something to follow. A drive's *Run* follows its *Enable*.
 - The supply drive's interlock (*never on while fire alarm healthy off*) fails, as the real design's override bypasses it: that's T1's "before". The extract drive's (*never on while its damper's open off*) is proved.
 - The host's serial ports are pin groups *COM A* and *COM B* with no points; the UIO channels taking sensors are set to analogue.
+
+**Step 1 (small fixes).**
+- F3: comms-only plant (`onNetworkOnly`: connects by comms, no point with pins) is in `toDraw().network`, not the field plant, and Check's *not drawn yet* skips it. To draw shows it under *On the network* with its network ticked, or amber *not on a network*; *Show* opens Design's Network view. It no longer counts in To draw's *left of* total.
+- F8: `BLOCK_HALF` is 2 (cells 4 units tall), so five characters fit without growing. **This changes how old drawings look:** every terminal block is a unit taller, and a wire's end on a cell moves from half a unit to a whole unit off the boundary. `fitBlock` now also runs after Renumber (every sheet), when a terminal is edited (`updateElement`) and after a stamp.
+- T10: `fitScale` picks from `STANDARD_SCALES` (1, 2, 2.5, 5, 10, 20, 25, 50); past 1:50 it rounds up to a multiple of 50. A 1000 × 1600 enclosure is 1:20 (it was 1:10.5). No 2:1: detail frames fitted with *Fit* are 1:1 at the largest. Sheets keep the scale they have.
+- T16: the number is `slotAddress` (the map's circle: the bus address if set, else rail order), after the tag: *A9-5 · Module 6 · DO-8 · Generic DO-8X · part of …*. Continuation views say it too.
+- T19: `stampSaved` (storage) writes `savedBy` after `format` and `version` on every save and on *Download*; `parseProject` reads it only for the newer-file message. `VERSION` and `RELEASES_URL` moved to `src/core/version.ts`.

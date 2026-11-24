@@ -163,11 +163,15 @@ export function drawnGaItems(project: Project, page: Page): DrawnGaItem[] {
  * dimensions: any scale (1:7.5, 1:12…), to the next half step, so the layout
  * uses the page well. The usual scales stay as quick picks.
  */
+/** Standard drawing scales a fitted sheet chooses from (v0.4.x T10). */
+export const STANDARD_SCALES = [1, 2, 2.5, 5, 10, 20, 25, 50];
+
+/** The smallest standard scale (1:1, 1:2, 1:2.5, 1:5, 1:10…) at which an enclosure fits the sheet. A sheet already made keeps its scale. */
 export function fitScale(w: number, h: number): number {
   // Room to the right and below for the dimensions.
   const room = { w: (AREA_UNITS.w - GA_ORIGIN[0]) * UNIT_MM - 20, h: (AREA_UNITS.h - GA_ORIGIN[1]) * UNIT_MM - 18 };
-  const need = Math.max(w / room.w, h / room.h, 0.5);
-  return Math.ceil(need * 2 - 1e-9) / 2;
+  const need = Math.max(w / room.w, h / room.h);
+  return STANDARD_SCALES.find((s) => s >= need - 1e-9) ?? Math.ceil(need / 50) * 50;
 }
 
 /** A scale as it's written: 1:7.5, 1:12. */

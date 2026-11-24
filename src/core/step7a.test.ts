@@ -32,10 +32,11 @@ describe("simulation", () => {
 });
 
 describe("GA sheets", () => {
-  test("any scale: Fit gives the largest that fits, to a half step (1:7.5, 1:12.5)", () => {
-    const s = fitScale(1000, 1600);
-    expect(s * 2).toBe(Math.round(s * 2));
-    expect(fitScale(1000, 1600)).toBeLessThan(15);
+  test("Fit gives the smallest standard scale that fits (v0.4.x T10): never 1:9.5", () => {
+    expect(fitScale(1000, 1600)).toBe(20);
+    expect(fitScale(800, 1200)).toBe(10);
+    expect(fitScale(100, 100)).toBe(1);
+    expect(fitScale(400, 500)).toBe(5);
     expect(scaleText(7.5)).toBe("1:7.5");
     expect(scaleText(12)).toBe("1:12");
   });

@@ -108,7 +108,19 @@
         {/each}
       </details>
     {/if}
-    {#if !lists.plant.length}<p class="hint pad">No field plant in Design yet.</p>{/if}
+    {#if !lists.plant.length && !lists.network.length}<p class="hint pad">No field plant in Design yet.</p>{/if}
+
+    {#if lists.network.length}
+      <div class="group">On the network <span class="hint">comms only: drawn on the network sheet, not a schematic</span></div>
+      {#each lists.network as t (t.item.id)}
+        <div class="row">
+          {#if t.net}<span class="tick">✓</span>{:else}<span class="amber" title="Not on a network">●</span>{/if}
+          <strong>{plantLabel(t.item)}</strong>
+          <span class="what">{t.item.description || "—"}<span class={t.net ? "dim" : "amber"}>{` · ${t.net ?? "not on a network"}`}</span></span>
+          <button onclick={() => ((editor.designView = "network"), (editor.designPick = { plant: [t.item.id] }))} title="Design's Network view">Show</button>
+        </div>
+      {/each}
+    {/if}
 
     <div class="group">Modules <span class="hint">{modsLeft.length} of {lists.modules.length} left</span></div>
     {#each modsLeft as t (t.item.id)}
@@ -219,6 +231,9 @@
   }
   .tick {
     color: #1d6b2c;
+  }
+  .amber {
+    color: #b36b00;
   }
   .tags {
     font-weight: 600;

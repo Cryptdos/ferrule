@@ -7,6 +7,7 @@
  * place, and the previous version is kept as `.bak`, so a crash mid-save
  * can't lose a drawing. Deleting moves the file to a "Deleted" folder.
  */
+import { VERSION } from "../core/version";
 import { mkdir, readdir, readFile, rename, rm, stat, writeFile, copyFile } from "node:fs/promises";
 import { existsSync, statSync, watch, type FSWatcher } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
@@ -54,6 +55,17 @@ export interface FolderListing {
   files: { name: string; path: string; modified: string }[];
   /** Places to start from: home, the projects folder, drives on Windows. */
   places: { name: string; path: string }[];
+}
+
+/**
+ * The project as written to its file: `savedBy`, the version that saved it,
+ * at the top beside the format (v0.4.x T19). Read when a newer file won't
+ * open; otherwise ignored.
+ */
+export function stampSaved(project: Project): Record<string, unknown> {
+  const { format, version, ...rest } = project as Project & { savedBy?: string };
+  delete (rest as { savedBy?: string }).savedBy;
+  return { format, version, savedBy: VERSION, ...rest };
 }
 
 export function slugify(title: string): string {
@@ -247,7 +259,7 @@ export class Storage {
     await mkdir(dirname(file), { recursive: true });
     if (existsSync(file)) await copyFile(file, file + ".bak");
     const tmp = file + ".tmp";
-    await writeFile(tmp, JSON.stringify(project, null, 1));
+    await writeFile(tmp, JSON.stringify(stampSaved(project), null, 1));
     await rename(tmp, file);
   }
 

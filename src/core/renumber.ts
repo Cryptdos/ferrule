@@ -19,6 +19,7 @@
  * linked to a coil take its tag and get pole numbers 1, 2, 3… (13/14,
  * 21/22, 33/34…).
  */
+import { fitBlock } from "./blocks";
 import { refreshConductors } from "./conductors";
 import { columnOf, type Vec } from "./geometry";
 import type { Conductor, Element, Page, Project } from "./model";
@@ -229,6 +230,8 @@ export function renumber(project: Project): RenumberResult {
   }
   // Module labels follow the tags of the points on them (design-v0.4 §4).
   syncPlantViews(project);
+  // Each sheet's terminal block fits its new numbers now, not at the next route (v0.4.x F8).
+  for (const page of project.pages) fitBlock(page);
   return result;
 }
 

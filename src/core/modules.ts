@@ -238,16 +238,22 @@ function pointsRange(item: PlantItem, el: Element): string {
 }
 
 /**
- * A module view's title row (controller.md §5): its tag, type, maker and
- * model, and the controller it's part of, `A3-23 · DI-8 · part of A2-5,
- * AHU-1 outstation`. A continuation says where it carries on from:
+ * A module view's title row (controller.md §5): its tag, its number on the
+ * rail (the controller map's circled number, v0.4.x T16), type, maker and
+ * model, and the controller it's part of, `A3-23 · Module 3 · DI-8 · part
+ * of A2-5, AHU-1 outstation`. A continuation says where it carries on from:
  * `A3-23 · DO-8 · DO5–8, continued from 3-23`.
  */
 export function moduleTitle(project: Project, el: Element): string {
   const item = project.plant.find((p) => p.id === el.params.plant);
   if (!isModule(item)) return "";
   const tag = item.tag || `${item.prefix || "A"}?`;
-  const parts = [tag, moduleTypeName(item.module)];
+  const parts = [tag];
+  // Its number on the rail, as circled on the controller map (v0.4.x T16).
+  const ctrlOf = controllerOfModule(project, item);
+  const slot = ctrlOf ? ctrlOf.slots.findIndex((s) => s.module === item.id) : -1;
+  if (ctrlOf && slot >= 0) parts.push(`Module ${slotAddress(project, ctrlOf, slot)}`);
+  parts.push(moduleTypeName(item.module));
   const who = [item.module.maker, item.module.model].filter(Boolean).join(" ");
   if (who) parts.push(who);
   const views = viewsOf(project, item.id);
