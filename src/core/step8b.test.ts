@@ -98,7 +98,8 @@ describe("controllers and modules", () => {
     expect(texts).toContain("AO1");
     expect(texts).toContain("RET");
     expect(texts).toContain("SF-01 SPEED");
-    expect(texts.find((t) => t.startsWith("A1-11 · Module 1 · AO-2 · Maker AO-2X"))).toBeTruthy();
+    // The title row, wrapped at its separators to the narrow view's width (v0.4.x F5).
+    expect(g.prims.flatMap((x) => (x.t === "text" && x.role === "tag" ? [x.text] : [])).join(" ")).toMatch(/^A1-11 · Module 1 · AO-2 · Maker AO-2X/);
     // The job label runs down from under the terminals, beside its first wire.
     const lay = moduleViewLayout(v);
     expect(lay.labels).toEqual([{ x: -0.55, text: "SF-01 SPEED" }]);

@@ -1498,17 +1498,22 @@ const SYMBOLS: SymbolDef[] = [
           });
         }
       }
-      for (const g of lay.groups) prims.push(text((g.x0 + g.x1) / 2, lay.termH + lay.idH + 1.9, g.name, PLANT.group, "middle", "note"));
-      // Tag, description and information under the box: centred under a box
-      // wider than they are, otherwise left-aligned from its left edge.
-      const lines: [string, number, TextRole][] = [["{tag}", TAG, "tag"]];
-      for (const l of [str(el, "pdesc", ""), ...str(el, "pinfo", "").split("\n")].filter(Boolean)) lines.push([l, DETAIL, "note"]);
+      for (const g of lay.groups) g.lines.forEach((l, i) => prims.push(text((g.x0 + g.x1) / 2, lay.termH + lay.idH + 1.9 + i * PLANT.group * LINE, l, PLANT.group, "middle", "note")));
+      // Tag, description and information under the box, centred, wrapped to
+      // the box plus 1.5 units each side and never narrower than 12 (v0.4.x F4):
+      // words at spaces; a tag only at a hyphen, and only when it must.
+      const wrapW = Math.max(right - left + 3, 12);
+      const mid = (left + right) / 2;
+      const lines: [string, number, TextRole][] = [];
+      const tagText = t?.tag ?? "";
+      const tagLines = tagText ? wrapTag(tagText, TAG, wrapW) : ["{tag}"];
+      if (tagLines.length > 1) for (const l of tagLines) lines.push([l, TAG, "tag"]);
+      else lines.push(["{tag}", TAG, "tag"]);
+      for (const l of [str(el, "pdesc", ""), ...str(el, "pinfo", "").split("\n")].filter(Boolean)) for (const w of wrapText(l, TAG, wrapW)) lines.push([w, TAG, "note"]);
       if (el.label) lines.push(["{label}", TAG, "label"]);
-      const widest = Math.max(...lines.map(([t, size]) => (t === "{tag}" ? 8 : t.length) * size * 0.55));
-      const centred = widest < right - left;
       let y = h + 1.8;
-      for (const [t, size, role] of lines) {
-        prims.push(text(centred ? (left + right) / 2 : left, y, t, size, centred ? "middle" : "start", role));
+      for (const [tx, size, role] of lines) {
+        prims.push(text(mid, y, tx, size, "middle", role));
         y += size * 1.35;
       }
       const terminals: TerminalDef[] = lay.terms.map((t) => ({ name: t.id, at: [t.x, 0], dir: "up" as Dir }));
@@ -2067,7 +2072,10 @@ export function moduleViewLayout(el: Element) {
   const shown = base.terms.map((t) => t.id);
   const cutLeft = !!all.length && !!shown.length && shown[0] !== all[0];
   const cutRight = !!all.length && !!shown.length && shown[shown.length - 1] !== all[all.length - 1];
-  const h = base.termH + base.idH + MODULE.groups + MODULE.heading;
+  // Channel names wrap like a plant's group names, at their own size; their band grows with the tallest (v0.4.x F4).
+  const chLines = base.groups.map((g) => wrapText(g.name, DETAIL, Math.max(g.x1 - g.x0 + 2, GROUP_MIN)));
+  const groupsBand = Math.max(MODULE.groups, Math.ceil((0.7 + chLines.reduce((a, l) => Math.max(a, l.length), 1) * DETAIL * LINE + 0.4) * 2) / 2);
+  const h = base.termH + base.idH + groupsBand + MODULE.heading;
   // Job labels, one per point, between (or beside) its shown pins.
   const pins = parsePlantPins(str(el, "ppins", ""));
   const xOf = new Map(base.terms.map((t) => [t.id, t.x]));
@@ -2082,7 +2090,7 @@ export function moduleViewLayout(el: Element) {
     // Beside the point's first wire, in the gap before it (between channels), reading along it.
     labels.push({ x: a - 0.55, text: p.job.toUpperCase() });
   }
-  return { ...base, h, cutLeft, cutRight, labels };
+  return { ...base, h, cutLeft, cutRight, labels, chLines };
 }
 
 function drawModuleView(el: Element, t?: GeometryText): { prims: Prim[]; terminals: TerminalDef[]; body: Rect } {
@@ -2103,13 +2111,20 @@ function drawModuleView(el: Element, t?: GeometryText): { prims: Prim[]; termina
   const prims: Prim[] = [line([left, -h], [right, -h]), line([left, 0], [right, 0])];
   prims.push(lay.cutLeft ? line(...zig(left)) : line([left, -h], [left, 0]));
   prims.push(lay.cutRight ? line(...zig(right)) : line([right, -h], [right, 0]));
-  // Title row over the box: tag, type, maker and model, controller (or where it carries on from).
-  prims.push(text(left, -h - 0.7, "{xref}", TAG, "start", "tag"));
+  // Title row over the box: tag, type, maker and model, controller (or where it
+  // carries on from), wrapped at its separators to the view's width, the band
+  // above growing a line at a time (v0.4.x F5).
+  const title = t?.xref ? wrapTitle(t.xref, TAG, right - left) : ["{xref}"];
+  if (title.length < 2) prims.push(text(left, -h - 0.7, "{xref}", TAG, "start", "tag"));
+  else title.forEach((l, i) => prims.push(text(left, -h - 0.7 - (title.length - 1 - i) * TAG * LINE, l, TAG, "start", "tag")));
   // Heading, centred under the top edge.
   if (info.heading) prims.push(text((left + right) / 2, -h + MODULE.heading - 0.6, info.heading, PLANT.group, "middle", "note"));
   // Channel names over the id boxes.
   const top = -(lay.termH + lay.idH);
-  for (const g of lay.groups) prims.push(text((g.x0 + g.x1) / 2, top - 0.7, g.name, DETAIL, "middle", "note"));
+  lay.groups.forEach((g, gi) => {
+    const ls = lay.chLines[gi] ?? [g.name];
+    ls.forEach((l, i) => prims.push(text((g.x0 + g.x1) / 2, top - 0.7 - (ls.length - 1 - i) * DETAIL * LINE, l, DETAIL, "middle", "note")));
+  });
   // Terminal boxes along the bottom inside edge: numbers at the bottom, ids above them.
   const half = PLANT.pitch / 2;
   for (const tm of lay.terms) {
@@ -2152,6 +2167,51 @@ function drawModuleView(el: Element, t?: GeometryText): { prims: Prim[]; termina
 }
 
 /** Plant view sizes, grid units. */
+/**
+ * A tag broken to fit a width (v0.4.x F4): only at a hyphen (kept at the end
+ * of its line), and only when the whole tag is wider than the width.
+ */
+export function wrapTag(tag: string, size: number, width: number): string[] {
+  if (textWidth(tag, size) <= width) return [tag];
+  const parts = tag.split(/(?<=-)/);
+  const out: string[] = [];
+  let cur = "";
+  for (const p of parts) {
+    if (cur && textWidth(cur + p, size) > width) {
+      out.push(cur);
+      cur = p;
+    } else cur += p;
+  }
+  if (cur) out.push(cur);
+  return out;
+}
+
+/**
+ * A module view's title row wrapped to a width (v0.4.x F5): at its " · "
+ * separators, the separator ending the line; a part wider than the width
+ * by itself keeps a line of its own.
+ */
+export function wrapTitle(title: string, size: number, width: number): string[] {
+  if (textWidth(title, size) <= width) return [title];
+  const parts = title.split(" · ");
+  const out: string[] = [];
+  let cur = "";
+  for (const p of parts) {
+    const next = cur ? `${cur} · ${p}` : p;
+    if (cur && textWidth(next, size) > width) {
+      out.push(`${cur} ·`);
+      cur = p;
+    } else cur = next;
+  }
+  if (cur) out.push(cur);
+  return out;
+}
+
+/** Group names never wrap narrower than this (v0.4.x F4). */
+const GROUP_MIN = 8;
+/** Line spacing of wrapped text under a view, as a share of its size. */
+const LINE = 1.25;
+
 export const PLANT = {
   /** Terminal boxes along the top inside edge: 2 units apart (a column each), like terminal block cells (v0.3 §2). */
   pitch: 2,
@@ -2175,7 +2235,8 @@ export const PLANT = {
  */
 export function plantViewLayout(el: Element): {
   terms: { id: string; name: string; pinId: string; x: number }[];
-  groups: { name: string; x0: number; x1: number }[];
+  /** Each group's name, wrapped to its width (v0.4.x F4), and where its terminals run. */
+  groups: { name: string; lines: string[]; x0: number; x1: number }[];
   left: number;
   right: number;
   h: number;
@@ -2196,24 +2257,27 @@ export function plantViewLayout(el: Element): {
     if (last && last.name === name) last.terms.push(t);
     else runs.push({ name, terms: [t] });
   }
-  const textW = (name: string) => (name ? textWidth(name, PLANT.group) : 0);
   const P = PLANT.pitch;
+  // A group's name wraps to its group's width plus a unit each side, never less than 8 (v0.4.x F4).
+  const wrapName = (name: string, span: number) => (name ? wrapText(name.toUpperCase(), PLANT.group, Math.max(span + 2, GROUP_MIN)) : []);
+  const linesW = (lines: string[]) => Math.max(0, ...lines.map((l) => textWidth(l, PLANT.group)));
   const terms: { id: string; name: string; pinId: string; x: number }[] = [];
-  const groups: { name: string; x0: number; x1: number }[] = [];
+  const groups: { name: string; lines: string[]; x0: number; x1: number }[] = [];
   let prevRight = -Infinity; // right edge of whatever the previous run drew (boxes or name)
   for (const [i, r] of runs.entries()) {
     const span = (r.terms.length - 1) * P;
-    const half = Math.max(span + P, textW(r.name)) / 2;
+    const lines = wrapName(r.name, span);
+    const half = Math.max(span + P, linesW(lines)) / 2;
     // Centre far enough right to clear the last run by a unit and a half.
     let x0 = 0;
     if (i > 0) x0 = Math.ceil(prevRight + 1.5 + half - span / 2);
     const centre = x0 + span / 2;
     r.terms.forEach((t, j) => terms.push({ id: t, name: info.get(t)?.printed ?? t, pinId: info.get(t)?.id ?? "", x: x0 + j * P }));
-    if (r.name) groups.push({ name: r.name.toUpperCase(), x0, x1: x0 + span });
+    if (r.name) groups.push({ name: r.name.toUpperCase(), lines, x0, x1: x0 + span });
     prevRight = centre + half;
   }
   const lastX = terms.length ? terms[terms.length - 1]!.x : 0;
-  const nameEdge = (g: { name: string; x0: number; x1: number }, side: -1 | 1) => (g.x0 + g.x1) / 2 + (side * textW(g.name)) / 2;
+  const nameEdge = (g: { lines: string[]; x0: number; x1: number }, side: -1 | 1) => (g.x0 + g.x1) / 2 + (side * linesW(g.lines)) / 2;
   const left = Math.min(-1.5, ...groups.map((g) => nameEdge(g, -1) - 1));
   const right = Math.max(lastX + 1.5, left + 6, ...groups.map((g) => nameEdge(g, 1) + 1));
   // Boxes tall enough for the longest name written up them, in half-unit steps.
@@ -2223,7 +2287,10 @@ export function plantViewLayout(el: Element): {
   const termH = tall([...terms.map((t) => t.name), PLANT.minName], PLANT.termH, TAG);
   const ids = terms.map((t) => t.pinId).filter(Boolean);
   const idH = ids.length ? tall(ids, PLANT.idH, DETAIL) : 0;
-  return { terms, groups, left, right, h: termH + idH + PLANT.below, termH, idH, partial: shown.length < all.length };
+  // Room under the boxes for the tallest wrapped group name.
+  const nameLines = Math.max(1, ...groups.map((g) => g.lines.length));
+  const below = Math.max(PLANT.below, Math.ceil((1.9 + (nameLines - 1) * PLANT.group * LINE + 1.1) * 2) / 2);
+  return { terms, groups, left, right, h: termH + idH + below, termH, idH, partial: shown.length < all.length };
 }
 
 /** Does a parameter apply to this element as it's set now? */
