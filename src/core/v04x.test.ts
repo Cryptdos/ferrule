@@ -21,7 +21,10 @@ import { addElement, addGaDevice, addPlant, connect, resetRoute, rotateElements,
 import { earthConductors, removeLoops, fractionAlong, isFieldWire, numberByDefault, pointAlong, wireTexts } from "./wires";
 import { routePage } from "./routing";
 import { billOfMaterials, pointsSchedule } from "./schedules";
-import { compile, initialState } from "./sim";
+import { compile, initialState, toggle } from "./sim";
+import { addController, addModule, setModuleCommons } from "./controllers";
+import { pointRef } from "./points";
+import { Nets } from "./wiring";
 import { ENCL, PLATE_MARGIN, gaCandidates, sizeKey, dimLayout, doorPanes, plateDoor, platesOf, drawnGaItems, gaFrame, paneOf, paneRef, sheetPanes } from "./ga";
 import { renumber } from "./renumber";
 import { stampSaved } from "../server/storage";
@@ -805,5 +808,64 @@ describe("step 9b: RCD, connector, plant marks (M1); door devices with no schema
     expect(JSON.stringify(bom)).toContain("HMI1");
     const back = parseProject(JSON.parse(JSON.stringify(p)));
     expect(back.pages.find((x) => x.id === door.id)!.gaItems!.find((i) => i.id === d.id)).toMatchObject({ tag: "HMI1", text: "Operator touch screen", cutout: "186 x 138" });
+  });
+});
+
+describe("step 10a: module commons and tags (M6, T9)", () => {
+  const rig = (linked: boolean) => {
+    const p = newProject("m");
+    const pg = p.pages[0]!.id;
+    const c = addController(p, "Controller");
+    const di = addModule(p, c.id, { type: "di", channels: 4 });
+    if (!linked) setModuleCommons(p, di.id, false);
+    const sw = addPlant(p, "S1", "Switch", ["C", "NO"], { points: [{ name: "Closed", form: "contact", pins: ["C", "NO"] }] });
+    const mv = placePlantView(p, pg, di.id, [10, 20]);
+    const sv = placePlantView(p, pg, sw.id, [10, 60]);
+    const pt = (n: string) => di.points!.find((q) => q.name === n)!;
+    const [sig] = pt("DI1").pins;
+    const com3 = pt("DI3").pins[1]!;
+    connect(p, pg, [mv.id, sig!], [sv.id, "C"]);
+    connect(p, pg, [sv.id, "NO"], [mv.id, com3]);
+    refreshConductors(p);
+    return { p, di, sw, mv };
+  };
+
+  test("M6: a new module's commons are linked; one return to any of them works in Simulate; off, it doesn't", () => {
+    for (const linked of [true, false]) {
+      const { p, di, sw } = rig(linked);
+      expect(!!di.module!.commons?.length).toBe(linked);
+      if (linked) expect(di.module!.commons![0]!.length).toBe(2);
+      const c = compile(p);
+      const s = toggle(c, initialState(c), pointRef(sw.id, "Closed"));
+      expect(!!s.energised[pointRef(di.id, "DI1")]).toBe(linked);
+    }
+  });
+
+  test("M6: the module view shows the link; old files open with commons off", () => {
+    const { p, di, mv } = rig(true);
+    const g = localGeometry(mv, elementTexts(mv, p));
+    expect(g.prims.filter((x) => x.t === "circle" && x.fill).length).toBeGreaterThanOrEqual(2);
+    const file = JSON.parse(JSON.stringify(p));
+    delete file.plant.find((x: { id: string }) => x.id === di.id).module.commons;
+    expect(parseProject(file).plant.find((x) => x.id === di.id)!.module!.commons).toBeUndefined();
+    expect(parseProject(JSON.parse(JSON.stringify(p))).plant.find((x) => x.id === di.id)!.module!.commons).toEqual(di.module!.commons!);
+  });
+
+  test("M6: the wiring check accepts a return that reaches any linked common", () => {
+    const { p, di, sw } = rig(true);
+    const nets = new Nets(p);
+    const list = di.module!.commons![0]!;
+    expect(nets.find(Nets.pin(di.id, list[0]!))).toBe(nets.find(Nets.pin(di.id, list[1]!)));
+    void sw;
+  });
+
+  test("T9: with a controller map, modules take their tags from their place on it; without, from their first view", () => {
+    const { project: p, modules } = fresh();
+    const mapSheet = p.pages.find((pg) => pg.elements.some((e) => e.symbol === "ctrlmap"))!;
+    for (const m of Object.values(modules)) expect(m.tag).toMatch(new RegExp(`^A${mapSheet.number}-\\d+`));
+    expect(new Set(Object.values(modules).map((m) => m.tag)).size).toBe(6);
+    mapSheet.elements = mapSheet.elements.filter((e) => e.symbol !== "ctrlmap");
+    renumber(p);
+    expect(modules.di.tag).toBe(`A${viewsOf(p, modules.di.id)[0]!.page.number}-${viewsOf(p, modules.di.id)[0]!.address.split("-")[1]}`);
   });
 });

@@ -359,6 +359,11 @@ export interface ModuleInfo {
   address?: number;
   /** The model it is from the device table (its size on the GA, its pins as entered from the datasheet). */
   device?: string;
+  /**
+   * Pins joined inside the module (v0.4.x M6): its commons, RET or 0 V, one
+   * list per set that's linked. Set: *Commons are linked inside the module*.
+   */
+  commons?: string[][];
 }
 
 /**

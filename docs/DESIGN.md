@@ -367,6 +367,7 @@ Reference drawings from other companies are proprietary. They are never committe
 | Routing clear of strips and pin rows, v0.4.x step 8 (2026-11-24) | F6: `blockRect` (`routing.ts`): the terminal block one obstacle out to `ROW_CLEAR`; a view's obstacle pushed out past its pin rows; `lessStubs` so the repair pass lets stubs cross the clearance |
 | Connector block, socket, motors, v0.4.x step 9a (2026-11-24) | M9: `connector-block` (terminals 2–12, `connectorNames`, `bridged` as one potential, E1/E2 border points, upright text), `GA_SIZES.connBlock`; T17: the socket redrawn with E from the top, `etop` / `eMoved` for older files and their Check line; M8: the motor's `phases` and `picture` |
 | Symbols and door devices, v0.4.x step 9b (2026-11-24) | M1: the switch part's `rcd` function; `plug-socket` (ways 1–12, bridged per way); `PlantItem.mark` / `PLANT_MARKS`, `markPrims`, view param `pmark`; Design templates drop foreign `dists` on insert. M5: `GaItem.tag`, `addGaDevice`, the *Device (no schematic part)* Layout tool, its fields in Properties, its BOM row |
+| Module commons and tags, v0.4.x step 10a (2026-11-24) | M6: `ModuleInfo.commons`, `sharedPins`, `setModuleCommons` (`controllers.ts`); fixed links in `compile`, joined pins in `Nets`; the view's link line from `pmod.commons`. T9: `controllerMapSlots` (`symbols.ts`) and Renumber tagging modules from their place on the controller map |
 
 ## 16. Open questions
 

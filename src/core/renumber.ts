@@ -27,6 +27,8 @@ import { assignAddresses, collisionSuffix, type Placed } from "./numbering";
 import { requireSymbol, terminalPoint } from "./symbols";
 import { tagPrefix } from "./tags";
 import { plantTag, syncPlantViews } from "./ops";
+import { controllerMapEntries } from "./modules";
+import { controllerMapSlots } from "./symbols";
 import { isMaster, masterOf, slavesOf } from "./xref";
 
 /**
@@ -147,10 +149,35 @@ export function renumber(project: Project): RenumberResult {
   }
 
   // --- Plant: prefix + where its first view is -------------------------------
+  // A controller's modules, when the project has a map of it, take their tags
+  // from their place on the map instead (v0.4.x T9).
+  const onMap = new Map<string, Item>();
+  for (const page of project.pages) {
+    for (const el of page.elements) {
+      if (el.symbol !== "ctrlmap") continue;
+      const ctrl = (project.controllers ?? []).find((c) => c.id === el.params.ctrl) ?? project.controllers?.[0];
+      if (!ctrl) continue;
+      const entries = controllerMapEntries(project, ctrl.id);
+      const slots = controllerMapSlots(entries, typeof el.params.width === "number" ? el.params.width : 120);
+      ctrl.slots.forEach((sl, i) => {
+        const item = sl.module ? project.plant.find((p) => p.id === sl.module) : undefined;
+        const at = slots[i];
+        if (!item || !at || onMap.has(item.id)) return;
+        const x = el.pos[0] + at[0];
+        const y = el.pos[1] + at[1];
+        onMap.set(item.id, { id: item.id, page: page.number, column: columnOf(x), y, x, group: item.prefix || "A" });
+      });
+    }
+  }
   const plantItems: Item[] = [];
   for (const item of project.plant) {
     if (item.locked && item.tag) {
       takenTags.add(item.tag);
+      continue;
+    }
+    const mapped = onMap.get(item.id);
+    if (mapped) {
+      plantItems.push(mapped);
       continue;
     }
     let first: Item | null = null;

@@ -10,6 +10,8 @@
     moveSlot,
     removeSlot,
     setSlotAddress,
+    setModuleCommons,
+    sharedPins,
     updateController,
     updateModule,
   } from "../../core/controllers";
@@ -163,6 +165,11 @@
                 <td class="sheets">{where(item.id) || "–"}</td>
                 <td class="actions">
                   <button class:active={gen?.id === item.id} onclick={() => (gen?.id === item.id ? (gen = null) : openGenerator(item))} title="Fill in its pins from a pattern">Generate…</button>
+                  {#if sharedPins(item).length > 1}
+                    <label class="commons" title="Its commons (C, RET, 0 V) are joined inside the module, as its datasheet has it: one return carries them all, in Simulate and the wiring check, and its view shows the link">
+                      <input type="checkbox" checked={!!m.commons?.length} onchange={(e) => editor.apply((p) => setModuleCommons(p, item.id, e.currentTarget.checked))} /> Commons linked
+                    </label>
+                  {/if}
                   {#if !m.device}
                     <button title="Save it as a model in the device table, pins and all, so the next one takes seconds (and from there to the shared library with its datasheet)"
                       onclick={() => editor.apply((p) => void saveModuleDevice(p, item.id))}>Save model</button>
@@ -332,6 +339,10 @@
     gap: 6px;
     align-items: center;
     margin-top: 6px;
+  }
+  .commons {
+    font-size: 12px;
+    white-space: nowrap;
   }
   .model {
     font-size: 11px;

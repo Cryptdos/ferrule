@@ -868,7 +868,11 @@ export function plantPinsParam(item: PlantItem, project?: Project): string {
 /** What a module view draws besides its pins: its type and heading. JSON. */
 export function moduleParam(item: PlantItem): string {
   if (!item.module) return "";
-  return JSON.stringify({ type: moduleTypeName(item.module), heading: moduleType(item.module.type).heading.toUpperCase() });
+  return JSON.stringify({
+    type: moduleTypeName(item.module),
+    heading: moduleType(item.module.type).heading.toUpperCase(),
+    ...(item.module.commons?.length ? { commons: item.module.commons } : {}),
+  });
 }
 
 /** Kept for callers of the old name: quick entry, "L N E | ENABLE: 1 2 | R1: C NO NC". */
