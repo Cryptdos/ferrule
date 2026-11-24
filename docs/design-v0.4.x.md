@@ -324,4 +324,11 @@ A column says what each line is (*wire*, *core, panel end*, *core, field end*), 
 
 ## 5. Changed during build
 
-*(Empty. Judgement calls made while building go here, step by step.)*
+Judgement calls made while building, step by step.
+
+**Step 0 (the fixture).**
+- Twelve sheets: supply and 24 V; fire alarm interface and enables; drives and dampers; the extract damper's open relay; the controller (map, host with two serial ports, power supply module, the drives' bus daisy-chained through the boundary); one sheet each for DI-16, UIO-16, AO-8 and DO-8; the network diagram; the backplate GA; the door GA (one leaf).
+- The enable is two relays deep: DO1 → *BMS enable* relay → (*fire alarm healthy* or *firemans override*) → *AHU-01 enable* relay, whose contacts enable both drives and open both dampers. The extract drive also waits for its damper's open relay.
+- Dampers are 24 V spring return: *Open* follows *Power* after 5 s and *Closed* follows it off, so proofs have something to follow. A drive's *Run* follows its *Enable*.
+- The supply drive's interlock (*never on while fire alarm healthy off*) fails, as the real design's override bypasses it: that's T1's "before". The extract drive's (*never on while its damper's open off*) is proved.
+- The host's serial ports are pin groups *COM A* and *COM B* with no points; the UIO channels taking sensors are set to analogue.
