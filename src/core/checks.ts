@@ -13,6 +13,7 @@ import { numberingTerminal } from "./renumber";
 import { displayTag, elementTexts } from "./tags";
 import { isMaster, isSlave, masterOf, partnerOf, slavesOf } from "./xref";
 import { drawnOn, fieldPlant, needsChannel, onNetworkOnly } from "./design";
+import { devicesOn, networkChain, portName } from "./network";
 import { Nets, wiringOf } from "./wiring";
 import { describeInterlock, interlockStatus, type Proofs } from "./interlocks";
 
@@ -536,6 +537,18 @@ export function designChecks(project: Project, opts: { oneHop?: boolean; proofs?
       else if (st?.kind === "unknown") out.push({ level: "info", message: `${what} isn't proved: too many sequences to try them all`, ids: [], design: { plant: plant.id } });
       else if (st?.kind === "unchecked") out.push({ level: "info", message: `${what} isn't proved yet: Prove in Design, or Check logic in Simulate`, ids: [], design: { plant: plant.id } });
     }
+  }
+  // A network built from the drawing (v0.4.x M7): Design and the wiring from its port agree.
+  for (const n of project.networks ?? []) {
+    const ch = networkChain(project, n);
+    if (!ch.drawn) continue;
+    const port = portName(project, n);
+    for (const d of devicesOn(project, n.id))
+      if (!ch.devices.includes(d))
+        out.push({ level: "warning", message: `${tagOf(d)} is on ${n.name} in Design, but the wiring from ${port} doesn't reach it (at a pin of a serial port)`, ids: viewsOf(project, d.id).map((v) => v.el.id), design: { plant: d.id } });
+    for (const d of ch.devices)
+      if (d.network !== n.id)
+        out.push({ level: "warning", message: `${tagOf(d)} is wired on ${n.name} from ${port}, but isn't on it in Design`, ids: viewsOf(project, d.id).map((v) => v.el.id), design: { plant: d.id } });
   }
   // Equipment drawn below the panel boundary is field plant: it should be in the table (principle 1).
   for (const pg of project.pages) {

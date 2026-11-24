@@ -25,7 +25,8 @@ import { compile, initialState, toggle } from "./sim";
 import { addController, addModule, setModuleCommons } from "./controllers";
 import { pointRef } from "./points";
 import { Nets } from "./wiring";
-import { networkData, updateNetwork } from "./network";
+import { moveOnNetwork, networkChain, networkData, putOnNetwork, updateNetwork } from "./network";
+import { designChecks } from "./checks";
 import { networkDiagram } from "./networkdraw";
 import { ENCL, PLATE_MARGIN, gaCandidates, sizeKey, dimLayout, doorPanes, plateDoor, platesOf, drawnGaItems, gaFrame, paneOf, paneRef, sheetPanes } from "./ga";
 import { renumber } from "./renumber";
@@ -891,5 +892,45 @@ describe("step 10b: serial ports (M7, T5)", () => {
     const back = parseProject(JSON.parse(JSON.stringify(p)));
     expect(back.networks!.find((n) => n.name === "Meters bus")!.port).toEqual({ plant: modules.host.id, group: "COM B" });
     expect(back.plant.find((x) => x.id === modules.host.id)!.pins!["4"]!.port).toBe(true);
+  });
+
+  test("a wired port gives the network its devices and order from the drawing; Check flags where Design and the wiring differ", () => {
+    const { project: p, plant } = fresh();
+    const SFD = plant.SFD!;
+    const EFD = plant.EFD!;
+    const drives = p.networks!.find((n) => n.name === "Drives bus")!;
+    const meters = p.networks!.find((n) => n.name === "Meters bus")!;
+    // Drives: daisy-chained from COM A through the boundary terminals, SFD then EFD.
+    expect(networkChain(p, drives)).toEqual({ drawn: true, devices: [SFD, EFD] });
+    // Meters: COM B has no wires, so the order is Design's.
+    expect(networkChain(p, meters).drawn).toBe(false);
+    const msgs = () => designChecks(p).map((f) => f.message).filter((m) => /bus/.test(m));
+    expect(msgs()).toEqual([]);
+    // The rows the other way round: the drawing still decides, and the order can't be moved by hand.
+    const a = p.plant.indexOf(SFD);
+    const b = p.plant.indexOf(EFD);
+    p.plant[a] = EFD;
+    p.plant[b] = SFD;
+    expect(networkData(p).buses[0]!.devices).toEqual([SFD.tag, EFD.tag]);
+    expect(() => moveOnNetwork(p, SFD.id, 1)).toThrow(/from the drawing/);
+    expect(() => moveOnNetwork(p, plant.M1!.id, 1)).not.toThrow();
+    // Chain the extract drive first: the drawing's order follows.
+    const page = p.pages.find((pg) => pg.title.startsWith("Controller: map"))!;
+    const comms = page.elements.filter((e) => e.symbol === "plant-view" && String(e.params.show) === "A+,B-");
+    expect(comms.map((e) => e.params.plant)).toEqual([SFD.id, EFD.id]);
+    comms[0]!.params.plant = EFD.id;
+    comms[1]!.params.plant = SFD.id;
+    expect(networkChain(p, drives).devices).toEqual([EFD, SFD]);
+    expect(networkData(p).buses[0]!.devices).toEqual([EFD.tag, SFD.tag]);
+    // Cut the link on to the second drive: Check says the chain doesn't reach it.
+    page.segments = page.segments.filter((s) => !(s.from[0] === comms[0]!.id && s.to[0] === comms[1]!.id) && !(s.to[0] === comms[0]!.id && s.from[0] === comms[1]!.id));
+    expect(networkChain(p, drives).devices).toEqual([EFD]);
+    expect(msgs()).toEqual([`${SFD.tag} is on Drives bus in Design, but the wiring from COM A doesn't reach it (at a pin of a serial port)`]);
+    // A device wired on the bus but not on the network in Design.
+    putOnNetwork(p, [EFD.id], "");
+    expect(msgs()).toContain(`${EFD.tag} is wired on Drives bus from COM A, but isn't on it in Design`);
+    // A device whose comms pins aren't a serial port ends the trail: not reached.
+    for (const t of ["A+", "B-"]) delete EFD.pins![t]!.port;
+    expect(networkChain(p, drives)).toEqual({ drawn: true, devices: [] });
   });
 });

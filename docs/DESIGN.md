@@ -369,6 +369,7 @@ Reference drawings from other companies are proprietary. They are never committe
 | Symbols and door devices, v0.4.x step 9b (2026-11-24) | M1: the switch part's `rcd` function; `plug-socket` (ways 1–12, bridged per way); `PlantItem.mark` / `PLANT_MARKS`, `markPrims`, view param `pmark`; Design templates drop foreign `dists` on insert. M5: `GaItem.tag`, `addGaDevice`, the *Device (no schematic part)* Layout tool, its fields in Properties, its BOM row |
 | Module commons and tags, v0.4.x step 10a (2026-11-24) | M6: `ModuleInfo.commons`, `sharedPins`, `setModuleCommons` (`controllers.ts`); fixed links in `compile`, joined pins in `Nets`; the view's link line from `pmod.commons`. T9: `controllerMapSlots` (`symbols.ts`) and Renumber tagging modules from their place on the controller map |
 | Serial ports, v0.4.x step 10b first PR (2026-11-24) | M7/T5: `PinInfo.port` on a group's pins (`setGroupPort`, `portGroups`), `Network.port` (`updateNetwork`), the port named on the network sheet; the chain from the drawing follows in the second PR |
+| Networks from the drawing, v0.4.x step 10b second PR (2026-11-24) | M7: `networkChain` and `networkOrder` (`network.ts`), the network sheet and Design's network view from the wiring when the port is wired, `moveOnNetwork` refusing then; two checks where Design and the wiring differ |
 
 ## 16. Open questions
 
