@@ -21,7 +21,7 @@ Small and safe first; then the data other steps need; then layout, where three e
 |---|---|---|---|
 | 0 | — | A generic BMS panel fixture (`src/bench/bms01.ts`) | Small |
 | 1 | F3, F8, T10, T16, T19, T21 | Small fixes | Small |
-| 1b | M13 | Modular doors: columns of stacked doors | Medium |
+| 1b | M13 | Modular doors: columns of stacked doors, each with its own backplate | Medium, two PRs |
 | 2 | M11, F2, F1 | What a supply gives; unpowered distributions; honest proofs | Medium |
 | 3 | T1, T11 | Interlocks with several conditions; proving shows progress | Small |
 | 4 | F7, T3 | Panel wiring and panel devices | Medium |
@@ -98,9 +98,21 @@ interface DoorPane { h: number; hinge: "left" | "right"; name?: string }  // top
 
 **Setting it out.** In the door sheet's settings, where leaves are set now: a list of columns with their widths, and under each its doors with height, hinge and name. Two quick tools on the sheet: *Split this door* (across or down, at the pointer) and *Join with the door below*.
 
-**Not in this entry.** The interior behind each door: a backplate sheet stays one plate for the enclosure. Compartments with their own mounting plates are a later entry if they're needed.
+**Compartment backplates.** In a sectioned panel each door has its own mounting plate behind it. A backplate sheet already has its own size (each GA sheet carries its own `enclosure`), so a project can already hold several plates; what's missing is the tie between a plate and its door.
 
-Tests: a door of two columns, three doors each, of different heights: every door's outline, an item's owner, and a dimension from its own door's edge; the door back mirrored; an old two-leaf sheet draws exactly as before.
+- A backplate sheet can say which door it's behind: `GaSettings.behind?: { sheet: string; pane: [col, row] }`, the door-front sheet and the door on it. Unset, it's the panel's one backplate, as now.
+- Its size starts as that door's width and height, less a margin all round (25 mm, editable), and is then the user's to set: the plate is rarely the door's exact size.
+- Its title starts as *Backplate:* and the door's name; the door on the front sheet prints a small reference to its plate's sheet, and the plate's sheet names its door, so the two can be found from each other.
+- *Add a backplate for each door* on a door-front sheet makes the sheets in one go, in column then row order; doors that already have one are skipped.
+- Changing a door's size afterwards doesn't resize a plate that's been set; Check gives an info line when a plate is larger than its door's opening.
+- Rails, trunking, devices, the rail fit and the enclosure fit (T20) all work per plate, as they do per backplate sheet now. The bill of materials already lists by sheet, so it reads per compartment.
+- Deleting a door, or joining two, leaves their plates as ordinary backplate sheets with nothing behind them, and Check says so. Nothing on a plate is deleted.
+
+Built as two PRs: the doors; then the plates behind them.
+
+**Not in this entry.** An interior elevation showing every compartment's plate in place, with the doors open. Each plate is its own sheet.
+
+Tests: a door of two columns, three doors each, of different heights: every door's outline, an item's owner, and a dimension from its own door's edge; the door back mirrored; an old two-leaf sheet draws exactly as before; a plate made for each door has that door's size less the margin and names its door; joining two doors leaves both plates, flagged.
 
 ### Step 2: supplies
 
