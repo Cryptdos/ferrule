@@ -815,7 +815,7 @@
       return;
     }
     if (page.ga && editor.mode === "draft") {
-      editor.flash("This is a GA sheet: lay it out in the GA workbench.");
+      editor.flash("This is a GA sheet: lay it out in the Layout workbench.");
       return;
     }
 

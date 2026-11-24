@@ -38,7 +38,7 @@ export class Editor {
   }
   tool: Tool = $state("select");
   /** Workbench (DESIGN.md §9): drafting, or simulating the logic as drawn. */
-  /** Workbench: drafting the electrics, annotating, the panel GA, or simulating. */
+  /** Workbench: drafting the electrics, annotating, the panel layout (GA), or simulating. */
   mode: "draft" | "annotate" | "ga" | "simulate" = $state("draft");
   placeSymbol: string | null = $state(null);
   /** A section template waiting to be stamped where you click. */

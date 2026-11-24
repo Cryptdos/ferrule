@@ -225,7 +225,7 @@ Each step is one PR with a build, `ferrule-windows-v0.3.0-pre.zip`. The working 
 
 **Step 8 (alignment tools)**
 
-- **The jump ring** (double-click a reference) is now drawn round the part's body, not round its tag and label too, so it shows exactly the edges alignment uses, as the review asked ("the same bounds").
+- **The highlight** (double-click a reference) is now drawn round the part's body, not round its tag and label too, so it shows exactly the edges alignment uses, as the review asked ("the same bounds").
 - **What aligns:** in Draft and Annotate, the workbench's own parts (not wires, section boxes or revision clouds); on a GA, its items except dimensions, which follow what they measure.
 - **The first picked** is the first in the selection: click it first, then Shift+click the rest. A box selection stays "a box" until the selection changes.
 - **The buttons** sit after the tools (Select, Wire), before the menus. Their hover text says what they'll align to: the sheet, the first picked, or the outline.

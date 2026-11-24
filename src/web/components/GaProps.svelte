@@ -31,7 +31,7 @@
   import { displayTag } from "../../core/tags";
   import type { Editor } from "../editor.svelte";
 
-  /** GA workbench, right side: the selected item, or the sheet's enclosure and the size library. */
+  /** Layout workbench (GA sheets), right side: the selected item, or the sheet's enclosure and the size library. */
   let { editor, ondevices }: { editor: Editor; ondevices?: () => void } = $props();
 
   const page = $derived(editor.page);
@@ -111,7 +111,7 @@
 
 <div class="props">
   {#if !page.ga}
-    <h3>GA workbench</h3>
+    <h3>Layout workbench</h3>
     <p class="hint">Pick a GA sheet from the list, or add one on the left.</p>
   {:else if one}
     {#if ip.id !== page.id}<p class="hint">On sheet {ip.number}, seen through a frame: changes are made there.</p>{/if}
@@ -382,7 +382,7 @@
     {/each}
     {#if sheetLeaves(editor.project, page).length === 0 && page.ga.view === "door-back"}<p class="hint warn">Pick the door this is the back of.</p>{/if}
     <p class="hint">
-      The GA tools are in the browser on the left; parts from the schematic in <em>Place parts…</em>.
+      The Layout tools are in the browser on the left; parts from the schematic in <em>Place parts…</em>.
       Positions are measured from the enclosure's top-left corner, as this sheet sees it.
     </p>
     <div class="buttons">

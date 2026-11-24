@@ -39,7 +39,7 @@
     if (!st.shown) width = 0;
   });
 
-  const partsTitle = $derived(editor.mode === "ga" ? "GA tools" : editor.mode === "annotate" ? "Annotations" : "Parts");
+  const partsTitle = $derived(editor.mode === "ga" ? "Layout tools" : editor.mode === "annotate" ? "Annotations" : "Parts");
   const hasParts = $derived(editor.mode !== "simulate");
 </script>
 
