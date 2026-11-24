@@ -11,8 +11,10 @@ import { newProject, type IoPoint, type Project } from "./model";
 import { defaultPattern } from "./modules";
 import { addElement, addPage, addPlant, connect, deletePlant, linkContact, placePlantView, setQuickEntry, updatePin, updatePlant, updatePoint } from "./ops";
 import { refreshConductors } from "./conductors";
+import { elementTexts } from "./tags";
+import { localGeometry } from "./symbols";
 import { confirmWiring, wiringOf } from "./wiring";
-import { addNetwork, deleteNetwork, devicesOn, moveOnNetwork, networkData, networkDiagram, putOnNetwork, updateNetwork } from "./network";
+import { placeNetworkSheet, addNetwork, deleteNetwork, devicesOn, moveOnNetwork, networkData, networkDiagram, putOnNetwork, updateNetwork } from "./network";
 import { circuitKey, describeInterlock, interlockStatus, proveInterlocks } from "./interlocks";
 import { setExpectation, deleteExpectation } from "./ops";
 import { designChecks } from "./checks";
@@ -700,6 +702,20 @@ describe("interlocks (§6)", () => {
 });
 
 describe("networks (§7)", () => {
+  test("Place as sheet: a spare sheet with the diagram, redrawn from the data", () => {
+    const { p, lan } = riser();
+    const pg = placeNetworkSheet(p);
+    expect([pg.title, pg.spare, pg.number]).toEqual(["Network diagram", true, p.pages.length]);
+    const el = pg.elements[0]!;
+    const drawn = () => localGeometry(el, elementTexts(el, p)).prims.flatMap((x) => (x.t === "text" ? [x.text] : []));
+    expect(drawn()).toContain("LAN 1 · BACnet IP · 19 devices");
+    updateNetwork(p, lan.id, { name: "Riser LAN" });
+    expect(drawn()).toContain("Riser LAN · BACnet IP · 19 devices");
+    const g = localGeometry(el, elementTexts(el, p));
+    expect(g.bbox.w).toBeLessThanOrEqual(150);
+    expect(g.bbox.h).toBeLessThanOrEqual(90);
+    expect(roundTrip(p).pages.at(-1)!.elements[0]!.symbol).toBe("netmap");
+  });
   function riser() {
     const { p } = panel();
     const lan = addNetwork(p, "lan");
