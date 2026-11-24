@@ -24,6 +24,7 @@
     updateElement,
     setViewSpan,
     setViewSide,
+    setGroupSide,
     type ElementPatch,
     plantLabel,
     addAsset,
@@ -32,7 +33,7 @@
   import { controllerName, moduleTitle } from "../../core/modules";
   import { readImage } from "../images";
   import { address, contactMarks, contactType, isMaster, isSlave, masterOf, partnerOf, slavesOf } from "../../core/xref";
-  import { isBar, paramApplies, plantViewLayout, requireSymbol, terminalNames, viewSides, type ViewSide } from "../../core/symbols";
+  import { isBar, paramApplies, parsePlantPins, plantViewLayout, requireSymbol, terminalNames, viewSides, type ViewSide } from "../../core/symbols";
   import { WIRE_FUNCTIONS } from "../../core/wirecolours";
   import ColourSelect from "./ColourSelect.svelte";
   import { displayTag, tagPrefix } from "../../core/tags";
@@ -403,6 +404,22 @@
           <option value="right">The right</option>
         </select>
       </label>
+      {@const groupNames = [...new Set(parsePlantPins(String(one.params.ppins ?? "")).filter((x) => String(one.params.show ?? "").split(",").includes(x.pin) && x.label).map((x) => x.label))]}
+      {#if groupNames.length > 1}
+        <!-- Each group of terminals on a side of its own (v0.4.x T15): power on top, control below. -->
+        <div class="sub">Groups</div>
+        {#each groupNames as gname (gname)}
+          {@const sd = viewSides(one)}
+          <label class="inline">{gname}
+            <select value={sd.groups[gname] ?? sd.view} onchange={(e) => { const id = one.id; const v = e.currentTarget.value as ViewSide; editor.apply((p) => setGroupSide(p, editor.pageId, id, gname, v)); }}>
+              <option value="top">Top</option>
+              <option value="bottom">Bottom</option>
+              <option value="left">Left</option>
+              <option value="right">Right</option>
+            </select>
+          </label>
+        {/each}
+      {/if}
       {#if item?.module}
         <!-- A module's view shows chosen channels (controller.md §5); split it across sheets as needed. -->
         <div class="sub">Channels shown on this sheet</div>
@@ -879,5 +896,11 @@
     line-height: 14px;
     text-align: center;
     cursor: help;
+  }
+  label.inline {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px;
   }
 </style>

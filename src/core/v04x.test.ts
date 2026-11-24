@@ -17,8 +17,8 @@ import { elementTexts } from "./tags";
 import { textWidth } from "./textwidth";
 import { AREA_UNITS, textUnits } from "./geometry";
 import { moduleTitle, viewsOf } from "./modules";
-import { addElement, addPlant, deletePlant, linkContact, setGroupSide, setViewSide, setViewSpan, setWireTextAt, moveElements, placePlantView, addGaDim, addGaItem, addGaPage, addPlatesForDoors, joinDoorBelow, setPlateBehind, setBoundary, setGaSettings, splitDoor, updateElement } from "./ops";
-import { earthConductors, fractionAlong, isFieldWire, numberByDefault, pointAlong, wireTexts } from "./wires";
+import { addElement, addPlant, connect, deletePlant, linkContact, setGroupSide, setViewSide, setViewSpan, setWireTextAt, moveElements, placePlantView, addGaDim, addGaItem, addGaPage, addPlatesForDoors, joinDoorBelow, setPlateBehind, setBoundary, setGaSettings, splitDoor, updateElement } from "./ops";
+import { earthConductors, removeLoops, fractionAlong, isFieldWire, numberByDefault, pointAlong, wireTexts } from "./wires";
 import { routePage } from "./routing";
 import { pointsSchedule } from "./schedules";
 import { ENCL, PLATE_MARGIN, gaCandidates, dimLayout, doorPanes, plateDoor, platesOf, drawnGaItems, gaFrame, paneOf, paneRef, sheetPanes } from "./ga";
@@ -573,5 +573,47 @@ describe("step 7b: terminal groups on any side (T15)", () => {
     expect(new Set(g.terminals.map((t) => t.dir))).toEqual(new Set(["up"]));
     setViewSide(p, v.page.id, v.el.id, "bottom");
     expect(v.el.params.side).toBeUndefined();
+  });
+});
+
+describe("step 7b: sides per group, and routing with them (T15)", () => {
+  const crossesBody = (pts: [number, number][], r: { x: number; y: number; w: number; h: number }) =>
+    pts.slice(1).some((b, i) => {
+      const a = pts[i]!;
+      const [x0, x1] = [Math.min(a[0], b[0]), Math.max(a[0], b[0])];
+      const [y0, y1] = [Math.min(a[1], b[1]), Math.max(a[1], b[1])];
+      const e = 0.05;
+      return x1 > r.x + e && x0 < r.x + r.w - e && y1 > r.y + e && y0 < r.y + r.h - e;
+    });
+
+  test("a drive with its power on top and its control on the bottom: no wire crosses its body", () => {
+    const p = newProject("d");
+    const pg = p.pages[0]!;
+    setBoundary(p, pg.id, 70);
+    const it = addPlant(p, "VSD-1", "Drive", ["L", "N", "DI1", "DCOM"], { pins: { L: { group: "Mains" }, N: { group: "Mains" }, DI1: { group: "Control" }, DCOM: { group: "Control" } } });
+    const v = placePlantView(p, pg.id, it.id, [40, 40]);
+    setGroupSide(p, pg.id, v.id, "Control", "bottom");
+    expect(JSON.parse(String(v.params.sides))).toEqual({ Control: "bottom" });
+    const mcb = addElement(p, pg.id, "isolator", [42, 15], { params: { function: "breaker", poles: 2, operator: "none" } });
+    connect(p, pg.id, [mcb.id, "2"], [v.id, "L"]);
+    connect(p, pg.id, [mcb.id, "4"], [v.id, "N"]);
+    const t1 = addElement(p, pg.id, "terminal", [42, 70]);
+    const t2 = addElement(p, pg.id, "terminal", [44, 70]);
+    connect(p, pg.id, [v.id, "DI1"], [t1.id, "1"]);
+    connect(p, pg.id, [v.id, "DCOM"], [t2.id, "1"]);
+    routePage(AvoidLib.getInstance(), pg);
+    const g = localGeometry(v, elementTexts(v, p));
+    const body = { x: v.pos[0] + g.body.x, y: v.pos[1] + g.body.y, w: g.body.w, h: g.body.h };
+    for (const s of pg.segments) expect(crossesBody(s.points as [number, number][], body)).toBe(false);
+    const dirs = Object.fromEntries(g.terminals.map((t) => [t.name, t.dir]));
+    expect(dirs).toEqual({ L: "up", N: "up", DI1: "down", DCOM: "down" });
+  });
+
+  test("on the fixture: field devices below with terminals on top, modules above with terminals on the bottom, route with no loops", () => {
+    const { project: p } = fresh();
+    for (const pg of p.pages.filter((x) => x.title.startsWith("Controller:"))) {
+      routePage(AvoidLib.getInstance(), pg);
+      for (const s of pg.segments) expect(removeLoops(s.points)).toEqual(s.points);
+    }
   });
 });

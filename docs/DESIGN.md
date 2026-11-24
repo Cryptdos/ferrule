@@ -363,6 +363,7 @@ Reference drawings from other companies are proprietary. They are never committe
 | Movable labels, v0.4.x step 6 (2026-11-24) | T14: `Element.labelAt`, `inLabelBlock` / `block` prims, `labelBlockRect`, `textBounds` (`symbols.ts`); `updateElement({ labelAt })`; the canvas `labelblock` gesture. T7: `labelOverlaps` in `checkProject`. T13: `Segment.numberAt` / `colourAt`, `setWireTextAt`, `pointAlong` / `fractionAlong` / `placedAlong` in `wires.ts`, the canvas `wiretext` gesture |
 | A view's width, v0.4.x step 7a (2026-11-24) | T2: `params.span` in `plantViewLayout` (runs spread with equal gaps, pitch 2 within a run); `setViewSpan` (`ops.ts`, a width, null, or `"fit"`); the canvas `span` gesture on a selected view's right edge; *Width* and *Fit to sheet* in Properties |
 | Terminals on a side, v0.4.x step 7b (2026-11-24) | T15: `params.side`, `viewSides`, `usesSides`, `sideViewLayout` and `drawSideView` (`symbols.ts`, used when a view leaves its usual side); `setViewSide` (`ops.ts`); *Terminals on* in Properties |
+| Sides per group, v0.4.x step 7b (2026-11-24) | T15: `params.sides` (JSON, group → side), `setGroupSide` (`ops.ts`), *Groups* in a view's Properties; laid out by `sideViewLayout` |
 
 ## 16. Open questions
 
