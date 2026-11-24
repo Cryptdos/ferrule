@@ -31,6 +31,15 @@
       line([0, 0], [1.6, 0]),
       line([0, 1.65], [2, 1.65]),
     ],
+    // A box with a trunk and devices hanging off it (a network diagram).
+    netmap: [
+      { t: "poly", pts: [[-1.2, -2.4], [1.2, -2.4], [1.2, -1.2], [-1.2, -1.2]], fill: false },
+      line([0, -1.2], [0, -0.4], [-2.6, -0.4], [-2.6, 2.2]),
+      { t: "poly", pts: [[-2, 0.2], [-0.6, 0.2], [-0.6, 1], [-2, 1]], fill: false },
+      { t: "poly", pts: [[-2, 1.6], [-0.6, 1.6], [-0.6, 2.4], [-2, 2.4]], fill: false },
+      { t: "poly", pts: [[0.2, 0.2], [1.6, 0.2], [1.6, 1], [0.2, 1]], fill: false },
+      line([-0.6, 0.6], [0.2, 0.6]),
+    ],
     // Module boxes side by side, each with its circled address; the last dashed (a spare slot).
     ctrlmap: [
       { t: "poly", pts: [[-3, -2], [-1, -2], [-1, 2], [-3, 2]], fill: false },

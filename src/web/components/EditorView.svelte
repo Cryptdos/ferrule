@@ -39,7 +39,7 @@
   import DuplicateDialog from "./DuplicateDialog.svelte";
   import DesignTemplatesDialog from "./DesignTemplatesDialog.svelte";
   import { addDesignPlant, addSystem, allocate } from "../../core/design";
-  import { addNetwork } from "../../core/network";
+  import { addNetwork, placeNetworkSheet } from "../../core/network";
   import Tiles from "./Tiles.svelte";
   import { canvases } from "../canvases";
   import Dockable from "./Dockable.svelte";
@@ -215,6 +215,17 @@
     const plant = pk.plant[0];
     const point = pk.point;
     if (plant && point) editor.apply((p) => allocate(p, plant, point, null));
+  }
+
+  /** Place as sheet: the network diagram on a sheet of its own, shown in Annotate. */
+  function placeNetwork() {
+    const existing = editor.project.pages.find((pg) => pg.elements.some((e) => e.symbol === "netmap"));
+    if (existing && !confirm(`Sheet ${existing.number} already has the network on it. Add another sheet with it?`)) return;
+    let id = "";
+    if (!editor.apply((p) => (id = placeNetworkSheet(p).id))) return;
+    setMode("annotate");
+    editor.setPage(id);
+    editor.flash("The network is on its own sheet: it's redrawn as Design's networks change");
   }
 
   let exporting = $state(false);
@@ -484,6 +495,7 @@
         <LabelButton icon="check" label="Check" active={!!open.checks} onclick={() => toggle("checks")} title="Check the design and the drawing: points with no channel, plant not drawn, points not wired to their channel" />
         <span class="sep"></span>
         {#if editor.designView === "network"}
+          <button class="primary" onclick={placeNetwork} title="The network as a sheet at the end of the set, redrawn from the data as networks change">Place as sheet</button>
           <button onclick={() => editor.apply((p) => void addNetwork(p, "lan"))} title="A network comms plant can be on: a LAN off a switch, or a bus off the controller">+ Network</button>
         {:else if editor.designView === "todraw"}
           <span class="hint">Pick a line and place it: Draft opens with it ready to drop on the sheet.</span>
@@ -778,6 +790,11 @@
   }
   .grow {
     flex: 1;
+  }
+  button.primary {
+    background: #1e6ee6;
+    border-color: #1e6ee6;
+    color: #fff;
   }
   .simnote {
     font-size: 12px;

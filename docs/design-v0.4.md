@@ -304,6 +304,13 @@ README screenshots are retaken when the interface changes. Small judgement calls
 - **Reordering swaps rows:** ↑ ↓ on a network swaps the device with its neighbour on that network, in the table too, as §7 says the order is the row order.
 - **Comms plant on no network** is listed under the drawing, so it isn't lost.
 
+**Step 9b (the network sheet)**
+
+- **The sheet is a spare sheet** (annotations only) titled *Network diagram*, at the end of the set, with one *Network diagram* element: like the controller map, it holds no data of its own and is redrawn from Design's networks every time. It can be moved, retitled and renumbered like any sheet, and the element is in Annotate's *Tables* to put on another sheet.
+- **Placing again** asks first, when a sheet already has the diagram: two sheets would print the same thing.
+- **After placing**, Annotate opens on the new sheet, so it's seen at once.
+- **The drawing's code** is in `networkdraw.ts`, apart from the network ops: the symbols draw it, and importing the ops there would make a loop.
+
 ---
 
 ## 11. Decisions, as discussed (24/11/26)

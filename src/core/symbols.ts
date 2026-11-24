@@ -12,6 +12,7 @@ import { CAP_HEIGHT, textWidth, wrapText } from "./textwidth";
 import { BUSBAR_COLOUR_OPTIONS } from "./wirecolours";
 import { BLOCK_HALF } from "./blocks";
 import { legendTable, notesLayout, revisionTable, type LegendEntry } from "./annotations";
+import { networkDiagram, type NetworkData } from "./networkdraw";
 import {
   type Dir,
   type Rect,
@@ -1582,6 +1583,20 @@ const SYMBOLS: SymbolDef[] = [
     },
   },
   {
+    id: "netmap",
+    bench: "annotate",
+    name: "Network diagram",
+    group: "Tables",
+    palette: true,
+    params: [{ key: "width", label: "Width (units)", type: "number", min: 40, max: 150, default: 146 }],
+    kind: () => null,
+    draw(el, t) {
+      // Redrawn from Design's networks every time (design-v0.4 §7), like the controller map.
+      const r = networkDiagram(t?.network ?? { lans: [], buses: [], loose: [] }, num(el, "width", 146, 40, 150));
+      return { prims: r.prims, terminals: [], body: { x: 0, y: 0, w: r.w, h: r.h } };
+    },
+  },
+  {
     id: "legend",
     bench: "annotate",
     name: "Symbol legend",
@@ -2319,6 +2334,8 @@ export interface GeometryText {
   timed?: string;
   /** A controller map's boxes. */
   modules?: MapEntry[];
+  /** A network diagram's networks and devices. */
+  network?: NetworkData;
   /** Revision list rows (revision table). */
   rows?: string[][];
   /** One of each part used (symbol legend). */

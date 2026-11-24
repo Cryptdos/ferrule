@@ -1,4 +1,5 @@
 import { STANDARDS } from "./designations";
+import { networkData } from "./network";
 import type { Element, Project } from "./model";
 import { isBar, requireSymbol, type GeometryText } from "./symbols";
 import { isTimed, masterOf, xrefText } from "./xref";
@@ -45,6 +46,7 @@ export function elementTexts(el: Element, project: Project): GeometryText {
   if (el.symbol === "plant-view" && el.params.pmod) t.xref = moduleTitle(project, el);
   if (el.symbol === "callout" && el.params.auto !== false) t.name = String(calloutNumber(project, el));
   if (el.symbol === "ctrlmap") t.modules = controllerMapEntries(project, String(el.params.ctrl ?? ""));
+  if (el.symbol === "netmap") t.network = networkData(project);
   if (el.symbol === "revtable") t.rows = revisionRows(project);
   else if (el.symbol === "legend") t.legend = legendEntries(project);
   else if (isBar(el) || el.symbol === "offpage") {
