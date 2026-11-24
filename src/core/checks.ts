@@ -133,16 +133,20 @@ export function checkProject(project: Project): Finding[] {
     }
   }
 
+  const design = usesDesign(project);
   for (const item of project.plant) {
     const map = shownOn.get(item.id) ?? new Map<string, string[]>();
     const missing = item.terminals.filter((t) => !map.has(t));
-    if (missing.length) {
-      out.push({ level: "warning", message: `Plant ${item.tag}: terminal ${missing.join(", ")} not shown on any sheet`, ids: [] });
+    // Not drawn at all is said once, elsewhere: a module by controllerChecks, plant by Design's checks.
+    const undrawn = !map.size && (!!item.module || design);
+    if (missing.length && !undrawn) {
+      const what = item.module ? "Module" : "Plant";
+      out.push({ level: "warning", message: `${what} ${item.tag || `${item.prefix || (item.module ? "A" : "U")}?`}: terminal ${missing.join(", ")} not shown on any sheet`, ids: [] });
     }
     for (const [t, pages] of map) {
       if (pages.length > 1) {
         const nums = pages.map((id) => project.pages.find((p) => p.id === id)?.number);
-        out.push({ level: "warning", message: `Plant ${item.tag}: terminal ${t} is shown on more than one sheet (${nums.join(", ")})`, ids: [] });
+        out.push({ level: "warning", message: `${item.module ? "Module" : "Plant"} ${item.tag || `${item.prefix || "U"}?`}: terminal ${t} is shown on more than one sheet (${nums.join(", ")})`, ids: [] });
       }
     }
   }

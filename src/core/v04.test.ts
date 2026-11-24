@@ -12,7 +12,7 @@ import { defaultPattern } from "./modules";
 import { addElement, addPage, addPlant, connect, deletePlant, linkContact, placePlantView, setQuickEntry, updatePin, updatePlant, updatePoint } from "./ops";
 import { refreshConductors } from "./conductors";
 import { confirmWiring, wiringOf } from "./wiring";
-import { designChecks } from "./checks";
+import { checkProject, designChecks } from "./checks";
 import { ioSchedule } from "./schedules";
 import { saveSheetTemplate } from "./templates";
 import { parseDesignTemplate, parseProject } from "./validate";
@@ -538,5 +538,17 @@ describe("checks: a point wired to its channel (§5)", () => {
     const q = newProject("q");
     addPlant(q, "P1", "Pump", ["1", "2"], { points: [{ name: "run", form: "contact", pins: ["1", "2"] }] });
     expect(designChecks(q)).toEqual([]);
+  });
+});
+
+describe("v0.3 fix: an undrawn module is reported once", () => {
+  test("no \"Plant : terminal … not shown\" for a module that isn't drawn; a part-drawn one is named", () => {
+    const { p, di } = panel();
+    const msgs = () => checkProject(p).map((f) => f.message);
+    expect(msgs().filter((m) => /terminal .* not shown/.test(m))).toEqual([]);
+    expect(msgs().some((m) => /Module A\? \(DI-4\).*isn't drawn/.test(m))).toBe(true);
+    const v = placePlantView(p, p.pages[0]!.id, di.id, [60, 4]);
+    v.params.show = di.terminals.slice(0, 2).join(",");
+    expect(msgs().some((m) => m.startsWith("Module A?: terminal") && m.endsWith("not shown on any sheet"))).toBe(true);
   });
 });
