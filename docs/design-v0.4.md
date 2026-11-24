@@ -311,6 +311,14 @@ README screenshots are retaken when the interface changes. Small judgement calls
 - **After placing**, Annotate opens on the new sheet, so it's seen at once.
 - **The drawing's code** is in `networkdraw.ts`, apart from the network ops: the symbols draw it, and importing the ops there would make a loop.
 
+**Step 10 (points schedule)**
+
+- **Where it is:** *Export points schedule* in Design's top bar, on every view, as the mockup has it; the MCP `schedules` tool gives it as kind `points`. The file is named like the other schedules (`<drawing number> points schedule.csv`).
+- **Rows:** every point of field plant, by system in the table's order, then rows within each system. Plant with no points (a motor, a comms device with none listed) is one row, its form *comms* when it's comms plant and its protocol in *Signal*, so nothing in the table is missing from the schedule.
+- **Via** is the relay when the check traced one hop. A point confirmed by hand has *confirmed* under *Wired* and *Via* empty: a confirmation doesn't say what's between.
+- **Wired** is empty for a point with no channel, as there's nothing to be wired to; *Channel* is empty too, so unallocated points stand out.
+- **Module** is the module's tag (*A3-23*, or *A?* until drawn); its type is in the IO schedule.
+
 ---
 
 ## 11. Decisions, as discussed (24/11/26)

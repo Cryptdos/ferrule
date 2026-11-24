@@ -18,7 +18,7 @@ import { placeNetworkSheet, addNetwork, deleteNetwork, devicesOn, moveOnNetwork,
 import { circuitKey, describeInterlock, interlockStatus, proveInterlocks } from "./interlocks";
 import { setExpectation, deleteExpectation } from "./ops";
 import { designChecks } from "./checks";
-import { ioSchedule } from "./schedules";
+import { POINTS_COLS, ioSchedule, pointsSchedule, toCsv } from "./schedules";
 import { saveSheetTemplate } from "./templates";
 import { parseDesignTemplate, parseProject } from "./validate";
 
@@ -766,5 +766,35 @@ describe("networks (§7)", () => {
     // No LANs, no switch.
     const q = newProject("q");
     expect(networkDiagram(networkData(q)).prims.some((x) => x.t === "text" && x.text === "Switch")).toBe(false);
+  });
+});
+
+describe("points schedule (§9)", () => {
+  test("every point by system, with type, goes to, controller, module, channel, via and wired; unallocated listed with no channel", () => {
+    const { project: p } = buildLsp01(AvoidLib.getInstance());
+    addSystem(p, "Supply air");
+    const c = addController(p, "Panel controller");
+    const di = addModule(p, c.id, { type: "di", channels: 4 });
+    const dps = p.plant.find((x) => x.tag === "DPS-SF-01")!;
+    setPlantDesign(p, dps.id, { system: "Supply air" });
+    updateDesignPoint(p, dps.id, "Airflow proven", { signal: "volt-free", goesTo: "relay" });
+    allocate(p, dps.id, "Airflow proven", { module: di.id, point: "DI1" });
+    const sheet = p.pages.find((pg) => pg.elements.some((e) => e.symbol === "plant-view" && e.params.plant === dps.id))!;
+    const mv = placePlantView(p, sheet.id, di.id, [60, 4]);
+    const k = addElement(p, sheet.id, "contact-no", [62, 40]);
+    linkContact(p, k.id, p.pages.flatMap((pg) => pg.elements).find((e) => e.tag === "K8-37" && e.symbol === "coil")!.id);
+    connect(p, sheet.id, [k.id, "14"], [mv.id, "1"]);
+    refreshConductors(p);
+    const rows = pointsSchedule(p);
+    expect(rows[0]).toEqual({
+      system: "Supply air", tag: "DPS-SF-01", description: "Supply airflow proving, SF-01", point: "Airflow proven", form: "contact", signal: "volt-free",
+      type: "DI", goesTo: "via relay", controller: rows[0]!.controller, module: "A?", channel: "DI1", via: "K8-37", wired: "via",
+    });
+    expect(rows[0]!.controller).toMatch(/Panel controller/);
+    const other = rows.find((r) => r.tag === "DPS-SF-02")!;
+    expect([other.system, other.type, other.goesTo, other.channel, other.wired]).toEqual(["", "DI", "channel", "", ""]);
+    // Motors with no points are a row each; CSV has the design's columns.
+    expect(rows.some((r) => r.tag === "SF-01" && r.point === "")).toBe(true);
+    expect(toCsv(rows, POINTS_COLS).split("\n")[0]).toBe("System,Tag,Description,Point,Form,Signal,Type,Goes to,Controller,Module,Channel,Via,Wired");
   });
 });
