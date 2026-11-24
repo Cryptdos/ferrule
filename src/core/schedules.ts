@@ -2,7 +2,8 @@
  * Terminal and cable schedules, generated from the drawing (DESIGN.md §7).
  */
 import type { Element, IoPoint, Page, PlantItem, Project, Segment } from "./model";
-import { channelLabel } from "./design";
+import { channelLabel, goesTo, pointType, systemGroups } from "./design";
+import { Nets, wiringOf } from "./wiring";
 import { displayTag, elementTexts } from "./tags";
 import { address, partnerOf } from "./xref";
 import { gaSizes, sizeKey } from "./ga";
@@ -304,6 +305,87 @@ export function plantPointsSchedule(project: Project): PlantPointRow[] {
         pins: pinsText(item, p),
         wiredTo: wiredTo(project, item, p),
       });
+    }
+  }
+  return rows;
+}
+
+// ---------------------------------------------------------------------------
+// Points schedule (design-v0.4 §9): an export of Design, by system.
+
+export interface PointsRow {
+  system: string;
+  tag: string;
+  description: string;
+  point: string;
+  form: string;
+  signal: string;
+  /** DI, DO, AI or AO: what the controller needs; empty for supplies and comms. */
+  type: string;
+  /** channel, via relay, panel only; empty where no channel is needed. */
+  goesTo: string;
+  controller: string;
+  module: string;
+  channel: string;
+  /** The relay, when the check found one hop. */
+  via: string;
+  /** direct, via, confirmed, to review, not drawn; empty when it has no channel. */
+  wired: string;
+}
+
+export const POINTS_COLS: [keyof PointsRow, string][] = [
+  ["system", "System"],
+  ["tag", "Tag"],
+  ["description", "Description"],
+  ["point", "Point"],
+  ["form", "Form"],
+  ["signal", "Signal"],
+  ["type", "Type"],
+  ["goesTo", "Goes to"],
+  ["controller", "Controller"],
+  ["module", "Module"],
+  ["channel", "Channel"],
+  ["via", "Via"],
+  ["wired", "Wired"],
+];
+
+/**
+ * Every point in Design's table, by system and in row order: unallocated
+ * points too, with the channel empty. Comms devices with no points listed
+ * are one row each.
+ */
+export function pointsSchedule(project: Project): PointsRow[] {
+  const nets = new Nets(project);
+  const rows: PointsRow[] = [];
+  const tag = (p: PlantItem) => p.tag || `${p.prefix || "U"}?`;
+  for (const g of systemGroups(project)) {
+    for (const plant of g.plant) {
+      const base = { system: g.name, tag: tag(plant), description: plant.description };
+      const points = plant.points ?? [];
+      if (!points.length) {
+        rows.push({ ...base, point: "", form: plant.connects === "comms" ? "comms" : "", signal: plant.protocol ?? "", type: "", goesTo: "", controller: "", module: "", channel: "", via: "", wired: "" });
+        continue;
+      }
+      for (const point of points) {
+        const t = pointType(point.form);
+        const go = goesTo(point);
+        const m = point.channel ? project.plant.find((x) => x.id === point.channel!.module) : undefined;
+        const ctrl = m ? controllerOfModule(project, m) : undefined;
+        const w = point.channel ? wiringOf(project, plant, point, nets) : undefined;
+        rows.push({
+          ...base,
+          point: point.name,
+          form: formLabel(point.form).toLowerCase(),
+          signal: point.signal ?? "",
+          type: t ?? "",
+          goesTo: t ? { channel: "channel", relay: "via relay", panel: "panel only" }[go] : "",
+          controller: ctrl ? controllerName(project, ctrl) : "",
+          module: m ? tag(m) : "",
+          channel: point.channel?.point ?? "",
+          via: w?.kind === "via" ? w.relay : "",
+          wired: w ? { direct: "direct", via: "via", confirmed: "confirmed", review: "to review", "not-drawn": "not drawn", "no-channel": "" }[w.kind] : "",
+        });
+      }
     }
   }
   return rows;

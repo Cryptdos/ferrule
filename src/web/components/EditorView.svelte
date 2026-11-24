@@ -40,6 +40,7 @@
   import DesignTemplatesDialog from "./DesignTemplatesDialog.svelte";
   import { addDesignPlant, addSystem, allocate } from "../../core/design";
   import { addNetwork, placeNetworkSheet } from "../../core/network";
+  import { POINTS_COLS, pointsSchedule, toCsv } from "../../core/schedules";
   import Tiles from "./Tiles.svelte";
   import { canvases } from "../canvases";
   import Dockable from "./Dockable.svelte";
@@ -226,6 +227,18 @@
     setMode("annotate");
     editor.setPage(id);
     editor.flash("The network is on its own sheet: it's redrawn as Design's networks change");
+  }
+
+  /** The points schedule (design-v0.4 §9): Design's table as CSV, by system. */
+  function exportPoints() {
+    const rows = pointsSchedule($state.snapshot(editor.project) as typeof editor.project);
+    const text = toCsv(rows, POINTS_COLS);
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([text], { type: "text/csv" }));
+    a.download = `${editor.project.project.drawingNo || editor.project.id} points schedule.csv`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
+    editor.flash(`Points schedule: ${rows.length} row${rows.length === 1 ? "" : "s"}`);
   }
 
   let exporting = $state(false);
@@ -493,6 +506,7 @@
           <button class:active={editor.designView === "todraw"} onclick={() => (editor.designView = "todraw")} title="What Design has that isn't on a sheet yet: place it from here">To draw</button>
         </div>
         <LabelButton icon="check" label="Check" active={!!open.checks} onclick={() => toggle("checks")} title="Check the design and the drawing: points with no channel, plant not drawn, points not wired to their channel" />
+        <LabelButton icon="schedules" label="Export points schedule" onclick={exportPoints} title="Every point, by system, with its channel and how it's wired, as a CSV for a spreadsheet" />
         <span class="sep"></span>
         {#if editor.designView === "network"}
           <button class="primary" onclick={placeNetwork} title="The network as a sheet at the end of the set, redrawn from the data as networks change">Place as sheet</button>

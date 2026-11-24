@@ -14,7 +14,7 @@ import type { Element, Page, ParamValue, Project } from "../core/model";
 import * as op from "../core/ops";
 import { renumber } from "../core/renumber";
 import { routePage } from "../core/routing";
-import { billOfMaterials, cableSchedule, ioSchedule, plantPointsSchedule, terminalSchedule } from "../core/schedules";
+import { billOfMaterials, cableSchedule, ioSchedule, plantPointsSchedule, terminalSchedule, pointsSchedule } from "../core/schedules";
 import { listSymbols, localGeometry } from "../core/symbols";
 import { displayTag, elementTexts } from "../core/tags";
 import { saveSectionTemplate, saveSheetTemplate, stampTemplate, type PlantMapping } from "../core/templates";
@@ -964,8 +964,8 @@ export const TOOLS: Tool[] = [
   {
     name: "schedules",
     description:
-      "Schedules generated from the drawing: terminals, field cables, io (every controller's points: controller, module, point (with where it's drawn if on a continuation), form, pins, label, wired to), plant (plant's points and what they're wired to), or bom (bill of materials from the GA sheets).",
-    inputSchema: obj({ project, kind: { type: "string", enum: ["terminals", "cables", "io", "plant", "bom"] } }, ["project", "kind"]),
+      "Schedules generated from the drawing: terminals, field cables, io (every controller's points: controller, module, point (with where it's drawn if on a continuation), form, pins, label, wired to), plant (plant's points and what they're wired to), bom (bill of materials from the GA sheets), or points (Design's points schedule, by system: tag, point, form, signal, type, goes to, controller, module, channel, via, wired).",
+    inputSchema: obj({ project, kind: { type: "string", enum: ["terminals", "cables", "io", "plant", "bom", "points"] } }, ["project", "kind"]),
     run: async (a, ctx) => {
       const p = await ctx.storage.load(str(a, "project"));
       switch (a.kind) {
@@ -977,6 +977,8 @@ export const TOOLS: Tool[] = [
           return plantPointsSchedule(p);
         case "bom":
           return billOfMaterials(p);
+        case "points":
+          return pointsSchedule(p);
         default:
           return terminalSchedule(p);
       }
