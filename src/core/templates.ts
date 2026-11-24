@@ -8,6 +8,7 @@
  * item the template refers to is mapped to an existing item or a new one.
  */
 import { spreadBlock } from "./blocks";
+import { tidyDesign } from "./design";
 import { refreshConductors } from "./conductors";
 import { fieldPlantRefs, remapFields } from "./fields";
 import { AREA_UNITS, type Vec, pointInRect } from "./geometry";
@@ -64,7 +65,8 @@ function capture(
     id: newId("tpl"),
     name: name.trim() || page.title || "Template",
     kind,
-    plant: clone(plant).map(({ module: _m, ...p }) => p),
+    // Plant, not controllers: no module, and no channels (allocation belongs to the project it's in).
+    plant: clone(plant).map(({ module: _m, ...p }) => ({ ...p, ...(p.points ? { points: p.points.map(({ channel: _c, ...q }) => q) } : {}) })),
     title: page.title,
     boundaryY: kind === "sheet" ? page.boundaryY : null,
     sections: secs,
@@ -156,7 +158,8 @@ export function stampTemplate(project: Project, templateId: string, opts: StampO
       const typed = /\d/.test(m.newTag) ? m.newTag : "";
       // Its points follow its own points by ref: those move to the new item.
       const own = `plant:${item.id}:`;
-      const points = clone(item.points ?? []).map((pt) => ({
+      // A copy isn't on its original's channels: allocation is by hand (design-v0.4 §4).
+      const points = clone(item.points ?? []).map(({ channel: _c, ...pt }) => ({
         ...pt,
         ...(pt.follows ? { follows: pt.follows.map((c) => (c.ref.startsWith(own) ? { ...c, ref: `plant:@new:${c.ref.slice(own.length)}` } : c)) } : {}),
       }));
@@ -246,6 +249,7 @@ export function stampTemplate(project: Project, templateId: string, opts: StampO
   spreadBlock(page);
   syncPlantViews(project);
   refreshConductors(project);
+  tidyDesign(project);
   return { page, elementIds: elements.map((e) => e.id) };
 }
 

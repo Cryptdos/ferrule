@@ -12,6 +12,7 @@ import { moduleGaSize, snapToRail } from "./ga";
 import type { GaItem } from "./model";
 import { defaultPattern, generatePins, moduleType, type ModulePattern } from "./modules";
 import { cleanPoints } from "./points";
+import { tidyDesign } from "./design";
 
 export function getController(project: Project, id: string): Controller {
   const c = project.controllers?.find((x) => x.id === id);
@@ -140,6 +141,8 @@ export function generateModule(project: Project, plantId: string, pattern: Modul
   else delete item.points;
   if (pattern.channels && moduleType(item.module.type).channels) item.module.channels = pattern.channels;
   syncPlantViews(project);
+  // Points allocated to channels the module no longer has let them go.
+  tidyDesign(project);
 }
 
 /** Add a spare slot (Spare I/O) to a controller's rail. */

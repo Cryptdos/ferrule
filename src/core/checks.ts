@@ -244,6 +244,8 @@ export function pointChecks(project: Project): Finding[] {
     const tag = item.tag || `${item.prefix || "U"}?`;
     const lead = item.module ? `Module ${tag}` : `Plant ${tag}`;
     for (const pt of item.points ?? []) {
+      // A point with no pins yet (Design) isn't drawn: there's nothing to wire.
+      if (!pt.pins.length) continue;
       // A shared common (wired for its neighbour) doesn't make a point wired: its own pins do.
       const own = pt.pins.filter((t) => !(item.points ?? []).some((q) => q !== pt && q.pins.includes(t)));
       const any = (own.length ? own : pt.pins).some((t) => pinWired(item.id, t));

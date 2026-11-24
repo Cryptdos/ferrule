@@ -34,6 +34,7 @@ import {
 } from "./model";
 import { benchOf, defaultParams, isBar, formatPoints, getSymbol, partPoints, poleMates, requireSymbol, terminalPoint } from "./symbols";
 import { moduleType, moduleTypeName } from "./modules";
+import { renamePointDesign, tidyDesign } from "./design";
 import { cleanPoints, formatQuickEntry, mergePoints, isInputForm, missingRefs, parseQuickEntry, pointOfPin, printedPin } from "./points";
 import { isOrthogonal, routeOf, simplifyRoute } from "./wires";
 import { isMaster, isSlave, locate } from "./xref";
@@ -945,10 +946,15 @@ export function updatePlant(
   // A point renamed or gone: expectations and conditions that named it by name follow, or are left to Check.
   for (const old of before) {
     if (points.some((p) => p.name === old.name)) continue;
-    const renamed = points.find((p) => !before.some((b) => b.name === p.name) && p.pins.join() === old.pins.join());
-    if (renamed) renamePointRefs(project, item.id, old.name, renamed.name);
+    // Matched by its pins: a point with none can't be told apart from another, so isn't followed.
+    const renamed = old.pins.length ? points.find((p) => !before.some((b) => b.name === p.name) && p.pins.join() === old.pins.join()) : undefined;
+    if (renamed) {
+      renamePointRefs(project, item.id, old.name, renamed.name);
+      renamePointDesign(project, item.id, old.name, renamed.name);
+    }
   }
   syncPlantViews(project);
+  tidyDesign(project);
 }
 
 /** Point refs that named plant:<id>:<old> now name plant:<id>:<new>. */
@@ -1046,7 +1052,8 @@ export function updatePin(
   }
   if (patch.point !== undefined) {
     const name = patch.point.trim();
-    const points = (item.points ?? []).map((p) => ({ ...p, pins: p.pins.filter((t) => t !== key) }));
+    // A point that loses its last pin here goes, as before; one that never had pins (Design) stays.
+    const points = (item.points ?? []).map((p) => ({ ...p, pins: p.pins.filter((t) => t !== key) })).filter((p, i) => p.pins.length || !item.points![i]!.pins.length);
     if (name) {
       const p = points.find((x) => x.name === name);
       if (p) p.pins = item.terminals.filter((t) => t === key || p.pins.includes(t));
@@ -1117,6 +1124,8 @@ export function deletePlant(project: Project, id: string): void {
     const views = page.elements.filter((e) => e.symbol === "plant-view" && e.params.plant === id).map((e) => e.id);
     if (views.length) deleteElements(project, page.id, views);
   }
+  // Points on its channels (a module) let them go.
+  tidyDesign(project);
 }
 
 /** Place a view of a plant item, showing the given terminals (default: all). */

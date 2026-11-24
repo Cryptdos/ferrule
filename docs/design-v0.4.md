@@ -208,6 +208,17 @@ README screenshots are retaken when the interface changes. Small judgement calls
 - **`controller.md`** named makers and models in its examples (the pin layers table, the datasheet line, per-module or per-controller numbering). They're now generic (a universal IO module, a room controller, an analogue output module), as the no-professional-references rule asks.
 - **README's top-bar paragraph** was headed *Layout:*; it's now *The window:*, so it isn't read as the workbench.
 
+**Step 2 (the model)**
+
+- **Unset means the usual:** a plant item with no `connects` is hardwired; a point with no `goesTo` goes straight to a channel. Earlier files have neither, so they read as they always did, and nothing is written for them.
+- **Systems are names, with an order kept beside them** (`Project.systems`). A system is still only a name on plant (§2), but `+ System` has to make one before any plant is in it, and systems fold in an order of their own. A name on plant that isn't in the list is added at the end.
+- **A channel is a module and one of its points** (`channel: { module, point }`): a module's channels are already its points. A channel takes one point. A universal (UIO) channel takes any of DI, DO, AI, AO; others take the one their form serves (a module input takes a plant contact, and so on).
+- **The Needs line** counts universal channels apart and lets them cover a shortfall, DI first, then DO, AI, AO. Supplies and comms points need no channel and aren't counted.
+- **Points with no pins:** a point made with none is kept through every edit. One whose pins all go (taken off the device, or moved to another point in the pin table) still goes with them, as in Draft today. Check doesn't call a point with no pins unwired: it isn't drawn, and saying so is step 7's.
+- **What's gone is let go, never guessed:** on opening and after edits, a network, channel or interlock naming something that no longer exists is cleared; a renamed channel or point is followed. An expectation made by an interlock that's gone stays, as a hand-written one, rather than vanishing.
+- **Copies aren't allocated:** Draft templates keep plant without channels, and plant stamped from one starts unallocated, as allocation is by hand (§4).
+- **No format change:** every addition is optional, so the format number stays 3. A file saved by a v0.4 build and opened in a v0.3 build loses only its Design fields.
+
 ---
 
 ## 11. Decisions, as discussed (24/11/26)

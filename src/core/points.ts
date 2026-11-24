@@ -137,7 +137,11 @@ export function mergePoints(before: IoPoint[], after: IoPoint[]): IoPoint[] {
   });
 }
 
-/** Points that only mention pins the device has, named and not empty. */
+/**
+ * Points that only mention pins the device has, named once each. A point
+ * made with no pins (in Design, design-v0.4 §2) is kept; one whose pins
+ * have all gone from the device goes with them.
+ */
 export function cleanPoints(points: IoPoint[], terminals: string[]): IoPoint[] {
   const have = new Set(terminals);
   const seen = new Set<string>();
@@ -146,7 +150,7 @@ export function cleanPoints(points: IoPoint[], terminals: string[]): IoPoint[] {
     const name = p.name.trim();
     // A pin may be in several points: a shared common (⊥, C1) is one pin, drawn once.
     const pins = [...new Set(p.pins)].filter((t) => have.has(t));
-    if (!name || seen.has(name) || !pins.length) continue;
+    if (!name || seen.has(name) || (p.pins.length && !pins.length)) continue;
     seen.add(name);
     const q: IoPoint = { ...p, name, pins };
     if (q.label !== undefined) {
