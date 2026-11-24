@@ -5,7 +5,7 @@
 import { describe, expect, test } from "bun:test";
 import { AvoidLib } from "libavoid-js";
 import { buildBms01 } from "../bench/bms01";
-import { cellHalfFor } from "./blocks";
+import { blockHalf, cellHalfFor } from "./blocks";
 import { checkProject } from "./checks";
 import { addInterlockCondition, removeInterlockCondition, setPlantDesign, systemGroups, toDraw, updateDesignPoint, updateInterlock } from "./design";
 import { describeInterlock, interlockExpectations, interlockStatus, proveInterlocks, provingJob } from "./interlocks";
@@ -614,6 +614,54 @@ describe("step 7b: sides per group, and routing with them (T15)", () => {
     for (const pg of p.pages.filter((x) => x.title.startsWith("Controller:"))) {
       routePage(AvoidLib.getInstance(), pg);
       for (const s of pg.segments) expect(removeLoops(s.points)).toEqual(s.points);
+    }
+  });
+});
+
+describe("step 8: routing clear of strips and pin rows (F6)", () => {
+  /** Length of horizontal runs lying within a unit outside an edge at y, over x0..x1 (stubs are vertical, so none count). */
+  const alongEdge = (pts: [number, number][], y: number, side: -1 | 1, x0: number, x1: number) => {
+    let n = 0;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const a = pts[i]!;
+      const b = pts[i + 1]!;
+      if (a[1] !== b[1]) continue;
+      const d = (a[1] - y) * side;
+      if (d < 0 || d >= 1) continue;
+      n += Math.max(0, Math.min(Math.max(a[0], b[0]), x1) - Math.max(Math.min(a[0], b[0]), x0));
+    }
+    return n;
+  };
+  test("on the fixture's module and damper sheets: nothing runs along the block or a pin row, and no wire passes under a view", () => {
+    const { project: p } = fresh();
+    const sheets = p.pages.filter((x) => x.title.startsWith("Controller:") || /drives and dampers|proven open/.test(x.title));
+    expect(sheets.length).toBeGreaterThanOrEqual(6);
+    for (const pg of sheets) {
+      routePage(AvoidLib.getInstance(), pg);
+      const segs = pg.segments.map((s) => s.points as [number, number][]);
+      if (pg.boundaryY !== null) {
+        const half = blockHalf(pg);
+        for (const pts of segs) {
+          expect(alongEdge(pts, pg.boundaryY - half, -1, 0, 150)).toBe(0);
+          expect(alongEdge(pts, pg.boundaryY + half, 1, 0, 150)).toBe(0);
+        }
+      }
+      for (const v of pg.elements.filter((e) => e.symbol === "plant-view")) {
+        const g = localGeometry(v, elementTexts(v, p));
+        const b = { x: v.pos[0] + g.body.x, y: v.pos[1] + g.body.y, w: g.body.w, h: g.body.h };
+        const topRow = g.terminals.some((t) => Math.abs(t.at[1] - g.body.y) < 0.01);
+        const bottomRow = g.terminals.some((t) => Math.abs(t.at[1] - (g.body.y + g.body.h)) < 0.01);
+        for (const pts of segs) {
+          if (topRow) expect(alongEdge(pts, b.y, -1, b.x, b.x + b.w)).toBe(0);
+          if (bottomRow) expect(alongEdge(pts, b.y + b.h, 1, b.x, b.x + b.w)).toBe(0);
+          // Never under (through) the view to a pin on its far side.
+          for (let i = 0; i < pts.length - 1; i++) {
+            const [a, c] = [pts[i]!, pts[i + 1]!];
+            const through = Math.max(a[0], c[0]) > b.x + 0.05 && Math.min(a[0], c[0]) < b.x + b.w - 0.05 && Math.max(a[1], c[1]) > b.y + 0.05 && Math.min(a[1], c[1]) < b.y + b.h - 0.05;
+            expect(through).toBe(false);
+          }
+        }
+      }
     }
   });
 });

@@ -364,6 +364,7 @@ Reference drawings from other companies are proprietary. They are never committe
 | A view's width, v0.4.x step 7a (2026-11-24) | T2: `params.span` in `plantViewLayout` (runs spread with equal gaps, pitch 2 within a run); `setViewSpan` (`ops.ts`, a width, null, or `"fit"`); the canvas `span` gesture on a selected view's right edge; *Width* and *Fit to sheet* in Properties |
 | Terminals on a side, v0.4.x step 7b (2026-11-24) | T15: `params.side`, `viewSides`, `usesSides`, `sideViewLayout` and `drawSideView` (`symbols.ts`, used when a view leaves its usual side); `setViewSide` (`ops.ts`); *Terminals on* in Properties |
 | Sides per group, v0.4.x step 7b (2026-11-24) | T15: `params.sides` (JSON, group → side), `setGroupSide` (`ops.ts`), *Groups* in a view's Properties; laid out by `sideViewLayout` |
+| Routing clear of strips and pin rows, v0.4.x step 8 (2026-11-24) | F6: `blockRect` (`routing.ts`): the terminal block one obstacle out to `ROW_CLEAR`; a view's obstacle pushed out past its pin rows; `lessStubs` so the repair pass lets stubs cross the clearance |
 
 ## 16. Open questions
 
