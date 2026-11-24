@@ -12,6 +12,7 @@ import { defaultPattern } from "./modules";
 import { addElement, addPage, addPlant, connect, deletePlant, linkContact, placePlantView, setQuickEntry, updatePin, updatePlant, updatePoint } from "./ops";
 import { refreshConductors } from "./conductors";
 import { confirmWiring, wiringOf } from "./wiring";
+import { addNetwork, deleteNetwork, devicesOn, moveOnNetwork, networkData, networkDiagram, putOnNetwork, updateNetwork } from "./network";
 import { circuitKey, describeInterlock, interlockStatus, proveInterlocks } from "./interlocks";
 import { setExpectation, deleteExpectation } from "./ops";
 import { designChecks } from "./checks";
@@ -695,5 +696,59 @@ describe("interlocks (§6)", () => {
     p.pages[1]!.elements[0]!.pos = [p.pages[1]!.elements[0]!.pos[0] + 2, p.pages[1]!.elements[0]!.pos[1]];
     expect(circuitKey(p)).not.toBe(key);
     expect(interlockStatus(p, proofs).get(ok.id)).toEqual({ kind: "unchecked" });
+  });
+});
+
+describe("networks (§7)", () => {
+  function riser() {
+    const { p } = panel();
+    const lan = addNetwork(p, "lan");
+    const bus = addNetwork(p, "bus");
+    const f = addDesignPlant(p);
+    f.tag = "FCU-01";
+    const fcus = [f, ...duplicatePlant(p, [f.id], 18, 1).plant];
+    putOnNetwork(p, fcus.map((x) => x.id), lan.id);
+    const m = addDesignPlant(p);
+    m.tag = "MTR-1";
+    const mtrs = [m, ...duplicatePlant(p, [m.id], 2, 1).plant];
+    putOnNetwork(p, mtrs.map((x) => x.id), bus.id);
+    return { p, lan, bus, fcus, mtrs };
+  }
+  test("named in turn with a protocol; devices are comms plant on it, in row order", () => {
+    const { p, lan, bus, fcus } = riser();
+    expect([lan.name, lan.protocol, bus.name, bus.protocol]).toEqual(["LAN 1", "BACnet IP", "Bus 1", "Modbus RTU"]);
+    expect(addNetwork(p, "lan").name).toBe("LAN 2");
+    expect(devicesOn(p, lan.id).map((x) => x.tag)).toEqual(fcus.map((x) => x.tag));
+    expect(fcus.every((x) => x.connects === "comms" && x.protocol === "BACnet IP")).toBe(true);
+    expect(() => updateNetwork(p, lan.id, { name: "Bus 1" })).toThrow(/already/);
+  });
+  test("order along a bus is the row order: moving a device moves its row", () => {
+    const { p, bus, mtrs } = riser();
+    moveOnNetwork(p, mtrs[2]!.id, -1);
+    expect(devicesOn(p, bus.id).map((x) => x.tag)).toEqual(["MTR-1", "MTR-3", "MTR-2"]);
+    expect(p.plant.indexOf(mtrs[2]!)).toBeLessThan(p.plant.indexOf(mtrs[1]!));
+    expect(roundTrip(p).plant.filter((x) => x.network === bus.id).map((x) => x.tag)).toEqual(["MTR-1", "MTR-3", "MTR-2"]);
+  });
+  test("deleting a network leaves its devices on none", () => {
+    const { p, bus, mtrs } = riser();
+    deleteNetwork(p, bus.id);
+    expect(mtrs.every((x) => !x.network)).toBe(true);
+    expect(p.networks!.map((n) => n.name)).toEqual(["LAN 1"]);
+  });
+  test("the drawing: controller, switch, each network with its devices, long runs shortened with a count", () => {
+    const { p } = riser();
+    const d = networkData(p);
+    expect(d.lans[0]!.devices).toHaveLength(19);
+    const texts = networkDiagram(d).prims.flatMap((x) => (x.t === "text" ? [x.text] : []));
+    expect(texts).toContain("Switch");
+    expect(texts).toContain("LAN 1 · BACnet IP · 19 devices");
+    expect(texts).toContain("FCU-16");
+    expect(texts).not.toContain("FCU-17");
+    expect(texts).toContain("… FCU-17 to FCU-19 (3 more)");
+    expect(texts).toContain("Bus 1 · Modbus RTU · 3 devices");
+    expect(texts).toContain("MTR-3");
+    // No LANs, no switch.
+    const q = newProject("q");
+    expect(networkDiagram(networkData(q)).prims.some((x) => x.t === "text" && x.text === "Switch")).toBe(false);
   });
 });

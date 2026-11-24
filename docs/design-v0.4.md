@@ -293,6 +293,17 @@ README screenshots are retaken when the interface changes. Small judgement calls
 - **Proved means no sequence breaks it**, as for any expectation in Check logic: an interlock whose point is drawn but wired to nothing is proved, since nothing can turn it on. Not drawn is reported before anything is tried.
 - **Proved on the example:** *FA-SF SF-01 running never on while FA-SF SF-02 running* (duty and standby) proves; *… while FA Fire alarm off* fails.
 
+**Step 9 is two PRs:** 9a networks and the Network view; 9b the network sheet.
+
+**Step 9a (networks, the Network view)**
+
+- **The switch isn't data:** it's drawn whenever there's a LAN (*Switch · 2 LANs*), with no tag or port count. A switch with a tag and ports would be plant (or a module) of its own, and nothing in v0.4 needs it; it can come with addresses.
+- **One drawing for the view and the sheet:** `networkDiagram` lays it out in sheet units, and the view shows exactly what the sheet will print (step 9b), in black on the paper colour rather than the mockup's colours.
+- **Shortened runs:** a LAN shows four devices a row for four rows (sixteen), a bus eight, then *… FCU-17 to FCU-19 (3 more)*. Enough to read the pattern on an A4 sheet; the table has every device.
+- **Putting a device on a network** makes it comms (if it was hardwired; *both* stays both) and gives it the network's protocol if it had none. A network's protocol is its own field too, so devices and network can be told apart if they ever differ.
+- **Reordering swaps rows:** ↑ ↓ on a network swaps the device with its neighbour on that network, in the table too, as §7 says the order is the row order.
+- **Comms plant on no network** is listed under the drawing, so it isn't lost.
+
 ---
 
 ## 11. Decisions, as discussed (24/11/26)
