@@ -203,6 +203,32 @@ export function panesUnder(owner: Page, it: Pick<GaItem, "x" | "y" | "w" | "h">)
   return doorPanes(owner).filter((p) => it.x < p.x + p.w - e && it.x + it.w > p.x + e && it.y < p.y + p.h - e && it.y + it.h > p.y + e);
 }
 
+// ---------------------------------------------------------------------------
+// A backplate behind each door (v0.4.x M13)
+
+/** The margin a plate made for a door starts with, all round, mm. */
+export const PLATE_MARGIN = 25;
+
+/** The door a backplate sheet is behind: its door-front sheet and the door, if both are still there. */
+export function plateDoor(project: Project, page: Page): { front: Page; pane: Pane } | null {
+  const b = page.ga?.behind;
+  if (!b?.pane) return null;
+  const front = project.pages.find((p) => p.id === b.sheet);
+  if (front?.ga?.view !== "door-front" || front.ga.of) return null;
+  const pane = doorPanes(front).find((p) => p.col === b.pane![0] && p.row === b.pane![1]);
+  return pane ? { front, pane } : null;
+}
+
+/** The backplate sheets behind a door front's doors, by door (`col:row`). */
+export function platesOf(project: Project, front: Page): Map<string, Page> {
+  const out = new Map<string, Page>();
+  for (const p of project.pages) {
+    const b = p.ga?.view === "backplate" ? p.ga.behind : undefined;
+    if (b?.sheet === front.id && b.pane) out.set(`${b.pane[0]}:${b.pane[1]}`, p);
+  }
+  return out;
+}
+
 /** What the sheet shows: all of it, one leaf of a door, or one door of a modular door. */
 export function gaFrame(project: Project, page: Page): GaFrame {
   const ga = page.ga!;

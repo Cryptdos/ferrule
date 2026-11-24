@@ -126,6 +126,13 @@ export interface GaSettings {
   columns?: DoorColumn[];
   /** A door view showing one door of a modular door: its column and row (from the front, from 0). */
   pane?: [number, number];
+  /**
+   * A backplate behind one door (v0.4.x M13): a compartment's own mounting
+   * plate. The door-front sheet and the door on it; `pane` null once that
+   * door is joined to another or gone (Check says so). Unset: the panel's
+   * one backplate.
+   */
+  behind?: { sheet: string; pane: [number, number] | null };
   /** Door views: the leaf this sheet shows (0: the left one from the front, 1: the right one). Unset: the whole door. */
   leaf?: 0 | 1;
   /**

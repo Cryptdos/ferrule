@@ -2,7 +2,7 @@
  * Rule checks (DESIGN.md §6, §7, §10). Each finding names the elements
  * involved so the UI can jump to them.
  */
-import { allDetails, allFrames, changedGaStrips, detailOf, doorOwner, frameOf, gaCandidates, paneName, panesUnder, railFill, railNumber } from "./ga";
+import { allDetails, allFrames, changedGaStrips, detailOf, doorOwner, frameOf, gaCandidates, paneName, panesUnder, plateDoor, railFill, railNumber } from "./ga";
 import { compile, pinNode } from "./sim";
 import { controllerName, modulesOf, moduleTypeName, slotAddress, viewsOf } from "./modules";
 import { contactPins, isAnalogueForm, isInputForm, missingRefs, describeExpectation, things } from "./points";
@@ -195,6 +195,13 @@ export function checkProject(project: Project, opts: { proofs?: Proofs | null } 
           const under = panesUnder(page, it);
           if (under.length > 1) out.push({ level: "warning", message: `Sheet ${page.number}: ${it.kind === "label" ? "a label plate" : "a device"} lies across two doors (${under.map(paneName).join(", ")})`, pageId: page.id, ids: [it.id] });
         }
+      }
+      // A compartment's plate and its door (v0.4.x M13).
+      if (page.ga?.view === "backplate" && page.ga.behind) {
+        const d = plateDoor(project, page);
+        if (!d) out.push({ level: "info", message: `Sheet ${page.number}: its backplate's door has been joined to another or removed, so nothing is behind it now: pick its door in Sheet settings, or clear it`, pageId: page.id, ids: [] });
+        else if (page.ga.enclosure.w > d.pane.w + 0.01 || page.ga.enclosure.h > d.pane.h + 0.01)
+          out.push({ level: "info", message: `Sheet ${page.number}: the backplate (${page.ga.enclosure.w} × ${page.ga.enclosure.h} mm) is larger than its door's opening, ${paneName(d.pane)} (${d.pane.w} × ${d.pane.h} mm)`, pageId: page.id, ids: [] });
       }
       if (page.ga?.view === "door-back" && !doorOwner(project, page)) {
         out.push({ level: "warning", message: `Sheet ${page.number} is a door back with no door front: pick its door in Sheet settings`, pageId: page.id, ids: [] });

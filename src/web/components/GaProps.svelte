@@ -1,13 +1,15 @@
 <script lang="ts">
   import { setModuleDevice } from "../../core/controllers";
   import { moduleTypeName } from "../../core/modules";
-  import { deleteGaItems, joinDoorBelow, rotateGaItems, setGaItemDevice, setGaSettings, setGaSize, splitDoor, updateDoor, updateGaItem, useLibraryDevice } from "../../core/ops";
+  import { addPlatesForDoors, deleteGaItems, joinDoorBelow, setPlateBehind, sizePlateFromDoor, rotateGaItems, setGaItemDevice, setGaSettings, setGaSize, splitDoor, updateDoor, updateGaItem, useLibraryDevice } from "../../core/ops";
   import {
     GA_SCALES,
     VIEW_NAMES,
     deviceSize,
     doorColumns,
     doorLeaves,
+    doorPanes,
+    plateDoor,
     doorOwner,
     paneName,
     sheetPanes,
@@ -105,6 +107,12 @@
   const modular = $derived(!!owner?.ga?.columns?.length);
   const columns = $derived(owner ? doorColumns(owner) : []);
   const panes = $derived(owner ? sheetPanes(editor.project, owner) : []);
+  // Every door of every door front, for a backplate to sit behind.
+  const plateDoors = $derived(
+    editor.project.pages
+      .filter((p) => p.ga?.view === "door-front" && !p.ga.of)
+      .flatMap((f) => doorPanes(f).map((pn) => ({ value: `${f.id}|${pn.col}:${pn.row}`, label: `${paneName(pn)}, door on sheet ${f.number}` }))),
+  );
   const door = (col: number, row: number | null, patch: { w?: number; h?: number; hinge?: "left" | "right"; name?: string }) => editor.apply((p) => updateDoor(p, editor.pageId, col, row, patch));
   const doorFronts = $derived(editor.project.pages.filter((p) => p.ga?.view === "door-front" && !p.ga.of && p.id !== page.id));
   const frame = $derived(page.ga ? gaFrame(editor.project, page) : null);
@@ -421,6 +429,38 @@
           <option value="1">The right leaf (from the front)</option>
         </select>
       </label>
+    {/if}
+    {#if ownDoor && panes.length > 1}
+      <!-- A compartment's plate behind each door (v0.4.x M13). -->
+      <div class="buttons">
+        <button
+          onclick={() => {
+            let n = 0;
+            if (editor.apply((p) => (n = addPlatesForDoors(p, editor.pageId).length))) editor.flash(`${n} backplate sheet${n === 1 ? "" : "s"} added, one behind each door`);
+          }}
+          title="A backplate sheet for each door that hasn't one, sized from the door less 25 mm all round">Add a backplate for each door</button
+        >
+      </div>
+    {/if}
+    {#if page.ga.view === "backplate"}
+      <label>
+        Behind
+        <select
+          value={page.ga.behind?.pane ? `${page.ga.behind.sheet}|${page.ga.behind.pane.join(":")}` : ""}
+          onchange={(e) => {
+            const v = e.currentTarget.value;
+            const [sheet, pn] = v.split("|");
+            editor.apply((p) => setPlateBehind(p, editor.pageId, v ? { sheet: sheet!, pane: pn!.split(":").map(Number) as [number, number] } : null));
+          }}
+        >
+          <option value="">The whole panel (its one backplate)</option>
+          {#each plateDoors as d (d.value)}<option value={d.value}>{d.label}</option>{/each}
+        </select>
+      </label>
+      {#if page.ga.behind && !plateDoor(editor.project, page)}<p class="hint warn">The door it was behind has been joined to another or removed.</p>{/if}
+      {#if plateDoor(editor.project, page)}
+        <div class="buttons"><button onclick={() => editor.apply((p) => sizePlateFromDoor(p, editor.pageId))} title="Its door's width and height, less 25 mm all round">Size from its door</button></div>
+      {/if}
     {/if}
     {#if page.ga.view === "door-back"}
       <p class="hint">Seen from inside, mirrored: the door's devices from sheet {owner?.number ?? "?"} are drawn dashed with their cut-outs. Rail and trunking on the door go here.</p>
