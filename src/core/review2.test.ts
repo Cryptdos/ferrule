@@ -117,13 +117,14 @@ describe("field wires", () => {
 });
 
 describe("parts", () => {
-  test("socket: L and N at the pole pitch, earth out of the side", () => {
+  test("socket: L and N at the pole pitch, earth beside them from the top (v0.4.x T17)", () => {
     const { p, pg } = project();
     const s = addElement(p, pg, "socket", [20, 20]);
     const g = localGeometry(s, "");
     const at = (n: string) => g.terminals.find((t) => t.name === n)!;
     expect(at("N").at[0] - at("L").at[0]).toBe(3);
-    expect(at("E").dir).toBe("right");
+    expect(at("E").dir).toBe("up");
+    expect(at("E").at).toEqual([6, -4]);
   });
 
   test("earth types draw differently", () => {

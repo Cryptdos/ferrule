@@ -393,6 +393,17 @@ function snapInside(points: Vec[], a: Vec, b: Vec): Vec[] {
 }
 
 /** Set a hand-drawn route. Must be square and start and end on the wire's terminals. */
+/** A socket whose earth moved to the top (v0.4.x T17) stops being flagged once its earth wire is re-routed. */
+function clearSocketFlag(page: Page, segIds: string[]): void {
+  for (const sg of page.segments) {
+    if (!segIds.includes(sg.id)) continue;
+    for (const [id, t] of [sg.from, sg.to]) {
+      const el = page.elements.find((e) => e.id === id);
+      if (el?.symbol === "socket" && t === "E") delete el.params.eMoved;
+    }
+  }
+}
+
 export function setManualRoute(project: Project, pageId: string, id: string, points: Vec[]): void {
   const page = getPage(project, pageId);
   const seg = getSegment(page, id);
@@ -407,6 +418,7 @@ export function setManualRoute(project: Project, pageId: string, id: string, poi
   if (!isOrthogonal(pts)) throw new OpError("Wire routes must be horizontal and vertical runs");
   seg.points = pts;
   seg.route = pts.length >= 3 ? "manual" : "auto";
+  clearSocketFlag(getPage(project, pageId), [id]);
 }
 
 /** Hand a wire back to the automatic router. */
@@ -417,6 +429,7 @@ export function resetRoute(project: Project, pageId: string, ids: string[]): voi
     seg.route = "auto";
     seg.points = [];
   }
+  clearSocketFlag(getPage(project, pageId), ids);
 }
 
 /**

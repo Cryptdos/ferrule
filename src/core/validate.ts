@@ -119,6 +119,12 @@ export function parseProject(input: unknown): Project {
       }
       // A part is outside the panel only below a boundary (v0.4.x F7): plant on a sheet with none is panel wiring.
       if (pg.boundaryY === null) el.zone = "internal";
+      // A socket from before v0.4.x T17 had its earth out of its side: now it's at the top. A wire
+      // routed by hand to it is flagged once in Check, until the wire is re-routed.
+      if (el.symbol === "socket" && el.params.etop !== true) {
+        el.params.etop = true;
+        if (pg.segments.some((sg) => sg.route === "manual" && ((sg.from[0] === el.id && sg.from[1] === "E") || (sg.to[0] === el.id && sg.to[1] === "E")))) el.params.eMoved = true;
+      }
       // Terminals on a panel boundary are cells of its terminal block.
       if (el.symbol !== "terminal") continue;
       if (pg.boundaryY !== null && el.pos[1] === pg.boundaryY && (el.rot === 0 || el.rot === 180)) el.params.onBlock = true;
