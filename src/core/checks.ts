@@ -3,7 +3,7 @@
  * involved so the UI can jump to them.
  */
 import { distributionChecks, supplyChecks } from "./supplies";
-import { allDetails, allFrames, changedGaStrips, detailOf, doorOwner, frameOf, gaCandidates, paneName, panesUnder, plateDoor, railFill, railNumber } from "./ga";
+import { allDetails, allFrames, sheetLeaves, changedGaStrips, detailOf, doorOwner, frameOf, gaCandidates, paneName, panesUnder, plateDoor, railFill, railNumber } from "./ga";
 import { compile, pinNode } from "./sim";
 import { controllerName, modulesOf, moduleTypeName, slotAddress, viewsOf } from "./modules";
 import { contactPins, isAnalogueForm, isInputForm, missingRefs, describeExpectation, things } from "./points";
@@ -181,7 +181,9 @@ export function checkProject(project: Project, opts: { proofs?: Proofs | null } 
   if (project.pages.some((p) => p.ga)) {
     const left = gaCandidates(project, (el) => el.tag);
     if (left.length) {
-      out.push({ level: "info", message: `${left.length} panel device${left.length === 1 ? "" : "s"} not on a GA yet (see the Layout workbench)`, ids: [] });
+      // Counted part by part (a strip's terminals each), as the bill of materials would (v0.4.x step 12).
+      const n = left.reduce((a, c) => a + (c.refs.length || c.modules?.length || 1), 0);
+      out.push({ level: "info", message: `${n} schematic part${n === 1 ? " isn't" : "s aren't"} on a layout sheet, so ${n === 1 ? "isn't" : "aren't"} on the bill of materials (see the Layout workbench)`, ids: [] });
     }
     // A placed strip whose terminals changed since its GA was last open (note 45).
     for (const c of changedGaStrips(project)) {
@@ -215,6 +217,24 @@ export function checkProject(project: Project, opts: { proofs?: Proofs | null } 
         if (!d) out.push({ level: "info", message: `Sheet ${page.number}: its backplate's door has been joined to another or removed, so nothing is behind it now: pick its door in Sheet settings, or clear it`, pageId: page.id, ids: [] });
         else if (page.ga.enclosure.w > d.pane.w + 0.01 || page.ga.enclosure.h > d.pane.h + 0.01)
           out.push({ level: "info", message: `Sheet ${page.number}: the backplate (${page.ga.enclosure.w} × ${page.ga.enclosure.h} mm) is larger than its door's opening, ${paneName(d.pane)} (${d.pane.w} × ${d.pane.h} mm)`, pageId: page.id, ids: [] });
+      }
+      // Does it fit (v0.4.x T20)? Rails, trunking, devices and label plates inside the backplate, or the door and one leaf of it.
+      if (page.ga && (page.ga.view === "backplate" || (page.ga.view === "door-front" && !page.ga.of))) {
+        const { w: W, h: H } = page.ga.enclosure;
+        const door = page.ga.view === "door-front";
+        const leaves = door && !page.ga.columns?.length ? sheetLeaves(project, page) : [];
+        const e = 0.5;
+        const name = { rail: "a DIN rail", trunking: "trunking", device: "a device", label: "a label plate" } as Record<string, string>;
+        for (const it of page.gaItems ?? []) {
+          const what = name[it.kind];
+          if (!what) continue;
+          const tag = it.kind === "device" ? gaItemName(project, it) : "";
+          const thing = tag ? `${what} (${tag})` : what;
+          if (it.x < -e || it.y < -e || it.x + it.w > W + e || it.y + it.h > H + e)
+            out.push({ level: "warning", message: `Sheet ${page.number}: ${thing} lies outside the ${door ? "door" : "backplate"} (${W} × ${H} mm)`, pageId: page.id, ids: [it.id] });
+          else if (leaves.length > 1 && it.kind !== "rail" && it.kind !== "trunking" && leaves.filter((l) => it.x < l.x + l.w - e && it.x + it.w > l.x + e).length > 1)
+            out.push({ level: "warning", message: `Sheet ${page.number}: ${thing} lies across both leaves of the door`, pageId: page.id, ids: [it.id] });
+        }
       }
       if (page.ga?.view === "door-back" && !doorOwner(project, page)) {
         out.push({ level: "warning", message: `Sheet ${page.number} is a door back with no door front: pick its door in Sheet settings`, pageId: page.id, ids: [] });
@@ -426,11 +446,26 @@ export function terminalNumberChecks(project: Project): Finding[] {
         ids: [t.el.id],
       });
     }
+    // Unlocked and different: not renumbered since; its markers will say the terminal's number (v0.4.x M10).
+    else if (!c.locked && c.number && t.el.tag && c.number !== t.el.tag) {
+      out.push({ level: "info", message: `Sheet ${t.page.number}: wire ${c.number} lands on terminal ${name}, so its markers say ${t.el.tag}: Renumber to match`, pageId: t.page.id, ids: [t.el.id] });
+    }
     if (c.number) seen.set(c.number, [...(seen.get(c.number) ?? []), name]);
   }
   for (const [n, names] of seen)
     if (names.length > 1) out.push({ level: "warning", message: `Wire number ${n} is on ${names.length} wires (terminals ${names.join(", ")}): move one of the terminals`, ids: [] });
   return out;
+}
+
+/** A GA device's name for a message: its schematic tags, its module's tag, or its own tag or text. */
+function gaItemName(project: Project, it: { refs?: string[]; module?: string; tag?: string; text?: string; strip?: string }): string {
+  if (it.strip) return it.strip;
+  if (it.module) return project.plant.find((p) => p.id === it.module)?.tag ?? "";
+  if (it.refs?.length) {
+    const els = new Map(project.pages.flatMap((pg) => pg.elements.map((e) => [e.id, e] as const)));
+    return it.refs.map((r) => els.get(r)).filter((e) => !!e).map((e) => displayTag(e!, project)).filter(Boolean).slice(0, 3).join(", ");
+  }
+  return it.tag || it.text || "";
 }
 
 /** A project worked on in Design: it has systems, a controller, or plant with Design's fields. */

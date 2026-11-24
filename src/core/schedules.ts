@@ -10,6 +10,7 @@ import { gaSizes, sizeKey } from "./ga";
 import { controllerName, controllerOfModule, controllersInOrder, moduleTypeName, pointLabel, viewsOf } from "./modules";
 import { formLabel, printedPin } from "./points";
 import { isBar } from "./symbols";
+import { isFieldWire } from "./wires";
 
 export interface TerminalRow {
   strip: string;
@@ -103,6 +104,105 @@ export function cableSchedule(project: Project): CableRow[] {
     }
   }
   return rows.sort((a, b) => natural(a.plant, b.plant) || natural(a.plantTerminal, b.plantTerminal));
+}
+
+export interface CoreRow {
+  plant: string;
+  description: string;
+  /** How many cores it needs: its wired terminals, earth included. */
+  cores: number;
+  terminals: string;
+}
+
+/**
+ * Cores per field device (v0.4.x T18): one row per plant item drawn with
+ * wires on its terminals (not a controller's module, not plant in the
+ * panel), counting each of its terminals with a wire on it once, earth
+ * included, over all its views.
+ */
+export function coresPerDevice(project: Project): CoreRow[] {
+  const wired = new Map<string, Set<string>>();
+  for (const page of project.pages) {
+    const byId = new Map(page.elements.map((e) => [e.id, e]));
+    for (const seg of page.segments) {
+      for (const [id, t] of [seg.from, seg.to]) {
+        const el = byId.get(id);
+        if (el?.symbol !== "plant-view") continue;
+        const plant = String(el.params.plant);
+        wired.set(plant, (wired.get(plant) ?? new Set()).add(t));
+      }
+    }
+  }
+  const rows: CoreRow[] = [];
+  for (const item of project.plant) {
+    const pins = wired.get(item.id);
+    if (!pins?.size || item.module || item.inPanel) continue;
+    // In the device's own pin order.
+    const terms = [...pins].sort((a, b) => (item.terminals.indexOf(a) + 1 || 1e9) - (item.terminals.indexOf(b) + 1 || 1e9) || natural(a, b));
+    rows.push({ plant: item.tag || `${item.prefix || "U"}?`, description: item.description, cores: terms.length, terminals: terms.join(" ") });
+  }
+  return rows.sort((a, b) => natural(a.plant, b.plant));
+}
+
+export interface MarkerRow {
+  /** What the marker says. */
+  text: string;
+  what: "wire" | "core, panel end" | "core, field end";
+  /** The wire's number on the drawing, and where its end is. */
+  wire: string;
+  where: string;
+}
+
+/**
+ * Wire and core markers for a marker supplier (v0.4.x M10), one per wire
+ * end. A panel wire has two, each the number of the terminal it lands on
+ * (the first along the strip, if it lands on two), or with none, its own
+ * number. A field core has two: at the panel end the terminal it goes into
+ * (or its own number), at the field end the device's tag. A terminal's
+ * number is read from the terminal itself, so a wire numbered by hand still
+ * gets the terminal's. An end on a junction isn't a place a marker goes, so
+ * it has none.
+ */
+export function wireMarkers(project: Project): MarkerRow[] {
+  const rows: MarkerRow[] = [];
+  const order = (a: { el: Element; page: Page }, b: { el: Element; page: Page }) => a.page.number - b.page.number || a.el.pos[0] - b.el.pos[0] || a.el.pos[1] - b.el.pos[1];
+  for (const page of project.pages) {
+    if (page.ga) continue;
+    const byId = new Map(page.elements.map((e) => [e.id, e]));
+    for (const seg of page.segments) {
+      const ends = [seg.from, seg.to].map(([id, t]) => ({ el: byId.get(id), t }));
+      if (ends.some((e) => !e.el)) continue;
+      const own = wireNumber(project, seg);
+      const terms = ends.filter((e) => e.el!.symbol === "terminal").map((e) => ({ el: e.el!, page })).sort(order);
+      const panelText = terms[0] ? displayTag(terms[0].el, project) || own : own;
+      const field = isFieldWire(page, seg);
+      // A field core's field end: a device out in the field, not the terminal.
+      const fieldEnd = field ? (ends.find((e) => e.el!.zone === "external" && e.el!.symbol !== "terminal") ?? ends.find((e) => e.el!.symbol !== "terminal")) : undefined;
+      for (const e of ends) {
+        const el = e.el!;
+        if (el.symbol === "junction") continue;
+        const where = address(page, el.pos);
+        if (field && e === fieldEnd) {
+          const item = el.symbol === "plant-view" ? project.plant.find((p) => p.id === el.params.plant) : undefined;
+          const tag = item ? item.tag || `${item.prefix || "U"}?` : displayTag(el, project) || el.symbol;
+          rows.push({ text: tag, what: "core, field end", wire: own, where });
+        } else rows.push({ text: panelText, what: field ? "core, panel end" : "wire", wire: own, where });
+      }
+    }
+  }
+  return rows;
+}
+
+/** Markers grouped: each text and kind once, with how many (v0.4.x M10). */
+export function groupMarkers(rows: MarkerRow[]): { text: string; what: string; count: number }[] {
+  const out = new Map<string, { text: string; what: string; count: number }>();
+  for (const r of rows) {
+    const k = `${r.what}\u0000${r.text}`;
+    const g = out.get(k) ?? { text: r.text, what: r.what, count: 0 };
+    g.count++;
+    out.set(k, g);
+  }
+  return [...out.values()].sort((a, b) => a.what.localeCompare(b.what) || natural(a.text, b.text));
 }
 
 /** CSV text for a list of rows, for spreadsheets. */
