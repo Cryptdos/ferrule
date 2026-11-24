@@ -89,6 +89,7 @@
     // A controller's module: its tag and type.
     if (it.module) {
       const m = project.plant.find((p) => p.id === it.module);
+      if (m && !m.module) return m.tag || `${m.prefix || "U"}?`; // plant in the panel (v0.4.x T3)
       return m?.module ? `${m.tag || `${m.prefix || "A"}?`} ${moduleTypeName(m.module)}` : "(deleted)";
     }
     const els = (it.refs ?? []).map((r) => byId.get(r)).filter((e) => !!e);

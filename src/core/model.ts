@@ -257,6 +257,12 @@ export interface PlantItem {
   terminals: string[];
   /** Its power supply isn't on these drawings: a break on the left, marked POWER BY OTHERS. */
   powerByOthers?: boolean;
+  /**
+   * In the panel (v0.4.x T3): a power supply, UPS or battery. Still plant
+   * (points, pins, a view), but listed under *Panel* in Design, drawn above
+   * the boundary, sized on the GA, and not field plant.
+   */
+  inPanel?: boolean;
   /** A pin's other labels, by its number: its id (C, Y1, VO) and its group (IO1, AO1). */
   pins?: Record<string, PinInfo>;
   /** Its signals, each made of pins (controller.md §3): what's drawn under the boxes, and how it simulates. */

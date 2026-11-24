@@ -1139,11 +1139,16 @@ export function deletePlant(project: Project, id: string): void {
 /** Place a view of a plant item, showing the given terminals (default: all). */
 export function placePlantView(project: Project, pageId: string, plantId: string, pos: Vec, show?: string[]): Element {
   const item = getPlant(project, plantId);
+  // A panel device is inside the panel (v0.4.x T3): never below the boundary.
+  const pg = getPage(project, pageId);
+  if (item.inPanel && pg.boundaryY !== null && pos[1] > pg.boundaryY) throw new OpError(`${item.tag || "It"} is in the panel: place it above the boundary`);
   const shown = (show ?? item.terminals).filter((t) => item.terminals.includes(t));
+  // External only below a boundary (v0.4.x F7): updateZones decides, as for any part.
   const el = addElement(project, pageId, "plant-view", pos, {
-    zone: item.module ? "internal" : "external",
+    zone: "internal",
     params: { plant: plantId, show: shown.join(",") },
   });
+  updateZones(getPage(project, pageId));
   syncPlantViews(project);
   return el;
 }
@@ -1221,8 +1226,9 @@ export function updateZones(page: Page): void {
       if (onBlock) el.params.onBlock = true;
       else delete el.params.onBlock;
     }
+    // No boundary: nothing on the sheet is outside the panel, plant views included (v0.4.x F7).
     if (page.boundaryY === null) {
-      if (el.symbol !== "plant-view") el.zone = "internal";
+      el.zone = "internal";
       continue;
     }
     el.zone = el.pos[1] > page.boundaryY ? "external" : "internal";

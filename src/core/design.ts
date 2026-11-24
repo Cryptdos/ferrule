@@ -216,11 +216,15 @@ export function renamePointDesign(project: Project, plantId: string, from: strin
 export const fieldPlant = (project: Project): PlantItem[] => project.plant.filter((p) => !p.module);
 
 /** The table's groups: each system in order, then plant with none (the unnamed group), if any or if there are no systems. */
-export function systemGroups(project: Project): { name: string; plant: PlantItem[] }[] {
-  const field = fieldPlant(project);
-  const out = (project.systems ?? []).map((name) => ({ name, plant: field.filter((p) => p.system === name) }));
+export function systemGroups(project: Project): { name: string; plant: PlantItem[]; panel?: true }[] {
+  const all = fieldPlant(project);
+  // Panel devices (v0.4.x T3) first, under a fixed group of their own, whatever their system.
+  const inPanel = all.filter((p) => p.inPanel);
+  const field = all.filter((p) => !p.inPanel);
+  const out: { name: string; plant: PlantItem[]; panel?: true }[] = (project.systems ?? []).map((name) => ({ name, plant: field.filter((p) => p.system === name) }));
   const none = field.filter((p) => !p.system || !(project.systems ?? []).includes(p.system));
   if (none.length || !out.length) out.push({ name: "", plant: none });
+  if (inPanel.length) out.unshift({ name: "Panel", plant: inPanel, panel: true });
   return out;
 }
 
@@ -269,6 +273,8 @@ export interface PlantDesign {
   network?: string;
   enabledBy?: string;
   source?: string;
+  /** In the panel (v0.4.x T3). */
+  inPanel?: boolean;
 }
 
 /** Set a plant item's Design fields; an empty value clears one. */
@@ -283,6 +289,14 @@ export function setPlantDesign(project: Project, id: string, patch: PlantDesign)
   if (patch.connects !== undefined) {
     if (patch.connects === "hardwired") delete it.connects;
     else it.connects = patch.connects;
+  }
+  if (patch.inPanel !== undefined) {
+    if (patch.inPanel) {
+      // Drawn below a boundary, it can't be in the panel.
+      const below = project.pages.find((pg) => pg.boundaryY !== null && pg.elements.some((e) => e.symbol === "plant-view" && e.params.plant === it.id && e.pos[1] > pg.boundaryY!));
+      if (below) throw new OpError(`${it.tag || "It"} is drawn below the panel boundary on sheet ${below.number}: move it above, then mark it in the panel`);
+      it.inPanel = true;
+    } else delete it.inPanel;
   }
   if (it.network && !(project.networks ?? []).some((n) => n.id === it.network)) throw new OpError("No such network");
   tidyDesign(project);
@@ -666,8 +680,11 @@ export const onNetworkOnly = (item: PlantItem): boolean => item.connects === "co
  * to draw), in table and rail order; comms-only plant apart, under `network`,
  * with its network's name (unset: not on a network).
  */
-export function toDraw(project: Project): { plant: ToDraw[]; modules: ToDraw[]; network: { item: PlantItem; net?: string }[] } {
-  const all = systemGroups(project).flatMap((g) => g.plant);
+export function toDraw(project: Project): { plant: ToDraw[]; panel: ToDraw[]; modules: ToDraw[]; network: { item: PlantItem; net?: string }[] } {
+  const groups = systemGroups(project);
+  // Panel devices (T3) are counted apart from field plant.
+  const panel = groups.filter((g) => g.panel).flatMap((g) => g.plant).map((item) => ({ item, sheets: drawnOn(project, item.id) }));
+  const all = groups.filter((g) => !g.panel).flatMap((g) => g.plant);
   const network = all.filter(onNetworkOnly).map((item) => {
     const net = (project.networks ?? []).find((n) => n.id === item.network)?.name;
     return net ? { item, net } : { item };
@@ -679,7 +696,7 @@ export function toDraw(project: Project): { plant: ToDraw[]; modules: ToDraw[]; 
     .map((id) => project.plant.find((p) => p.id === id))
     .filter((p): p is PlantItem => !!p?.module)
     .map((item) => ({ item, sheets: drawnOn(project, item.id) }));
-  return { plant, modules, network };
+  return { plant, panel, modules, network };
 }
 
 /** How many pins a point of each form is given when none were: what's usual, numbered. */

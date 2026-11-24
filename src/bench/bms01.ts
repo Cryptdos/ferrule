@@ -83,6 +83,9 @@ export function buildBms01(avoid: Avoid | null): Bms01 {
     points: [pt("Mains", "supply-in", ["L", "N"]), pt("24V out", "supply-out", ["+", "-"]), pt("Battery", "powered-out", ["B+", "B-"])],
   });
   const BAT = addPlant(p, "BAT-01", "Sealed lead acid standby battery", ["+", "-"], { points: [pt("Charge", "supply-in", ["+", "-"])] });
+  // Both are in the panel (T3): not field plant.
+  setPlantDesign(p, PSU.id, { inPanel: true });
+  setPlantDesign(p, BAT.id, { inPanel: true });
 
   // Fire alarm interface (by others) and the firemans override.
   const FA = sys(

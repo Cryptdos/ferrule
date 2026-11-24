@@ -450,6 +450,13 @@ export function designChecks(project: Project, opts: { oneHop?: boolean; proofs?
   const nets = new Nets(project);
   const tagOf = (p: { tag: string; prefix?: string }) => p.tag || `${p.prefix || "U"}?`;
   for (const plant of fieldPlant(project)) {
+    // A panel device drawn below the boundary (v0.4.x T3).
+    if (plant.inPanel) {
+      for (const v of viewsOf(project, plant.id)) {
+        if (v.page.boundaryY !== null && v.el.pos[1] > v.page.boundaryY)
+          out.push({ level: "warning", message: `${tagOf(plant)} is in the panel but drawn below the boundary on sheet ${v.page.number}: move it above`, pageId: v.page.id, ids: [v.el.id], design: { plant: plant.id } });
+      }
+    }
     if (!drawnOn(project, plant.id).length && !onNetworkOnly(plant)) {
       out.push({ level: "info", message: `${tagOf(plant)} ${plant.description}: in Design, not drawn yet (To draw)`.replace("  ", " "), ids: [], design: { plant: plant.id } });
     }

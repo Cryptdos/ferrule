@@ -217,6 +217,7 @@
       <label>Information (under its box on the drawing)
         <textarea rows="2" value={plant.info ?? ""} placeholder="Model, rating, supply…" onchange={(e) => editor.apply((p) => updatePlant(p, plant.id, { info: e.currentTarget.value }))}></textarea>
       </label>
+      <label class="tick" title="A power supply, UPS or battery: listed under Panel, drawn above the boundary with solid, numbered wiring, placed on the GA"><input type="checkbox" checked={plant.inPanel === true} onchange={(e) => setPlant({ inPanel: e.currentTarget.checked })} /> In the panel (a power supply, UPS or battery: not field plant)</label>
       <label class="tick"><input type="checkbox" checked={plant.powerByOthers === true} onchange={(e) => editor.apply((p) => updatePlant(p, plant.id, { powerByOthers: e.currentTarget.checked }))} /> Power by others (its power isn't on these drawings)</label>
 
       <div class="section">Points ({plant.points?.length ?? 0})</div>

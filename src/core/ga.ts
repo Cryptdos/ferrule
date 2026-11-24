@@ -345,6 +345,7 @@ export const GA_SIZES: Record<string, GaSize> = {
   ctrlPsu: { w: 36, h: 90, label: "Controller power supply" },
   ctrlHost: { w: 90, h: 100, label: "Controller host" },
   ctrlIo: { w: 9, h: 100, label: "Controller IO module, per 2 channels", perPole: true },
+  panelPlant: { w: 50, h: 90, label: "Panel device (power supply, UPS, battery)" },
 };
 
 /** A controller module's size on the GA: its device from the table, else a generic one by type and channels. */
@@ -353,6 +354,8 @@ export function moduleGaSize(project: Project, item: PlantItem): { w: number; h:
   const dev = m?.device ? project.devices?.find((d) => d.id === m.device) : undefined;
   if (dev) return { w: dev.w, h: dev.h };
   const sizes = gaSizes(project);
+  // Plant in the panel (v0.4.x T3): one size for all, until a device is picked.
+  if (!m) return { w: sizes.panelPlant!.w, h: sizes.panelPlant!.h };
   if (m?.type === "psu") return { w: sizes.ctrlPsu!.w, h: sizes.ctrlPsu!.h };
   if (!m || m.type === "host") return { w: sizes.ctrlHost!.w, h: sizes.ctrlHost!.h };
   const io = sizes.ctrlIo!;
@@ -513,6 +516,15 @@ export function gaCandidates(project: Project, tagOf: (el: Element) => string): 
   for (const [strip, s] of strips) {
     const { w, h } = stripSize(project, s.refs);
     out.push({ refs: s.refs, label: `${strip} (${s.refs.length} terminals)`, sheet: s.sheet, door: false, w, h });
+  }
+  // Plant in the panel (v0.4.x T3), once drawn: one item each, like any panel part.
+  for (const it of project.plant) {
+    if (!it.inPanel || it.module || placed.has(it.id)) continue;
+    const views = viewsOf(project, it.id);
+    if (!views.length) continue;
+    const size = moduleGaSize(project, it);
+    // Placed as a controller's module is: a GA item naming the plant item (its `module`).
+    out.push({ refs: [], modules: [{ id: it.id, ...size }], label: `${it.tag || `${it.prefix || "U"}?`} ${it.description}`.trim(), sheet: views[0]!.page.number, door: false, ...size });
   }
   // A controller is one item: its modules side by side on a rail, in rail order (controller.md §8).
   for (const c of project.controllers ?? []) {

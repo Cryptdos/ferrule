@@ -7,14 +7,16 @@ import { AvoidLib } from "libavoid-js";
 import { buildBms01 } from "../bench/bms01";
 import { cellHalfFor } from "./blocks";
 import { checkProject } from "./checks";
-import { addInterlockCondition, removeInterlockCondition, setPlantDesign, toDraw, updateDesignPoint, updateInterlock } from "./design";
+import { addInterlockCondition, removeInterlockCondition, setPlantDesign, systemGroups, toDraw, updateDesignPoint, updateInterlock } from "./design";
 import { describeInterlock, interlockExpectations, interlockStatus, proveInterlocks, provingJob } from "./interlocks";
 import { parseSupplies, parseSupply } from "./supplies";
 import { refreshConductors } from "./conductors";
 import { newProject } from "./model";
 import { moduleTitle, viewsOf } from "./modules";
-import { addElement, deletePlant, addGaDim, addGaItem, addGaPage, addPlatesForDoors, joinDoorBelow, setPlateBehind, setBoundary, setGaSettings, splitDoor, updateElement } from "./ops";
-import { ENCL, PLATE_MARGIN, dimLayout, doorPanes, plateDoor, platesOf, drawnGaItems, gaFrame, paneOf, paneRef, sheetPanes } from "./ga";
+import { addElement, deletePlant, moveElements, placePlantView, addGaDim, addGaItem, addGaPage, addPlatesForDoors, joinDoorBelow, setPlateBehind, setBoundary, setGaSettings, splitDoor, updateElement } from "./ops";
+import { earthConductors, isFieldWire, numberByDefault } from "./wires";
+import { pointsSchedule } from "./schedules";
+import { ENCL, PLATE_MARGIN, gaCandidates, dimLayout, doorPanes, plateDoor, platesOf, drawnGaItems, gaFrame, paneOf, paneRef, sheetPanes } from "./ga";
 import { renumber } from "./renumber";
 import { stampSaved } from "../server/storage";
 import { parseProject } from "./validate";
@@ -301,5 +303,63 @@ describe("step 3: interlocks (T1, T11)", () => {
     expect(job.steps.length).toBe(2);
     expect(job.steps.map((s) => s.run())).toEqual(["proved", "proved"]);
     expect(job.key).toBe(proveInterlocks(p).key);
+  });
+});
+
+describe("step 4: panel wiring and panel devices (F7, T3)", () => {
+  test("F7: plant on a sheet with no boundary is panel wiring: solid and numbered; below a boundary, field", () => {
+    const { project: p, plant } = fresh();
+    const sheet1 = p.pages[0]!;
+    const psu = sheet1.elements.find((e) => e.symbol === "plant-view" && e.params.plant === plant.PSU!.id)!;
+    expect(psu.zone).toBe("internal");
+    const toPsu = sheet1.segments.filter((s) => s.from[0] === psu.id || s.to[0] === psu.id);
+    expect(toPsu.length).toBeGreaterThan(0);
+    const earth = earthConductors(p);
+    for (const s of toPsu) {
+      expect(isFieldWire(sheet1, s)).toBe(false);
+      expect(numberByDefault(sheet1, s, earth)).toBe(true);
+    }
+    // Below a boundary: field wiring, as before.
+    const di = p.pages.find((pg) => pg.title === "Controller: digital inputs")!;
+    const dps = di.elements.find((e) => e.symbol === "plant-view" && e.params.plant === plant.DPS1!.id)!;
+    expect(dps.zone).toBe("external");
+    // Set by hand still wins.
+    toPsu[0]!.field = true;
+    expect(isFieldWire(sheet1, toPsu[0]!)).toBe(true);
+  });
+
+  test("F7: an old file's plant view marked external on a sheet with no boundary opens as panel wiring", () => {
+    const { project: p, plant } = fresh();
+    const file = JSON.parse(JSON.stringify(p));
+    const v = file.pages[0].elements.find((e: { params: { plant?: string } }) => e.params.plant === plant.PSU!.id);
+    v.zone = "external";
+    const back = parseProject(file);
+    expect(back.pages[0]!.elements.find((e) => e.id === v.id)!.zone).toBe("internal");
+  });
+
+  test("T3: panel devices: their own group first, counted apart in To draw, out of the points schedule, on the GA", () => {
+    const { project: p, plant } = fresh();
+    const g = systemGroups(p);
+    expect(g[0]!.panel).toBe(true);
+    expect(g[0]!.plant.map((x) => x.tag)).toEqual(["PSU-01", "BAT-01"]);
+    expect(g.slice(1).some((x) => x.plant.some((y) => y.inPanel))).toBe(false);
+    const td = toDraw(p);
+    expect(td.panel.map((x) => [x.item.tag, x.sheets])).toEqual([["PSU-01", [1]], ["BAT-01", [1]]]);
+    expect(td.plant.some((x) => x.item.inPanel)).toBe(false);
+    expect(pointsSchedule(p).some((r) => r.tag === "PSU-01" || r.tag === "BAT-01")).toBe(false);
+    const ga = gaCandidates(p, () => "").filter((c) => c.modules?.some((m) => m.id === plant.PSU!.id));
+    expect(ga.length).toBe(1);
+    expect(ga[0]!.w).toBe(50);
+  });
+
+  test("T3: placed only above the boundary; Check warns if one is below", () => {
+    const { project: p, plant } = fresh();
+    const pg = p.pages.find((x) => x.boundaryY !== null)!;
+    expect(() => placePlantView(p, pg.id, plant.BAT!.id, [120, 80])).toThrow(/in the panel: place it above the boundary/);
+    const v = placePlantView(p, pg.id, plant.BAT!.id, [120, 40]);
+    moveElements(p, pg.id, [v.id], [0, 40]);
+    expect(checkProject(p).some((f) => /BAT-01 is in the panel but drawn below the boundary/.test(f.message))).toBe(true);
+    // And marking plant drawn below as in the panel is refused.
+    expect(() => setPlantDesign(p, plant.DPS1!.id, { inPanel: true })).toThrow(/below the panel boundary/);
   });
 });
