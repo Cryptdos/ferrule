@@ -2,6 +2,7 @@
  * Terminal and cable schedules, generated from the drawing (DESIGN.md §7).
  */
 import type { Element, IoPoint, Page, PlantItem, Project, Segment } from "./model";
+import { channelLabel } from "./design";
 import { displayTag, elementTexts } from "./tags";
 import { address, partnerOf } from "./xref";
 import { gaSizes, sizeKey } from "./ga";
@@ -280,7 +281,7 @@ export function ioSchedule(project: Project): IoRow[] {
           point: said.slice(said.indexOf(":") + 1),
           form: formLabel(p.form),
           pins: pinsText(m, p),
-          label: p.label ?? "",
+          label: channelLabel(project, m, p),
           wiredTo: wiredTo(project, m, p),
         });
       }

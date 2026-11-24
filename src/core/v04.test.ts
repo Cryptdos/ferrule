@@ -6,10 +6,11 @@ import { AvoidLib } from "libavoid-js";
 import { buildLsp01 } from "../bench/lsp01";
 import { checkProject } from "./checks";
 import { addController, addModule, deleteController, generateModule } from "./controllers";
-import { channelsFor, noChannelReason, unallocated, designTemplateOf, duplicatePlant, insertDesignTemplate, stepTag, tagPlan, templateCounts, addDesignPlant, addDesignPoint, addSystem, allocate, channelsOf, deleteDesignPoint, deleteSystem, moveSystem, movePlant, needsLine, pointOnChannel, pointType, renameSystem, setPlantDesign, systemGroups, updateDesignPoint } from "./design";
+import { channelLabel, channelsFor, noChannelReason, unallocated, designTemplateOf, duplicatePlant, insertDesignTemplate, stepTag, tagPlan, templateCounts, addDesignPlant, addDesignPoint, addSystem, allocate, channelsOf, deleteDesignPoint, deleteSystem, moveSystem, movePlant, needsLine, pointOnChannel, pointType, renameSystem, setPlantDesign, systemGroups, updateDesignPoint } from "./design";
 import { newProject, type IoPoint, type Project } from "./model";
 import { defaultPattern } from "./modules";
-import { addPlant, deletePlant, updatePin, updatePlant } from "./ops";
+import { addPlant, deletePlant, placePlantView, updatePin, updatePlant, updatePoint } from "./ops";
+import { ioSchedule } from "./schedules";
 import { saveSheetTemplate } from "./templates";
 import { parseDesignTemplate, parseProject } from "./validate";
 
@@ -394,5 +395,31 @@ describe("the Controller view's lists (§4)", () => {
     expect(noChannelReason(p, pu.points![2]!)).toBe("the panel has no analogue outputs");
     allocate(p, pu.id, "a", { module: di.id, point: "DI1" });
     expect(noChannelReason(p, pu.points![1]!)).toBe("every DI channel is taken");
+  });
+});
+
+describe("labels follow points (§4)", () => {
+  test("a channel's label is its point's tag and name; with no point, a typed label is kept; drawn views and the IO schedule agree", () => {
+    const { p, di } = panel();
+    placePlantView(p, p.pages[0]!.id, di.id, [10, 4]);
+    updatePoint(p, di.id, "DI2", { label: "Spare, typed" });
+    const pu = pump(p, "DPS1", [{ name: "flow", form: "contact" }]);
+    pu.tag = "DPS1";
+    allocate(p, pu.id, "flow", { module: di.id, point: "DI1" });
+    const ch = (n: string) => di.points!.find((q) => q.name === n)!;
+    expect(channelLabel(p, di, ch("DI1"))).toBe("DPS1 flow");
+    expect(channelLabel(p, di, ch("DI2"))).toBe("Spare, typed");
+    const view = p.pages[0]!.elements.find((e) => e.symbol === "plant-view")!;
+    const label = (pin: string) => (JSON.parse(String(view.params.ppins)) as string[][]).find((r) => r[0] === pin)!.at(-1);
+    expect(label(ch("DI1").pins[0]!)).toBe("DPS1 flow");
+    expect(ioSchedule(p).find((r) => r.point.endsWith("DI1"))!.label).toBe("DPS1 flow");
+    // The plant renamed: the label follows. Taken off: back to what was typed (nothing here).
+    updatePlant(p, pu.id, { tag: "FS1" });
+    expect(label(ch("DI1").pins[0]!)).toBe("FS1 flow");
+    updateDesignPoint(p, pu.id, "flow", { name: "proved" });
+    expect(label(ch("DI1").pins[0]!)).toBe("FS1 proved");
+    allocate(p, pu.id, "proved", null);
+    expect(label(ch("DI1").pins[0]!)).toBe("");
+    expect(label(ch("DI2").pins[0]!)).toBe("Spare, typed");
   });
 });
