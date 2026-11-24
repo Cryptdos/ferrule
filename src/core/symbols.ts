@@ -1452,6 +1452,8 @@ const SYMBOLS: SymbolDef[] = [
     params: [],
     kind: () => null,
     draw(el, t) {
+      // Groups of terminals on chosen sides (v0.4.x T15).
+      if (usesSides(el)) return drawSideView(el, t);
       // A controller's module: at the top of the sheet, terminals along the bottom (controller.md §5).
       if (str(el, "pmod", "")) return drawModuleView(el, t);
       const lay = plantViewLayout(el);
@@ -2629,4 +2631,223 @@ export function poleMates(el: Element, terminal: string): string[] {
       break;
   }
   return pairs.flatMap(([a, b]) => (a === terminal ? [b] : b === terminal ? [a] : []));
+}
+
+// ---------------------------------------------------------------------------
+// Terminal groups on any side (v0.4.x T15)
+
+export type ViewSide = "top" | "bottom" | "left" | "right";
+const SIDES: ViewSide[] = ["top", "bottom", "left", "right"];
+
+/** A view's side for its terminals (`params.side`; default plant top, module bottom) and any group's own (`params.sides`, JSON). */
+export function viewSides(el: Element): { view: ViewSide; groups: Record<string, ViewSide> } {
+  const module = !!str(el, "pmod", "");
+  const v = str(el, "side", "");
+  const view = SIDES.includes(v as ViewSide) ? (v as ViewSide) : module ? "bottom" : "top";
+  let groups: Record<string, ViewSide> = {};
+  try {
+    const raw = JSON.parse(str(el, "sides", "{}")) as Record<string, string>;
+    groups = Object.fromEntries(Object.entries(raw).filter(([, s]) => SIDES.includes(s as ViewSide))) as Record<string, ViewSide>;
+  } catch {
+    /* none */
+  }
+  return { view, groups };
+}
+
+/** Does the view leave the usual layout (plant top, module bottom, every group with it)? */
+export function usesSides(el: Element): boolean {
+  const s = viewSides(el);
+  const usual = str(el, "pmod", "") ? "bottom" : "top";
+  return s.view !== usual || Object.values(s.groups).some((x) => x !== usual);
+}
+
+interface SideRun {
+  name: string;
+  terms: string[];
+  side: ViewSide;
+  lines: string[];
+  /** Along its side: where its first pin is. */
+  at: number;
+}
+
+/**
+ * A view with its groups of terminals on chosen sides (v0.4.x T15). The
+ * origin is the box's top-left corner. Along the top and bottom the
+ * terminals are boxes 2 apart with their numbers reading up, as usual; down
+ * the left and right they stack 2 apart with their numbers reading across,
+ * and the box grows with them. The text block (tag and lines, or a module's
+ * title row) sits on the side opposite the view's own, below for left and right.
+ */
+export function sideViewLayout(el: Element) {
+  const module = !!str(el, "pmod", "");
+  const { view, groups: perGroup } = viewSides(el);
+  const P = PLANT.pitch;
+  const all = str(el, "terms", "").split(",").filter(Boolean);
+  const showSet = new Set(str(el, "show", "").split(",").filter(Boolean));
+  const shown = all.filter((t) => showSet.has(t));
+  const info = new Map(parsePlantPins(str(el, "ppins", "")).map((p) => [p.pin, p]));
+  const nameSize = module ? DETAIL : PLANT.group;
+  const lh = nameSize * LINE;
+  const runs: SideRun[] = [];
+  for (const t of shown) {
+    const name = info.get(t)?.label ?? "";
+    const last = runs[runs.length - 1];
+    if (last && last.name === name) last.terms.push(t);
+    else runs.push({ name, terms: [t], side: view, lines: [], at: 0 });
+  }
+  for (const r of runs) {
+    r.side = perGroup[r.name] ?? view;
+    const sp = (r.terms.length - 1) * P;
+    const across = r.side === "top" || r.side === "bottom";
+    r.lines = r.name ? wrapText(r.name.toUpperCase(), nameSize, across ? Math.max(sp + 2, GROUP_MIN) : 12) : [];
+  }
+  const printed = (t: string) => info.get(t)?.printed ?? t;
+  const pinId = (t: string) => info.get(t)?.id ?? "";
+  const tall = (names: string[], min: number, size: number) => Math.max(min, Math.ceil((Math.max(0, ...names.map((n) => textWidth(n, size))) + 0.4) * 2) / 2);
+  const sideRuns = (s: ViewSide) => runs.filter((r) => r.side === s);
+  const extentOf = (r: SideRun) => {
+    const sp = (r.terms.length - 1) * P;
+    const across = r.side === "top" || r.side === "bottom";
+    return Math.max(sp + P, across ? Math.max(0, ...r.lines.map((l) => textWidth(l, nameSize))) : r.lines.length * lh);
+  };
+  // Along each side: its runs' extents, 1.5 apart, 0.5 in from the ends.
+  const lengthOf = (s: ViewSide) => {
+    const rs = sideRuns(s);
+    return rs.length ? rs.reduce((a, r) => a + extentOf(r), 0) + 1.5 * (rs.length - 1) + 1 : 0;
+  };
+  // Depth into the box from each side.
+  const termsOn = (s: ViewSide) => sideRuns(s).flatMap((r) => r.terms);
+  const termH = tall([...runs.flatMap((r) => r.terms.map(printed)), PLANT.minName], PLANT.termH, TAG);
+  const ids = runs.flatMap((r) => r.terms.map(pinId)).filter(Boolean);
+  const idH = ids.length ? tall(ids, PLANT.idH, DETAIL) : 0;
+  const nameBand = (s: ViewSide) => {
+    const n = Math.max(0, ...sideRuns(s).map((r) => r.lines.length));
+    return n ? Math.ceil((1.9 + (n - 1) * lh + 1.1) * 2) / 2 : 1;
+  };
+  const termW = (s: ViewSide) => Math.ceil((Math.max(0, ...termsOn(s).map((t) => textWidth(printed(t), TAG))) + 0.8) * 2) / 2;
+  const idW = (s: ViewSide) => {
+    const xs = termsOn(s).map(pinId).filter(Boolean);
+    return xs.length ? Math.ceil((Math.max(...xs.map((x) => textWidth(x, DETAIL))) + 0.6) * 2) / 2 : 0;
+  };
+  const nameW = (s: ViewSide) => {
+    const w = Math.max(0, ...sideRuns(s).flatMap((r) => r.lines.map((l) => textWidth(l, nameSize))));
+    return w ? w + 1.6 : 0.5;
+  };
+  const depth = (s: ViewSide) => (!sideRuns(s).length ? 0 : s === "top" || s === "bottom" ? termH + idH + nameBand(s) : Math.max(3, termW(s)) + idW(s) + nameW(s));
+  const heading = module ? MODULE.heading : 0;
+  const span = num(el, "span", 0, 0, 150);
+  let W = Math.ceil(Math.max(lengthOf("top"), lengthOf("bottom"), depth("left") + depth("right") + 4, 6));
+  if (span > W) W = Math.round(span);
+  const H = Math.ceil(Math.max(lengthOf("left"), lengthOf("right"), depth("top") + depth("bottom") + heading + 1, 4 + heading));
+  // Place each side's runs: spread along a top or bottom given a width (T2), otherwise centred.
+  for (const s of SIDES) {
+    const rs = sideRuns(s);
+    if (!rs.length) continue;
+    const full = s === "top" || s === "bottom" ? W : H;
+    const used = rs.reduce((a, r) => a + extentOf(r), 0);
+    const spread = (s === "top" || s === "bottom") && span > 0 && rs.length > 1;
+    const gap = spread ? (full - 1 - used) / (rs.length - 1) : 1.5;
+    let cursor = spread ? 0.5 : (full - lengthOf(s)) / 2 + 0.5;
+    for (const r of rs) {
+      const e = extentOf(r);
+      const sp = (r.terms.length - 1) * P;
+      r.at = Math.round(cursor + (e - sp) / 2);
+      cursor += e + gap;
+    }
+  }
+  const textSide: "above" | "below" = view === "bottom" ? "above" : "below";
+  return { module, view, runs, W, H, termH, idH, termW, idW, lh, nameSize, heading, textSide, printed, pinId, info };
+}
+
+function drawSideView(el: Element, t?: GeometryText): { prims: Prim[]; terminals: TerminalDef[]; body: Rect } {
+  const L = sideViewLayout(el);
+  const { W, H, termH, idH, lh, nameSize } = L;
+  const P = PLANT.pitch;
+  const half = P / 2;
+  const prims: Prim[] = [rect(0, 0, W, H)];
+  const terminals: TerminalDef[] = [];
+  const firstPin = new Map<string, { at: Vec; dir: Dir }>();
+  for (const r of L.runs) {
+    const tw = Math.max(3, L.termW(r.side));
+    const iw = L.idW(r.side);
+    r.terms.forEach((tm, j) => {
+      const a = r.at + j * P;
+      const num = L.printed(tm);
+      const id = L.pinId(tm);
+      let at: Vec;
+      let dir: Dir;
+      if (r.side === "top" || r.side === "bottom") {
+        const top = r.side === "top";
+        const y0 = top ? 0 : H - termH;
+        const yi = top ? termH : H - termH - idH;
+        prims.push(rect(a - half, y0, P, termH), { t: "text", at: [a + TAG * CAP_HEIGHT * 0.5, y0 + termH / 2], text: num, size: TAG, anchor: "middle", role: "term", vertical: true });
+        if (idH && id) prims.push(rect(a - half, yi, P, idH), { t: "text", at: [a + DETAIL * CAP_HEIGHT * 0.5, yi + idH / 2], text: id, size: DETAIL, anchor: "middle", role: "note", vertical: true });
+        at = [a, top ? 0 : H];
+        dir = top ? "up" : "down";
+      } else {
+        const left = r.side === "left";
+        const x0 = left ? 0 : W - tw;
+        const xi = left ? tw : W - tw - iw;
+        prims.push(rect(x0, a - half, tw, P), text(x0 + tw / 2, a + (TAG * CAP_HEIGHT) / 2, num, TAG, "middle", "term"));
+        if (iw && id) prims.push(rect(xi, a - half, iw, P), text(xi + iw / 2, a + (DETAIL * CAP_HEIGHT) / 2, id, DETAIL, "middle", "note"));
+        at = [left ? 0 : W, a];
+        dir = left ? "left" : "right";
+      }
+      terminals.push({ name: tm, at, dir });
+      const pt = L.info.get(tm)?.point;
+      if (pt && !firstPin.has(pt)) firstPin.set(pt, { at, dir });
+    });
+    // The group's name, by its terminals.
+    const mid = r.at + ((r.terms.length - 1) * P) / 2;
+    r.lines.forEach((l, i) => {
+      if (r.side === "top") prims.push(text(mid, termH + idH + 1.9 + i * lh, l, nameSize, "middle", "note"));
+      else if (r.side === "bottom") prims.push(text(mid, H - termH - idH - 0.7 - (r.lines.length - 1 - i) * lh, l, nameSize, "middle", "note"));
+      else {
+        const y = mid + (nameSize * CAP_HEIGHT) / 2 + (i - (r.lines.length - 1) / 2) * lh;
+        if (r.side === "left") prims.push(text(tw + iw + 0.8, y, l, nameSize, "start", "note"));
+        else prims.push(text(W - tw - iw - 0.8, y, l, nameSize, "end", "note"));
+      }
+    });
+  }
+  // A module: its heading inside the box, at the top unless terminals are there; each point's job along its wire.
+  if (L.module) {
+    let inf: { heading?: string } = {};
+    try {
+      inf = JSON.parse(str(el, "pmod", "{}")) as { heading?: string };
+    } catch {
+      /* none */
+    }
+    const topUsed = L.runs.some((r) => r.side === "top");
+    if (inf.heading) prims.push(text(W / 2, topUsed ? H - 0.9 : MODULE.heading - 0.6, inf.heading, PLANT.group, "middle", "note"));
+    const jobs = new Map(parsePlantPins(str(el, "ppins", "")).filter((p) => p.point && p.job).map((p) => [p.point, p.job.toUpperCase()]));
+    for (const [pt, at] of firstPin) {
+      const job = jobs.get(pt);
+      if (!job) continue;
+      const g = MODULE.labelGap;
+      if (at.dir === "down") prims.push({ t: "text", at: [at.at[0] - 0.55 + DETAIL * CAP_HEIGHT * 0.5, at.at[1] + g], text: job, size: DETAIL, anchor: "end", role: "note", vertical: true });
+      else if (at.dir === "up") prims.push({ t: "text", at: [at.at[0] - 0.55 + DETAIL * CAP_HEIGHT * 0.5, at.at[1] - g], text: job, size: DETAIL, anchor: "start", role: "note", vertical: true });
+      else if (at.dir === "left") prims.push(text(at.at[0] - g, at.at[1] - 0.45, job, DETAIL, "end", "note"));
+      else prims.push(text(at.at[0] + g, at.at[1] - 0.45, job, DETAIL, "start", "note"));
+    }
+  }
+  // The text block, opposite the view's side (below for left and right), centred and wrapped as F4 has it.
+  const wrapW = Math.max(W + 3, 12);
+  const lines: [string, TextRole][] = [];
+  if (L.module) {
+    const title = t?.xref ? wrapTitle(t.xref, TAG, W) : ["{xref}"];
+    for (const l of title) lines.push([l, "tag"]);
+  } else {
+    const tagText = t?.tag ?? "";
+    const tagLines = tagText ? wrapTag(tagText, TAG, wrapW) : ["{tag}"];
+    if (tagLines.length > 1) for (const l of tagLines) lines.push([l, "tag"]);
+    else lines.push(["{tag}", "tag"]);
+    for (const l of [str(el, "pdesc", ""), ...str(el, "pinfo", "").split("\n")].filter(Boolean)) for (const w of wrapText(l, TAG, wrapW)) lines.push([w, "note"]);
+  }
+  if (el.label) lines.push(["{label}", "label"]);
+  const step = TAG * 1.35;
+  lines.forEach(([tx, role], i) => {
+    const y = L.textSide === "below" ? H + 1.8 + i * step : -0.7 - (lines.length - 1 - i) * step;
+    prims.push({ ...text(L.module ? 0 : W / 2, y, tx, TAG, L.module ? "start" : "middle", role), block: true } as Prim);
+  });
+  return { prims, terminals, body: { x: 0, y: 0, w: W, h: H } };
 }

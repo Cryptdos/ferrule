@@ -33,7 +33,7 @@ import {
   type TerminalRef,
   newId,
 } from "./model";
-import { benchOf, defaultParams, isBar, formatPoints, getSymbol, partPoints, plantViewLayout, poleMates, requireSymbol, terminalPoint } from "./symbols";
+import { benchOf, defaultParams, isBar, formatPoints, getSymbol, partPoints, plantViewLayout, poleMates, requireSymbol, terminalPoint, viewSides, type ViewSide } from "./symbols";
 import { moduleType, moduleTypeName } from "./modules";
 import { channelLabel, renamePointDesign, tidyDesign } from "./design";
 import { cleanPoints, formatQuickEntry, mergePoints, isInputForm, missingRefs, parseQuickEntry, pointOfPin, printedPin } from "./points";
@@ -1200,6 +1200,31 @@ export function setViewSpan(project: Project, pageId: string, id: string, span: 
   const w = span === "fit" ? Math.floor(AREA_UNITS.w - 2 - (el.pos[0] + lay.left)) : Math.round(span);
   if (w <= lay.right - lay.left) delete el.params.span;
   else el.params.span = Math.min(150, w);
+}
+
+/**
+ * Which side of a plant or module view its terminals are on (v0.4.x T15):
+ * top, bottom, left or right; null back to its usual side (plant top, module
+ * bottom). Its wires follow its pins.
+ */
+export function setViewSide(project: Project, pageId: string, id: string, side: ViewSide | null): void {
+  const el = getElement(getPage(project, pageId), id);
+  if (el.symbol !== "plant-view") throw new OpError("Only a plant or module view has sides");
+  const usual = el.params.pmod ? "bottom" : "top";
+  if (!side || side === usual) delete el.params.side;
+  else el.params.side = side;
+}
+
+/** One group of a view's terminals on a side of its own (v0.4.x T15); null: with the view's. */
+export function setGroupSide(project: Project, pageId: string, id: string, group: string, side: ViewSide | null): void {
+  const el = getElement(getPage(project, pageId), id);
+  if (el.symbol !== "plant-view") throw new OpError("Only a plant or module view has sides");
+  const { view, groups } = viewSides(el);
+  const next = { ...groups };
+  if (!side || side === view) delete next[group];
+  else next[group] = side;
+  if (Object.keys(next).length) el.params.sides = JSON.stringify(next);
+  else delete el.params.sides;
 }
 
 export const PLANT_VIEW_KEYS = ["plant", "show", "terms", "pdesc", "pinfo", "ppins", "pgroups", "pbo", "pmod"];

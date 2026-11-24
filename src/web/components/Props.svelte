@@ -23,6 +23,7 @@
     setConductorInfo,
     updateElement,
     setViewSpan,
+    setViewSide,
     type ElementPatch,
     plantLabel,
     addAsset,
@@ -31,7 +32,7 @@
   import { controllerName, moduleTitle } from "../../core/modules";
   import { readImage } from "../images";
   import { address, contactMarks, contactType, isMaster, isSlave, masterOf, partnerOf, slavesOf } from "../../core/xref";
-  import { isBar, paramApplies, plantViewLayout, requireSymbol, terminalNames } from "../../core/symbols";
+  import { isBar, paramApplies, plantViewLayout, requireSymbol, terminalNames, viewSides, type ViewSide } from "../../core/symbols";
   import { WIRE_FUNCTIONS } from "../../core/wirecolours";
   import ColourSelect from "./ColourSelect.svelte";
   import { displayTag, tagPrefix } from "../../core/tags";
@@ -393,6 +394,15 @@
         </label>
         <button title="As wide as the usable sheet from where it stands" onclick={() => { const id = one.id; editor.apply((p) => setViewSpan(p, editor.pageId, id, "fit")); }}>Fit to sheet</button>
       </div>
+      <!-- Which side its terminals are on (v0.4.x T15). -->
+      <label>Terminals on
+        <select value={viewSides(one).view} onchange={(e) => { const id = one.id; const v = e.currentTarget.value as ViewSide; editor.apply((p) => setViewSide(p, editor.pageId, id, v)); }}>
+          <option value="top">The top</option>
+          <option value="bottom">The bottom</option>
+          <option value="left">The left</option>
+          <option value="right">The right</option>
+        </select>
+      </label>
       {#if item?.module}
         <!-- A module's view shows chosen channels (controller.md §5); split it across sheets as needed. -->
         <div class="sub">Channels shown on this sheet</div>
