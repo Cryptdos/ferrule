@@ -33,6 +33,7 @@
     updateGaItem,
     updateElement,
     setWireTextAt,
+    setViewSpan,
     updateSection,
     setPartPoints,
     wire,
@@ -123,6 +124,7 @@
     | { kind: "cloudsize"; id: string; start: Vec; rect: Rect4; delta: Vec; edges: string }
     | { kind: "table"; coil: string; start: Vec; at: Vec; delta: Vec; row: number }
     | { kind: "labelblock"; id: string; start: Vec; from: Vec; delta: Vec }
+    | { kind: "span"; id: string; start: Vec; width: number; dx: number }
     | { kind: "wiretext"; seg: string; what: "numberAt" | "colourAt"; f: number }
     | { kind: "boundary"; y: number }
     | null;
@@ -929,6 +931,12 @@
         return;
       }
     }
+    // A selected view's right-edge handle sets its width (v0.4.x T2).
+    const sh = spanHandle();
+    if (sh && Math.abs(pt[0] - sh.at[0]) < 0.9 && Math.abs(pt[1] - sh.at[1]) < 1.2) {
+      gesture = { kind: "span", id: sh.el.id, start: pt, width: sh.width, dx: 0 };
+      return;
+    }
     // The selected part's label block moves as one (v0.4.x T14).
     const lb = selectedLabelBlock();
     if (lb && pointInRect(pt, { x: lb.r.x, y: lb.r.y, w: lb.r.w, h: lb.r.h }, 0.2)) {
@@ -1034,6 +1042,8 @@
       // A picture keeps its shape (hold Shift to stretch it).
       if (g.keepShape && !e.shiftKey) d = [d[0], Math.round(((g.size[0] + d[0]) * g.size[1]) / g.size[0]) - g.size[1]];
       g.delta = d;
+    } else if (g.kind === "span") {
+      g.dx = Math.round(pointer[0] - g.start[0]);
     } else if (g.kind === "labelblock") {
       g.delta = [Math.round((pointer[0] - g.start[0]) * 2) / 2, Math.round((pointer[1] - g.start[1]) * 2) / 2];
     } else if (g.kind === "wiretext") {
@@ -1136,6 +1146,10 @@
     const g = gesture;
     gesture = null;
     if (!g) return;
+    if (g.kind === "span") {
+      if (g.dx) editor.apply((p) => setViewSpan(p, editor.pageId, g.id, Math.max(1, g.width + g.dx)));
+      return;
+    }
     if (g.kind === "labelblock") {
       if (g.delta[0] || g.delta[1]) editor.apply((p) => updateElement(p, editor.pageId, g.id, { labelAt: [g.from[0] + g.delta[0], g.from[1] + g.delta[1]] }));
       return;
@@ -1403,6 +1417,24 @@
     const el = id ? page.elements.find((x) => x.id === id) : null;
     const g = el ? geoms.get(el.id) : null;
     return el && g ? { el, g } : null;
+  });
+
+  /** The one selected plant or module view's width handle: the middle of its right edge (v0.4.x T2). */
+  function spanHandle(): { el: Element; at: Vec; width: number } | null {
+    if (sim || bench !== "draft" || page.ga || editor.selection.length !== 1) return null;
+    const el = page.elements.find((x) => x.id === editor.selection[0]);
+    if (!el || el.symbol !== "plant-view" || el.rot !== 0) return null;
+    const g = geoms.get(el.id);
+    if (!g) return null;
+    const b = g.body;
+    return { el, at: [el.pos[0] + b.x + b.w, el.pos[1] + b.y + b.h / 2], width: b.w };
+  }
+  const spanAt = $derived.by(() => {
+    void editor.selection;
+    const sh = spanHandle();
+    if (!sh) return null;
+    const g = gesture as Gesture;
+    return { x: sh.at[0] + (g?.kind === "span" ? g.dx : 0), y: sh.at[1], h: geoms.get(sh.el.id)!.body.h, top: sh.el.pos[1] + geoms.get(sh.el.id)!.body.y };
   });
 
   /** The one selected part's label block, if it has one (v0.4.x T14). */
@@ -1746,6 +1778,11 @@
       {/each}
     {/snippet}
     {#snippet over()}
+      {#if spanAt}
+        <!-- Drag the right edge to set its width (v0.4.x T2). -->
+        <line class="spanline" x1={spanAt.x} y1={spanAt.top} x2={spanAt.x} y2={spanAt.top + spanAt.h} />
+        <rect class="handle" x={spanAt.x - 0.5} y={spanAt.y - 0.9} width="1" height="1.8" />
+      {/if}
       {#if labelBlock}
         <!-- The selected part's label block: drag it to move it (v0.4.x T14). -->
         <rect class="labelblock" class:moving={labelBlock.moving} x={labelBlock.x - 0.25} y={labelBlock.y - 0.2} width={labelBlock.w + 0.5} height={labelBlock.h + 0.4} />
@@ -2048,6 +2085,11 @@
   .sim-input.active {
     fill: rgba(230, 126, 30, 0.12);
     stroke-dasharray: none;
+  }
+  .spanline {
+    stroke: #1e6ee6;
+    stroke-width: 0.12;
+    stroke-dasharray: 0.4 0.3;
   }
   .labelblock {
     fill: none;

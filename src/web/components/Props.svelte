@@ -22,6 +22,7 @@
     setConductorNumber,
     setConductorInfo,
     updateElement,
+    setViewSpan,
     type ElementPatch,
     plantLabel,
     addAsset,
@@ -30,7 +31,7 @@
   import { controllerName, moduleTitle } from "../../core/modules";
   import { readImage } from "../images";
   import { address, contactMarks, contactType, isMaster, isSlave, masterOf, partnerOf, slavesOf } from "../../core/xref";
-  import { isBar, paramApplies, requireSymbol, terminalNames } from "../../core/symbols";
+  import { isBar, paramApplies, plantViewLayout, requireSymbol, terminalNames } from "../../core/symbols";
   import { WIRE_FUNCTIONS } from "../../core/wirecolours";
   import ColourSelect from "./ColourSelect.svelte";
   import { displayTag, tagPrefix } from "../../core/tags";
@@ -383,6 +384,15 @@
       {@const item = editor.project.plant.find((x) => x.id === one.params.plant)}
       {@const shown = new Set(String(one.params.show ?? "").split(",").filter(Boolean))}
       <div class="sub">{item ? (item.module ? moduleTitle(editor.project, one) : `${plantLabel(item)} ${item.description}`) : "Plant item missing"}</div>
+      {@const natural = plantViewLayout({ ...one, params: { ...one.params, span: 0 } })}
+      <!-- A chosen width (v0.4.x T2): its groups spread with equal gaps, so each drops straight to what it wires to. -->
+      <div class="grid">
+        <label>Width (units)
+          <input type="number" min="0" max="150" step="1" value={typeof one.params.span === "number" ? one.params.span : ""} placeholder={String(Math.ceil(natural.right - natural.left))}
+            onchange={(e) => { const id = one.id; const v = Number(e.currentTarget.value); editor.apply((p) => setViewSpan(p, editor.pageId, id, v > 0 ? v : null)); }} />
+        </label>
+        <button title="As wide as the usable sheet from where it stands" onclick={() => { const id = one.id; editor.apply((p) => setViewSpan(p, editor.pageId, id, "fit")); }}>Fit to sheet</button>
+      </div>
       {#if item?.module}
         <!-- A module's view shows chosen channels (controller.md §5); split it across sheets as needed. -->
         <div class="sub">Channels shown on this sheet</div>

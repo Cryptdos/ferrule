@@ -33,7 +33,7 @@ import {
   type TerminalRef,
   newId,
 } from "./model";
-import { benchOf, defaultParams, isBar, formatPoints, getSymbol, partPoints, poleMates, requireSymbol, terminalPoint } from "./symbols";
+import { benchOf, defaultParams, isBar, formatPoints, getSymbol, partPoints, plantViewLayout, poleMates, requireSymbol, terminalPoint } from "./symbols";
 import { moduleType, moduleTypeName } from "./modules";
 import { channelLabel, renamePointDesign, tidyDesign } from "./design";
 import { cleanPoints, formatQuickEntry, mergePoints, isInputForm, missingRefs, parseQuickEntry, pointOfPin, printedPin } from "./points";
@@ -1183,6 +1183,25 @@ export function setPlantViewTerminals(project: Project, pageId: string, elId: st
 
 /** Copy plant data into its views (they draw from their own params) and drop wires on terminals that went away. */
 /** Settings that belong to plant views only; any other part carrying them picked them up by mistake. */
+/**
+ * A plant or module view's width (v0.4.x T2): spread its groups across that
+ * many units; null back to its natural width; "fit" as wide as the usable
+ * sheet from where it stands. Its wires follow its pins.
+ */
+export function setViewSpan(project: Project, pageId: string, id: string, span: number | null | "fit"): void {
+  const page = getPage(project, pageId);
+  const el = getElement(page, id);
+  if (el.symbol !== "plant-view") throw new OpError("Only a plant or module view takes a width");
+  if (span === null) {
+    delete el.params.span;
+    return;
+  }
+  const lay = plantViewLayout({ ...el, params: { ...el.params, span: 0 } });
+  const w = span === "fit" ? Math.floor(AREA_UNITS.w - 2 - (el.pos[0] + lay.left)) : Math.round(span);
+  if (w <= lay.right - lay.left) delete el.params.span;
+  else el.params.span = Math.min(150, w);
+}
+
 export const PLANT_VIEW_KEYS = ["plant", "show", "terms", "pdesc", "pinfo", "ppins", "pgroups", "pbo", "pmod"];
 
 export function syncPlantViews(project: Project): void {

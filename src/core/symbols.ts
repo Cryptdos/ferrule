@@ -2278,10 +2278,41 @@ export function plantViewLayout(el: Element): {
     if (r.name) groups.push({ name: r.name.toUpperCase(), lines, x0, x1: x0 + span });
     prevRight = centre + half;
   }
-  const lastX = terms.length ? terms[terms.length - 1]!.x : 0;
+  let lastX = terms.length ? terms[terms.length - 1]!.x : 0;
   const nameEdge = (g: { lines: string[]; x0: number; x1: number }, side: -1 | 1) => (g.x0 + g.x1) / 2 + (side * linesW(g.lines)) / 2;
   const left = Math.min(-1.5, ...groups.map((g) => nameEdge(g, -1) - 1));
-  const right = Math.max(lastX + 1.5, left + 6, ...groups.map((g) => nameEdge(g, 1) + 1));
+  let right = Math.max(lastX + 1.5, left + 6, ...groups.map((g) => nameEdge(g, 1) + 1));
+  // A chosen width (v0.4.x T2): wider than it needs, its groups spread with equal gaps between
+  // them, the first and last a margin in from the ends; within a group the pitch stays 2.
+  const span = num(el, "span", 0, 0, 150);
+  if (span > right - left && runs.length) {
+    const extents = runs.map((r) => {
+      const sp = (r.terms.length - 1) * P;
+      const ls = r.name ? wrapName(r.name, sp) : [];
+      return { sp, w: Math.max(sp + P, linesW(ls)) };
+    });
+    const margin = 1.5 - P / 2;
+    const used = extents.reduce((a, x) => a + x.w, 0);
+    const gap = runs.length > 1 ? (span - 2 * margin - used) / (runs.length - 1) : 0;
+    let cursor = left + margin + (runs.length > 1 ? 0 : (span - 2 * margin - used) / 2);
+    let k = 0;
+    const groupOf = new Map(groups.map((g) => [g.x0, g]));
+    runs.forEach((r, i) => {
+      const e = extents[i]!;
+      const x0 = Math.round(cursor + (e.w - e.sp) / 2);
+      const old = terms[k]!.x;
+      const g = groupOf.get(old);
+      if (g) {
+        g.x0 = x0;
+        g.x1 = x0 + e.sp;
+      }
+      for (let j = 0; j < r.terms.length; j++) terms[k + j]!.x = x0 + j * P;
+      k += r.terms.length;
+      cursor += e.w + gap;
+    });
+    lastX = terms[terms.length - 1]!.x;
+    right = left + span;
+  }
   // Boxes tall enough for the longest name written up them, in half-unit steps.
   const tall = (names: string[], min: number, size: number) => Math.max(min, Math.ceil((Math.max(0, ...names.map((n) => textWidth(n, size))) + 0.4) * 2) / 2);
   // Every plant's boxes are at least tall enough for a 5-character name, so plant views line up (v0.2.1 note 36).
