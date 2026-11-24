@@ -144,7 +144,10 @@
   {/each}
   {#if onexpectations}<button class="small" onclick={onexpectations}>Expectations…</button>{/if}
   <label class="inc"><input type="checkbox" bind:checked={sim.includeIsolators} /> Also try opening isolators and breakers</label>
-  <button onclick={() => sim.check(editor.project)} disabled={sim.searching}>
+  <button onclick={async () => {
+    await sim.check(editor.project);
+    if (sim.proofs) editor.proofs = sim.proofs;
+  }} disabled={sim.searching}>
     {sim.searching ? "Searching…" : "Check logic"}
   </button>
   {#if sim.result}

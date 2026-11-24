@@ -13,6 +13,7 @@ import { displayTag } from "./tags";
 import { isMaster, isSlave, masterOf, partnerOf, slavesOf } from "./xref";
 import { drawnOn, fieldPlant, needsChannel } from "./design";
 import { Nets, wiringOf } from "./wiring";
+import { describeInterlock, interlockStatus, type Proofs } from "./interlocks";
 
 export interface Finding {
   level: "error" | "warning" | "info";
@@ -39,7 +40,7 @@ function wiredTerminals(page: Page): Map<string, Set<string>> {
   return out;
 }
 
-export function checkProject(project: Project): Finding[] {
+export function checkProject(project: Project, opts: { proofs?: Proofs | null } = {}): Finding[] {
   const out: Finding[] = [];
   const tagOwners = new Map<string, { el: Element; page: Page }[]>();
   let unnumbered = 0;
@@ -161,7 +162,7 @@ export function checkProject(project: Project): Finding[] {
   out.push(...supplyBypasses(project));
   out.push(...pointChecks(project));
   out.push(...controllerChecks(project));
-  out.push(...designChecks(project));
+  out.push(...designChecks(project, { proofs: opts.proofs }));
 
   // With a GA drawn, say what isn't on it yet; and GA devices whose schematic part has gone.
   if (project.pages.some((p) => p.ga)) {
@@ -407,7 +408,7 @@ export function terminalNumberChecks(project: Project): Finding[] {
 /** A project worked on in Design: it has systems, a controller, or plant with Design's fields. */
 export function usesDesign(project: Project): boolean {
   if (project.systems?.length || project.controllers?.length || project.networks?.length) return true;
-  return project.plant.some((p) => p.system || p.connects || p.source || p.enabledBy || (p.points ?? []).some((q) => q.signal || q.goesTo || q.channel));
+  return project.plant.some((p) => p.system || p.connects || p.source || p.enabledBy || p.interlocks?.length || (p.points ?? []).some((q) => q.signal || q.goesTo || q.channel));
 }
 
 /** Parts that are wiring or drawing furniture, not equipment: never "field plant not in the table". */
@@ -420,7 +421,8 @@ const NOT_EQUIPMENT = new Set(["terminal", "plant-view", "junction", "offpage", 
  * channel (direct, via one relay, confirmed, or to review). Modules not
  * drawn are in controllerChecks.
  */
-export function designChecks(project: Project, oneHop = true): Finding[] {
+export function designChecks(project: Project, opts: { oneHop?: boolean; proofs?: Proofs | null } = {}): Finding[] {
+  const oneHop = opts.oneHop ?? true;
   const out: Finding[] = [];
   if (!usesDesign(project)) return out;
   const hasController = !!project.controllers?.length;
@@ -447,6 +449,18 @@ export function designChecks(project: Project, oneHop = true): Finding[] {
           confirm: { plant: plant.id, point: point.name },
         });
       }
+    }
+  }
+  // Interlocks not proved (design-v0.4 §6): failing in Simulate, or naming points not drawn yet.
+  const status = interlockStatus(project, opts.proofs);
+  for (const plant of project.plant) {
+    for (const il of plant.interlocks ?? []) {
+      const st = status.get(il.id);
+      const what = `Interlock ${describeInterlock(project, plant, il)}`;
+      if (st?.kind === "fails") out.push({ level: "warning", message: `${what} fails: Check logic in Simulate shows how`, ids: [], design: { plant: plant.id } });
+      else if (st?.kind === "not-drawn") out.push({ level: "info", message: `${what} isn't proved yet: ${st.what} isn't drawn`, ids: [], design: { plant: plant.id } });
+      else if (st?.kind === "unknown") out.push({ level: "info", message: `${what} isn't proved: too many sequences to try them all`, ids: [], design: { plant: plant.id } });
+      else if (st?.kind === "unchecked") out.push({ level: "info", message: `${what} isn't proved yet: Prove in Design, or Check logic in Simulate`, ids: [], design: { plant: plant.id } });
     }
   }
   // Equipment drawn below the panel boundary is field plant: it should be in the table (principle 1).

@@ -1349,6 +1349,7 @@ export function cloudsOn(project: Project, pageId: string): { id: string; rect: 
 
 /** Add or replace an expectation. "should" needs an input point; both need one or two conditions. */
 export function setExpectation(project: Project, e: Omit<Expectation, "id"> & { id?: string }): string {
+  if (e.id && project.expectations.find((x) => x.id === e.id)?.interlock) throw new OpError("That one is made by an interlock: change the interlock, in Design");
   const when = (e.when ?? []).filter((c) => c.ref).slice(0, 2).map((c) => ({ ref: c.ref, on: c.on !== false }));
   if (!when.length) throw new OpError("Say when: pick what it depends on");
   if (e.kind === "should") {
@@ -1376,6 +1377,7 @@ export function setExpectation(project: Project, e: Omit<Expectation, "id"> & { 
 }
 
 export function deleteExpectation(project: Project, id: string): void {
+  if (project.expectations.find((x) => x.id === id)?.interlock) throw new OpError("That one is made by an interlock: remove the interlock, in Design");
   project.expectations = project.expectations.filter((x) => x.id !== id);
 }
 

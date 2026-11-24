@@ -9,6 +9,7 @@
   import { moduleTypeName } from "../../core/modules";
   import { plantLabel, setQuickEntry } from "../../core/ops";
   import { startPlacing } from "../placing";
+  import { describeInterlock, interlockStatus, mergeProofs, proveInterlocks } from "../../core/interlocks";
   import type { Editor } from "../editor.svelte";
 
   let { editor }: { editor: Editor } = $props();
@@ -18,7 +19,19 @@
   const plantDone = $derived(lists.plant.filter((x) => x.sheets.length));
   const modsLeft = $derived(lists.modules.filter((x) => !x.sheets.length));
   const modsDone = $derived(lists.modules.filter((x) => x.sheets.length));
+  /** Interlocks, and whether each is proved. */
+  const interlocks = $derived.by(() => {
+    const st = interlockStatus(editor.project, editor.proofs);
+    return editor.project.plant.flatMap((plant) => (plant.interlocks ?? []).map((il) => ({ plant, il, st: st.get(il.id) })));
+  });
   const total = $derived(lists.plant.length + lists.modules.length);
+  let proving = $state(false);
+  async function proveAll() {
+    proving = true;
+    await new Promise((r) => setTimeout(r, 20));
+    editor.proofs = mergeProofs(editor.proofs, proveInterlocks($state.snapshot(editor.project) as typeof editor.project));
+    proving = false;
+  }
   const left = $derived(plantLeft.length + modsLeft.length);
 
   /** The plant whose pins are being given, and the line being edited. */
@@ -115,6 +128,27 @@
       </div>
     {/each}
     {#if !lists.modules.length}<p class="hint pad">No controller modules yet.</p>{/if}
+
+    {#if interlocks.length}
+      <div class="group il">
+        <span>Interlocks <span class="hint">proved in Simulate · {interlocks.filter((x) => x.st?.kind !== "proved").length} not yet</span></span>
+        {#if interlocks.some((x) => x.st?.kind === "unchecked")}<button onclick={proveAll} disabled={proving}>{proving ? "Proving…" : "Prove all"}</button>{/if}
+      </div>
+      {#each interlocks as x (x.il.id)}
+        <div class="row il">
+          {#if x.st?.kind === "proved"}<span class="tick">✓</span>{:else}<span class="dot">●</span>{/if}
+          <span class="ilname">{describeInterlock(editor.project, x.plant, x.il)}</span>
+          <span class="dim">
+            {#if x.st?.kind === "proved"}proved
+            {:else if x.st?.kind === "fails"}fails: Check logic in Simulate shows how
+            {:else if x.st?.kind === "not-drawn"}not yet: {x.st.what} isn't drawn
+            {:else if x.st?.kind === "unknown"}not proved: too many sequences to try them all
+            {:else}not proved yet: Prove all, or Check logic in Simulate{/if}
+          </span>
+          <button onclick={() => (editor.designView = "table", editor.designPick = { plant: [x.plant.id] })}>Show</button>
+        </div>
+      {/each}
+    {/if}
   </div>
 </div>
 
@@ -161,6 +195,17 @@
     border-bottom: 1px solid #f0f1f3;
     font-size: 13px;
     min-height: 34px;
+  }
+  .group.il {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .row.il {
+    grid-template-columns: 1.5em minmax(14em, 1fr) 1fr auto;
+  }
+  .ilname {
+    font-weight: 600;
   }
   .row.done {
     grid-template-columns: 1.5em 1fr auto;

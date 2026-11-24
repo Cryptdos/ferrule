@@ -45,6 +45,8 @@ export class Editor {
   designPick: { plant: string[]; point?: string; system?: string } = $state({ plant: [] });
   /** Systems folded in Design's table (by name; "" is the unnamed group). Not saved. */
   designFolded: string[] = $state([]);
+  /** Interlocks proved (design-v0.4 §6), by Check logic or Prove, for the drawing as it was then. Not saved. */
+  proofs: import("../core/interlocks").Proofs | null = $state(null);
   /** + Point: the new point's form is open in Properties. */
   designAdding: boolean = $state(false);
   placeSymbol: string | null = $state(null);

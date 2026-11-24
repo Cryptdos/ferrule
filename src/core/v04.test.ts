@@ -6,12 +6,14 @@ import { AvoidLib } from "libavoid-js";
 import { buildLsp01 } from "../bench/lsp01";
 import { checkProject } from "./checks";
 import { addController, addModule, deleteController, generateModule } from "./controllers";
-import { needsPins, suggestPins, toDraw, channelLabel, channelsFor, noChannelReason, unallocated, designTemplateOf, duplicatePlant, insertDesignTemplate, stepTag, tagPlan, templateCounts, addDesignPlant, addDesignPoint, addSystem, allocate, channelsOf, deleteDesignPoint, deleteSystem, moveSystem, movePlant, needsLine, pointOnChannel, pointType, renameSystem, setPlantDesign, systemGroups, updateDesignPoint } from "./design";
+import { addInterlock, deleteInterlock, updateInterlock, needsPins, suggestPins, toDraw, channelLabel, channelsFor, noChannelReason, unallocated, designTemplateOf, duplicatePlant, insertDesignTemplate, stepTag, tagPlan, templateCounts, addDesignPlant, addDesignPoint, addSystem, allocate, channelsOf, deleteDesignPoint, deleteSystem, moveSystem, movePlant, needsLine, pointOnChannel, pointType, renameSystem, setPlantDesign, systemGroups, updateDesignPoint } from "./design";
 import { newProject, type IoPoint, type Project } from "./model";
 import { defaultPattern } from "./modules";
 import { addElement, addPage, addPlant, connect, deletePlant, linkContact, placePlantView, setQuickEntry, updatePin, updatePlant, updatePoint } from "./ops";
 import { refreshConductors } from "./conductors";
 import { confirmWiring, wiringOf } from "./wiring";
+import { circuitKey, describeInterlock, interlockStatus, proveInterlocks } from "./interlocks";
+import { setExpectation, deleteExpectation } from "./ops";
 import { designChecks } from "./checks";
 import { ioSchedule } from "./schedules";
 import { saveSheetTemplate } from "./templates";
@@ -104,9 +106,8 @@ describe("the Design fields round-trip (§2, §4, §6, §7)", () => {
     expect(back.plant[0]!.network).toBeUndefined();
     expect(back.plant[0]!.points![0]!.channel).toBeUndefined();
     expect(back.plant[0]!.interlocks).toBeUndefined();
-    // The expectation stays, as a hand-written one.
-    expect(back.expectations).toHaveLength(1);
-    expect(back.expectations[0]!.interlock).toBeUndefined();
+    // A generated expectation goes with its interlock (step 8: it follows it).
+    expect(back.expectations).toHaveLength(0);
   });
 });
 
@@ -630,5 +631,69 @@ describe("one hop, proved on the example project (§5)", () => {
     connect(p, sheet.id, [k.id, "14"], [ev.id, "1"]);
     refreshConductors(p);
     expect(wiringOf(p, ef, ef.points![0]!)).toMatchObject({ kind: "via", relay: "KY1" });
+  });
+});
+
+describe("interlocks (§6)", () => {
+  function two() {
+    const p = newProject("t");
+    const p1 = pump(p, "P1", [{ name: "enable", form: "dry-in" }, { name: "speed", form: "analogue-in" }]);
+    const pu = pump(p, "PU1", [{ name: "fault", form: "contact" }]);
+    return { p, p1, pu };
+  }
+  test("an interlock makes a never expectation, marked with it; it follows edits and goes with it; hand-written ones are untouched", () => {
+    const { p, p1, pu } = two();
+    p.expectations.push({ id: "mine", kind: "never", when: [{ ref: `plant:${pu.id}:fault`, on: true }] });
+    const il = addInterlock(p, p1.id, "enable", { ref: `plant:${pu.id}:fault`, on: true });
+    expect(describeInterlock(p, p1, il)).toBe("P1 enable never on while PU1 fault");
+    const gen = () => p.expectations.filter((e) => e.interlock === il.id);
+    expect(gen()).toEqual([{ id: `x_${il.id}_0`, kind: "never", when: [{ ref: `plant:${p1.id}:enable`, on: true }, { ref: `plant:${pu.id}:fault`, on: true }], join: "and", interlock: il.id }]);
+    updateInterlock(p, p1.id, il.id, { when: { ref: `plant:${pu.id}:fault`, on: false } });
+    expect(gen()[0]!.when[1]).toEqual({ ref: `plant:${pu.id}:fault`, on: false });
+    // Renamed points follow.
+    updateDesignPoint(p, pu.id, "fault", { name: "trip" });
+    expect(gen()[0]!.when[1]!.ref).toBe(`plant:${pu.id}:trip`);
+    // Not editable as an expectation.
+    expect(() => setExpectation(p, { ...gen()[0]! })).toThrow(/interlock/);
+    expect(() => deleteExpectation(p, gen()[0]!.id)).toThrow(/interlock/);
+    deleteInterlock(p, p1.id, il.id);
+    expect(p.expectations.map((e) => e.id)).toEqual(["mine"]);
+  });
+  test("only points that can be on or off; not against itself; a point turned analogue loses its interlocks", () => {
+    const { p, p1, pu } = two();
+    expect(() => addInterlock(p, p1.id, "speed", { ref: `plant:${pu.id}:fault`, on: true })).toThrow();
+    expect(() => addInterlock(p, p1.id, "enable", { ref: `plant:${p1.id}:enable`, on: true })).toThrow(/itself/);
+    addInterlock(p, p1.id, "enable", { ref: `plant:${pu.id}:fault`, on: true });
+    updateDesignPoint(p, pu.id, "fault", { form: "analogue-out" });
+    expect(p1.interlocks).toBeUndefined();
+    expect(p.expectations).toEqual([]);
+  });
+  test("copies keep their interlocks, each with its own expectation", () => {
+    const { p, p1, pu } = two();
+    addInterlock(p, p1.id, "enable", { ref: `plant:${pu.id}:fault`, on: true });
+    const r = duplicatePlant(p, [p1.id], 2, 1);
+    expect(r.plant.every((x) => x.interlocks?.length === 1)).toBe(true);
+    expect(p.expectations.filter((e) => e.interlock)).toHaveLength(3);
+  });
+  test("not proved until drawn; then proved, on the example, by Check logic's search, for that drawing only", () => {
+    const { p: q, p1, pu } = two();
+    const il0 = addInterlock(q, p1.id, "enable", { ref: `plant:${pu.id}:fault`, on: true });
+    expect(interlockStatus(q).get(il0.id)).toEqual({ kind: "not-drawn", what: "P1 enable" });
+    const { project: p } = buildLsp01(AvoidLib.getInstance());
+    const fasf = p.plant.find((x) => x.tag === "FA-SF")!;
+    // Duty and standby never run together: the example's interlocking proves it.
+    const ok = addInterlock(p, fasf.id, "SF-01 running", { ref: `plant:${fasf.id}:SF-02 running`, on: true });
+    const fa = p.plant.find((x) => x.tag === "FA")!;
+    const bad = addInterlock(p, fasf.id, "SF-01 running", { ref: `plant:${fa.id}:Fire alarm`, on: false });
+    expect(interlockStatus(p).get(ok.id)).toEqual({ kind: "unchecked" });
+    const proofs = proveInterlocks(p);
+    expect(interlockStatus(p, proofs).get(ok.id)).toEqual({ kind: "proved" });
+    expect(interlockStatus(p, proofs).get(bad.id)).toEqual({ kind: "fails" });
+    expect(designChecks(p, { proofs }).some((f) => /SF-01 running never on while FA Fire alarm off fails/.test(f.message))).toBe(true);
+    // A change to the drawing: unchecked again until proved again.
+    const key = circuitKey(p);
+    p.pages[1]!.elements[0]!.pos = [p.pages[1]!.elements[0]!.pos[0] + 2, p.pages[1]!.elements[0]!.pos[1]];
+    expect(circuitKey(p)).not.toBe(key);
+    expect(interlockStatus(p, proofs).get(ok.id)).toEqual({ kind: "unchecked" });
   });
 });

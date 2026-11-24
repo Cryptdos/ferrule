@@ -6,6 +6,7 @@
 import { syncGaStrips } from "../core/ga";
 import type { Avoid } from "libavoid-js";
 import { checkProject } from "../core/checks";
+import { proveInterlocks } from "../core/interlocks";
 import { refreshConductors } from "../core/conductors";
 import { resolveFields } from "../core/fields";
 import { AREA_UNITS, columnOf, type Vec } from "../core/geometry";
@@ -952,7 +953,8 @@ export const TOOLS: Tool[] = [
     inputSchema: obj({ project }, ["project"]),
     run: async (a, ctx) => {
       const p = await ctx.storage.load(str(a, "project"));
-      return checkProject(p).map((f) => ({
+      // Interlocks are proved here, as Check logic would (design-v0.4 §6).
+      return checkProject(p, { proofs: proveInterlocks(p) }).map((f) => ({
         level: f.level,
         message: f.message,
         ids: f.ids.length ? f.ids : undefined,
