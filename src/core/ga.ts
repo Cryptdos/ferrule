@@ -347,6 +347,7 @@ export const GA_SIZES: Record<string, GaSize> = {
   ctrlIo: { w: 9, h: 100, label: "Controller IO module, per 2 channels", perPole: true },
   panelPlant: { w: 50, h: 90, label: "Panel device (power supply, UPS, battery)" },
   connBlock: { w: 6, h: 45, label: "Connector block, per 2 terminals", perPole: true },
+  plugSocket: { w: 20, h: 40, label: "Connector (plug and socket)" },
 };
 
 /** A controller module's size on the GA: its device from the table, else a generic one by type and channels. */
@@ -382,7 +383,7 @@ export function sizeKey(project: Project, el: Element): { key: string; poles: nu
       return { key: "timer", poles: 1 };
     case "isolator":
       if (el.params.function === "contactor") return isSlave(el) && el.links.length ? null : { key: "contactor", poles: 1 };
-      return { key: el.params.function === "breaker" ? "mcb" : "isolator", poles: poles + (Number(el.params.aux) || 0) * 0.5 };
+      return { key: el.params.function === "breaker" || el.params.function === "rcd" ? "mcb" : "isolator", poles: poles + (Number(el.params.aux) || 0) * 0.5 };
     case "fuse":
       return { key: "fuse", poles };
     case "terminal":
@@ -391,6 +392,8 @@ export function sizeKey(project: Project, el: Element): { key: string; poles: nu
       return { key: "transformer", poles: 1 };
     case "socket":
       return { key: "socket", poles: 1 };
+    case "plug-socket":
+      return { key: "plugSocket", poles: 1 };
     case "connector-block":
       // Its length follows its terminal count (v0.4.x M9).
       return { key: "connBlock", poles: Math.ceil((Number(el.params.terminals) || 2) / 2) };
@@ -424,6 +427,7 @@ export const SUITS: { key: string; label: string }[] = [
   { key: "transformer", label: "Transformer" },
   { key: "socket", label: "Socket outlet" },
   { key: "connBlock", label: "Connector block" },
+  { key: "plugSocket", label: "Connector (plug and socket)" },
   { key: "block", label: "Busbar (distribution block)" },
   { key: "lamp", label: "Indicator lamp" },
   { key: "pushbutton", label: "Push button" },

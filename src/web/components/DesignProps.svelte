@@ -22,7 +22,7 @@
     type PlantDesign,
     type PointDesign,
   } from "../../core/design";
-  import { CONNECTS, GOES_TO, POINT_FORMS, SIGNAL_SUGGESTIONS, type PointForm } from "../../core/model";
+  import { CONNECTS, GOES_TO, PLANT_MARKS, POINT_FORMS, SIGNAL_SUGGESTIONS, type PointForm } from "../../core/model";
   import { deletePlant, plantLabel, setQuickEntry, updatePlant } from "../../core/ops";
   import { formatQuickEntry, printedPin } from "../../core/points";
   import type { Editor } from "../editor.svelte";
@@ -218,6 +218,12 @@
         <textarea rows="2" value={plant.info ?? ""} placeholder="Model, rating, supply…" onchange={(e) => editor.apply((p) => updatePlant(p, plant.id, { info: e.currentTarget.value }))}></textarea>
       </label>
       <label class="tick" title="A power supply, UPS or battery: listed under Panel, drawn above the boundary with solid, numbered wiring, placed on the GA"><input type="checkbox" checked={plant.inPanel === true} onchange={(e) => setPlant({ inPanel: e.currentTarget.checked })} /> In the panel (a power supply, UPS or battery: not field plant)</label>
+      <label>Mark (a small picture in its view)
+        <select value={plant.mark ?? ""} onchange={(e) => setPlant({ mark: e.currentTarget.value as PlantDesign["mark"] })}>
+          <option value="">None</option>
+          {#each PLANT_MARKS as m (m.value)}<option value={m.value}>{m.label}</option>{/each}
+        </select>
+      </label>
       <label class="tick"><input type="checkbox" checked={plant.powerByOthers === true} onchange={(e) => editor.apply((p) => updatePlant(p, plant.id, { powerByOthers: e.currentTarget.checked }))} /> Power by others (its power isn't on these drawings)</label>
 
       <div class="section">Points ({plant.points?.length ?? 0})</div>

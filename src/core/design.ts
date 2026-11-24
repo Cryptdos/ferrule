@@ -6,7 +6,7 @@
  * reference to something that's gone is let go, never guessed.
  */
 import { parseSupplies, parseSupply } from "./supplies";
-import { newId, type ChannelRef, type Condition, type DesignTemplate, type Interlock, type IoPoint, type PlantItem, type PointForm, type Project } from "./model";
+import { newId, type ChannelRef, type Condition, type DesignTemplate, type Interlock, type IoPoint, type PlantItem, type PlantMark, type PointForm, type Project } from "./model";
 import { OpError, getPlant, renamePointRefs, syncPlantViews } from "./ops";
 import { MAX_CONDITIONS, newInterlock, syncInterlocks } from "./interlocks";
 
@@ -275,6 +275,8 @@ export interface PlantDesign {
   source?: string;
   /** In the panel (v0.4.x T3). */
   inPanel?: boolean;
+  /** The picture inside its view (v0.4.x M1); empty clears it. */
+  mark?: PlantMark | "";
 }
 
 /** Set a plant item's Design fields; an empty value clears one. */
@@ -289,6 +291,11 @@ export function setPlantDesign(project: Project, id: string, patch: PlantDesign)
   if (patch.connects !== undefined) {
     if (patch.connects === "hardwired") delete it.connects;
     else it.connects = patch.connects;
+  }
+  if (patch.mark !== undefined) {
+    if (patch.mark) it.mark = patch.mark;
+    else delete it.mark;
+    syncPlantViews(project);
   }
   if (patch.inPanel !== undefined) {
     if (patch.inPanel) {
@@ -515,6 +522,11 @@ function copyRows(
       for (const pt of it.points ?? []) {
         delete pt.channel;
         for (const c of pt.follows ?? []) c.ref = remap(c.ref);
+        // A supply out's distributions from another project aren't this one's (a Design template, v0.4.x M1).
+        if (pt.dists) {
+          pt.dists = Object.fromEntries(Object.entries(pt.dists).filter(([, d]) => project.distributions.some((x) => x.id === d)));
+          if (!Object.keys(pt.dists).length) delete pt.dists;
+        }
       }
       for (const x of it.interlocks ?? []) {
         x.id = newId("il");

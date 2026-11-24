@@ -11,7 +11,7 @@ import { AREA_UNITS } from "./geometry";
 import { tidyDesign } from "./design";
 import { RELEASES_URL, VERSION } from "./version";
 import { MAX_CONDITIONS } from "./interlocks";
-import { DISTRIBUTION_KINDS, type DistributionKind, POINT_FORMS, type Condition, type Controller, type ControllerSlot, type DesignTemplate, type ModuleInfo, type ModuleType, type PlantItem, type Expectation, type IoPoint, type Interlock, type Network, type PinInfo, type PointForm, FORMAT, FORMAT_VERSION, type GaDim, type GaDimPoint, type GaItem, type Page, type Project, emptyInfo } from "./model";
+import { PLANT_MARKS, DISTRIBUTION_KINDS, type DistributionKind, POINT_FORMS, type Condition, type Controller, type ControllerSlot, type DesignTemplate, type ModuleInfo, type ModuleType, type PlantItem, type Expectation, type IoPoint, type Interlock, type Network, type PinInfo, type PointForm, FORMAT, FORMAT_VERSION, type GaDim, type GaDimPoint, type GaItem, type Page, type Project, emptyInfo } from "./model";
 import { defaultParams, getSymbol } from "./symbols";
 import { gaToSheet } from "./ga";
 import { MODULE_TYPES } from "./modules";
@@ -225,6 +225,7 @@ export function parsePlant(v: unknown): Project["plant"] {
       ...(pl.locked === true ? { locked: true } : {}),
       ...(pl.powerByOthers === true ? { powerByOthers: true } : {}),
       ...(pl.inPanel === true ? { inPanel: true } : {}),
+      ...(typeof pl.mark === "string" && PLANT_MARKS.some((m) => m.value === pl.mark) ? { mark: pl.mark as PlantItem["mark"] } : {}),
       description: strOr(pl.description),
       terminals: arr(pl.terminals).filter((t): t is string => typeof t === "string"),
       ...parsePoints(pl.points, pl.pins),
@@ -524,6 +525,7 @@ function parsePage(pg: Record<string, unknown>, i: number): Project["pages"][num
       ...(typeof it.module === "string" && it.module ? { module: it.module } : {}),
       ...(it.part === "handle" ? { part: "handle" as const } : {}),
       ...(typeof it.text === "string" ? { text: it.text } : {}),
+      ...(typeof it.tag === "string" && it.tag.trim() ? { tag: it.tag.trim() } : {}),
       ...(typeof it.device === "string" && it.device ? { device: it.device } : {}),
       ...(typeof it.strip === "string" && it.strip ? { strip: it.strip } : {}),
       ...(Array.isArray(it.seen) ? { seen: it.seen.filter((r): r is string => typeof r === "string") } : {}),

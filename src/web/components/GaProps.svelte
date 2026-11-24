@@ -232,13 +232,19 @@
       {/if}
       <button class="link-btn" onclick={() => ondevices?.()}>Device table…</button>
     {/if}
+    {#if one.kind === "device" && !one.refs?.length && !one.module}
+      <!-- A device with no schematic part (v0.4.x M5): its name, tag and cut-out. -->
+      <label>Name (on the bill of materials)<input value={one.text ?? ""} onchange={(e) => editor.apply((p) => updateGaItem(p, ip.id, one.id, { text: e.currentTarget.value }))} /></label>
+      <label>Tag (printed on it)<input value={one.tag ?? ""} placeholder="e.g. HMI1" onchange={(e) => editor.apply((p) => updateGaItem(p, ip.id, one.id, { tag: e.currentTarget.value }))} /></label>
+      <label>Door cut-out (mm: 22.3 round, or 92 x 92)<input placeholder="e.g. 186 x 138" value={one.cutout ?? ""} onchange={(e) => editor.apply((p) => updateGaItem(p, ip.id, one.id, { cutout: e.currentTarget.value }))} /></label>
+    {/if}
     {#if doorDevice}
       <label>
         Door cut-out (mm: 22.3 round, or 92 x 92)
         <input placeholder="e.g. 22.3" value={one.cutout ?? ""} onchange={(e) => editor.apply((p) => updateGaItem(p, ip.id, one.id, { cutout: e.currentTarget.value }))} />
       </label>
     {/if}
-    {#if one.kind === "device"}
+    {#if one.kind === "device" && (one.refs?.length || one.module)}
       <label>
         Label (instead of its tag)
         <input value={one.text ?? ""} onchange={(e) => editor.apply((p) => updateGaItem(p, ip.id, one.id, { text: e.currentTarget.value }))} />

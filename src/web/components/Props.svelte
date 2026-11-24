@@ -353,7 +353,7 @@
       <p class="hint">
         {#if one.params.function === "contactor"}
           Worked by its coil: pick the coil under “Driven by coil”. The handle doesn't apply.
-        {:else if one.params.function === "breaker"}
+        {:else if one.params.function === "breaker" || one.params.function === "rcd"}
           A breaker trips and resets by hand on its own toggle, so no operator is drawn.
         {:else}
           Worked by hand. For poles that a coil works, set the function to contactor main contacts.
