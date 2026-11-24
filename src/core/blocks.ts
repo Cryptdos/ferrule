@@ -105,7 +105,11 @@ export function applyStripLines(page: Page): void {
       const reach = t.params.onBlock === true ? 1 : 0.45;
       const [x, y] = t.pos;
       const crosses = dy === 0 ? Math.abs(y - a[1]) <= reach && x >= x0 - reach && x <= x1 + reach : Math.abs(x - a[0]) <= reach && y >= y0 - reach && y <= y1 + reach;
-      if (crosses) t.params.strip = name;
+      if (crosses) {
+        t.params.strip = name;
+        // A strip line is the strip set by hand (v0.4.x T4).
+        delete t.params.stripAuto;
+      }
     }
   }
 }

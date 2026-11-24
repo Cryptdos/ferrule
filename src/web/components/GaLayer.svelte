@@ -22,6 +22,7 @@
     sheetLeaves,
     sheetPanes,
     shownPane,
+    stripLabel,
     type DrawnGaItem,
   } from "../../core/ga";
   import { textUnits } from "../../core/geometry";
@@ -96,7 +97,8 @@
     }
     const els = (it.refs ?? []).map((r) => byId.get(r)).filter((e) => !!e);
     if (!els.length) return it.refs?.length ? "(deleted)" : "";
-    if (els[0]!.symbol === "terminal") return String(els[0]!.params.strip ?? "X1");
+    // A strip: its name, and its range once it's split (v0.4.x T4).
+    if (els[0]!.symbol === "terminal") return stripLabel(project, it) ?? String(els[0]!.params.strip ?? "X1");
     return displayTag(els[0]!, project);
   }
   /** The schematic part a door device is drawn from, if it's one. */

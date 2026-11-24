@@ -440,3 +440,11 @@ Judgement calls made while building, step by step.
 - Not drawn: as before, Design's order, moved with ↑ ↓.
 - Check (warnings, in Design's checks): *X is on Drives bus in Design, but the wiring from COM A doesn't reach it (at a pin of a serial port)*; *X is wired on Drives bus from COM A, but isn't on it in Design*.
 - On the fixture: the drives bus is wired COM A → boundary terminals → supply drive → extract drive, so its order is from the drawing; the meters bus has no wires and keeps Design's order.
+
+**Step 11 (terminal strips).**
+- Strips by section: `numbering.strips: "section"` (*Terminal strips* in the project's numbering settings), applied at Renumber (`stripsBySection`). Sections are ordered by sheet, then left edge, then top. A terminal below every section, in the panel boundary's block, belongs to the nearest section above it across its width: that's where the block sits on a sheet with sections (the fixture's sections all stop above the boundary). Sections with the same name share one strip, so a section carried on to the next sheet stays one strip. Only sections with terminals take a name.
+- Every terminal carries `strip: "X1"` from its defaults, so X1 counts as not set by hand. Any other strip set in Properties or by a strip line wins, and its name is skipped when sections are named. A terminal whose strip Renumber gave is marked `stripAuto`; setting the strip by hand clears that. A locked terminal keeps its strip. Back to *one*, Renumber puts the `stripAuto` terminals back on X1.
+- Terminals outside every section stay on X1; when there are any, the first section takes X2.
+- Split on the GA: *Split here* in a placed strip's Properties (`splitGaStrip`). That terminal and the rest go on a new item, placed on the next horizontal rail down from its left end, or beside an upright strip. Each part's length follows its terminals unless a real device sets it.
+- Parts keep up with the schematic: each part runs from the first of its terminals still on the strip to the next part's start (`syncGaStrips`). Deleting a part gives its terminals back to the part before, which is how to join a strip again.
+- A strip in parts prints *X1: first–last* on each part (`stripLabel`); one part still prints *X1*. The bill of materials counts the parts together.

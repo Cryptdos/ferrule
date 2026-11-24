@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { addAsset, addRevision, deleteRevision, setLogo, setNumberingScheme, updateProjectInfo, updateRevision } from "../../core/ops";
+  import { addAsset, addRevision, deleteRevision, setLogo, setNumberingScheme, setTerminalStrips, updateProjectInfo, updateRevision } from "../../core/ops";
   import { readImage } from "../images";
   import type { ProjectInfo, Revision } from "../../core/model";
   import type { Editor } from "../editor.svelte";
@@ -109,6 +109,20 @@
       >
         <option value="position">Position: K10-16, wire 11-22 (sheet-column)</option>
         <option value="sequential">Sequential: K1, K2…, wire 100, 101…</option>
+      </select>
+    </label>
+    <label class="inline">
+      Terminal strips
+      <select
+        value={editor.project.numbering.strips ?? "one"}
+        onchange={(e) => {
+          const v = e.currentTarget.value as "one" | "section";
+          editor.apply((p) => setTerminalStrips(p, v));
+        }}
+        title="By section: each section's terminals take a strip of their own (X1, X2… across the sheets); a strip set by hand on a terminal wins"
+      >
+        <option value="one">One (X1)</option>
+        <option value="section">By section (X1, X2…)</option>
       </select>
     </label>
     <p class="hint">Takes effect next time you press Renumber.</p>

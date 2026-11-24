@@ -611,7 +611,15 @@ export interface Project {
   id: string;
   project: ProjectInfo;
   /** How renumbering assigns tags and wire numbers (DESIGN.md §8). */
-  numbering: { scheme: NumberingScheme };
+  numbering: {
+    scheme: NumberingScheme;
+    /**
+     * Terminal strips (v0.4.x T4): unset, every terminal is on X1 unless its
+     * strip is set; "section", Renumber gives each section's terminals a
+     * strip of their own.
+     */
+    strips?: "section";
+  };
   designation: { standard: string; overrides: Record<string, string> };
   titleBlock: string;
   plant: PlantItem[];

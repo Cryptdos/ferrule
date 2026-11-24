@@ -40,7 +40,7 @@ import { cleanPoints, formatQuickEntry, mergePoints, isInputForm, missingRefs, p
 import { isOrthogonal, routeOf, simplifyRoute } from "./wires";
 import { isMaster, isSlave, locate } from "./xref";
 import { colourCode, knownColour, lampColour } from "./wirecolours";
-import { DETAIL_ZOOMS, MAX_COLUMNS, MAX_DOORS, PLATE_MARGIN, allDetails, detailOf, detailSpace, doorColumns, doorOwner, doorPanes, paneName, platesOf, plateDoor, fitScale, fitZoom, frameOf, itemStrip, nextDetailLetter, sheetTakes, syncDetailFrames, viewTakes } from "./ga";
+import { DETAIL_ZOOMS, MAX_COLUMNS, MAX_DOORS, PLATE_MARGIN, allDetails, detailOf, detailSpace, doorColumns, doorOwner, doorPanes, paneName, platesOf, plateDoor, fitScale, fitZoom, frameOf, itemStrip, stripSize, nextDetailLetter, sheetTakes, syncDetailFrames, viewTakes } from "./ga";
 
 export class OpError extends Error {}
 
@@ -260,6 +260,8 @@ export function updateElement(project: Project, pageId: string, id: string, patc
     else delete el.labelAt;
   }
   if (patch.params) el.params = normaliseParams(el.symbol, { ...el.params, ...patch.params });
+  // A strip set by hand wins over one Renumber gave it by section (v0.4.x T4).
+  if (el.symbol === "terminal" && patch.params && "strip" in patch.params) delete el.params.stripAuto;
   // A terminal's number changed: the block fits its numbers at once, not at the next route (F8).
   if (el.symbol === "terminal") fitBlock(getPage(project, pageId));
   // A linked arrow's partner is always the other way round: one source, one destination.
@@ -830,7 +832,16 @@ export function setConductorInfo(project: Project, conductorId: string, info: { 
 }
 
 export function setNumberingScheme(project: Project, scheme: Project["numbering"]["scheme"]): void {
-  project.numbering = { scheme };
+  project.numbering = { ...project.numbering, scheme };
+}
+
+/** Terminal strips: one (X1), or one per section (v0.4.x T4). Takes effect at the next Renumber. */
+export function setTerminalStrips(project: Project, by: "one" | "section"): void {
+  if (by === "section") project.numbering = { ...project.numbering, strips: "section" };
+  else {
+    const { strips: _, ...rest } = project.numbering;
+    project.numbering = rest;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1929,6 +1940,51 @@ export function rotateGaItems(project: Project, pageId: string, ids: string[]): 
     it.x = Math.round((cx - it.w / 2) * 2) / 2;
     it.y = Math.round((cy - it.h / 2) * 2) / 2;
   }
+}
+
+/**
+ * Split a placed terminal strip at one of its terminals (v0.4.x T4): that
+ * terminal and the rest go on a new GA item, put on the next rail down when
+ * there is one (or beside it, for a strip turned upright). Both keep the
+ * strip's name and print their range. Returns the new item.
+ */
+export function splitGaStrip(project: Project, pageId: string, id: string, at: string): GaItem {
+  const page = gaPage(project, pageId);
+  const it = page.gaItems.find((x) => x.id === id);
+  const strip = it && !it.part ? itemStrip(project, it) : null;
+  if (!it || !strip) throw new OpError("Pick a placed terminal strip");
+  const refs = it.refs ?? [];
+  const i = refs.indexOf(at);
+  if (i < 0) throw new OpError("That terminal isn't in this part of the strip");
+  if (i === 0) throw new OpError("Split at a terminal after the first");
+  const upright = it.h > it.w;
+  const head = refs.slice(0, i);
+  const tail = refs.slice(i);
+  const size = (r: string[]) => stripSize(project, r).w;
+  const part: GaItem = { ...structuredClone(it), id: newId("g"), refs: tail, seen: [...tail] };
+  it.refs = head;
+  it.seen = [...head];
+  if (!it.device) {
+    if (upright) {
+      it.h = size(head);
+      part.h = size(tail);
+    } else {
+      it.w = size(head);
+      part.w = size(tail);
+    }
+  }
+  if (upright) part.x = it.x + it.w + 10;
+  else {
+    // The next horizontal rail below, from its left end; else just below.
+    const rails = page.gaItems.filter((r) => r.kind === "rail" && r.w >= r.h && r.y + r.h / 2 > it.y + it.h / 2 + 1).sort((a, b) => a.y - b.y);
+    const rail = rails[0];
+    if (rail) {
+      part.x = rail.x;
+      part.y = Math.round((rail.y + rail.h / 2 - part.h / 2) * 2) / 2;
+    } else part.y = it.y + it.h + 10;
+  }
+  page.gaItems.push(part);
+  return part;
 }
 
 export function deleteGaItems(project: Project, pageId: string, ids: string[]): void {
