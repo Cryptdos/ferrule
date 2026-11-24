@@ -38,8 +38,7 @@ Small and safe first; then the data other steps need; then layout, where three e
 | 12 | T18, M10, T20 | Cable cores, wire markers, enclosure fit | Small |
 | 13 | T6, T8, T12 | Stamp links, Duplicate's step, label plate text | Small |
 | 14 | M12 | Supply load in Simulate | Medium |
-| 15a | M3, M4 | Wire colour by function; relay pins from the part | Medium |
-| 15b | M2 | Cables as objects | Large |
+| 15 | M3, M4 | Wire colour by function; relay pins from the part | Medium |
 
 Steps 5, 6 and 7 touch the same code (`plantViewLayout`, `moduleViewLayout`, `drawModuleView` in `src/core/symbols.ts`) and are built in that order, one after another, not in parallel. Step 8 comes after 7 because sides and widths remove much of what the router gets wrong today.
 
@@ -275,7 +274,7 @@ Two PRs: the port and the network's `port` field; then the chain from the drawin
 | What | Markers | Text |
 |---|---|---|
 | A panel wire | 2, one at each end | The number of the boundary terminal it lands on. With no boundary terminal on it, the wire's own number, which comes from where the wire starts. |
-| A field core | 2, one at each end | Panel end: the number of the boundary terminal it goes into. Field end: what identifies the cable outside the panel: the device's tag, or the cable's own tag once cables are objects (M2). |
+| A field core | 2, one at each end | Panel end: the number of the boundary terminal it goes into. Field end: what identifies the cable outside the panel: the device's tag. |
 
 So a boundary terminal feeding plant accounts for four markers: two on the panel wire and two on the field core. The terminal's number, from the sheet and column it's placed at, is the authority.
 
@@ -304,17 +303,13 @@ A column says what each line is (*wire*, *core, panel end*, *core, field end*), 
 - **In Simulate:** beside each supply, *live* (what's energised now) and *worst case* (everything that supply can reach). A supply's total is passed up to what feeds it, divided by its efficiency. Sums are in VA; each figure is shown in amps at that supply's voltage. Over its rating, the figure is red.
 - Parts with no draw count as zero, and one info line says how many.
 
-### Step 15a: wire colours and relay pins
+### Step 15: wire colours and relay pins
 
 **M3. Wire colour by function.** A project table, *function → colour*, empty to start: phase, neutral, earth, 24 V +, 0 V, DC signal, AC signal, external supply, and any the user adds. A conductor's function comes from its distribution when it's on one; otherwise it's set by hand on a wire (*Function* in Properties) and applies to the whole conductor. Colour from the table prints as today's colour codes do. No inference from the circuit in this sprint.
 
 **M4. Relay pins from the part.** A device library entry (`devices.ts`) can carry a pin map: the coil's two terminals and, per pole, common, NC and NO. A coil whose device has one prints those numbers in place of A1/A2 and 11/12/14, on the coil, its contacts and its contact table. No map, IEC numbers as now.
 
-### Step 15b: cables
-
-**M2.** A cable is an object: tag (W1), type, cores, screened or not. Field wires are put on a cable by selecting them and choosing *Cable…*; a cable mark is drawn across them with its tag and type. The cable schedule lists cables with their cores used and spare; devices with no cable fall back to T18's row. The existing *Cable screen* symbol attaches to a cable.
-
-This is the largest entry and the least specified. Before it starts, write its design up in this section and stop for the user.
+**M2, cables as objects, is not being built.** Decided by the user: cabling is outside the panel and installers don't work from it. Cable types stay as notes on the sheet or in a plant item's information.
 
 ## 4. Decisions for the user
 
@@ -325,7 +320,7 @@ This is the largest entry and the least specified. Before it starts, write its d
 | 3 | T9 | Module tags from the controller map when there is one? | **Decided:** yes |
 | 4 | M10 | Wire markers: how many, and what text? | **Decided:** two per panel wire and two per field core, one at each end; a marker matches the boundary terminal its wire goes into; a core's field end carries the cable's identity |
 | 5 | M1 | Power supply, battery and UPS: symbols or plant? | **Decided:** all three are panel plant, set up once and kept as a Design template; no supply symbols |
-| 6 | M2 | Cables as objects in this sprint, or after it? | Open. Recommended: after the rest, with its own design |
+| 6 | M2 | Cables as objects in this sprint, or after it? | **Decided:** not at all; it's outside the panel |
 
 ## 5. Changed during build
 
