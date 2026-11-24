@@ -1,6 +1,6 @@
 # Working on Ferrule
 
-Read this first. The design record is `docs/DESIGN.md`; the plan being built is `docs/design-v0.4.md` (earlier plans: `docs/design-v0.3.md`, built and being tested; `docs/design-v0.2.md`, the v0.2 sprint; `docs/design-v0.2.1.md`, which ended at its step 2). Controllers and field IO are designed in `docs/controller.md`.
+Read this first. The design record is `docs/DESIGN.md`; the plan being built is `docs/design-v0.4.x.md`, the revision sprint for v0.4, which works through the master list in `docs/design-v0.4.md` §13 (earlier plans: `docs/design-v0.4.md` §1–12, built; `docs/design-v0.3.md`, built and being tested; `docs/design-v0.2.md`, the v0.2 sprint; `docs/design-v0.2.1.md`, which ended at its step 2). Controllers and field IO are designed in `docs/controller.md`.
 
 ## Where the work is
 
@@ -8,7 +8,8 @@ v0.4, version `0.4.0-pre`: planned in `docs/design-v0.4.md` (§10 *Order of work
 
 - **v0.4 steps:** 1 start (version, docs, GA renamed Layout, "highlight"); 2 the model (systems, connects-by, protocol, network, enabled-by and source on plant; points without pins; signal, goes-to and channel on points; interlocks; networks); 3 the Design table; 4 Duplicate ×n and Design templates; 5 the controller in Design; 6 To draw, and Draft placing only; 7 checks (direct, confirm by hand, one hop); 8 interlocks; 9 the network; 10 the points schedule export; 11 Suggest.
 - **Built:** every step, as PRs 59–73 (step 5 as 5a–5b, 7 as 7a–7b, 9 as 9a–9b; PR 67 a v0.3 fix). What's left is the user's testing of the builds; fixes go in as small PRs the same way, noted under *Changed during build*.
-- **The master list for v0.4.x:** `docs/design-v0.4.md` §13, *Fixes and tweaks for v0.4.x* (with the user's tweaks and tests). Work from it; tick each item with its PR number.
+- **The v0.4.x sprint:** `docs/design-v0.4.x.md` has the order of work (§2), how each entry is to be built (§3), the decisions that are the user's (§4) and *Changed during build* (§5). The master list it works through is `docs/design-v0.4.md` §13, *Fixes and tweaks for v0.4.x*: tick each entry there with its PR number. The list says what's wanted; where the two disagree, the list wins and the sprint document is corrected.
+- **The sprint's fixture:** `src/bench/bms01.ts` (step 0), a generic BMS panel for before and after pictures. The integration test it stands in for is private and stays on the user's computer.
 - Design's code: `src/core/design.ts` (table, allocation, To draw, interlock ops, Suggest), `wiring.ts` (wired to its channel), `interlocks.ts`, `network.ts` / `networkdraw.ts`; the web side is `DesignView.svelte` and the views it switches between.
 - **Settled, and not to creep back:** no Generate tool, recipes or built-in plant types; no Door view and no fascia note in Design; allocation is manual (Suggest only proposes); one controller per panel; Design templates are a list of their own, separate from Draft's.
 - **Files:** old project files must open unchanged at every step; plant with no system sits under an unnamed group.
@@ -22,9 +23,9 @@ v0.4, version `0.4.0-pre`: planned in `docs/design-v0.4.md` (§10 *Order of work
 
 - One step, one PR, from a branch. CI (`check`, `exe`) must pass; the PR is set to auto-merge (`PUT repos/Cryptdos/ferrule/pulls/<n>/ccr/auto_merge`, squash). GraphQL isn't available; use REST (`gh api`).
 - Stop only at a PR boundary. The PR body ends by saying what's next.
-- Small judgement calls: decide, and note them under *Changed during build* in the design doc being built (`docs/design-v0.4.md` §10). Anything costly to reverse: push-notify and wait.
+- Small judgement calls: decide, and note them under *Changed during build* in the design doc being built (`docs/design-v0.4.x.md` §5). Anything costly to reverse: push-notify and wait.
 - Each code PR: build `dist/ferrule-windows-v<version>.zip`, now `ferrule-windows-v0.4.0-pre.zip` (`bun scripts/build-exe.ts`, then `cd dist && zip -q -9 ferrule-windows-v<version>.zip ferrule.exe`), and send it to the user.
-- After each PR, sync the design doc being built (`docs/design-v0.4.md`) to the user's `C:\Temp\eCAD\v0.4.0-pre Notes\design-v0.4.md`: copy it to `/mnt/user-data/outputs/<unique name>.md`, list the folder for a fresh `mtimeMs`, then `device_commit_files` with `expectedMtimeMs`. Never `force`.
+- After each PR, sync both `docs/design-v0.4.x.md` and `docs/design-v0.4.md` to the user's `C:\Temp\eCAD\v0.4.0-pre Notes\` under the same names: copy each to `/mnt/user-data/outputs/<unique name>.md`, wait a few seconds, list the folder for a fresh `mtimeMs`, then `device_commit_files` with `expectedMtimeMs`. Never `force`. List the folder again afterwards and check each file's size against the repo's: a copy just written can be read stale.
 - Update `README.md` and add a row to the decisions table in `docs/DESIGN.md` for what changed; retake README screenshots when the interface changes.
 - Before a PR: `bun test`, `bun run typecheck`, and look at the result (print view screenshots or the browser).
 

@@ -435,7 +435,7 @@ Targeted checks for the v0.4 build (`ferrule-windows-v0.4.0-pre.zip`, after PR 7
 
 ### Fixes and tweaks for v0.4.x
 
-The master list from here on: what testing finds, to fix in small PRs (one or a few per PR, noted under *Changed during build*), or to carry into a later version. Add to it as testing goes; tick an item when its PR is merged and give the PR number.
+How each entry is to be built, and in what order, is in `docs/design-v0.4.x.md`. The master list from here on: what testing finds, to fix in small PRs (one or a few per PR, noted under *Changed during build*), or to carry into a later version. Add to it as testing goes; tick an item when its PR is merged and give the PR number.
 
 The first entries come from an integration test: a 36-sheet BMS panel (incomer and 24 V supply with UPS, fire alarm interface relays, fan and damper enable logic, drives, fans, a controller with eight IO modules and about 70 points) rebuilt in Ferrule through the core operations, then checked, proved, exported and compared with the original sheet by sheet. Design, allocation, module pin patterns, the wiring check, templates, cross-references, Renumber, Layout, the network sheet, the points schedule and PDF export all did the job. What didn't, or was missing:
 
