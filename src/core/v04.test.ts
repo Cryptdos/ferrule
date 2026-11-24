@@ -552,3 +552,83 @@ describe("v0.3 fix: an undrawn module is reported once", () => {
     expect(msgs().some((m) => m.startsWith("Module A?: terminal") && m.endsWith("not shown on any sheet"))).toBe(true);
   });
 });
+
+describe("one hop, proved on the example project (§5)", () => {
+  /**
+   * LSP-01 with a DI module added: DPS-SF-01's airflow contact drives coil
+   * K8-37 (through terminal 8-35), so a K8-37 contact wired to DI1 is one hop.
+   */
+  function example() {
+    const { project: p } = buildLsp01(AvoidLib.getInstance());
+    const c = addController(p, "Panel controller");
+    const di = addModule(p, c.id, { type: "di", channels: 4 });
+    const dps = p.plant.find((x) => x.tag === "DPS-SF-01")!;
+    // On the airflow switch's own sheet (8): wires don't cross sheets.
+    const sheet = p.pages.find((pg) => pg.elements.some((e) => e.symbol === "plant-view" && e.params.plant === dps.id))!;
+    const mv = placePlantView(p, sheet.id, di.id, [60, 4]);
+    allocate(p, dps.id, "Airflow proven", { module: di.id, point: "DI1" });
+    const coil = (tag: string) => p.pages.flatMap((pg) => pg.elements).find((e) => e.tag === tag && (e.symbol === "coil" || e.symbol === "timer-coil"))!;
+    const contactOf = (tag: string, at: [number, number]) => {
+      const k = addElement(p, sheet.id, "contact-no", at);
+      linkContact(p, k.id, coil(tag).id);
+      return k;
+    };
+    const wire = (a: [string, string], b: [string, string]) => {
+      connect(p, sheet.id, a, b);
+      refreshConductors(p);
+    };
+    return { p, dps, mv, sheet, coil, contactOf, wire, kind: () => wiringOf(p, dps, dps.points![0]!) };
+  }
+  test("the airflow switch to DI1 through a contact of the relay it drives: via K8-37", () => {
+    const { mv, contactOf, wire, kind } = example();
+    expect(kind().kind).toBe("review");
+    const k = contactOf("K8-37", [62, 40]);
+    wire([k.id, "14"], [mv.id, "1"]);
+    expect(kind()).toMatchObject({ kind: "via", relay: "K8-37" });
+  });
+  test("a contact of a relay the switch doesn't drive is to review", () => {
+    const { p, mv, contactOf, wire, kind } = example();
+    const other = p.pages.flatMap((pg) => pg.elements).find((e) => e.symbol === "coil" && e.tag && e.tag !== "K8-37")!;
+    const k = contactOf(other.tag, [62, 40]);
+    wire([k.id, "14"], [mv.id, "1"]);
+    expect(kind().kind).toBe("review");
+  });
+  test("two relays between are to review: one hop only", () => {
+    const { p, mv, sheet, contactOf, wire, kind } = example();
+    // K8-37's contact drives a new relay KX; KX's contact goes to DI1.
+    const kx = addElement(p, sheet.id, "coil", [90, 60]);
+    kx.tag = "KX1";
+    const a = contactOf("K8-37", [80, 40]);
+    wire([a.id, "14"], [kx.id, "A1"]);
+    const b = addElement(p, sheet.id, "contact-no", [62, 40]);
+    linkContact(p, b.id, kx.id);
+    wire([b.id, "14"], [mv.id, "1"]);
+    expect(kind().kind).toBe("review");
+  });
+  test("a switch or timer between is to review; confirming it by hand still works", () => {
+    const { p, dps, mv, sheet, wire, kind } = example();
+    const sw = addElement(p, sheet.id, "contact-no", [62, 40]);
+    const views = p.pages.flatMap((pg) => pg.elements.filter((e) => e.symbol === "plant-view" && e.params.plant === dps.id));
+    wire([views[0]!.id, "NO"], [sw.id, "13"]);
+    wire([sw.id, "14"], [mv.id, "1"]);
+    expect(kind().kind).toBe("review");
+    confirmWiring(p, dps.id, "Airflow proven");
+    expect(kind().kind).toBe("confirmed");
+  });
+  test("the reverse, for an output: the channel drives a relay whose contact switches the plant's input", () => {
+    const { p, sheet } = example();
+    const dout = addModule(p, p.controllers![0]!.id, { type: "do", channels: 2 });
+    const dv = placePlantView(p, sheet.id, dout.id, [100, 4]);
+    const ef = addPlant(p, "EF3", "Extract fan 3 enable", ["1", "2"], { points: [{ name: "enable", form: "dry-in", pins: ["1", "2"] }] });
+    const ev = placePlantView(p, sheet.id, ef.id, [130, 70]);
+    allocate(p, ef.id, "enable", { module: dout.id, point: "DO1" });
+    const ky = addElement(p, sheet.id, "coil", [110, 50]);
+    ky.tag = "KY1";
+    const k = addElement(p, sheet.id, "contact-no", [130, 40]);
+    linkContact(p, k.id, ky.id);
+    connect(p, sheet.id, [dv.id, dout.points![0]!.pins[1]!], [ky.id, "A1"]);
+    connect(p, sheet.id, [k.id, "14"], [ev.id, "1"]);
+    refreshConductors(p);
+    expect(wiringOf(p, ef, ef.points![0]!)).toMatchObject({ kind: "via", relay: "KY1" });
+  });
+});

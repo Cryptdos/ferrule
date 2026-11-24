@@ -115,7 +115,7 @@ function viaOneRelay(nets: Nets, from: Set<string>, to: Set<string>): { relay: s
 }
 
 /** Whether a point is wired to its channel, by the rules above. */
-export function wiringOf(project: Project, plant: PlantItem, point: IoPoint, nets = new Nets(project), oneHop = false): Wired {
+export function wiringOf(project: Project, plant: PlantItem, point: IoPoint, nets = new Nets(project), oneHop = true): Wired {
   if (!point.channel) return { kind: "no-channel" };
   const module = project.plant.find((p) => p.id === point.channel!.module);
   const ch = module?.points?.find((q) => q.name === point.channel!.point);
