@@ -219,6 +219,17 @@ README screenshots are retaken when the interface changes. Small judgement calls
 - **Copies aren't allocated:** Draft templates keep plant without channels, and plant stamped from one starts unallocated, as allocation is by hand (§4).
 - **No format change:** every addition is optional, so the format number stays 3. A file saved by a v0.4 build and opened in a v0.3 build loses only its Design fields.
 
+**Step 3 (the Design table)**
+
+- **Design is a view, not a sheet:** it takes the whole main area (no tiles, no browser), with its Properties beside the table rather than floating. Projects still open in Draft, so older projects open as they always did.
+- **Goes to and Channel share a column:** the channel, with *via relay* after it, or *panel only*. A Goes to column said "channel" on nearly every row.
+- **+ Point** opens a small form in Properties (name, form, signal) that stays open for the next one, so a plant item's points go in one after another; an empty name gets *Point n*.
+- **+ Plant** goes in the picked system, after the picked plant; with nothing picked, at the end of the unnamed group. Its tag is empty (shown *U?*): typed, or given by Renumber from where it's drawn, as plant always has been.
+- **Deleting a system** keeps its plant, under *No system*. Deleting plant that's drawn says which sheets, then removes its views as the Plant window does.
+- **The unnamed group** shows only when it has plant, or when there are no systems at all (then the table has no group headings). It comes after the systems.
+- **Interlocks** aren't in Properties yet: the field comes with step 8, where they're made.
+- **Modules aren't rows:** the table is field plant only from the start, ahead of step 5 taking modules out of Draft's Plant list.
+
 ---
 
 ## 11. Decisions, as discussed (24/11/26)
