@@ -39,6 +39,7 @@
   import DuplicateDialog from "./DuplicateDialog.svelte";
   import DesignTemplatesDialog from "./DesignTemplatesDialog.svelte";
   import { addDesignPlant, addSystem, allocate } from "../../core/design";
+  import { addNetwork } from "../../core/network";
   import Tiles from "./Tiles.svelte";
   import { canvases } from "../canvases";
   import Dockable from "./Dockable.svelte";
@@ -477,11 +478,14 @@
         <div class="workbench" role="group" aria-label="Design view">
           <button class:active={editor.designView === "table"} onclick={() => (editor.designView = "table")} title="Systems, plant and points">Table</button>
           <button class:active={editor.designView === "controller"} onclick={() => (editor.designView = "controller")} title="The panel's controller: its modules, their channels, and the points on them">Controller</button>
+          <button class:active={editor.designView === "network"} onclick={() => (editor.designView = "network")} title="Comms plant by network: a LAN off a switch, or a bus off the controller">Network</button>
           <button class:active={editor.designView === "todraw"} onclick={() => (editor.designView = "todraw")} title="What Design has that isn't on a sheet yet: place it from here">To draw</button>
         </div>
         <LabelButton icon="check" label="Check" active={!!open.checks} onclick={() => toggle("checks")} title="Check the design and the drawing: points with no channel, plant not drawn, points not wired to their channel" />
         <span class="sep"></span>
-        {#if editor.designView === "todraw"}
+        {#if editor.designView === "network"}
+          <button onclick={() => editor.apply((p) => void addNetwork(p, "lan"))} title="A network comms plant can be on: a LAN off a switch, or a bus off the controller">+ Network</button>
+        {:else if editor.designView === "todraw"}
           <span class="hint">Pick a line and place it: Draft opens with it ready to drop on the sheet.</span>
         {:else if editor.designView === "controller"}
           <LabelButton icon="controllers" label="Controller…" active={!!open.controllers} onclick={() => toggle("controllers")} title="Describe the controller; add modules in rail order, spares and addresses; their pins" />
