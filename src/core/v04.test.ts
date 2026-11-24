@@ -6,7 +6,7 @@ import { AvoidLib } from "libavoid-js";
 import { buildLsp01 } from "../bench/lsp01";
 import { checkProject } from "./checks";
 import { addController, addModule, deleteController, generateModule } from "./controllers";
-import { designTemplateOf, duplicatePlant, insertDesignTemplate, stepTag, tagPlan, templateCounts, addDesignPlant, addDesignPoint, addSystem, allocate, channelsOf, deleteDesignPoint, deleteSystem, moveSystem, movePlant, needsLine, pointOnChannel, pointType, renameSystem, setPlantDesign, systemGroups, updateDesignPoint } from "./design";
+import { channelsFor, noChannelReason, unallocated, designTemplateOf, duplicatePlant, insertDesignTemplate, stepTag, tagPlan, templateCounts, addDesignPlant, addDesignPoint, addSystem, allocate, channelsOf, deleteDesignPoint, deleteSystem, moveSystem, movePlant, needsLine, pointOnChannel, pointType, renameSystem, setPlantDesign, systemGroups, updateDesignPoint } from "./design";
 import { newProject, type IoPoint, type Project } from "./model";
 import { defaultPattern } from "./modules";
 import { addPlant, deletePlant, updatePin, updatePlant } from "./ops";
@@ -360,5 +360,39 @@ describe("Duplicate ×n and Design templates (§3)", () => {
     t.plant[0]!.description = "changed";
     expect(r.plant[0]!.description).not.toBe("changed");
     expect(() => insertDesignTemplate(q, t, { system: "Nope" })).toThrow(/No system/);
+  });
+});
+
+describe("the Controller view's lists (§4)", () => {
+  test("unallocated: points that go to a channel and have none; channels offered: the right type, free, in rail order", () => {
+    const { p, di, uio } = panel();
+    const pu = pump(p, "P1", [
+      { name: "fault", form: "contact" },
+      { name: "trip", form: "contact", goesTo: "panel" },
+      { name: "speed", form: "analogue-in" },
+      { name: "flow", form: "contact", goesTo: "relay" },
+    ]);
+    expect(unallocated(p).map((u) => u.point.name)).toEqual(["fault", "speed", "flow"]);
+    const fault = pu.points![0]!;
+    expect(channelsFor(p, fault).map((c) => `${c.module.id === di.id ? "di" : "uio"} ${c.channel.name}`)).toEqual(["di DI1", "di DI2", "di DI3", "di DI4", "uio IO1", "uio IO2"]);
+    allocate(p, pu.id, "fault", { module: di.id, point: "DI1" });
+    allocate(p, pu.id, "flow", { module: di.id, point: "DI2" });
+    expect(unallocated(p).map((u) => u.point.name)).toEqual(["speed"]);
+    // Its own channel is still offered; another's isn't.
+    expect(channelsFor(p, fault)[0]!.channel.name).toBe("DI1");
+    expect(channelsFor(p, pu.points![3]!).map((c) => c.channel.name)).not.toContain("DI1");
+    // An AO only a universal channel can take.
+    expect(channelsFor(p, pu.points![2]!).map((c) => c.module.id)).toEqual([uio.id, uio.id]);
+    expect(noChannelReason(p, pu.points![2]!)).toBeUndefined();
+    expect(channelsFor(p, pu.points![1]!)).toEqual([]);
+  });
+  test("why a point can't go anywhere: no channels of its type, or every one taken", () => {
+    const p = newProject("t");
+    const c = addController(p, "Panel controller");
+    const di = addModule(p, c.id, { type: "di", channels: 1 });
+    const pu = pump(p, "P1", [{ name: "a", form: "contact" }, { name: "b", form: "contact" }, { name: "speed", form: "analogue-in" }]);
+    expect(noChannelReason(p, pu.points![2]!)).toBe("the panel has no analogue outputs");
+    allocate(p, pu.id, "a", { module: di.id, point: "DI1" });
+    expect(noChannelReason(p, pu.points![1]!)).toBe("every DI channel is taken");
   });
 });

@@ -551,3 +551,51 @@ export function templateCounts(t: DesignTemplate): { rows: { tag: string; descri
   });
   return { rows, total };
 }
+
+// ---------------------------------------------------------------------------
+// Allocation views (design-v0.4 §4): what's left to put on a channel, and
+// which channels a point can go on. Nothing here allocates.
+
+/** Points that go to a channel and have none, in table order. */
+export function unallocated(project: Project): { plant: PlantItem; point: IoPoint }[] {
+  const out: { plant: PlantItem; point: IoPoint }[] = [];
+  for (const g of systemGroups(project)) for (const plant of g.plant) for (const point of plant.points ?? []) if (needsChannel(point) && !point.channel) out.push({ plant, point });
+  return out;
+}
+
+/** Channels a point could go on: of a type it needs, and free (or already its own), in rail order. */
+export function channelsFor(project: Project, point: IoPoint): { module: PlantItem; channel: IoPoint }[] {
+  const t = pointType(point.form);
+  if (!t || goesTo(point) === "panel") return [];
+  const out: { module: PlantItem; channel: IoPoint }[] = [];
+  for (const { module, channel, types } of channelsOfInRailOrder(project)) {
+    if (!types.includes(t)) continue;
+    const on = pointOnChannel(project, { module: module.id, point: channel.name });
+    if (!on || on.point === point) out.push({ module, channel });
+  }
+  return out;
+}
+
+/** Every module channel, its controller's rail order first. */
+export function channelsOfInRailOrder(project: Project): { module: PlantItem; channel: IoPoint; types: IoType[] }[] {
+  const all = channelsOf(project);
+  const order: string[] = [];
+  for (const c of project.controllers ?? []) for (const s of c.slots) if (s.module) order.push(s.module);
+  const rank = (id: string) => {
+    const i = order.indexOf(id);
+    return i < 0 ? order.length : i;
+  };
+  return all.map((x, i) => ({ ...x, i })).sort((a, b) => rank(a.module.id) - rank(b.module.id) || a.i - b.i);
+}
+
+/** Why a point can't be allocated at all, if it can't: no channel of its type on the controller. */
+export function noChannelReason(project: Project, point: IoPoint): string | undefined {
+  const t = pointType(point.form);
+  if (!t || goesTo(point) === "panel") return undefined;
+  if (!channelsOf(project).some((c) => c.types.includes(t))) {
+    const word = { DI: "digital inputs", DO: "digital outputs", AI: "analogue inputs", AO: "analogue outputs" }[t];
+    return `the panel has no ${word}`;
+  }
+  if (!channelsFor(project, point).length) return `every ${t} channel is taken`;
+  return undefined;
+}

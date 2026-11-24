@@ -38,7 +38,7 @@
   import DesignView from "./DesignView.svelte";
   import DuplicateDialog from "./DuplicateDialog.svelte";
   import DesignTemplatesDialog from "./DesignTemplatesDialog.svelte";
-  import { addDesignPlant, addSystem } from "../../core/design";
+  import { addDesignPlant, addSystem, allocate } from "../../core/design";
   import Tiles from "./Tiles.svelte";
   import { canvases } from "../canvases";
   import Dockable from "./Dockable.svelte";
@@ -201,6 +201,19 @@
       editor.designAdding = false;
       editor.designFolded = editor.designFolded.filter((n) => n !== sys);
     }
+  }
+
+  /** The point picked in Design, when it's on a channel. */
+  const pickedAllocated = $derived.by(() => {
+    const pk = editor.designPick;
+    if (pk.plant.length !== 1 || !pk.point) return false;
+    return !!editor.project.plant.find((p) => p.id === pk.plant[0])?.points?.find((q) => q.name === pk.point)?.channel;
+  });
+  function unallocate() {
+    const pk = editor.designPick;
+    const plant = pk.plant[0];
+    const point = pk.point;
+    if (plant && point) editor.apply((p) => allocate(p, plant, point, null));
   }
 
   let exporting = $state(false);
@@ -463,14 +476,20 @@
       {#if editor.mode === "design"}
         <div class="workbench" role="group" aria-label="Design view">
           <button class:active={editor.designView === "table"} onclick={() => (editor.designView = "table")} title="Systems, plant and points">Table</button>
+          <button class:active={editor.designView === "controller"} onclick={() => (editor.designView = "controller")} title="The panel's controller: its modules, their channels, and the points on them">Controller</button>
         </div>
         <span class="sep"></span>
+        {#if editor.designView === "controller"}
+          <LabelButton icon="controllers" label="Controller…" active={!!open.controllers} onclick={() => toggle("controllers")} title="Describe the controller; add modules in rail order, spares and addresses; their pins" />
+          <button disabled={!pickedAllocated} onclick={unallocate} title={pickedAllocated ? "Take the picked point off its channel" : "Pick an allocated point first"}>Unallocate</button>
+        {:else}
         <button onclick={newSystem} title="A name that groups plant: Chilled water, Ventilation">+ System</button>
         <button onclick={newPlant} title="An empty plant row, in the picked system (or the picked plant's)">+ Plant</button>
         <button onclick={() => (editor.designAdding = true)} disabled={editor.designPick.plant.length !== 1} title={editor.designPick.plant.length === 1 ? "A point on the picked plant: its form, name and signal" : "Pick one plant row first"}>+ Point</button>
         <span class="sep"></span>
         <button class:active={!!editor.open.designDuplicate} disabled={!editor.designPick.plant.length} onclick={() => (editor.open.designDuplicate = !editor.open.designDuplicate)} title={editor.designPick.plant.length ? "Copy the picked rows n times, tags stepping on" : "Pick plant rows first (Ctrl+click for a group)"}>Duplicate ×n…</button>
         <button class:active={!!editor.open.designTemplates} onclick={() => (editor.open.designTemplates = !editor.open.designTemplates)} title="Your Design templates: insert one, or save the picked rows as one">Templates…</button>
+        {/if}
       {:else}
       <button class="icon" onclick={() => canvas?.fit()} title="Fit sheet (tap Space)"><Icon name="fit" /></button>
       <button class="icon" onclick={split} title="Split: the active tile in two, side by side, both showing its sheet. Each tile has its own bar to split right or down and to close"><Icon name="split" /></button>

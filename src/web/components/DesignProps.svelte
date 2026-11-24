@@ -5,7 +5,6 @@
    */
   import {
     addDesignPoint,
-    channelText,
     deleteDesignPoint,
     deleteSystem,
     goesTo,
@@ -22,6 +21,7 @@
   import { printedPin } from "../../core/points";
   import type { Editor } from "../editor.svelte";
   import TypeBadge from "./TypeBadge.svelte";
+  import ChannelSelect from "./ChannelSelect.svelte";
 
   let { editor }: { editor: Editor } = $props();
 
@@ -140,7 +140,7 @@
               <select value={goesTo(pt)} onchange={(e) => setPoint(pt.name, { goesTo: e.currentTarget.value as PointDesign["goesTo"] })} aria-label="Goes to">
                 {#each GOES_TO as g (g.value)}<option value={g.value} title={g.hint}>{g.label}</option>{/each}
               </select>
-              {#if goesTo(pt) !== "panel"}<span class="chan">{channelText(editor.project, pt.channel) || "not allocated"}</span>{/if}
+              {#if goesTo(pt) !== "panel"}<ChannelSelect {editor} {plant} point={pt} />{/if}
             </div>
           {/if}
           <div class="pins">{pt.pins.length ? `Pins ${pt.pins.map((x) => printedPin(x, pt.name)).join(" ")}` : "No pins yet"}</div>
@@ -280,11 +280,6 @@
     background: none;
     color: #a00;
     padding: 0 4px;
-  }
-  .chan {
-    font-size: 12px;
-    color: #445;
-    flex: none;
   }
   .pins {
     font-size: 11px;

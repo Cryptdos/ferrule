@@ -239,6 +239,17 @@ README screenshots are retaken when the interface changes. Small judgement calls
 - **Within a group, links follow the copies:** a point that follows another row's point, and interlocks between rows of the group, point at the copies; links to rows outside the group stay. Copies are never on a channel.
 - **A template keeps no system:** it's picked when inserting (*Into system*), defaulting to the picked system or the picked plant's.
 
+**Step 5 is two PRs:** 5a the Controller view and allocation; 5b labels following points, and modules and the Controllers window leaving Draft.
+
+**Step 5a (the Controller view, allocation)**
+
+- **Controller… is the Controllers window**, opened from Design's Controller view: describing the controller, modules in rail order, the generator, pins and points, spares and addresses were all there already, so it's reused rather than rebuilt. No separate *+ Module* button: adding a module is in that window.
+- **One controller per panel:** *Add controller* is offered only while there's none, in Design and in the window. A file with more than one shows them one under another, as §4 says, with a note.
+- **Channels are shown by module**, a card each in rail order (*A3-23 DI-8, 2 of 8 used*), rather than gathered by type across modules: a module is what's on the rail, and its tag is how it's referred to.
+- **The channel picker** (table and Properties) offers only free channels of a type the point needs, in rail order, so a wrong choice can't be made there either. Picking *—* takes it off.
+- **A point no channel can take** is shaded red in *Unallocated* and can't be dragged; picked, it says why: *no analogue outputs*, or *every DI channel is taken*.
+- **Modules show *A?*** until a view of them is drawn: they're tagged by where they're drawn, as before.
+
 ---
 
 ## 11. Decisions, as discussed (24/11/26)
