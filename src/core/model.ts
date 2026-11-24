@@ -401,6 +401,11 @@ export interface IoPoint {
   goesTo?: "relay" | "panel";
   /** The module channel it's allocated to: a module (plant id) and its point. Unset until allocated. */
   channel?: ChannelRef;
+  /**
+   * Wired to its channel, confirmed by hand (design-v0.4 §5): the wiring at
+   * both ends as it was when confirmed. Any change there, and it's to review again.
+   */
+  confirmed?: string;
 }
 
 /** A module's channel: the module (a plant item with `module` set) and the point that is the channel. */

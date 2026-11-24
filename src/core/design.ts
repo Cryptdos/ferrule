@@ -141,6 +141,7 @@ export function allocate(project: Project, plantId: string, pointName: string, c
   if (plant.module) throw new OpError("A module's points are its channels");
   const point = plant.points?.find((p) => p.name === pointName);
   if (!point) throw new OpError(`No point "${pointName}" on that plant`);
+  delete point.confirmed;
   if (!channel) {
     delete point.channel;
     syncPlantViews(project);
@@ -183,8 +184,10 @@ export function tidyDesign(project: Project): void {
       const m = byId.get(pt.channel.module);
       const key = `${pt.channel.module}\u0000${pt.channel.point}`;
       // A module's own points are its channels; a panel-only point has none; one point to a channel.
-      if (it.module || pt.goesTo === "panel" || !m?.module || !m.points?.some((q) => q.name === pt.channel!.point) || taken.has(key)) delete pt.channel;
-      else taken.add(key);
+      if (it.module || pt.goesTo === "panel" || !m?.module || !m.points?.some((q) => q.name === pt.channel!.point) || taken.has(key)) {
+        delete pt.channel;
+        delete pt.confirmed;
+      } else taken.add(key);
     }
     if (it.interlocks) {
       it.interlocks = it.interlocks.filter((x) => it.points?.some((q) => q.name === x.point));

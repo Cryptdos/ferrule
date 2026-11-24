@@ -21,6 +21,7 @@
   import { formatQuickEntry, printedPin } from "../../core/points";
   import type { Editor } from "../editor.svelte";
   import TypeBadge from "./TypeBadge.svelte";
+  import { confirmWiring, wiringOf } from "../../core/wiring";
   import ChannelSelect from "./ChannelSelect.svelte";
 
   let { editor }: { editor: Editor } = $props();
@@ -152,6 +153,16 @@
             </div>
           {/if}
           <div class="pins">{pt.pins.length ? `Pins ${pt.pins.map((x) => printedPin(x, pt.name)).join(" ")}` : "No pins yet"}</div>
+          {#if pt.channel}
+            {@const w = wiringOf(editor.project, plant, pt)}
+            <div class="wired {w.kind}">
+              {#if w.kind === "direct"}✓ Wired straight to its channel
+              {:else if w.kind === "via"}✓ Wired to its channel via {w.relay}
+              {:else if w.kind === "confirmed"}✓ Wired: confirmed by hand <button class="link" onclick={() => editor.apply((p) => confirmWiring(p, plant.id, pt.name, false))}>Undo</button>
+              {:else if w.kind === "review"}Not wired straight to its channel: check the drawing <button onclick={() => editor.apply((p) => confirmWiring(p, plant.id, pt.name))}>Confirm by hand</button>
+              {:else if w.kind === "not-drawn"}Not drawn yet: its wiring is checked once it and its channel are on a sheet{/if}
+            </div>
+          {/if}
         </div>
       {/each}
       <label title="Each point and its pins, | between: enable: 1 2 | fault: 11 14. Points not listed keep what they have">Pins, from the datasheet
@@ -309,6 +320,26 @@
   .pins {
     font-size: 11px;
     color: #889;
+  }
+  .wired {
+    font-size: 12px;
+    color: #667;
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .wired.direct,
+  .wired.via,
+  .wired.confirmed {
+    color: #1d6b2c;
+  }
+  .wired.review {
+    color: #a60;
+  }
+  .wired button {
+    font-size: 12px;
+    padding: 1px 6px;
   }
   .actions {
     display: flex;
