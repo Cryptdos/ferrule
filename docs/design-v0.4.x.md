@@ -426,3 +426,9 @@ Judgement calls made while building, step by step.
 - M6 in Simulate: fixed links between the listed pins' nodes; in the wiring check (`Nets`): the pins are one net, so a return or a via-relay trace through any of them counts. Check never asked for a wire on each common (the *isn't wired* check already looks at a point's own pins only), so nothing changed there. Each drawn wire keeps its own number.
 - M6 on the view: a thin line 0.6 under the joined pins with a dot on each, inside the band F6 keeps clear of wires, so only wire stubs cross it. Drawn in the usual module layout; a module view on another side (T15) doesn't draw it yet.
 - T9: Renumber gives each module of a controller with a map (`ctrlmap`, the controller named on it or the first) the address of its box's middle on the map (`controllerMapSlots`), in place of its first view's. Without a map, from the first view, as before. The fixture's modules are now A5-*.
+
+**Step 10b, first PR (the port).**
+- M7: `PinInfo.port` on each pin of the group (`setGroupPort`); the tick is *Serial ports* in a plant's or module's pins window (the same window serves both, so it's the pattern editor's tick the plan names). Only a pin with a group can carry it.
+- T5: `Network.port = { plant, group }`, set from *Port* in Design's network view, which lists every device's groups marked as ports (`portGroups`); the field isn't limited to the controller, since a LAN's switch or a gateway can be the head end. Unticking a port clears it from any network on it.
+- The network sheet prints the port's name before the network's at the controller end (*COM A: Drives bus · Modbus RTU · 2 devices*).
+- The fixture's host has COM A and COM B ports, its drives' Modbus groups are ports, and its two buses name their ports.

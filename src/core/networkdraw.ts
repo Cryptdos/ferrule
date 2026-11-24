@@ -11,8 +11,8 @@ import { textWidth } from "./textwidth";
 export interface NetworkData {
   /** The controller's tag and description, if there is one. */
   controller?: { tag: string; description: string };
-  lans: { net: Network; devices: string[] }[];
-  buses: { net: Network; devices: string[] }[];
+  lans: { net: Network; devices: string[]; port?: string }[];
+  buses: { net: Network; devices: string[]; port?: string }[];
   /** Comms plant on no network. */
   loose: string[];
 }
@@ -93,7 +93,7 @@ export function networkDiagram(d: NetworkData, width = 150): { prims: Prim[]; w:
       const tapX = sx + 3 + ((i % 6) * (headW - 6)) / 5;
       // From the switch down, along to the trunk.
       prims.push(line([tapX, headH], [tapX, top - 2], [x, top - 2], [x, top]));
-      prims.push(txt(x + 1, top - 2.6, `${lan.net.name}${lan.net.protocol ? ` · ${lan.net.protocol}` : ""} · ${lan.devices.length} device${lan.devices.length === 1 ? "" : "s"}`, NOTE, "start"));
+      prims.push(txt(x + 1, top - 2.6, `${lan.port ? `${lan.port}: ` : ""}${lan.net.name}${lan.net.protocol ? ` · ${lan.net.protocol}` : ""} · ${lan.devices.length} device${lan.devices.length === 1 ? "" : "s"}`, NOTE, "start"));
       const shown = lan.devices.slice(0, PER_ROW * ROWS);
       const rows = Math.ceil(shown.length / PER_ROW) + (lan.devices.length > shown.length ? 1 : 0);
       const h = Math.max(1, rows) * (BOX_H + GAP) + 1;
@@ -124,7 +124,8 @@ export function networkDiagram(d: NetworkData, width = 150): { prims: Prim[]; w:
   let busLineTop = headH;
   for (const bus of d.buses) {
     y += 6;
-    const label = `${bus.net.name}${bus.net.protocol ? ` · ${bus.net.protocol}` : ""} · ${bus.devices.length} device${bus.devices.length === 1 ? "" : "s"}`;
+    // The port it's on, at the controller end (v0.4.x T5).
+    const label = `${bus.port ? `${bus.port}: ` : ""}${bus.net.name}${bus.net.protocol ? ` · ${bus.net.protocol}` : ""} · ${bus.devices.length} device${bus.devices.length === 1 ? "" : "s"}`;
     prims.push(txt(busX + 2, y - 0.8, label, NOTE, "start"));
     const by = y + 1;
     prims.push(line([busX, busLineTop], [busX, by + BOX_H / 2]));

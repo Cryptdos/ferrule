@@ -262,7 +262,8 @@ export function parseNetworks(v: unknown): Network[] {
   const out: Network[] = [];
   for (const n of arr(v).filter(isObj)) {
     if (typeof n.id !== "string" || !n.id || out.some((x) => x.id === n.id)) continue;
-    out.push({ id: n.id, name: text(n.name), protocol: text(n.protocol), kind: n.kind === "lan" ? "lan" : "bus" });
+    const port = isObj(n.port) && text(n.port.plant) && text(n.port.group) ? { port: { plant: text(n.port.plant), group: text(n.port.group) } } : {};
+    out.push({ id: n.id, name: text(n.name), protocol: text(n.protocol), kind: n.kind === "lan" ? "lan" : "bus", ...port });
   }
   return out;
 }
@@ -366,7 +367,7 @@ function parsePoints(points: unknown, pins: unknown): { points?: IoPoint[]; pins
       if (!isObj(v)) continue;
       const id = strOr(v.id);
       const group = strOr(v.group);
-      if (id || group) m[k] = { ...(id ? { id } : {}), ...(group ? { group } : {}) };
+      if (id || group) m[k] = { ...(id ? { id } : {}), ...(group ? { group } : {}), ...(group && v.port === true ? { port: true as const } : {}) };
     }
     if (Object.keys(m).length) out.pins = m;
   }

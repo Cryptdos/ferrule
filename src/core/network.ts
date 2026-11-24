@@ -6,7 +6,7 @@
  * runs shortened with a count. Addresses aren't held in v0.4.
  */
 import { newId, type Network, type Page, type PlantItem, type Project } from "./model";
-import { OpError, addElement, addPage, getPlant } from "./ops";
+import { OpError, addElement, addPage, getPlant, portGroups } from "./ops";
 import type { NetworkData } from "./networkdraw";
 import { controllerTag } from "./modules";
 
@@ -29,7 +29,7 @@ export function addNetwork(project: Project, kind: "lan" | "bus" = "lan", protoc
   return n;
 }
 
-export function updateNetwork(project: Project, id: string, patch: Partial<Omit<Network, "id">>): void {
+export function updateNetwork(project: Project, id: string, patch: Partial<Omit<Network, "id" | "port">> & { port?: Network["port"] | null }): void {
   const n = project.networks?.find((x) => x.id === id);
   if (!n) throw new OpError("No such network");
   if (patch.name !== undefined) {
@@ -39,6 +39,15 @@ export function updateNetwork(project: Project, id: string, patch: Partial<Omit<
     n.name = v;
   }
   if (patch.protocol !== undefined) n.protocol = patch.protocol.trim();
+  // The serial port it's on (v0.4.x T5): a group marked as a port.
+  if (patch.port !== undefined) {
+    if (!patch.port) delete n.port;
+    else {
+      const it = project.plant.find((p) => p.id === patch.port!.plant);
+      if (!it || !portGroups(it).includes(patch.port.group)) throw new OpError("Pick a group of pins marked as a serial port");
+      n.port = { plant: it.id, group: patch.port.group };
+    }
+  }
   if (patch.kind !== undefined) n.kind = patch.kind === "lan" ? "lan" : "bus";
 }
 
@@ -86,14 +95,29 @@ export function putOnNetwork(project: Project, ids: string[], net: string): void
 // ---------------------------------------------------------------------------
 // The drawing
 
+/** A network's port, as printed at the controller end (v0.4.x T5): its group, and whose it is when that isn't the controller's host. */
+export function portName(project: Project, net: Network): string {
+  if (!net.port) return "";
+  const it = project.plant.find((p) => p.id === net.port!.plant);
+  if (!it) return "";
+  const c = project.controllers?.[0];
+  const host = c ? controllerTag(project, c) : "";
+  const tag = it.tag || `${it.prefix || "U"}?`;
+  return tag === host ? net.port.group : `${tag} ${net.port.group}`;
+}
+
 export function networkData(project: Project): NetworkData {
+  const portOf = (n: Network) => {
+    const p = portName(project, n);
+    return p ? { port: p } : {};
+  };
   const c = project.controllers?.[0];
   const nets = project.networks ?? [];
   const on = (n: Network) => devicesOn(project, n.id).map(tagOf);
   return {
     ...(c ? { controller: { tag: controllerTag(project, c), description: c.description } } : {}),
-    lans: nets.filter((n) => n.kind === "lan").map((net) => ({ net, devices: on(net) })),
-    buses: nets.filter((n) => n.kind === "bus").map((net) => ({ net, devices: on(net) })),
+    lans: nets.filter((n) => n.kind === "lan").map((net) => ({ net, devices: on(net), ...portOf(net) })),
+    buses: nets.filter((n) => n.kind === "bus").map((net) => ({ net, devices: on(net), ...portOf(net) })),
     loose: project.plant.filter((p) => !p.module && (p.connects === "comms" || p.connects === "both") && !p.network).map(tagOf),
   };
 }

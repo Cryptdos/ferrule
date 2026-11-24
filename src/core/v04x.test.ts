@@ -17,7 +17,7 @@ import { elementTexts } from "./tags";
 import { textWidth } from "./textwidth";
 import { AREA_UNITS, textUnits } from "./geometry";
 import { moduleTitle, viewsOf } from "./modules";
-import { addElement, addGaDevice, addPlant, connect, resetRoute, rotateElements, deletePlant, linkContact, setGroupSide, setViewSide, setViewSpan, setWireTextAt, moveElements, placePlantView, addGaDim, addGaItem, addGaPage, addPlatesForDoors, joinDoorBelow, setPlateBehind, setBoundary, setGaSettings, splitDoor, updateElement } from "./ops";
+import { addElement, addGaDevice, addPlant, connect, portGroups, setGroupPort, resetRoute, rotateElements, deletePlant, linkContact, setGroupSide, setViewSide, setViewSpan, setWireTextAt, moveElements, placePlantView, addGaDim, addGaItem, addGaPage, addPlatesForDoors, joinDoorBelow, setPlateBehind, setBoundary, setGaSettings, splitDoor, updateElement } from "./ops";
 import { earthConductors, removeLoops, fractionAlong, isFieldWire, numberByDefault, pointAlong, wireTexts } from "./wires";
 import { routePage } from "./routing";
 import { billOfMaterials, pointsSchedule } from "./schedules";
@@ -25,6 +25,8 @@ import { compile, initialState, toggle } from "./sim";
 import { addController, addModule, setModuleCommons } from "./controllers";
 import { pointRef } from "./points";
 import { Nets } from "./wiring";
+import { networkData, updateNetwork } from "./network";
+import { networkDiagram } from "./networkdraw";
 import { ENCL, PLATE_MARGIN, gaCandidates, sizeKey, dimLayout, doorPanes, plateDoor, platesOf, drawnGaItems, gaFrame, paneOf, paneRef, sheetPanes } from "./ga";
 import { renumber } from "./renumber";
 import { stampSaved } from "../server/storage";
@@ -867,5 +869,27 @@ describe("step 10a: module commons and tags (M6, T9)", () => {
     mapSheet.elements = mapSheet.elements.filter((e) => e.symbol !== "ctrlmap");
     renumber(p);
     expect(modules.di.tag).toBe(`A${viewsOf(p, modules.di.id)[0]!.page.number}-${viewsOf(p, modules.di.id)[0]!.address.split("-")[1]}`);
+  });
+});
+
+describe("step 10b: serial ports (M7, T5)", () => {
+  test("a group of pins is a serial port; a network names its port; the network sheet prints it at the controller end", () => {
+    const { project: p, modules, plant } = fresh();
+    expect(portGroups(modules.host)).toEqual(["COM A", "COM B"]);
+    expect(portGroups(plant.SFD!)).toEqual(["Modbus"]);
+    const bus = p.networks!.find((n) => n.name === "Drives bus")!;
+    expect(bus.port).toEqual({ plant: modules.host.id, group: "COM A" });
+    const d = networkData(p);
+    expect(d.buses.map((b) => b.port)).toEqual(["COM A", "COM B"]);
+    const texts = networkDiagram(d).prims.flatMap((x) => (x.t === "text" ? [x.text] : []));
+    expect(texts.some((t) => t.startsWith("COM A: Drives bus"))).toBe(true);
+    // Untick the port: the network loses it.
+    setGroupPort(p, modules.host.id, "COM A", false);
+    expect(bus.port).toBeUndefined();
+    expect(() => updateNetwork(p, bus.id, { port: { plant: modules.host.id, group: "COM A" } })).toThrow(/serial port/);
+    // Saved and read back.
+    const back = parseProject(JSON.parse(JSON.stringify(p)));
+    expect(back.networks!.find((n) => n.name === "Meters bus")!.port).toEqual({ plant: modules.host.id, group: "COM B" });
+    expect(back.plant.find((x) => x.id === modules.host.id)!.pins!["4"]!.port).toBe(true);
   });
 });
