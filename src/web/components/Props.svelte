@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { channelLabel, pointOnChannel } from "../../core/design";
   import { resolveFields } from "../../core/fields";
   import { columnOf } from "../../core/geometry";
   import { earthConductors, isFieldWire, numberedSegments, routeOf } from "../../core/wires";
@@ -401,6 +402,12 @@
         <p class="hint">A view that leaves channels out has a break at that edge. The module keeps one tag, from its first view; points drawn on a later view are referred to with where they are, e.g. <code>A3-23:DO5 (4-10)</code>.</p>
         <div class="sub">Labels</div>
         {#each (item.points ?? []).filter((q) => q.pins.some((t) => shown.has(t))) as pt (pt.name)}
+          {#if pointOnChannel(editor.project, { module: item.id, point: pt.name })}
+          <label class="joblabel">
+            {pt.name}
+            <input value={channelLabel(editor.project, item, pt)} disabled title="It follows the point on this channel (Design → Controller)" />
+          </label>
+          {:else}
           <label class="joblabel">
             {pt.name}
             <input
@@ -414,6 +421,7 @@
               }}
             />
           </label>
+          {/if}
         {/each}
       {:else if item}
         <div class="sub">Terminals shown on this sheet</div>
@@ -434,7 +442,7 @@
             </label>
           {/each}
         </div>
-        <p class="hint">Hidden terminals give the box a break line. Edit the plant itself under Plant….</p>
+        <p class="hint">Hidden terminals give the box a break line. The plant itself is edited in Design; its pins under Plant….</p>
         {#if item.points?.length}
           <div class="sub">Points</div>
           {#each item.points as pt (pt.name)}

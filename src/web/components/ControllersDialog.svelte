@@ -15,7 +15,7 @@
   } from "../../core/controllers";
   import { POINT_FORMS, type ModuleType, type PlantItem, type PointForm } from "../../core/model";
   import { MODULE_TYPES, controllerTag, defaultPattern, moduleType, slotAddress, viewsOf, type ModulePattern } from "../../core/modules";
-  import { moduleParam, plantLabel, plantPinsParam } from "../../core/ops";
+  import { plantLabel } from "../../core/ops";
   import type { Editor } from "../editor.svelte";
   import { deviceLibrary } from "../devices.svelte";
   import Modal from "./Modal.svelte";
@@ -58,28 +58,6 @@
   const moduleOf = (id: string | undefined): PlantItem | undefined => (id ? editor.project.plant.find((p) => p.id === id) : undefined);
   const where = (id: string) => viewsOf(editor.project, id).map((v) => v.address).join(", ");
 
-  function place(item: PlantItem) {
-    // Draft draws it (design-v0.4 §4): placing a view goes there, on a schematic sheet.
-    if (editor.mode !== "draft") editor.mode = "draft";
-    if (editor.page.ga || editor.page.spare) {
-      editor.flash("Pick a schematic sheet in Draft, then Place view again");
-      return;
-    }
-    editor.tool = "place";
-    editor.placeSymbol = "plant-view";
-    editor.placeParams = {
-      plant: item.id,
-      show: item.terminals.join(","),
-      terms: item.terminals.join(","),
-      pdesc: item.description,
-      pinfo: item.info ?? "",
-      ppins: plantPinsParam(item, editor.project),
-      pbo: false,
-      pmod: moduleParam(item),
-    };
-    onclose();
-  }
-
   function openGenerator(item: PlantItem) {
     const m = item.module!;
     // Start from what it has: its channel count, first pin, and the ids of its first channel.
@@ -108,7 +86,7 @@
     A controller (an outstation or PLC) is its modules in rail order. Add modules by type; the generator fills in their pins
     (one channel each, ids and numbers from the datasheet), and <em>Pins and points…</em> takes care of any oddities. Each
     module is tagged by where its first view is drawn, prefix A (A3-23), and its points are referred to as
-    <code>A3-23:DI2</code>. Its views go at the top of a sheet, terminals underneath.
+    <code>A3-23:DI2</code>. Its views go at the top of a sheet, terminals underneath: place them from Design's <em>To draw</em>.
   </p>
   {#if !controllers.length}
   <form
@@ -184,7 +162,6 @@
                 <td><input value={m.model ?? ""} onchange={(e) => editor.apply((p) => updateModule(p, item.id, { model: e.currentTarget.value }))} /></td>
                 <td class="sheets">{where(item.id) || "–"}</td>
                 <td class="actions">
-                  <button onclick={() => place(item)} title="Place a view of this module on the current sheet, at the top">Place view</button>
                   <button class:active={gen?.id === item.id} onclick={() => (gen?.id === item.id ? (gen = null) : openGenerator(item))} title="Fill in its pins from a pattern">Generate…</button>
                   {#if !m.device}
                     <button title="Save it as a model in the device table, pins and all, so the next one takes seconds (and from there to the shared library with its datasheet)"

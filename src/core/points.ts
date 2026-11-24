@@ -131,10 +131,12 @@ export function pointOfPin(item: Pick<PlantItem, "points">): Map<string, string>
  * distributions) where their name is unchanged; new ones take the guess.
  */
 export function mergePoints(before: IoPoint[], after: IoPoint[]): IoPoint[] {
-  return after.map((p) => {
+  const merged = after.map((p) => {
     const old = before.find((x) => x.name === p.name);
     return old ? { ...old, pins: p.pins } : p;
   });
+  // Points with no pins yet (made in Design) aren't in a quick-entry line: they stay.
+  return [...merged, ...before.filter((x) => !x.pins.length && !after.some((p) => p.name === x.name))];
 }
 
 /**

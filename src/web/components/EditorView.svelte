@@ -477,9 +477,12 @@
         <div class="workbench" role="group" aria-label="Design view">
           <button class:active={editor.designView === "table"} onclick={() => (editor.designView = "table")} title="Systems, plant and points">Table</button>
           <button class:active={editor.designView === "controller"} onclick={() => (editor.designView = "controller")} title="The panel's controller: its modules, their channels, and the points on them">Controller</button>
+          <button class:active={editor.designView === "todraw"} onclick={() => (editor.designView = "todraw")} title="What Design has that isn't on a sheet yet: place it from here">To draw</button>
         </div>
         <span class="sep"></span>
-        {#if editor.designView === "controller"}
+        {#if editor.designView === "todraw"}
+          <span class="hint">Pick a line and place it: Draft opens with it ready to drop on the sheet.</span>
+        {:else if editor.designView === "controller"}
           <LabelButton icon="controllers" label="Controller…" active={!!open.controllers} onclick={() => toggle("controllers")} title="Describe the controller; add modules in rail order, spares and addresses; their pins" />
           <button disabled={!pickedAllocated} onclick={unallocate} title={pickedAllocated ? "Take the picked point off its channel" : "Pick an allocated point first"}>Unallocate</button>
         {:else}

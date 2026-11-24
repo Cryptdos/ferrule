@@ -613,3 +613,74 @@ export function channelLabel(project: Project, module: PlantItem, channel: IoPoi
   const on = pointOnChannel(project, { module: module.id, point: channel.name });
   return on ? `${plantLabelOf(on.plant)} ${on.point.name}` : (channel.label ?? "");
 }
+
+// ---------------------------------------------------------------------------
+// To draw (design-v0.4 §8): what Design has that isn't on a sheet yet.
+
+/** Sheet numbers a plant item or module has a view on. */
+export function drawnOn(project: Project, plantId: string): number[] {
+  return project.pages.filter((pg) => pg.elements.some((e) => e.symbol === "plant-view" && e.params.plant === plantId)).map((pg) => pg.number);
+}
+
+export interface ToDraw {
+  item: PlantItem;
+  sheets: number[];
+}
+
+/** Field plant and modules, each with the sheets it's drawn on (none: still to draw), in table and rail order. */
+export function toDraw(project: Project): { plant: ToDraw[]; modules: ToDraw[] } {
+  const plant = systemGroups(project).flatMap((g) => g.plant).map((item) => ({ item, sheets: drawnOn(project, item.id) }));
+  const order: string[] = [];
+  for (const c of project.controllers ?? []) for (const s of c.slots) if (s.module) order.push(s.module);
+  const modules = order
+    .map((id) => project.plant.find((p) => p.id === id))
+    .filter((p): p is PlantItem => !!p?.module)
+    .map((item) => ({ item, sheets: drawnOn(project, item.id) }));
+  return { plant, modules };
+}
+
+/** How many pins a point of each form is given when none were: what's usual, numbered. */
+const PIN_COUNT: Record<PointForm, number> = {
+  contact: 2,
+  "powered-out": 2,
+  "dry-in": 2,
+  "powered-in": 2,
+  "analogue-in": 2,
+  "analogue-out": 2,
+  "supply-in": 3,
+  "supply-out": 2,
+  comms: 3,
+};
+
+/**
+ * Pins for drawing it, as a quick-entry line (`Mains: L N E | fault: 1 2`):
+ * the pins it has, then numbered pins for each point that has none, carrying
+ * on from its highest number. Only a suggestion, edited before placing:
+ * pins come from the datasheet.
+ */
+export function suggestPins(item: PlantItem): string {
+  const runs: string[] = [];
+  const pointOf = new Map<string, string>();
+  for (const p of item.points ?? []) for (const t of p.pins) if (!pointOf.has(t)) pointOf.set(t, p.name);
+  let cur: { name: string; terms: string[] } | null = null;
+  for (const t of item.terminals) {
+    const name = pointOf.get(t) ?? "";
+    const shown = t.includes(".") ? t.slice(t.indexOf(".") + 1) : t;
+    if (cur && cur.name === name) cur.terms.push(shown);
+    else {
+      if (cur) runs.push(cur.name ? `${cur.name}: ${cur.terms.join(" ")}` : cur.terms.join(" "));
+      cur = { name, terms: [shown] };
+    }
+  }
+  if (cur) runs.push(cur.name ? `${cur.name}: ${cur.terms.join(" ")}` : cur.terms.join(" "));
+  let next = Math.max(0, ...item.terminals.map((t) => Number(t)).filter((n) => Number.isFinite(n))) + 1;
+  for (const p of item.points ?? []) {
+    if (p.pins.length) continue;
+    const pins = Array.from({ length: PIN_COUNT[p.form] }, () => String(next++));
+    runs.push(`${p.name}: ${pins.join(" ")}`);
+  }
+  return runs.join(" | ");
+}
+
+/** Plant with a point that has no pins, or no pins at all, needs pins before it's drawn. */
+export const needsPins = (item: PlantItem): boolean => !item.terminals.length || (item.points ?? []).some((p) => !p.pins.length);
