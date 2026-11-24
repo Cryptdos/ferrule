@@ -9,7 +9,7 @@ import { PLANT_VIEW_KEYS, labelWidthFor, legendToPositions } from "./ops";
 import { parseProjectDevices } from "./devices";
 import { AREA_UNITS } from "./geometry";
 import { tidyDesign } from "./design";
-import { DISTRIBUTION_KINDS, type DistributionKind, POINT_FORMS, type Condition, type Controller, type ControllerSlot, type ModuleInfo, type ModuleType, type PlantItem, type Expectation, type IoPoint, type Interlock, type Network, type PinInfo, type PointForm, FORMAT, FORMAT_VERSION, type GaDim, type GaDimPoint, type GaItem, type Page, type Project, emptyInfo } from "./model";
+import { DISTRIBUTION_KINDS, type DistributionKind, POINT_FORMS, type Condition, type Controller, type ControllerSlot, type DesignTemplate, type ModuleInfo, type ModuleType, type PlantItem, type Expectation, type IoPoint, type Interlock, type Network, type PinInfo, type PointForm, FORMAT, FORMAT_VERSION, type GaDim, type GaDimPoint, type GaItem, type Page, type Project, emptyInfo } from "./model";
 import { defaultParams, getSymbol } from "./symbols";
 import { gaToSheet } from "./ga";
 import { MODULE_TYPES } from "./modules";
@@ -135,6 +135,16 @@ export function parseProject(input: unknown): Project {
   if (input.useDeviceLibrary === false) project.useDeviceLibrary = false;
   project.conductors = parseConductors(input.conductors);
   return project;
+}
+
+/** A Design template (design-v0.4 §3), from a library file: rows only, no modules, channels or system. */
+export function parseDesignTemplate(v: unknown): DesignTemplate {
+  if (!isObj(v)) throw new ProjectFormatError("Not a Design template");
+  const plant = parsePlant(v.plant).map(({ module: _m, system: _s, ...p }) => {
+    for (const pt of p.points ?? []) delete pt.channel;
+    return p as PlantItem;
+  });
+  return { name: strOr(v.name, "Template").trim() || "Template", plant };
 }
 
 /** A template, from a project file or a library file. */

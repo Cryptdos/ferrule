@@ -162,7 +162,7 @@
       {:else}
         <button onclick={() => (editor.designAdding = true)}>+ Point</button>
       {/if}
-      <div class="actions"><button class="danger" onclick={removePlant}>Delete</button></div>
+      <div class="actions"><button onclick={() => (editor.open.designDuplicate = true)}>Duplicate ×n…</button><button class="danger" onclick={removePlant}>Delete</button></div>
     {:else if many.length > 1}
       <div class="who"><strong>{many.length} plant picked</strong><span class="hint">{many.map(plantLabel).join(", ")}</span></div>
       <label>Move to system
@@ -172,7 +172,7 @@
           {#each systems as s (s)}<option value={s}>{s}</option>{/each}
         </select>
       </label>
-      <div class="actions"><button class="danger" onclick={removePlant}>Delete</button></div>
+      <div class="actions"><button onclick={() => (editor.open.designDuplicate = true)}>Duplicate ×n…</button><button onclick={() => (editor.open.designTemplates = true)}>Save as template…</button><button class="danger" onclick={removePlant}>Delete</button></div>
     {:else if pick.system}
       {@const name = pick.system}
       <div class="who"><strong>{name}</strong><span class="hint">System · {editor.project.plant.filter((p) => !p.module && p.system === name).length} plant</span></div>

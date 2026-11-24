@@ -277,6 +277,18 @@ export interface Interlock {
   join?: "and" | "or";
 }
 
+/**
+ * A Design template (design-v0.4 §3): plant rows someone saved, with their
+ * points and interlocks. A list of its own, apart from Draft's templates
+ * (drawing fragments). Nothing is built in, and nothing links back: what's
+ * inserted is ordinary plant.
+ */
+export interface DesignTemplate {
+  name: string;
+  /** Copies of the rows: no module, no channels, no system (the system is picked when inserting). */
+  plant: PlantItem[];
+}
+
 /** A network comms plant is on (design-v0.4 §7): a LAN off a switch, or a bus off the controller. */
 export interface Network {
   id: string;

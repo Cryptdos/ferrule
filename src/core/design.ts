@@ -5,7 +5,7 @@
  * here decides anything for the engineer: allocation is by hand, and a
  * reference to something that's gone is let go, never guessed.
  */
-import { newId, type ChannelRef, type IoPoint, type PlantItem, type PointForm, type Project } from "./model";
+import { newId, type ChannelRef, type DesignTemplate, type IoPoint, type PlantItem, type PointForm, type Project } from "./model";
 import { OpError, getPlant, renamePointRefs } from "./ops";
 
 /** What the controller needs for a point (design-v0.4 §2, Type): shown, never stored. */
@@ -395,4 +395,159 @@ export function channelText(project: Project, ref: ChannelRef | undefined): stri
   if (!ref) return "";
   const m = project.plant.find((p) => p.id === ref.module);
   return m ? `${plantLabelOf(m)} ${ref.point}` : "";
+}
+
+// ---------------------------------------------------------------------------
+// Duplicate ×n and Design templates (design-v0.4 §3): general tools that
+// copy rows, with no idea what kind of plant they are.
+
+/**
+ * A tag moved on by `by`: its last number plus `by`, keeping leading zeros
+ * (P1 → P2, AHU-01 → AHU-02). A tag with no number, or an empty one, gives
+ * an empty tag, for Renumber or typing.
+ */
+export function stepTag(tag: string, by: number): string {
+  const m = /^(.*?)(\d+)(\D*)$/.exec(tag);
+  if (!m) return "";
+  const n = Number(m[2]) + by;
+  if (n < 0) return "";
+  return `${m[1]}${String(n).padStart(m[2]!.length, "0")}${m[3]}`;
+}
+
+/** What copying would give each source row's tag, copy by copy, and whether it's free. */
+export function tagPlan(project: Project, tags: string[], copies: number, step: number, first: number): { tag: string; taken: boolean }[][] {
+  const used = new Set(project.plant.map((p) => p.tag).filter(Boolean));
+  const out: { tag: string; taken: boolean }[][] = [];
+  for (let k = 0; k < copies; k++) {
+    out.push(
+      tags.map((t) => {
+        const tag = stepTag(t, step * (first + k));
+        const taken = !!tag && used.has(tag);
+        if (tag && !taken) used.add(tag);
+        return { tag, taken };
+      }),
+    );
+  }
+  return out;
+}
+
+/**
+ * Copies of plant rows, `copies` times, each copy's tags moved on by
+ * `step` more (copy k by step × (first + k)). Within the group, points
+ * that follow or interlock on each other follow the copies; anything
+ * outside the group is kept. Copies aren't on channels (allocation is by
+ * hand) and aren't drawn. A tag that's taken is left empty.
+ */
+function copyRows(
+  project: Project,
+  source: PlantItem[],
+  opts: { copies: number; step: number; first: number; system?: string; after?: string },
+): { plant: PlantItem[]; untagged: number } {
+  const copies = Math.max(1, Math.min(200, Math.floor(opts.copies)));
+  const plan = tagPlan(project, source.map((p) => p.tag), copies, opts.step, opts.first);
+  const made: PlantItem[] = [];
+  let untagged = 0;
+  let after = opts.after;
+  for (let k = 0; k < copies; k++) {
+    const ids = new Map(source.map((p) => [p.id, newId("p")]));
+    const remap = (ref: string) => {
+      const m = /^plant:([^:]+):(.*)$/.exec(ref);
+      const to = m && ids.get(m[1]!);
+      return to ? `plant:${to}:${m![2]}` : ref;
+    };
+    source.forEach((src, i) => {
+      const { module: _m, ...rest } = plain(src);
+      const it: PlantItem = { ...rest, id: ids.get(src.id)! };
+      const t = plan[k]![i]!;
+      it.tag = t.taken ? "" : t.tag;
+      if (src.tag && !it.tag) untagged++;
+      if (it.tag) it.locked = true;
+      else delete it.locked;
+      if (opts.system !== undefined) {
+        if (opts.system) it.system = opts.system;
+        else delete it.system;
+      }
+      for (const pt of it.points ?? []) {
+        delete pt.channel;
+        for (const c of pt.follows ?? []) c.ref = remap(c.ref);
+      }
+      for (const x of it.interlocks ?? []) {
+        x.id = newId("il");
+        for (const c of x.when) c.ref = remap(c.ref);
+      }
+      insertPlant(project, it, after);
+      after = it.id;
+      made.push(it);
+    });
+  }
+  if (opts.system && !(project.systems ?? []).includes(opts.system)) project.systems = [...(project.systems ?? []), opts.system];
+  tidyDesign(project);
+  return { plant: made, untagged };
+}
+
+/** Plain data from a reactive proxy or a plain object alike. */
+function plain<T>(v: T): T {
+  return JSON.parse(JSON.stringify(v)) as T;
+}
+
+/** Plant rows by id, in table order. */
+function rowsOf(project: Project, ids: string[]): PlantItem[] {
+  const set = new Set(ids);
+  const rows = project.plant.filter((p) => set.has(p.id) && !p.module);
+  if (!rows.length) throw new OpError("Pick plant rows first");
+  return rows;
+}
+
+/**
+ * Duplicate ×n (design-v0.4 §3): any picked rows, one item or a group,
+ * copied n times after the last of them, tags stepping (P1 → P2, P3…).
+ */
+export function duplicatePlant(project: Project, ids: string[], copies = 1, step = 1): { plant: PlantItem[]; untagged: number } {
+  const rows = rowsOf(project, ids);
+  return copyRows(project, rows, { copies, step, first: 1, after: rows[rows.length - 1]!.id });
+}
+
+/** Save picked rows as a Design template: copies, with no module, channels or system. */
+export function designTemplateOf(project: Project, ids: string[], name: string): DesignTemplate {
+  const n = name.trim();
+  if (!n) throw new OpError("A template needs a name");
+  const rows = rowsOf(project, ids);
+  const plant = rows.map((src) => {
+    const { module: _m, system: _s, ...rest } = plain(src);
+    for (const pt of rest.points ?? []) delete pt.channel;
+    return rest as PlantItem;
+  });
+  return { name: n, plant };
+}
+
+/**
+ * Insert a Design template into a system: `copies` copies, the first with
+ * the template's own tags, each next moved on by `step`. Nothing links
+ * back to the template.
+ */
+export function insertDesignTemplate(
+  project: Project,
+  t: DesignTemplate,
+  opts: { system?: string; copies?: number; step?: number; after?: string } = {},
+): { plant: PlantItem[]; untagged: number } {
+  if (!t.plant.length) throw new OpError("That template has no rows");
+  if (opts.system && !(project.systems ?? []).includes(opts.system)) throw new OpError(`No system "${opts.system}"`);
+  return copyRows(project, t.plant, { copies: opts.copies ?? 1, step: opts.step ?? 1, first: 0, system: opts.system ?? "", after: opts.after });
+}
+
+/** What a template's rows need from the controller: its DI, DO, AI, AO, row by row and in all. */
+export function templateCounts(t: DesignTemplate): { rows: { tag: string; description: string; points: string; counts: Counts }[]; total: Counts } {
+  const total = zero();
+  const rows = t.plant.map((p) => {
+    const counts = zero();
+    for (const q of p.points ?? []) {
+      const ty = pointType(q.form);
+      if (ty && goesTo(q) !== "panel") {
+        counts[ty]++;
+        total[ty]++;
+      }
+    }
+    return { tag: p.tag, description: p.description, points: (p.points ?? []).map((q) => q.name).join(", "), counts };
+  });
+  return { rows, total };
 }

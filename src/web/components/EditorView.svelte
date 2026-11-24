@@ -36,6 +36,8 @@
   import SchedulesDialog from "./SchedulesDialog.svelte";
   import TableView from "./TableView.svelte";
   import DesignView from "./DesignView.svelte";
+  import DuplicateDialog from "./DuplicateDialog.svelte";
+  import DesignTemplatesDialog from "./DesignTemplatesDialog.svelte";
   import { addDesignPlant, addSystem } from "../../core/design";
   import Tiles from "./Tiles.svelte";
   import { canvases } from "../canvases";
@@ -466,6 +468,9 @@
         <button onclick={newSystem} title="A name that groups plant: Chilled water, Ventilation">+ System</button>
         <button onclick={newPlant} title="An empty plant row, in the picked system (or the picked plant's)">+ Plant</button>
         <button onclick={() => (editor.designAdding = true)} disabled={editor.designPick.plant.length !== 1} title={editor.designPick.plant.length === 1 ? "A point on the picked plant: its form, name and signal" : "Pick one plant row first"}>+ Point</button>
+        <span class="sep"></span>
+        <button class:active={!!editor.open.designDuplicate} disabled={!editor.designPick.plant.length} onclick={() => (editor.open.designDuplicate = !editor.open.designDuplicate)} title={editor.designPick.plant.length ? "Copy the picked rows n times, tags stepping on" : "Pick plant rows first (Ctrl+click for a group)"}>Duplicate ×n…</button>
+        <button class:active={!!editor.open.designTemplates} onclick={() => (editor.open.designTemplates = !editor.open.designTemplates)} title="Your Design templates: insert one, or save the picked rows as one">Templates…</button>
       {:else}
       <button class="icon" onclick={() => canvas?.fit()} title="Fit sheet (tap Space)"><Icon name="fit" /></button>
       <button class="icon" onclick={split} title="Split: the active tile in two, side by side, both showing its sheet. Each tile has its own bar to split right or down and to close"><Icon name="split" /></button>
@@ -552,6 +557,12 @@
           <p><kbd>Ctrl</kbd>+<kbd>Z</kbd> undo, <kbd>Ctrl</kbd>+<kbd>Y</kbd> redo, <kbd>Ctrl</kbd>+<kbd>A</kbd> select all on this workbench. Saving is automatic.</p>
         </div>
       </FloatBox>
+    {/if}
+    {#if editor.mode === "design" && editor.open.designDuplicate}
+      <DuplicateDialog {editor} onclose={() => (editor.open.designDuplicate = false)} />
+    {/if}
+    {#if editor.mode === "design" && editor.open.designTemplates}
+      <DesignTemplatesDialog {editor} onclose={() => (editor.open.designTemplates = false)} />
     {/if}
     {#if editor.linking}
       <div class="linkbar">

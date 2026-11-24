@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { ProjectFormatError } from "../core/validate";
-import { type Library, type Storage, StorageError } from "./storage";
+import { type DesignLibrary, type Library, type Storage, StorageError } from "./storage";
 import type { DeviceLibrary } from "./devices";
 import { routePage } from "../core/routing";
 import { routesStale } from "../core/wires";
@@ -11,6 +11,8 @@ import type { McpServer } from "./mcp";
 export interface AppOptions {
   storage: Storage;
   library?: Library;
+  /** Design templates (design-v0.4 §3), in the library's design folder. */
+  designs?: DesignLibrary;
   devices?: DeviceLibrary;
   assets?: AssetSource;
   version?: string;
@@ -42,7 +44,7 @@ function fileName(s: string): string {
   return s.replace(/[^A-Za-z0-9._ -]+/g, "-").trim() || "drawing";
 }
 
-export function createApp({ storage, library, devices, assets, version = "dev", pdf, selfUrl, mcp, examples, command, quit }: AppOptions): Hono {
+export function createApp({ storage, library, designs, devices, assets, version = "dev", pdf, selfUrl, mcp, examples, command, quit }: AppOptions): Hono {
   const app = new Hono();
 
   app.onError((err, c) => {
@@ -187,6 +189,17 @@ export function createApp({ storage, library, devices, assets, version = "dev", 
     app.get("/api/library", async (c) => c.json(await library.list()));
     app.get("/api/library/:file", async (c) => c.json(await library.load(c.req.param("file"))));
     app.post("/api/library", async (c) => c.json({ file: await library.save(await c.req.json()) }, 201));
+  }
+
+  if (designs) {
+    // Design templates: the engineer's own rows, a list apart from Draft's templates.
+    app.get("/api/design-templates", async (c) => c.json(await designs.list()));
+    app.get("/api/design-templates/:file", async (c) => c.json(await designs.load(c.req.param("file"))));
+    app.post("/api/design-templates", async (c) => c.json({ file: await designs.save(await c.req.json()) }, 201));
+    app.delete("/api/design-templates/:file", async (c) => {
+      await designs.remove(c.req.param("file"));
+      return c.json({ ok: true });
+    });
   }
 
   if (devices) {
