@@ -8,6 +8,8 @@
     deleteDesignPoint,
     addInterlock,
     updateInterlock,
+    addInterlockCondition,
+    removeInterlockCondition,
     deleteInterlock,
     interlockable,
     deleteSystem,
@@ -26,7 +28,7 @@
   import type { Editor } from "../editor.svelte";
   import TypeBadge from "./TypeBadge.svelte";
   import { confirmWiring, wiringOf } from "../../core/wiring";
-  import { interlockStatus, mergeProofs, proveInterlocks } from "../../core/interlocks";
+  import { MAX_CONDITIONS, interlockStatus } from "../../core/interlocks";
   import ChannelSelect from "./ChannelSelect.svelte";
   import { SUPPLY_CHOICES, formatSupplies, formatSupply } from "../../core/supplies";
 
@@ -49,20 +51,23 @@
   );
   /** Whether each of this plant's interlocks is proved (Check logic's search, kept short). */
   const ilStatus = $derived(plant?.interlocks?.length ? interlockStatus(editor.project, editor.proofs, plant.interlocks.map((x) => x.id)) : new Map());
-  let proving = $state(false);
   /** Prove this plant's interlocks now, as Check logic would: it can take a moment, so it's asked for. */
-  async function prove() {
-    if (!plant) return;
-    proving = true;
-    await new Promise((r) => setTimeout(r, 20));
-    editor.proofs = mergeProofs(editor.proofs, proveInterlocks($state.snapshot(editor.project) as typeof editor.project, plant.interlocks?.map((x) => x.id)));
-    proving = false;
+  function prove() {
+    if (plant) void editor.proveInterlocks(plant.interlocks?.map((x) => x.id));
   }
   function newInterlock() {
     if (!plant) return;
     const point = (plant.points ?? []).find((q) => interlockable(q.form));
     const other = tablePoints.find((t) => t.ref !== `plant:${plant.id}:${point?.name}`);
     if (point && other) editor.apply((p) => void addInterlock(p, plant.id, point.name, { ref: other.ref, on: true }));
+  }
+
+  /** Another condition on an interlock: the first point in the table it doesn't name yet. */
+  function addCondition(id: string, point: string) {
+    if (!plant) return;
+    const il = plant.interlocks?.find((x) => x.id === id);
+    const other = tablePoints.find((t) => t.ref !== `plant:${plant.id}:${point}` && !il?.when.some((c) => c.ref === t.ref)) ?? tablePoints.find((t) => t.ref !== `plant:${plant.id}:${point}`);
+    if (other) editor.apply((p) => addInterlockCondition(p, plant.id, id, { ref: other.ref, on: true }));
   }
 
   let newName = $state("");
@@ -157,25 +162,37 @@
       <div class="section">Interlocks{plant.interlocks?.length ? ` (${plant.interlocks.length})` : ""}</div>
       {#each plant.interlocks ?? [] as il (il.id)}
         {@const st = ilStatus.get(il.id)}
-        {@const c = il.when[0]!}
         <div class="interlock">
           <div class="line">
             <select value={il.point} aria-label="Point" onchange={(e) => editor.apply((p) => updateInterlock(p, plant.id, il.id, { point: e.currentTarget.value }))}>
               {#each (plant.points ?? []).filter((q) => interlockable(q.form)) as q (q.name)}<option value={q.name}>{q.name}</option>{/each}
             </select>
             <span class="never">never on while</span>
+            {#if il.when.length > 1}
+              <!-- Several conditions (v0.4.x T1): all of them together, or any one. -->
+              <select class="state" value={il.join ?? "or"} aria-label="All of or any of" title="All of: only while every condition holds (an exception: '…and the override is off'). Any of: while any one does." onchange={(e) => editor.apply((p) => updateInterlock(p, plant.id, il.id, { join: e.currentTarget.value as "and" | "or" }))}>
+                <option value="and">all of</option>
+                <option value="or">any of</option>
+              </select>
+            {/if}
             <button class="x" title="Remove this interlock and its expectation" onclick={() => editor.apply((p) => deleteInterlock(p, plant.id, il.id))}>×</button>
           </div>
-          <div class="line">
-            <select value={c.ref} aria-label="Condition" onchange={(e) => editor.apply((p) => updateInterlock(p, plant.id, il.id, { when: { ref: e.currentTarget.value, on: c.on } }))}>
-              {#if !tablePoints.some((t) => t.ref === c.ref)}<option value={c.ref}>(missing)</option>{/if}
-              {#each tablePoints.filter((t) => t.ref !== `plant:${plant.id}:${il.point}`) as t (t.ref)}<option value={t.ref}>{t.name}</option>{/each}
-            </select>
-            <select class="state" value={c.on ? "1" : "0"} aria-label="On or off" onchange={(e) => editor.apply((p) => updateInterlock(p, plant.id, il.id, { when: { ref: c.ref, on: e.currentTarget.value === "1" } }))}>
-              <option value="1">on</option>
-              <option value="0">off</option>
-            </select>
-          </div>
+          {#each il.when as c, ci (ci)}
+            <div class="line">
+              <select value={c.ref} aria-label="Condition" onchange={(e) => editor.apply((p) => updateInterlock(p, plant.id, il.id, { at: ci, when: { ref: e.currentTarget.value, on: c.on } }))}>
+                {#if !tablePoints.some((t) => t.ref === c.ref)}<option value={c.ref}>(missing)</option>{/if}
+                {#each tablePoints.filter((t) => t.ref !== `plant:${plant.id}:${il.point}`) as t (t.ref)}<option value={t.ref}>{t.name}</option>{/each}
+              </select>
+              <select class="state" value={c.on ? "1" : "0"} aria-label="On or off" onchange={(e) => editor.apply((p) => updateInterlock(p, plant.id, il.id, { at: ci, when: { ref: c.ref, on: e.currentTarget.value === "1" } }))}>
+                <option value="1">on</option>
+                <option value="0">off</option>
+              </select>
+              {#if il.when.length > 1}<button class="x" title="Take this condition off" onclick={() => editor.apply((p) => removeInterlockCondition(p, plant.id, il.id, ci))}>×</button>{/if}
+            </div>
+          {/each}
+          {#if il.when.length < MAX_CONDITIONS}
+            <button class="link" onclick={() => addCondition(il.id, il.point)} title="Another condition: any of them, or all of them together">+ Condition</button>
+          {/if}
           <div class="ilst {st?.kind ?? ''}">
             {#if st?.kind === "proved"}✓ Proved: the drawing can't break it
             {:else if st?.kind === "fails"}Not proved: it fails. Check logic in Simulate shows how
@@ -186,8 +203,10 @@
           </div>
         </div>
       {/each}
-      {#if [...ilStatus.values()].some((s) => s.kind === "unchecked")}
-        <button onclick={prove} disabled={proving} title="Try every sequence that can affect them, as Check logic in Simulate does">{proving ? "Proving…" : "Prove"}</button>
+      {#if editor.proving}
+        <div class="proving">Proving {editor.proving.done + 1} of {editor.proving.total}… <button onclick={() => editor.cancelProving()}>Cancel</button></div>
+      {:else if [...ilStatus.values()].some((s) => s.kind === "unchecked")}
+        <button onclick={prove} title="Try every sequence that can affect them, as Check logic in Simulate does">Prove</button>
       {/if}
       {#if (plant.points ?? []).some((q) => interlockable(q.form)) && tablePoints.length > 1}
         <button onclick={newInterlock} title="This plant's point is never on while a condition holds: a hardwired interlock, proved in Simulate">+ Interlock</button>
@@ -419,6 +438,10 @@
     display: flex;
     gap: 6px;
     align-items: center;
+    font-size: 12px;
+    color: #556;
+  }
+  .proving {
     font-size: 12px;
     color: #556;
   }

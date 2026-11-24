@@ -13,8 +13,18 @@ import { type Circuit, compile, initialState, search, type SimState } from "./si
 /** The point's ref, as conditions name it. */
 const ref = (plant: PlantItem, point: string) => `plant:${plant.id}:${point}`;
 
-/** The generated expectations for one interlock: one per condition (each is its own "never"). */
+/** An interlock's conditions, at most. */
+export const MAX_CONDITIONS = 6;
+
+/**
+ * The generated expectations for one interlock (v0.4.x T1): with `or` (or
+ * unset), one "never" per condition, *point on and that condition*; with
+ * `and`, one, *point on and every condition holds*: "never enabled while the
+ * fire alarm isn't healthy and the override is off".
+ */
 export function interlockExpectations(plant: PlantItem, il: Interlock): Expectation[] {
+  if (il.join === "and" && il.when.length > 1)
+    return [{ id: `x_${il.id}_0`, kind: "never" as const, when: [{ ref: ref(plant, il.point), on: true }, ...il.when.map((c) => ({ ref: c.ref, on: c.on }))], join: "and" as const, interlock: il.id }];
   return il.when.map((c, i) => ({
     id: `x_${il.id}_${i}`,
     kind: "never" as const,
@@ -53,7 +63,7 @@ export function describeInterlock(project: Project, plant: PlantItem, il: Interl
     const what = other ? `${tag(other)} ${m![2]}` : "(missing)";
     return c.on ? what : `${what} off`;
   };
-  return `${tag(plant)} ${il.point} never on while ${il.when.map(name).join(" or ")}`;
+  return `${tag(plant)} ${il.point} never on while ${il.when.map(name).join(il.join === "and" ? " and " : " or ")}`;
 }
 
 export type Proved =
@@ -119,22 +129,33 @@ function provable(project: Project, only?: string[]): { il: Interlock; rules: Ex
  * seconds on a big drawing, so it's run when asked, not on every edit.
  */
 export function proveInterlocks(project: Project, only?: string[], limit = 20000): Proofs {
+  const job = provingJob(project, only, limit);
   const results: Proofs["results"] = {};
+  for (const st of job.steps) results[st.id] = st.run();
+  return { key: job.key, results };
+}
+
+/**
+ * Proving one interlock at a time (v0.4.x T11): the drawing's key and a step
+ * per interlock, each run when the caller is ready, so the interface can
+ * show each result as it lands, say how far it's got, and stop.
+ */
+export function provingJob(project: Project, only?: string[], limit = 20000): { key: string; steps: { id: string; run: () => Proofs["results"][string] }[] } {
   const todo = provable(project, only);
-  if (todo.length) {
-    const c = compile(project);
-    const start = initialState(c);
-    for (const { il, rules } of todo) {
+  let c: Circuit | null = null;
+  let start: SimState | null = null;
+  const steps = todo.map(({ il, rules }) => ({
+    id: il.id,
+    run: (): Proofs["results"][string] => {
+      c ??= compile(project);
+      start ??= initialState(c);
       // First: can its point ever be on? A rule about a point that never is, is true for nothing (F1).
-      if (neverOn(c, start, rules[0]!.when[0]!.ref, limit)) {
-        results[il.id] = "never-on";
-        continue;
-      }
+      if (neverOn(c, start, rules[0]!.when[0]!.ref, limit)) return "never-on";
       const r = search(c, start, rules, { limit });
-      results[il.id] = r.violations.length ? "fails" : r.truncated ? "unknown" : "proved";
-    }
-  }
-  return { key: circuitKey(project), results };
+      return r.violations.length ? "fails" : r.truncated ? "unknown" : "proved";
+    },
+  }));
+  return { key: circuitKey(project), steps };
 }
 
 /** True when no sequence turns this point on: one search for *point on* (v0.4.x F1). Unknown (too many sequences) isn't never. */

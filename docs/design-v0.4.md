@@ -412,7 +412,7 @@ Targeted checks for the v0.4 build (`ferrule-windows-v0.4.0-pre.zip`, after PR 7
 - [ ] **Prove** (Properties), **Prove all** (To draw), or **Check logic** in Simulate: on the example, *FA-SF SF-01 running never on while FA-SF SF-02 running* is proved; *… while FA Fire alarm off* fails.
 - [ ] **Not proved yet** after changing the drawing, until proved again; **not drawn** when a point it names isn't on a sheet.
 - [ ] **Judgement call:** proving is asked for, not run on every edit (it takes seconds on a real drawing). Keep?
-- [ ] **Judgement call:** one condition per interlock; a second condition is a second interlock. Keep?
+- [ ] **Judgement call:** one condition per interlock; a second condition is a second interlock. Keep? *Replaced by v0.4.x T1 (PR 99): an interlock takes several conditions, all of them or any of them.*
 
 ### Step 9: the network
 
@@ -452,7 +452,7 @@ The first entries come from an integration test: a 36-sheet BMS panel (incomer a
 
 **Tweaks**
 
-- [ ] **T1. Interlocks with an exception.** *Never on while A off, unless B on* (a fire alarm stop with a firemans override) can't be written: each condition is its own rule, so the real design shows as *fails*. Add AND conditions, or an *except while* clause. Revisits the step 8 judgement call (one condition per interlock). v0.5.
+- [x] **T1. Interlocks with an exception.** *Never on while A off, unless B on* (a fire alarm stop with a firemans override) can't be written: each condition is its own rule, so the real design shows as *fails*. Add AND conditions, or an *except while* clause. Revisits the step 8 judgement call (one condition per interlock). v0.5. *Done in PR 99.*
 - [ ] **T2. A module view spans a chosen width.** Channel groups are packed two units apart, so eight channels take about 40 units while their field devices need 120 or more: every wire runs sideways under the module and wire numbers crowd at its pins. A module view (and any plant view with groups of terminals) should take a width, up to the usable sheet, and spread its groups with equal gaps between them, so each channel drops straight to its device. v0.4.x.
 - [ ] **T3. Panel devices that aren't field plant.** A power supply, DC UPS and batteries had to be plant (so the simulator has a 24 V source): their wiring draws dashed as field wiring, they count in To draw's field plant, sit under *No system* in Design and appear in the points schedule. A *panel device* kind of plant (inside the panel, solid wiring, not field), or a generic device box with pins. v0.5.
 - [ ] **T4. Terminal strips by section.** Everything lands on X1; on the backplate one long strip runs off the end of its rail. Offer strips by section, and let a strip on a GA wrap onto the next rail. v0.5.
@@ -462,7 +462,7 @@ The first entries come from an integration test: a 36-sheet BMS panel (incomer a
 - [ ] **T8. Duplicate steps the last number** (P1-12 → P1-13). With sheet-and-column tags the copy is always retagged; consider stepping the first number, or leaving tags to Renumber. v0.4.x (judgement call).
 - [ ] **T9. Module tags.** Modules take their tag from their first view (a module sheet), and the controller's from its host; a drawing set that tags them from the controller map sheet can't. Let the map sheet give module tags, or say which view does. v0.5.
 - [x] **T10. GA fit scale.** A door fitted at 1:9.5; fit to standard scales (1:5, 1:10, 1:20). v0.4.x. *Done in PR 95.*
-- [ ] **T11. Proving takes time on a real panel:** about 18 s for four interlocks with some 40 hand-set inputs. Show progress, or prove one interlock at a time in the background. v0.5.
+- [x] **T11. Proving takes time on a real panel:** about 18 s for four interlocks with some 40 hand-set inputs. Show progress, or prove one interlock at a time in the background. v0.5. *Done in PR 99.*
 - [ ] **T12. Label plate text position.** A label plate's text can sit at any of nine places: top, middle or bottom, by left, middle or right. v0.4.x.
 - [ ] **T13. Wire labels slide along their wire.** A wire's number and colour stay snapped to the wire, but can be dragged along its length to where they read best. v0.4.x or v0.5.
 - [ ] **T14. Part labels can be moved.** A lamp's, coil's or other part's label can be dragged clear by hand, as a relay's contact table can; solving every collision automatically isn't worth it. A part with several lines (a plant view's tag, description and information) moves them together as one block. Takes the place of T7's moving labels (a hint in Check can stay). v0.4.x or v0.5.

@@ -9,7 +9,7 @@
   import { moduleTypeName } from "../../core/modules";
   import { plantLabel, setQuickEntry } from "../../core/ops";
   import { startPlacing } from "../placing";
-  import { describeInterlock, interlockStatus, mergeProofs, proveInterlocks } from "../../core/interlocks";
+  import { describeInterlock, interlockStatus } from "../../core/interlocks";
   import type { Editor } from "../editor.svelte";
 
   let { editor }: { editor: Editor } = $props();
@@ -25,13 +25,7 @@
     return editor.project.plant.flatMap((plant) => (plant.interlocks ?? []).map((il) => ({ plant, il, st: st.get(il.id) })));
   });
   const total = $derived(lists.plant.length + lists.modules.length);
-  let proving = $state(false);
-  async function proveAll() {
-    proving = true;
-    await new Promise((r) => setTimeout(r, 20));
-    editor.proofs = mergeProofs(editor.proofs, proveInterlocks($state.snapshot(editor.project) as typeof editor.project));
-    proving = false;
-  }
+  const proveAll = () => void editor.proveInterlocks();
   const left = $derived(plantLeft.length + modsLeft.length);
 
   /** The plant whose pins are being given, and the line being edited. */
@@ -144,7 +138,7 @@
     {#if interlocks.length}
       <div class="group il">
         <span>Interlocks <span class="hint">proved in Simulate · {interlocks.filter((x) => x.st?.kind !== "proved").length} not yet</span></span>
-        {#if interlocks.some((x) => x.st?.kind === "unchecked")}<button onclick={proveAll} disabled={proving}>{proving ? "Proving…" : "Prove all"}</button>{/if}
+        {#if editor.proving}<span class="hint">Proving {editor.proving.done + 1} of {editor.proving.total}…</span> <button onclick={() => editor.cancelProving()}>Cancel</button>{:else if interlocks.some((x) => x.st?.kind === "unchecked")}<button onclick={proveAll}>Prove all</button>{/if}
       </div>
       {#each interlocks as x (x.il.id)}
         <div class="row il">

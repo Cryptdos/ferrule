@@ -3,6 +3,7 @@
  * history and autosave. All model changes go through `apply`, which calls
  * the core operations, records an undo step and schedules a save.
  */
+import { mergeProofs, provingJob } from "../core/interlocks";
 import type { Project } from "../core/model";
 import { OpError } from "../core/ops";
 import { routePage } from "../core/routing";
@@ -47,6 +48,35 @@ export class Editor {
   designFolded: string[] = $state([]);
   /** Interlocks proved (design-v0.4 §6), by Check logic or Prove, for the drawing as it was then. Not saved. */
   proofs: import("../core/interlocks").Proofs | null = $state(null);
+  /** Proving under way (v0.4.x T11): how many of how many, until it's done or cancelled. */
+  proving: { done: number; total: number } | null = $state(null);
+  private stopProving = false;
+
+  /**
+   * Prove interlocks one at a time, yielding to the interface between them:
+   * each result shows as it lands, and Cancel stops after the one running.
+   */
+  async proveInterlocks(only?: string[]): Promise<void> {
+    if (this.proving) return;
+    const job = provingJob($state.snapshot(this.project) as Project, only);
+    this.stopProving = false;
+    this.proving = { done: 0, total: job.steps.length };
+    try {
+      for (const step of job.steps) {
+        await new Promise((r) => setTimeout(r, 20));
+        if (this.stopProving) break;
+        const result = step.run();
+        this.proofs = mergeProofs(this.proofs, { key: job.key, results: { [step.id]: result } });
+        this.proving = { done: this.proving!.done + 1, total: job.steps.length };
+      }
+    } finally {
+      this.proving = null;
+    }
+  }
+
+  cancelProving(): void {
+    this.stopProving = true;
+  }
   /** + Point: the new point's form is open in Properties. */
   designAdding: boolean = $state(false);
   placeSymbol: string | null = $state(null);

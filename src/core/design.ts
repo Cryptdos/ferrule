@@ -8,7 +8,7 @@
 import { parseSupplies, parseSupply } from "./supplies";
 import { newId, type ChannelRef, type Condition, type DesignTemplate, type Interlock, type IoPoint, type PlantItem, type PointForm, type Project } from "./model";
 import { OpError, getPlant, renamePointRefs, syncPlantViews } from "./ops";
-import { newInterlock, syncInterlocks } from "./interlocks";
+import { MAX_CONDITIONS, newInterlock, syncInterlocks } from "./interlocks";
 
 /** What the controller needs for a point (design-v0.4 §2, Type): shown, never stored. */
 export type IoType = "DI" | "DO" | "AI" | "AO";
@@ -755,18 +755,48 @@ export function addInterlock(project: Project, plantId: string, point: string, w
   return il;
 }
 
-/** Change an interlock's point or condition; its expectation follows. */
-export function updateInterlock(project: Project, plantId: string, id: string, patch: { point?: string; when?: Condition }): void {
+/**
+ * Change an interlock's point, a condition (`when`, the `at`th; default the
+ * first), or how its conditions join (v0.4.x T1); its expectations follow.
+ */
+export function updateInterlock(project: Project, plantId: string, id: string, patch: { point?: string; when?: Condition; at?: number; join?: "and" | "or" }): void {
   const it = getPlant(project, plantId);
   const il = it.interlocks?.find((x) => x.id === id);
   if (!il) throw new OpError("No such interlock");
   const point = patch.point ?? il.point;
   const p = it.points?.find((q) => q.name === point);
   if (!p || !interlockable(p.form)) throw new OpError("An interlock is on one of the plant's own points that can be on or off");
-  const when = patch.when ? { ref: patch.when.ref, on: patch.when.on !== false } : il.when[0]!;
-  checkCondition(project, when, `plant:${it.id}:${point}`);
+  const at = patch.at ?? 0;
+  if (!il.when[at]) throw new OpError("No such condition");
+  const when = il.when.map((c, i) => (i === at && patch.when ? { ref: patch.when.ref, on: patch.when.on !== false } : c));
+  for (const c of when) checkCondition(project, c, `plant:${it.id}:${point}`);
   il.point = point;
-  il.when = [when];
+  il.when = when;
+  if (patch.join) il.join = patch.join;
+  if (il.when.length < 2) delete il.join;
+  syncInterlocks(project);
+}
+
+/** Add a condition to an interlock (v0.4.x T1): any of them (or), unless set to all of them (and). */
+export function addInterlockCondition(project: Project, plantId: string, id: string, when: Condition): void {
+  const it = getPlant(project, plantId);
+  const il = it.interlocks?.find((x) => x.id === id);
+  if (!il) throw new OpError("No such interlock");
+  if (il.when.length >= MAX_CONDITIONS) throw new OpError(`An interlock has up to ${MAX_CONDITIONS} conditions`);
+  checkCondition(project, when, `plant:${it.id}:${il.point}`);
+  il.when = [...il.when, { ref: when.ref, on: when.on !== false }];
+  il.join ??= "or";
+  syncInterlocks(project);
+}
+
+/** Take a condition off an interlock; its last one stays. */
+export function removeInterlockCondition(project: Project, plantId: string, id: string, at: number): void {
+  const it = getPlant(project, plantId);
+  const il = it.interlocks?.find((x) => x.id === id);
+  if (!il) throw new OpError("No such interlock");
+  if (il.when.length < 2) throw new OpError("An interlock needs a condition: delete the interlock instead");
+  il.when = il.when.filter((_, i) => i !== at);
+  if (il.when.length < 2) delete il.join;
   syncInterlocks(project);
 }
 

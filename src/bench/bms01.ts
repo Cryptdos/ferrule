@@ -12,7 +12,7 @@
  *   module on its own sheet with its field devices below the boundary;
  * - comms-only meters on a second bus;
  * - long project tags and four-word descriptions;
- * - two interlocks, one of which needs an exception;
+ * - two interlocks, one of which needs an exception (all of two conditions);
  * - a door and a backplate GA.
  *
  * Laid out from coordinates and left untidied on purpose: it's the "before"
@@ -21,7 +21,7 @@
 import type { Avoid } from "libavoid-js";
 import { refreshConductors } from "../core/conductors";
 import { addController, addModule, placeModulesOnGa } from "../core/controllers";
-import { addInterlock, addSystem, allocate, setPlantDesign } from "../core/design";
+import { addInterlock, addInterlockCondition, addSystem, allocate, setPlantDesign, updateInterlock } from "../core/design";
 import { ENCL, fitScale, gaCandidates } from "../core/ga";
 import type { Vec } from "../core/geometry";
 import { type Distribution, type Element, type IoPoint, type Page, type ParamValue, type PlantItem, type Project, newProject } from "../core/model";
@@ -484,10 +484,11 @@ export function buildBms01(avoid: Avoid | null): Bms01 {
   placeNetworkSheet(p);
 
   // --- Interlocks ---------------------------------------------------------------
-  // The supply fan drive is never enabled while the fire alarm isn't healthy.
-  // Its real design has an exception (unless the firemans override is on), which
-  // a one-condition interlock can't say: before T1 it shows as failing.
-  addInterlock(p, SFD.id, "Enable", { ref: pointRef(FA.id, "Healthy"), on: false });
+  // The supply fan drive is never enabled while the fire alarm isn't healthy,
+  // unless the firemans override is on: two conditions, all of them (T1).
+  const ilSf = addInterlock(p, SFD.id, "Enable", { ref: pointRef(FA.id, "Healthy"), on: false });
+  addInterlockCondition(p, SFD.id, ilSf.id, { ref: pointRef(FOS.id, "Override"), on: false });
+  updateInterlock(p, SFD.id, ilSf.id, { join: "and" });
   // The extract fan drive is never enabled before its damper is open.
   addInterlock(p, EFD.id, "Enable", { ref: pointRef(DMP2.id, "Open"), on: false });
 

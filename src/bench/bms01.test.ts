@@ -54,11 +54,12 @@ describe("BMS-01 fixture", () => {
     expect(s.lamps[lamp.id]).toBe(true);
   });
 
-  test("two interlocks: the one needing an exception fails, the other is proved", () => {
+  test("two interlocks, one with an exception (all of two conditions): both proved", () => {
     const r = proveInterlocks(p);
-    const sf = plant.SFD!.interlocks![0]!.id;
+    const sf = plant.SFD!.interlocks![0]!;
     const ef = plant.EFD!.interlocks![0]!.id;
+    expect(sf.join).toBe("and");
     expect(r.results[ef]).toBe("proved");
-    expect(r.results[sf]).toBe("fails");
+    expect(r.results[sf.id]).toBe("proved");
   });
 });
