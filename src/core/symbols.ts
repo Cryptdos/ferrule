@@ -2128,6 +2128,18 @@ export interface MapEntry {
  * each with its tag and bus address (in a circle), maker, model, type and
  * where it's drawn; spare slots dashed. Wraps onto more rows to fit.
  */
+/** Where each box of a controller map is, from the map's origin: its middle (v0.4.x T9, module tags from the map). */
+export function controllerMapSlots(entries: MapEntry[], width: number): Vec[] {
+  const pad = 0.8;
+  const r = 1.1;
+  const lh = DETAIL * 1.45;
+  const lines = (e: MapEntry) => (e.spare ? ["SPARE", "I/O"] : [e.maker.toUpperCase(), e.model.toUpperCase(), e.type, e.where]);
+  const boxW = Math.ceil(Math.max(14, ...entries.map((e) => Math.max(textWidth(e.spare ? "" : e.tag, TAG) + 2 * r + 1.5, ...lines(e).map((l) => textWidth(l, DETAIL))))) + 2 * pad);
+  const boxH = Math.ceil(pad * 2 + TAG * 1.4 + 4 * lh);
+  const per = Math.max(1, Math.floor((width + 0.5) / boxW));
+  return entries.map((_, i) => [(i % per) * boxW + boxW / 2, Math.floor(i / per) * (boxH + 1) + boxH / 2]);
+}
+
 export function controllerMap(entries: MapEntry[], width: number): { prims: Prim[]; w: number; h: number } {
   if (!entries.length) return { prims: [text(0, 2, "CONTROLLER MAP: no modules yet (Controllers…)", TAG, "start", "label")], w: 40, h: 3 };
   const lh = DETAIL * 1.45;
@@ -2208,9 +2220,9 @@ export function moduleViewLayout(el: Element) {
 function drawModuleView(el: Element, t?: GeometryText): { prims: Prim[]; terminals: TerminalDef[]; body: Rect } {
   const lay = moduleViewLayout(el);
   const { left, right, h } = lay;
-  let info: { heading?: string } = {};
+  let info: { heading?: string; commons?: string[][] } = {};
   try {
-    info = JSON.parse(str(el, "pmod", "{}")) as { heading?: string };
+    info = JSON.parse(str(el, "pmod", "{}")) as { heading?: string; commons?: string[][] };
   } catch {
     /* drawn without a heading */
   }
@@ -2260,6 +2272,15 @@ function drawModuleView(el: Element, t?: GeometryText): { prims: Prim[]; termina
         vertical: true,
       });
     }
+  }
+  // Commons linked inside the module (v0.4.x M6): a thin line under the joined pins, a dot at each.
+  const xOfPin = new Map(lay.terms.map((tm) => [tm.id, tm.x]));
+  for (const list of info.commons ?? []) {
+    const xs = list.map((p) => xOfPin.get(p)).filter((x): x is number => x !== undefined);
+    if (xs.length < 2) continue;
+    const y = 0.6;
+    prims.push({ t: "line", pts: [[Math.min(...xs), y], [Math.max(...xs), y]], w: lineUnits("thin") });
+    for (const x of xs) prims.push(circle(x, y, 0.18, true));
   }
   // What each point does on this job, along its wire under the terminals.
   for (const l of lay.labels) {

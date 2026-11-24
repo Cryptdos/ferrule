@@ -79,7 +79,30 @@ export function addModule(project: Project, controllerId: string, m: NewModule):
   if (c.slots[at]?.spare) c.slots[at] = slot;
   else c.slots.splice(at, 0, slot);
   if (m.pattern !== null) generateModule(project, item.id, { ...defaultPattern(m.type, channels), ...(m.pattern ?? {}) });
+  // A new module's shared returns are linked inside it (v0.4.x M6), as most datasheets have them.
+  const shared = sharedPins(item);
+  if (shared.length > 1) info.commons = [shared];
   return item;
+}
+
+/** A module's pins shared by more than one of its points: its commons. */
+export function sharedPins(item: PlantItem): string[] {
+  const pts = item.points ?? [];
+  return item.terminals.filter((t) => pts.filter((q) => q.pins.includes(t)).length > 1);
+}
+
+/**
+ * *Commons are linked inside the module* (v0.4.x M6): its shared pins are one
+ * point in Simulate and in the wiring check, and its view shows the link. Off,
+ * each is a pin of its own, as in files from before.
+ */
+export function setModuleCommons(project: Project, plantId: string, on: boolean): void {
+  const item = getPlant(project, plantId);
+  if (!item.module) throw new OpError(`${item.tag || "That"} isn't a controller's module`);
+  const shared = sharedPins(item);
+  if (on && shared.length > 1) item.module.commons = [shared];
+  else delete item.module.commons;
+  syncPlantViews(project);
 }
 
 /** Change a module's type, channel count, maker, model or bus address. */
@@ -140,6 +163,12 @@ export function generateModule(project: Project, plantId: string, pattern: Modul
   if (clean.length) item.points = clean;
   else delete item.points;
   if (pattern.channels && moduleType(item.module.type).channels) item.module.channels = pattern.channels;
+  // Linked commons follow the new pins (v0.4.x M6).
+  if (item.module.commons) {
+    const shared = sharedPins(item);
+    if (shared.length > 1) item.module.commons = [shared];
+    else delete item.module.commons;
+  }
   // Points allocated to channels the module no longer has let them go.
   tidyDesign(project);
   syncPlantViews(project);

@@ -357,6 +357,12 @@ export function compile(project: Project): Circuit {
       }
     }
   }
+  // A module's commons linked inside it (v0.4.x M6) are one node.
+  for (const item of project.plant) {
+    for (const list of item.module?.commons ?? []) {
+      for (let i = 1; i < list.length; i++) links.push({ a: pinNode(item.id, list[0]!), b: pinNode(item.id, list[i]!), el: item.id, src: item.id, closed: () => true, fixed: true });
+    }
+  }
   // Busbars and distributions join their wires electrically (each wire still has its own number).
   for (const j of netJoins(project)) links.push({ a: node.get(`${j.a[0]}:${j.a[1]}`) ?? `${j.a[0]}:${j.a[1]}`, b: node.get(`${j.b[0]}:${j.b[1]}`) ?? `${j.b[0]}:${j.b[1]}`, el: j.el, src: j.el, closed: () => true, fixed: true });
   if (supply.size && ret.size) supplies.push({ el: "rails", phases: [...supply], ret: [...ret] });

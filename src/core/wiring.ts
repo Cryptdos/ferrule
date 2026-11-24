@@ -51,6 +51,8 @@ export class Nets {
         for (const t of String(el.params.show ?? "").split(",").filter(Boolean)) this.union(this.term(el.id, t), Nets.pin(String(el.params.plant), t));
       }
     }
+    // A module's commons linked inside it (v0.4.x M6): a return reaching any of them reaches them all.
+    for (const item of project.plant) for (const list of item.module?.commons ?? []) for (const t of list.slice(1)) this.union(Nets.pin(item.id, list[0]!), Nets.pin(item.id, t));
   }
 
   static pin(plant: string, pin: string): string {

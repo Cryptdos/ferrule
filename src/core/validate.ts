@@ -276,6 +276,9 @@ function parseModule(v: unknown): { module?: ModuleInfo } {
   const whole = (x: unknown, max: number) => (typeof x === "number" && Number.isFinite(x) && x >= 1 ? Math.min(max, Math.floor(x)) : undefined);
   const channels = whole(v.channels, 64);
   const address = whole(v.address, 255);
+  const commons = arr(v.commons)
+    .map((l) => arr(l).filter((t): t is string => typeof t === "string"))
+    .filter((l) => l.length > 1);
   return {
     module: {
       controller: v.controller,
@@ -285,6 +288,7 @@ function parseModule(v: unknown): { module?: ModuleInfo } {
       ...(typeof v.model === "string" && v.model ? { model: v.model } : {}),
       ...(address ? { address } : {}),
       ...(typeof v.device === "string" && v.device ? { device: v.device } : {}),
+      ...(commons.length ? { commons } : {}),
     },
   };
 }
