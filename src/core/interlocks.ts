@@ -8,7 +8,7 @@
  * expectation.
  */
 import { newId, type Condition, type Expectation, type Interlock, type PlantItem, type Project } from "./model";
-import { compile, initialState, search } from "./sim";
+import { type Circuit, compile, initialState, search, type SimState } from "./sim";
 
 /** The point's ref, as conditions name it. */
 const ref = (plant: PlantItem, point: string) => `plant:${plant.id}:${point}`;
@@ -58,6 +58,8 @@ export function describeInterlock(project: Project, plant: PlantItem, il: Interl
 
 export type Proved =
   | { kind: "proved" }
+  /** Proved only because its point can never be on (v0.4.x F1): is it powered? */
+  | { kind: "never-on" }
   | { kind: "fails" }
   | { kind: "not-drawn"; what: string }
   /** Too many sequences to try them all. */
@@ -68,7 +70,7 @@ export type Proved =
 /** Proofs, from Check logic or Prove: each interlock's result, and the drawing they were for. */
 export interface Proofs {
   key: string;
-  results: Record<string, "proved" | "fails" | "unknown">;
+  results: Record<string, "proved" | "fails" | "unknown" | "never-on">;
 }
 
 /** A point is drawn when one of its pins is on a sheet. */
@@ -123,6 +125,11 @@ export function proveInterlocks(project: Project, only?: string[], limit = 20000
     const c = compile(project);
     const start = initialState(c);
     for (const { il, rules } of todo) {
+      // First: can its point ever be on? A rule about a point that never is, is true for nothing (F1).
+      if (neverOn(c, start, rules[0]!.when[0]!.ref, limit)) {
+        results[il.id] = "never-on";
+        continue;
+      }
       const r = search(c, start, rules, { limit });
       results[il.id] = r.violations.length ? "fails" : r.truncated ? "unknown" : "proved";
     }
@@ -130,13 +137,27 @@ export function proveInterlocks(project: Project, only?: string[], limit = 20000
   return { key: circuitKey(project), results };
 }
 
+/** True when no sequence turns this point on: one search for *point on* (v0.4.x F1). Unknown (too many sequences) isn't never. */
+export function neverOn(c: Circuit, start: SimState, ref: string, limit = 20000): boolean {
+  const r = search(c, start, [{ id: "on?", kind: "never", when: [{ ref, on: true }] }], { limit });
+  return !r.violations.length && !r.truncated;
+}
+
 /** Proofs from a Check logic run: each interlock fails if any of its expectations was broken. */
 export function proofsFromSearch(project: Project, broken: string[], truncated: boolean): Proofs {
   const results: Proofs["results"] = {};
+  let c: Circuit | null = null;
+  let start: SimState | null = null;
   for (const plant of project.plant) {
     for (const il of plant.interlocks ?? []) {
       const ids = interlockExpectations(plant, il).map((e) => e.id);
       results[il.id] = ids.some((id) => broken.includes(id)) ? "fails" : truncated ? "unknown" : "proved";
+      // Proved: but could its point ever be on (F1)?
+      if (results[il.id] === "proved") {
+        c ??= compile(project);
+        start ??= initialState(c);
+        if (neverOn(c, start, ref(plant, il.point))) results[il.id] = "never-on";
+      }
     }
   }
   return { key: circuitKey(project), results };

@@ -355,3 +355,10 @@ Judgement calls made while building, step by step.
 - A backplate's Sheet settings have *Behind*: the whole panel, or any door of any door front.
 - The door front prints *BACKPLATE: SHEET n* small at each door's bottom left; the plate's title reads *BACKPLATE BEHIND Controls, DOOR ON SHEET 1*.
 - Check: an info line when a plate is larger than its door.
+
+**Step 2 (supplies).**
+- M11: `SupplyType` on plant points (`gives`, `accepts`), typed in Design's point Properties; on parts it's a text param, `gives` on the Incoming supply and the transformer and `accepts` (*Takes*) on coils, timer coils and lamps, parsed by `parseSupply` / `parseSupplies` (*24 V AC, 24 V DC* or *24 V AC/DC*). A controller's power supply module takes through its supply-in point's `accepts` (set in data; there's no field for it in the controller window yet).
+- M11's check runs over what `compile` traces with every switch closed: a load is fed by a supply when either end shares a node with one of the supply's phases. A plant supply out's name in the message is its point's (*PSU-01 24V out*).
+- The info line counting loads that don't say what they take only appears once something in the project says what it gives or takes, so drawings that don't use it aren't told about every coil.
+- F2: a distribution's conductors are those on its busbars, rails and arrows; it's supplied when a supply's phase or return shares a node with them. A plant supply out's `dists` join it to its distributions even with no view drawn, so the fixture's F2 test deletes the power supply plant, not its view.
+- F1: `neverOn` is one search for the interlocked point being on, run before each interlock's own search (and after a Check logic run, for each interlock that came out proved). An unknown (too many sequences) isn't never on. `never-on` is amber in To draw and Properties and a warning in Check.

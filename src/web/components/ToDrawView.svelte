@@ -148,11 +148,12 @@
       </div>
       {#each interlocks as x (x.il.id)}
         <div class="row il">
-          {#if x.st?.kind === "proved"}<span class="tick">✓</span>{:else}<span class="dot">●</span>{/if}
+          {#if x.st?.kind === "proved"}<span class="tick">✓</span>{:else if x.st?.kind === "never-on"}<span class="amber">●</span>{:else}<span class="dot">●</span>{/if}
           <span class="ilname">{describeInterlock(editor.project, x.plant, x.il)}</span>
           <span class="dim">
             {#if x.st?.kind === "proved"}proved
             {:else if x.st?.kind === "fails"}fails: Check logic in Simulate shows how
+            {:else if x.st?.kind === "never-on"}<span class="amber">never on: is it powered?</span>
             {:else if x.st?.kind === "not-drawn"}not yet: {x.st.what} isn't drawn
             {:else if x.st?.kind === "unknown"}not proved: too many sequences to try them all
             {:else}not proved yet: Prove all, or Check logic in Simulate{/if}

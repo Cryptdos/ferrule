@@ -230,6 +230,11 @@ export function buildBms01(avoid: Avoid | null): Bms01 {
   PSU.points![1]!.follows = [{ ref: pointRef(PSU.id, "Mains"), on: true }];
   PSU.points![1]!.dists = { "+": D.V24.id, "-": D.V0.id };
   PSU.points![2]!.follows = [{ ref: pointRef(PSU.id, "Mains"), on: true }];
+  // What the supplies give and the loads take (M11).
+  PSU.points![0]!.accepts = [{ v: 230, ac: true }];
+  PSU.points![1]!.gives = { v: 24, ac: false };
+  for (const it of [DMP1, DMP2, VLV]) it.points![0]!.accepts = [{ v: 24, ac: true }, { v: 24, ac: false }];
+  modules.psu.points![0]!.accepts = [{ v: 24, ac: false }];
 
   // --- Drawing helpers -------------------------------------------------------------
   let page: Page = p.pages[0]!;
@@ -259,7 +264,7 @@ export function buildBms01(avoid: Avoid | null): Bms01 {
   // battery are inside the panel.
   page.title = "Incoming supply and 24 V DC";
   addSection(p, page.id, "INCOMING SUPPLY AND 24 V DC", [2, 2, 146, 84]);
-  const inc = add("supply", 14, 8, { label: "230V 1PH+N 50Hz SUPPLY", params: { system: "1ph-n" } });
+  const inc = add("supply", 14, 8, { label: "230V 1PH+N 50Hz SUPPLY", params: { system: "1ph-n", gives: "230 V AC" } });
   const qMain = add("isolator", 14, 18, { label: "32A MAIN ISOLATOR", params: { poles: 2, aux: 0, operator: "door" } });
   w([inc, "L"], [qMain, "1"]);
   w([inc, "N"], [qMain, "3"]);
