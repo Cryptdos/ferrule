@@ -34,7 +34,7 @@ v0.4, version `0.4.0-pre`: planned in `docs/design-v0.4.md` (§10 *Order of work
 - **Never commit** the user's test projects, reference drawings or notes; they're proprietary and stay in `C:\Temp\eCAD`. The one exception is the design doc being built, copied in as `docs/design-v<version>.md`.
 - Projects and distributions start empty; preferred setups go in templates.
 - Simple, consistent parts; no Swiss-army-knife features.
-- **Chats stay private:** no links to Claude sessions or chats (no `Claude-Session:` line, no session URL) in commits, PR bodies, comments or files. Commits end with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>` only; PR bodies end with `🤖 Generated with [Claude Code](https://claude.com/claude-code)` only. Nothing from a chat (names, firms, drawings discussed) goes into the repo.
+- **Chats stay private:** no links to Claude sessions or chats (no `Claude-Session:` line, no session URL) in commits, PR bodies, comments or files. Commits end with one `Co-Authored-By: Claude <model> <noreply@anthropic.com>` line only, naming the model that made the commit (e.g. `Claude Opus 5.5`, `Claude Fable 5.2`), so the history says which model did what; PR bodies end with `🤖 Generated with [Claude Code](https://claude.com/claude-code)` only. Nothing from a chat (names, firms, drawings discussed) goes into the repo.
 
 ## Checking your work
 

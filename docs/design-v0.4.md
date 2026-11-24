@@ -466,6 +466,7 @@ The first entries come from an integration test: a 36-sheet BMS panel (incomer a
 - [ ] **T12. Label plate text position.** A label plate's text can sit at any of nine places: top, middle or bottom, by left, middle or right. v0.4.x.
 - [ ] **T13. Wire labels slide along their wire.** A wire's number and colour stay snapped to the wire, but can be dragged along its length to where they read best. v0.4.x or v0.5.
 - [ ] **T14. Part labels can be moved.** A lamp's, coil's or other part's label can be dragged clear by hand, as a relay's contact table can; solving every collision automatically isn't worth it. Takes the place of T7's moving labels (a hint in Check can stay). v0.4.x or v0.5.
+- [ ] **T15. Terminal groups face up or down.** A plant view's terminals are along its top and a module view's along its bottom, fixed. Either should be able to face the other way (a setting on the view, or per group), so plant can sit above what it wires to and a module below, without wires looping round. Helps F6. v0.4.x or v0.5.
 
 **Missing (for later versions)**
 
@@ -475,3 +476,4 @@ The first entries come from an integration test: a 36-sheet BMS panel (incomer a
 - [ ] **M4. Relay pin numbering from the part:** a relay base's own terminal numbers rather than IEC 11/12/14.
 - [ ] **M5. Door devices with no schematic part** (a touchscreen) as GA devices with a tag, not label plates.
 - [ ] **M6. A controller's commons are linked inside it.** The common, RET and 0 V terminals of a module should be joined internally (per module, as its datasheet has it), so one return can carry 0 V for all its IO: in Simulate, in the wiring check, and without each one needing its own wire for Check to be quiet. Today each is a separate pin. v0.4.x or v0.5.
+- [ ] **M7. Comms ports as terminal groups.** A group of terminals on plant or a controller can be a comms port: Ethernet or serial. An Ethernet port is illustrative: it names what it plugs into on the network map (eth0 → SW1). A serial port (RS485) does more: the network is built from the links drawn from that port, device to device in wiring order, so the network sheet's bus, its order and its ends come from the drawing. Takes in T5 (a network knows its port). v0.5.
