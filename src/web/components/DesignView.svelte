@@ -8,6 +8,7 @@
   import DesignTable from "./DesignTable.svelte";
   import NeedsLine from "./NeedsLine.svelte";
   import ControllerView from "./ControllerView.svelte";
+  import ToDrawView from "./ToDrawView.svelte";
 
   let { editor }: { editor: Editor } = $props();
 </script>
@@ -15,6 +16,8 @@
 <div class="design">
   {#if editor.designView === "controller"}
     <div class="views one"><ControllerView {editor} /></div>
+  {:else if editor.designView === "todraw"}
+    <div class="views one"><ToDrawView {editor} /></div>
   {:else}
     <div class="views">
       <div class="main"><DesignTable {editor} /></div>

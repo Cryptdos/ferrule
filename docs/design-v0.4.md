@@ -257,6 +257,16 @@ README screenshots are retaken when the interface changes. Small judgement calls
 - **Modules were already out of the Plant window** and the plant schedule (v0.2 put them under Controllers); nothing more was needed for "modules stop being listed as plant".
 - **The Controllers button leaves Draft;** the window is *Controller…* in Design. Its *Place view* switches to Draft to place the module's view, until To draw (step 6) takes placing over. A window left open from Draft still closes from its own ×.
 
+**Step 6 (To draw, Draft placing only)**
+
+- **Pins arrive at placing** when Design made points without them: *Place on sheet* first opens a one-line pin entry, pre-filled with numbered pins per point (two for most forms, three for a supply in or comms), carrying on from the plant's highest pin number. It's a start to correct from the datasheet, not a choice made for you; nothing is placed until every point has pins. Pins can also be given beforehand in Design's Properties (*Pins, from the datasheet*).
+- **Quick entry keeps pinless points:** a pins line edited in Draft or Design leaves points that aren't in it and have no pins as they are. Before, they'd have gone.
+- **To draw lists drawn things too,** ticked with their sheets, so another view of a plant item or module can be placed from the same place (splitting a module across sheets). Module views are placed only from here now: *Place view* has left the Controllers window.
+- **Placing goes to the open sheet in Draft**, or the nearest schematic sheet when the open one is a GA or spare sheet.
+- **Unallocated plant can be placed;** To draw says *not all allocated* beside it. The mockup's *Allocate first* isn't in the design, and drawing first is sometimes how a job goes.
+- **Draft's Plant window** keeps *Place view*, the pins line and *Pins and points…*; tag, description, prefix, information, *power by others*, *New plant…* and delete moved to Design (prefix, information and *power by others* are new in Design's Properties).
+- **Interlocks in To draw** come with step 8, where interlocks are made.
+
 ---
 
 ## 11. Decisions, as discussed (24/11/26)

@@ -17,8 +17,8 @@
     type PointDesign,
   } from "../../core/design";
   import { CONNECTS, GOES_TO, POINT_FORMS, SIGNAL_SUGGESTIONS, type PointForm } from "../../core/model";
-  import { deletePlant, plantLabel, updatePlant } from "../../core/ops";
-  import { printedPin } from "../../core/points";
+  import { deletePlant, plantLabel, setQuickEntry, updatePlant } from "../../core/ops";
+  import { formatQuickEntry, printedPin } from "../../core/points";
   import type { Editor } from "../editor.svelte";
   import TypeBadge from "./TypeBadge.svelte";
   import ChannelSelect from "./ChannelSelect.svelte";
@@ -91,6 +91,9 @@
       <label>Description
         <input value={plant.description} onchange={(e) => editor.apply((p) => updatePlant(p, plant.id, { description: e.currentTarget.value }))} />
       </label>
+      <label title="The letters its tag starts with when Renumber tags it from where it's drawn (P → P3-12)">Prefix
+        <input value={plant.prefix ?? ""} placeholder="U" onchange={(e) => editor.apply((p) => updatePlant(p, plant.id, { prefix: e.currentTarget.value }))} />
+      </label>
       <label>System
         <select value={plant.system ?? ""} onchange={(e) => setPlant({ system: e.currentTarget.value })}>
           <option value="">No system</option>
@@ -120,6 +123,11 @@
         <input value={plant.source ?? ""} placeholder="Where in the client's document it's from" onchange={(e) => setPlant({ source: e.currentTarget.value })} />
       </label>
 
+      <label>Information (under its box on the drawing)
+        <textarea rows="2" value={plant.info ?? ""} placeholder="Model, rating, supply…" onchange={(e) => editor.apply((p) => updatePlant(p, plant.id, { info: e.currentTarget.value }))}></textarea>
+      </label>
+      <label class="tick"><input type="checkbox" checked={plant.powerByOthers === true} onchange={(e) => editor.apply((p) => updatePlant(p, plant.id, { powerByOthers: e.currentTarget.checked }))} /> Power by others (its power isn't on these drawings)</label>
+
       <div class="section">Points ({plant.points?.length ?? 0})</div>
       {#each plant.points ?? [] as pt (pt.name)}
         {@const t = pointType(pt.form)}
@@ -146,6 +154,10 @@
           <div class="pins">{pt.pins.length ? `Pins ${pt.pins.map((x) => printedPin(x, pt.name)).join(" ")}` : "No pins yet"}</div>
         </div>
       {/each}
+      <label title="Each point and its pins, | between: enable: 1 2 | fault: 11 14. Points not listed keep what they have">Pins, from the datasheet
+        <input class="mono" value={formatQuickEntry(plant)} placeholder={plant.points?.length ? "None yet: given here, or when it's placed" : "e.g. Mains: L N E | Run: 1 2"}
+          onchange={(e) => editor.apply((p) => setQuickEntry(p, plant.id, e.currentTarget.value))} />
+      </label>
       {#if editor.designAdding}
         <form class="point add" onsubmit={addPoint}>
           <div class="line">
@@ -242,6 +254,19 @@
     gap: 2px;
     font-size: 12px;
     color: #556;
+  }
+  label.tick {
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+  }
+  textarea {
+    font: inherit;
+    font-size: 13px;
+    resize: vertical;
+  }
+  .mono {
+    font-family: ui-monospace, Consolas, monospace;
   }
   .section {
     margin-top: 6px;

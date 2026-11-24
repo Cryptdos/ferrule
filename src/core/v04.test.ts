@@ -6,10 +6,10 @@ import { AvoidLib } from "libavoid-js";
 import { buildLsp01 } from "../bench/lsp01";
 import { checkProject } from "./checks";
 import { addController, addModule, deleteController, generateModule } from "./controllers";
-import { channelLabel, channelsFor, noChannelReason, unallocated, designTemplateOf, duplicatePlant, insertDesignTemplate, stepTag, tagPlan, templateCounts, addDesignPlant, addDesignPoint, addSystem, allocate, channelsOf, deleteDesignPoint, deleteSystem, moveSystem, movePlant, needsLine, pointOnChannel, pointType, renameSystem, setPlantDesign, systemGroups, updateDesignPoint } from "./design";
+import { needsPins, suggestPins, toDraw, channelLabel, channelsFor, noChannelReason, unallocated, designTemplateOf, duplicatePlant, insertDesignTemplate, stepTag, tagPlan, templateCounts, addDesignPlant, addDesignPoint, addSystem, allocate, channelsOf, deleteDesignPoint, deleteSystem, moveSystem, movePlant, needsLine, pointOnChannel, pointType, renameSystem, setPlantDesign, systemGroups, updateDesignPoint } from "./design";
 import { newProject, type IoPoint, type Project } from "./model";
 import { defaultPattern } from "./modules";
-import { addPlant, deletePlant, placePlantView, updatePin, updatePlant, updatePoint } from "./ops";
+import { addPlant, deletePlant, placePlantView, setQuickEntry, updatePin, updatePlant, updatePoint } from "./ops";
 import { ioSchedule } from "./schedules";
 import { saveSheetTemplate } from "./templates";
 import { parseDesignTemplate, parseProject } from "./validate";
@@ -421,5 +421,44 @@ describe("labels follow points (§4)", () => {
     allocate(p, pu.id, "proved", null);
     expect(label(ch("DI1").pins[0]!)).toBe("");
     expect(label(ch("DI2").pins[0]!)).toBe("Spare, typed");
+  });
+});
+
+describe("To draw (§8)", () => {
+  test("lists field plant and modules with where they're drawn; nothing drawn yet is what's left", () => {
+    const { p, di, dout } = panel();
+    addSystem(p, "A");
+    const a = addDesignPlant(p, "A");
+    const b = addDesignPlant(p);
+    b.terminals = ["1", "2"];
+    placePlantView(p, p.pages[0]!.id, b.id, [20, 50]);
+    placePlantView(p, p.pages[0]!.id, dout.id, [10, 4]);
+    const t = toDraw(p);
+    expect(t.plant.map((x) => [x.item.id, x.sheets])).toEqual([[a.id, []], [b.id, [1]]]);
+    expect(t.modules.map((x) => [x.item.id, x.sheets.length])).toEqual([[di.id, 0], [dout.id, 1], [p.plant.find((x) => x.module?.type === "uio")!.id, 0]]);
+  });
+  test("pins for a point with none are suggested, numbered on from its highest; given, the plant keeps its Design data", () => {
+    const { p, di } = panel();
+    const it = addPlant(p, "P1", "Pump", ["L", "N", "E", "7"], { points: [{ name: "Mains", form: "supply-in", pins: ["L", "N", "E"] }] });
+    addDesignPoint(p, it.id, { name: "enable", form: "powered-in", signal: "24 V" });
+    addDesignPoint(p, it.id, { name: "fault", form: "contact", signal: "volt-free" });
+    allocate(p, it.id, "fault", { module: di.id, point: "DI1" });
+    expect(needsPins(it)).toBe(true);
+    expect(suggestPins(it)).toBe("Mains: L N E | 7 | enable: 8 9 | fault: 10 11");
+    setQuickEntry(p, it.id, "Mains: L N E | enable: 8 9 | fault: 11 14");
+    expect(needsPins(it)).toBe(false);
+    expect(it.points!.map((q) => [q.name, q.form, q.pins, q.signal, q.channel?.point])).toEqual([
+      ["Mains", "supply-in", ["L", "N", "E"], undefined, undefined],
+      ["enable", "powered-in", ["8", "9"], "24 V", undefined],
+      ["fault", "contact", ["11", "14"], "volt-free", "DI1"],
+    ]);
+  });
+  test("a quick-entry edit in Draft keeps points that have no pins yet", () => {
+    const p = newProject("t");
+    const it = addPlant(p, "P1", "Pump", ["1", "2"], { points: [{ name: "run", form: "contact", pins: ["1", "2"] }] });
+    addDesignPoint(p, it.id, { name: "fault", form: "contact" });
+    setQuickEntry(p, it.id, "run: 1 2 3");
+    expect(it.points!.map((q) => [q.name, q.pins])).toEqual([["run", ["1", "2", "3"]], ["fault", []]]);
+    expect(needsPins(addDesignPlant(p))).toBe(true);
   });
 });
