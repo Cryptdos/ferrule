@@ -432,3 +432,40 @@ Targeted checks for the v0.4 build (`ferrule-windows-v0.4.0-pre.zip`, after PR 7
 - [ ] **Suggest…** (Controller view) proposes channels for the unallocated points; points already on channels aren't moved; a point with no room says so.
 - [ ] **Change a line** or untick it, then **Accept ticked**: only those are allocated, as one undo step. **Throw away** changes nothing.
 - [ ] **It never runs by itself:** nothing is allocated until you accept.
+
+### Fixes and tweaks for v0.4.x
+
+The master list from here on: what testing finds, to fix in small PRs (one or a few per PR, noted under *Changed during build*), or to carry into a later version. Add to it as testing goes; tick an item when its PR is merged and give the PR number.
+
+The first entries come from an integration test: a 36-sheet BMS panel (incomer and 24 V supply with UPS, fire alarm interface relays, fan and damper enable logic, drives, fans, a controller with eight IO modules and about 70 points) rebuilt in Ferrule through the core operations, then checked, proved, exported and compared with the original sheet by sheet. Design, allocation, module pin patterns, the wiring check, templates, cross-references, Renumber, Layout, the network sheet, the points schedule and PDF export all did the job. What didn't, or was missing:
+
+**Fixes**
+
+- [ ] **F1. An interlock proved because nothing is powered.** With the 24 V supply drawn as boxes (no source on the 24 V distribution), every interlock came out *proved*: nothing on 24 V can ever be on. A proof whose point can never be on should say so (*never on: is it powered?*) rather than *proved*. Small; v0.4.x.
+- [ ] **F2. A distribution with loads and no source isn't reported.** Check should warn when a distribution feeds coils, lamps or plant and nothing supplies it (no incoming supply, transformer, plant supply out or busbar stand-in). Small; v0.4.x. Goes with F1.
+- [ ] **F3. Comms-only plant is reported as not drawn.** Plant connected by comms only (meters on a bus) belongs on the network sheet, not a schematic, but To draw lists it red and Check says *not drawn yet*. Leave comms-only plant with no wired points out of both (or show it as *on the network sheet*). Small; v0.4.x.
+- [ ] **F4. Plant view text runs into its neighbour.** A plant view's tag and description can be wider than its box; long project tags overlap the next view. Either the view's width takes its text into account, or Check reports overlapping views. v0.4.x.
+- [ ] **F5. Module views side by side overprint their title rows** (tag · type · maker model · part of …). Wrap or shorten the title to the view's width. v0.4.x.
+- [ ] **F6. Routes run along the terminal strip and module pin rows,** next to other wires' stubs, and loop round a pin that faces away (a module's supply pins face down, so a supply from the rails above loops round the module). Keep routes a clear unit off strips and pin rows. v0.4.x or later.
+
+**Tweaks**
+
+- [ ] **T1. Interlocks with an exception.** *Never on while A off, unless B on* (a fire alarm stop with a firemans override) can't be written: each condition is its own rule, so the real design shows as *fails*. Add AND conditions, or an *except while* clause. Revisits the step 8 judgement call (one condition per interlock). v0.5.
+- [ ] **T2. Module channel spacing.** Channels are packed two units apart, so eight channels take about 40 units while their field devices need 120 or more: every wire runs sideways under the module and wire numbers crowd at its pins. A spacing setting, or *spread to the sheet's width*, so each channel drops straight to its device. v0.4.x or v0.5.
+- [ ] **T3. Panel devices that aren't field plant.** A power supply, DC UPS and batteries had to be plant (so the simulator has a 24 V source): their wiring draws dashed as field wiring, they count in To draw's field plant, sit under *No system* in Design and appear in the points schedule. A *panel device* kind of plant (inside the panel, solid wiring, not field), or a generic device box with pins. v0.5.
+- [ ] **T4. Terminal strips by section.** Everything lands on X1; on the backplate one long strip runs off the end of its rail. Offer strips by section, and let a strip on a GA wrap onto the next rail. v0.5.
+- [ ] **T5. Networks know their port.** A network doesn't record which controller port it's on (COM A, COM B, Ethernet); it had to go in the name. Add a port; consider end-of-line terminators and in/out on the same terminal as notes on the network sheet. v0.5.
+- [ ] **T6. Stamping and links out.** A stamped sheet drops links out of the stamp (by design), so each stamped sheet's relay contacts and arrows are linked again by hand. Offer to map them while stamping (this contact → that coil). v0.5.
+- [ ] **T7. Label collisions.** Coil labels collide when relays are close; arrow labels collide when arrows are under about 20 units apart. A hint in Check, or labels that move clear. v0.5.
+- [ ] **T8. Duplicate steps the last number** (P1-12 → P1-13). With sheet-and-column tags the copy is always retagged; consider stepping the first number, or leaving tags to Renumber. v0.4.x (judgement call).
+- [ ] **T9. Module tags.** Modules take their tag from their first view (a module sheet), and the controller's from its host; a drawing set that tags them from the controller map sheet can't. Let the map sheet give module tags, or say which view does. v0.5.
+- [ ] **T10. GA fit scale.** A door fitted at 1:9.5; fit to standard scales (1:5, 1:10, 1:20). v0.4.x.
+- [ ] **T11. Proving takes time on a real panel:** about 18 s for four interlocks with some 40 hand-set inputs. Show progress, or prove one interlock at a time in the background. v0.5.
+
+**Missing (for later versions)**
+
+- [ ] **M1. Symbols:** power supply, DC UPS, battery, RCD (and RCD socket), resistor (end of line), screened cable or pair with screen earth, connector and flying leads, and field device marks inside plant views (temperature, ΔP, valve, damper actuator).
+- [ ] **M2. Cables** as objects: type, cores, screen (RS485 pair, fire-rated, Ethernet), rather than notes.
+- [ ] **M3. Wire colour by function,** not only from distributions: DC signal and external supply colours as the drawing's notes give them.
+- [ ] **M4. Relay pin numbering from the part:** a relay base's own terminal numbers rather than IEC 11/12/14.
+- [ ] **M5. Door devices with no schematic part** (a touchscreen) as GA devices with a tag, not label plates.
