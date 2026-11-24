@@ -8,7 +8,8 @@ import { spreadBlock } from "./blocks";
 import { PLANT_VIEW_KEYS, labelWidthFor, legendToPositions } from "./ops";
 import { parseProjectDevices } from "./devices";
 import { AREA_UNITS } from "./geometry";
-import { DISTRIBUTION_KINDS, type DistributionKind, POINT_FORMS, type Condition, type Controller, type ControllerSlot, type ModuleInfo, type ModuleType, type PlantItem, type Expectation, type IoPoint, type PinInfo, type PointForm, FORMAT, FORMAT_VERSION, type GaDim, type GaDimPoint, type GaItem, type Page, type Project, emptyInfo } from "./model";
+import { tidyDesign } from "./design";
+import { DISTRIBUTION_KINDS, type DistributionKind, POINT_FORMS, type Condition, type Controller, type ControllerSlot, type ModuleInfo, type ModuleType, type PlantItem, type Expectation, type IoPoint, type Interlock, type Network, type PinInfo, type PointForm, FORMAT, FORMAT_VERSION, type GaDim, type GaDimPoint, type GaItem, type Page, type Project, emptyInfo } from "./model";
 import { defaultParams, getSymbol } from "./symbols";
 import { gaToSheet } from "./ga";
 import { MODULE_TYPES } from "./modules";
@@ -93,6 +94,11 @@ export function parseProject(input: unknown): Project {
   project.expectations = parseExpectations(input.expectations);
   const controllers = parseControllers(input.controllers, project.plant);
   if (controllers) project.controllers = controllers;
+  const networks = parseNetworks(input.networks);
+  if (networks.length) project.networks = networks;
+  const systems = arr(input.systems).filter((x): x is string => typeof x === "string").map((x) => x.trim()).filter(Boolean);
+  if (systems.length) project.systems = [...new Set(systems)];
+  tidyDesign(project);
   project.assets = parseAssets(input.assets);
   for (const pg of project.pages) {
     for (const el of pg.elements) {
@@ -199,8 +205,41 @@ export function parsePlant(v: unknown): Project["plant"] {
       ...parsePoints(pl.points, pl.pins),
       ...(typeof pl.info === "string" && pl.info ? { info: pl.info } : {}),
       ...parseModule(pl.module),
+      ...parsePlantDesign(pl),
     }));
 }
+
+const text = (v: unknown) => (typeof v === "string" ? v.trim() : "");
+
+/** A plant item's Design fields (design-v0.4 §2), each only when set. */
+function parsePlantDesign(pl: Record<string, unknown>): Partial<PlantItem> {
+  const out: Partial<PlantItem> = {};
+  for (const k of ["system", "protocol", "network", "enabledBy", "source"] as const) {
+    const v = text(pl[k]);
+    if (v) out[k] = v;
+  }
+  if (pl.connects === "comms" || pl.connects === "both") out.connects = pl.connects;
+  const interlocks: Interlock[] = [];
+  for (const x of arr(pl.interlocks).filter(isObj)) {
+    if (typeof x.id !== "string" || !x.id || interlocks.some((y) => y.id === x.id)) continue;
+    const point = text(x.point);
+    const when = parseConditions(x.when);
+    if (!point || !when.length) continue;
+    interlocks.push({ id: x.id, point, when, ...(when.length > 1 && (x.join === "or" || x.join === "and") ? { join: x.join } : {}) });
+  }
+  if (interlocks.length) out.interlocks = interlocks;
+  return out;
+}
+
+export function parseNetworks(v: unknown): Network[] {
+  const out: Network[] = [];
+  for (const n of arr(v).filter(isObj)) {
+    if (typeof n.id !== "string" || !n.id || out.some((x) => x.id === n.id)) continue;
+    out.push({ id: n.id, name: text(n.name), protocol: text(n.protocol), kind: n.kind === "lan" ? "lan" : "bus" });
+  }
+  return out;
+}
+
 
 const MODULE_TYPE_SET = new Set<string>(MODULE_TYPES.map((t) => t.value));
 
@@ -276,10 +315,14 @@ function parsePoints(points: unknown, pins: unknown): { points?: IoPoint[]; pins
         ...(typeof p.delay === "number" && p.delay > 0 ? { delay: p.delay } : {}),
         ...(dists && Object.keys(dists).length ? { dists } : {}),
         ...(typeof p.label === "string" && p.label.trim() ? { label: p.label.trim() } : {}),
+        ...(text(p.signal) ? { signal: text(p.signal) } : {}),
+        ...(p.goesTo === "relay" || p.goesTo === "panel" ? { goesTo: p.goesTo } : {}),
+        ...(isObj(p.channel) && text(p.channel.module) && text(p.channel.point) ? { channel: { module: text(p.channel.module), point: text(p.channel.point) } } : {}),
       };
       return q;
     })
-    .filter((p) => p.pins.length);
+    // A point may have no pins yet (design-v0.4 §2); names are unique on a device.
+    .filter((p, i, all) => all.findIndex((q) => q.name === p.name) === i);
   if (list.length) out.points = list;
   if (isObj(pins)) {
     const m: Record<string, PinInfo> = {};
@@ -309,6 +352,7 @@ export function parseExpectations(v: unknown): Expectation[] {
         when,
         ...(when.length > 1 && (e.join === "or" || e.join === "and") ? { join: e.join } : {}),
         ...(typeof e.note === "string" && e.note ? { note: e.note } : {}),
+        ...(typeof e.interlock === "string" && e.interlock ? { interlock: e.interlock } : {}),
       };
       return x;
     })
