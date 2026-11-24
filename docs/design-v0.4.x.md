@@ -30,7 +30,7 @@ Small and safe first; then the data other steps need; then layout, where three e
 | 7b | T15 | Terminal groups on any side | Large |
 | 8 | F6 | Routing clear of strips and pin rows | Medium |
 | 9a | M9, T17, M8 | Connector block, socket, motors | Medium |
-| 9b | M1, M5 | Remaining symbols; door devices | Medium |
+| 9b | M1, M5 | RCD, resistor, connector, plant marks; door devices | Small |
 | 10a | M6, T9 | Module commons; module tags | Small |
 | 10b | M7, T5 | Serial ports build their network | Large |
 | 11 | T4 | Terminal strips by section | Medium |
@@ -177,17 +177,17 @@ Decided: it grows taller, in pairs, and it can be rotated like any part, so turn
 
 ### Step 9b: symbols and door devices
 
-**M1.** New symbols, each plain and parameter-light:
+**M1.** Decided: **no supply symbols.** A power supply, a battery and a DC UPS are plant, marked *In the panel* (T3), with their terminals named and their points set up by the user: a `supply-in`, and a `supply-out` that follows it and says what it gives (M11). The setup is done once and kept as a Design template. So a Design template must carry everything that makes such plant work: *In the panel*, each point's *gives* or *accepts*, what a `supply-out` follows, and its draw and rating (M12). Test: save the fixture's power supply as a Design template, insert it into an empty project, and it supplies 24 V in Simulate with nothing more set.
 
-| Symbol | Terminals | Notes |
+What M1 still adds:
+
+| Part | Terminals | Notes |
 |---|---|---|
-| Power supply | L N E in; + − out | A source for Simulate: its output *gives* (M11) and follows its input. Rating text. |
-| Battery | + − | A source, always on. |
-| RCD | as the two-pole breaker | A *function* of the existing isolator part, with the RCD mark. |
+| RCD | as the two-pole breaker | A *function* of the existing isolator part, with the RCD mark. Not a new symbol. |
 | Resistor | 1 2 | Value as its label (120 Ω). A closed link in Simulate. |
 | Connector | plug and socket pair, 1–12 ways | For flying leads. |
 
-A DC UPS is a panel device (T3) with points, not a symbol: too many variants. Field device marks: a plant item gets an optional *Mark* (temperature, pressure, humidity, ΔP switch, valve, damper, meter) drawn small inside its view's box.
+Field device marks: a plant item gets an optional *Mark* (temperature, pressure, humidity, ΔP switch, valve, damper, meter, power supply, battery) drawn small inside its view's box. The picture only; nothing depends on it.
 
 **M5. Door devices with no schematic part.** In Layout, *Add device* places a device that isn't on any schematic: a name, a tag, a size and an optional cutout. It prints its tag and is on the bill of materials. For an operator screen and the like.
 
@@ -284,7 +284,7 @@ This is the largest entry and the least specified. Before it starts, write its d
 | 2 | M9 | Connector block grows taller in pairs, or wider in rows? | **Decided:** taller, and it rotates |
 | 3 | T9 | Module tags from the controller map when there is one? | **Decided:** yes |
 | 4 | M10 | Wire markers: how many, and what text? | **Decided:** two per panel wire and two per field core, one at each end; a marker matches the boundary terminal its wire goes into; a core's field end carries the cable's identity |
-| 5 | M1 | DC UPS as a panel device with points, not a symbol? | Open. Recommended: yes |
+| 5 | M1 | Power supply, battery and UPS: symbols or plant? | **Decided:** all three are panel plant, set up once and kept as a Design template; no supply symbols |
 | 6 | M2 | Cables as objects in this sprint, or after it? | Open. Recommended: after the rest, with its own design |
 
 ## 5. Changed during build
