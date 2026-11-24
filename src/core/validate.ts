@@ -10,6 +10,7 @@ import { parseProjectDevices } from "./devices";
 import { AREA_UNITS } from "./geometry";
 import { tidyDesign } from "./design";
 import { RELEASES_URL, VERSION } from "./version";
+import { MAX_CONDITIONS } from "./interlocks";
 import { DISTRIBUTION_KINDS, type DistributionKind, POINT_FORMS, type Condition, type Controller, type ControllerSlot, type DesignTemplate, type ModuleInfo, type ModuleType, type PlantItem, type Expectation, type IoPoint, type Interlock, type Network, type PinInfo, type PointForm, FORMAT, FORMAT_VERSION, type GaDim, type GaDimPoint, type GaItem, type Page, type Project, emptyInfo } from "./model";
 import { defaultParams, getSymbol } from "./symbols";
 import { gaToSheet } from "./ga";
@@ -238,7 +239,8 @@ function parsePlantDesign(pl: Record<string, unknown>): Partial<PlantItem> {
   for (const x of arr(pl.interlocks).filter(isObj)) {
     if (typeof x.id !== "string" || !x.id || interlocks.some((y) => y.id === x.id)) continue;
     const point = text(x.point);
-    const when = parseConditions(x.when);
+    // An interlock takes several conditions (v0.4.x T1).
+    const when = parseConditions(x.when, MAX_CONDITIONS);
     if (!point || !when.length) continue;
     interlocks.push({ id: x.id, point, when, ...(when.length > 1 && (x.join === "or" || x.join === "and") ? { join: x.join } : {}) });
   }
@@ -305,11 +307,11 @@ const isSupplyType = (v: unknown): v is { v: number; ac: boolean } => isObj(v) &
 
 const FORMS = new Set(POINT_FORMS.map((f) => f.value));
 
-function parseConditions(v: unknown): Condition[] {
+function parseConditions(v: unknown, max = 2): Condition[] {
   return arr(v)
     .filter(isObj)
     .filter((c) => typeof c.ref === "string" && c.ref)
-    .slice(0, 2)
+    .slice(0, max)
     .map((c) => ({ ref: c.ref as string, on: c.on !== false }));
 }
 

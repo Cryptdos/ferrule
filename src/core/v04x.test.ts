@@ -7,8 +7,8 @@ import { AvoidLib } from "libavoid-js";
 import { buildBms01 } from "../bench/bms01";
 import { cellHalfFor } from "./blocks";
 import { checkProject } from "./checks";
-import { setPlantDesign, toDraw, updateDesignPoint } from "./design";
-import { interlockStatus, proveInterlocks } from "./interlocks";
+import { addInterlockCondition, removeInterlockCondition, setPlantDesign, toDraw, updateDesignPoint, updateInterlock } from "./design";
+import { describeInterlock, interlockExpectations, interlockStatus, proveInterlocks, provingJob } from "./interlocks";
 import { parseSupplies, parseSupply } from "./supplies";
 import { refreshConductors } from "./conductors";
 import { newProject } from "./model";
@@ -261,5 +261,45 @@ describe("step 2: supplies (M11, F2, F1)", () => {
     for (const pg of p.pages) pg.elements = pg.elements.filter((e) => e.symbol !== "supply");
     refreshConductors(p);
     expect(checkProject(p).some((f) => /nothing supplies it/.test(f.message))).toBe(false);
+  });
+});
+
+describe("step 3: interlocks (T1, T11)", () => {
+  test("T1: all of: one expectation, point on and every condition; any of: one per condition", () => {
+    const { project: p, plant } = fresh();
+    const il = plant.SFD!.interlocks![0]!;
+    expect(describeInterlock(p, plant.SFD!, il)).toBe("AHU-01-SF-01-VSD Enable never on while FA-IF-01 Healthy off and FOS-01 Override off");
+    const ex = interlockExpectations(plant.SFD!, il);
+    expect(ex.map((e) => e.id)).toEqual([`x_${il.id}_0`]);
+    expect(ex[0]!.when.length).toBe(3);
+    expect(proveInterlocks(p, [il.id]).results[il.id]).toBe("proved");
+    // Any of: the override no longer excuses it, so it fails.
+    updateInterlock(p, plant.SFD!.id, il.id, { join: "or" });
+    expect(interlockExpectations(plant.SFD!, il).map((e) => e.id)).toEqual([`x_${il.id}_0`, `x_${il.id}_1`]);
+    expect(describeInterlock(p, plant.SFD!, il)).toMatch(/Healthy off or FOS-01 Override off$/);
+    expect(proveInterlocks(p, [il.id]).results[il.id]).toBe("fails");
+    expect(p.expectations.filter((e) => e.interlock === il.id).length).toBe(2);
+    // Back to one condition: join goes.
+    removeInterlockCondition(p, plant.SFD!.id, il.id, 1);
+    expect(il.join).toBeUndefined();
+    const back = parseProject(JSON.parse(JSON.stringify(p)));
+    expect(back.plant.find((x) => x.id === plant.SFD!.id)!.interlocks![0]!.when.length).toBe(1);
+  });
+
+  test("T1: an interlock of three conditions survives a save", () => {
+    const { project: p, plant } = fresh();
+    const il = plant.SFD!.interlocks![0]!;
+    addInterlockCondition(p, plant.SFD!.id, il.id, { ref: `plant:${plant.DMP1!.id}:Open`, on: false });
+    const back = parseProject(JSON.parse(JSON.stringify(p)));
+    const b = back.plant.find((x) => x.id === plant.SFD!.id)!.interlocks![0]!;
+    expect([b.when.length, b.join]).toEqual([3, "and"]);
+  });
+
+  test("T11: proving runs one interlock at a time, each a step of its own", () => {
+    const { project: p } = fresh();
+    const job = provingJob(p);
+    expect(job.steps.length).toBe(2);
+    expect(job.steps.map((s) => s.run())).toEqual(["proved", "proved"]);
+    expect(job.key).toBe(proveInterlocks(p).key);
   });
 });
