@@ -10,8 +10,8 @@ import { checkProject } from "./checks";
 import { setPlantDesign, toDraw } from "./design";
 import { newProject } from "./model";
 import { moduleTitle, viewsOf } from "./modules";
-import { addElement, addGaDim, addGaItem, addGaPage, joinDoorBelow, setBoundary, setGaSettings, splitDoor, updateElement } from "./ops";
-import { ENCL, dimLayout, doorPanes, drawnGaItems, gaFrame, paneOf, paneRef, sheetPanes } from "./ga";
+import { addElement, addGaDim, addGaItem, addGaPage, addPlatesForDoors, joinDoorBelow, setPlateBehind, setBoundary, setGaSettings, splitDoor, updateElement } from "./ops";
+import { ENCL, PLATE_MARGIN, dimLayout, doorPanes, plateDoor, platesOf, drawnGaItems, gaFrame, paneOf, paneRef, sheetPanes } from "./ga";
 import { renumber } from "./renumber";
 import { stampSaved } from "../server/storage";
 import { parseProject } from "./validate";
@@ -175,5 +175,40 @@ describe("step 1b: modular doors (M13)", () => {
     // Back to one plain door: no columns kept.
     setGaSettings(p, front.id, { columns: null });
     expect(doorPanes(front).length).toBe(1);
+  });
+
+  test("a backplate for each door: the door's size less the margin, named for it, in column then row order", () => {
+    const { p, front } = twoByThree();
+    const plates = addPlatesForDoors(p, front.id);
+    expect(plates.length).toBe(6);
+    expect(plates.map((x) => x.ga!.behind!.pane)).toEqual([[0, 0], [0, 1], [0, 2], [1, 0], [1, 1], [1, 2]]);
+    expect(plates[0]!.title).toBe("Backplate: Incomer");
+    expect(plates[3]!.ga!.enclosure).toEqual({ w: 600 - 2 * PLATE_MARGIN, h: 600 - 2 * PLATE_MARGIN });
+    expect(plateDoor(p, plates[3]!)?.pane).toMatchObject({ col: 1, row: 0 });
+    expect(platesOf(p, front).get("1:0")?.id).toBe(plates[3]!.id);
+    // Doors that have one are skipped; a plate's size is its own once made.
+    expect(() => addPlatesForDoors(p, front.id)).toThrow("Every door already has a backplate");
+    // Larger than its door: an info line.
+    plates[0]!.ga!.enclosure = { w: 500, h: 250 };
+    expect(checkProject(p).some((f) => /larger than its door's opening, Incomer/.test(f.message))).toBe(true);
+    // Saved and read back.
+    const back = parseProject(JSON.parse(JSON.stringify(p)));
+    expect(back.pages.find((x) => x.id === plates[4]!.id)!.ga!.behind).toEqual({ sheet: front.id, pane: [1, 1] });
+  });
+
+  test("joining two doors leaves both plates as ordinary backplates, flagged; plates below move up", () => {
+    const { p, front } = twoByThree();
+    const plates = addPlatesForDoors(p, front.id);
+    const item = addGaItem(p, plates[3]!.id, { kind: "rail", x: 10, y: 50, w: 400, h: 35 });
+    joinDoorBelow(p, front.id, 1, 0);
+    expect(plates[3]!.ga!.behind!.pane).toBeNull();
+    expect(plates[4]!.ga!.behind!.pane).toBeNull();
+    expect(plates[5]!.ga!.behind!.pane).toEqual([1, 1]);
+    expect(plates[3]!.gaItems!.map((x) => x.id)).toEqual([item.id]);
+    const flagged = checkProject(p).filter((f) => /backplate's door has been joined to another or removed/.test(f.message));
+    expect(flagged.map((f) => f.pageId).sort()).toEqual([plates[3]!.id, plates[4]!.id].sort());
+    // Put behind a door again by hand.
+    setPlateBehind(p, plates[3]!.id, { sheet: front.id, pane: [1, 0] });
+    expect(plateDoor(p, plates[3]!)?.pane.h).toBe(1200);
   });
 });

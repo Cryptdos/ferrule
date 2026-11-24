@@ -40,7 +40,7 @@ import { cleanPoints, formatQuickEntry, mergePoints, isInputForm, missingRefs, p
 import { isOrthogonal, routeOf, simplifyRoute } from "./wires";
 import { isMaster, isSlave, locate } from "./xref";
 import { colourCode, knownColour, lampColour } from "./wirecolours";
-import { DETAIL_ZOOMS, MAX_COLUMNS, MAX_DOORS, allDetails, detailOf, detailSpace, doorColumns, doorOwner, fitScale, fitZoom, frameOf, itemStrip, nextDetailLetter, sheetTakes, syncDetailFrames, viewTakes } from "./ga";
+import { DETAIL_ZOOMS, MAX_COLUMNS, MAX_DOORS, PLATE_MARGIN, allDetails, detailOf, detailSpace, doorColumns, doorOwner, doorPanes, paneName, platesOf, plateDoor, fitScale, fitZoom, frameOf, itemStrip, nextDetailLetter, sheetTakes, syncDetailFrames, viewTakes } from "./ga";
 
 export class OpError extends Error {}
 
@@ -1421,6 +1421,7 @@ export function addGaPage(project: Project, title: string, ga: GaSettings, after
   if (ga.view === "door-front" && !ga.of && ga.columns?.length) setColumns(page.ga, ga.columns);
   if (ga.leaf !== undefined && ga.view !== "backplate") page.ga.leaf = ga.leaf;
   if (ga.pane && ga.view !== "backplate") page.ga.pane = [ga.pane[0], ga.pane[1]];
+  if (ga.behind && ga.view === "backplate") page.ga.behind = { sheet: ga.behind.sheet, pane: ga.behind.pane ? [ga.behind.pane[0], ga.behind.pane[1]] : null };
   page.gaItems = [];
   return page;
 }
@@ -1491,15 +1492,32 @@ export function splitDoor(project: Project, pageId: string, col: number, row: nu
     const a = Math.round(at ?? d.h / 2);
     if (!(a >= 20 && d.h - a >= 20)) throw new OpError("Split it at least 20 mm from its edge");
     c.doors.splice(row, 1, { ...d, h: a }, { h: d.h - a, hinge: d.hinge });
+    replate(project, page, ([c0, r0]) => (c0 === col && r0 > row ? [c0, r0 + 1] : [c0, r0]));
   } else {
     if (cols.length >= MAX_COLUMNS) throw new OpError(`A door has up to ${MAX_COLUMNS} columns`);
     const a = Math.round(at ?? c.w / 2);
     if (!(a >= 20 && c.w - a >= 20)) throw new OpError("Split it at least 20 mm from its edge");
     const right = { w: c.w - a, doors: c.doors.map((x) => ({ h: x.h, hinge: "right" as const })) };
     cols.splice(col, 1, { ...c, w: a }, right);
+    // Plates behind columns to the right move with them.
+    replate(project, page, ([c0, r0]) => (c0 > col ? [c0 + 1, r0] : [c0, r0]));
   }
   setColumns(page.ga, cols);
   page.ga.columns ??= cols;
+}
+
+/**
+ * Plates behind a door front's doors when its doors change (v0.4.x M13): a
+ * plate behind a door that's gone (joined, or its column removed) is left as
+ * an ordinary backplate with nothing behind it, for Check to say so; plates
+ * behind doors that moved up a row move with them. Nothing on a plate changes.
+ */
+function replate(project: Project, front: Page, map: (pane: [number, number]) => [number, number] | null): void {
+  for (const p of project.pages) {
+    const b = p.ga?.view === "backplate" ? p.ga.behind : undefined;
+    if (b?.sheet !== front.id || !b.pane) continue;
+    b.pane = map(b.pane);
+  }
 }
 
 /** Join a door with the one below it (v0.4.x M13): one door, the top one's hinge and name. */
@@ -1513,6 +1531,8 @@ export function joinDoorBelow(project: Project, pageId: string, col: number, row
   if (!below) throw new OpError("There's no door below it");
   c.doors.splice(row, 2, { ...d, h: d.h + below.h });
   setColumns(page.ga, cols);
+  // Both doors' plates are left with nothing behind them; those below move up a row.
+  replate(project, page, ([c0, r0]) => (c0 !== col ? [c0, r0] : r0 === row || r0 === row + 1 ? null : r0 > row + 1 ? [c0, r0 - 1] : [c0, r0]));
   // Sheets showing the door below now show the joined one; rows below move up.
   for (const p of project.pages) {
     const pn = p.ga?.of === page.id ? p.ga.pane : undefined;
@@ -1541,6 +1561,57 @@ export function updateDoor(project: Project, pageId: string, col: number, row: n
   // A plain door stays plain unless named: keep it modular once it's had columns set.
   setColumns(page.ga, cols);
   if (!page.ga.columns && (cols.length > 1 || cols[0]!.doors.length > 1 || cols[0]!.doors[0]!.name)) page.ga.columns = cols;
+  dropGonePlates(project, page);
+}
+
+/** Plates behind doors that no longer exist are left with nothing behind them. */
+function dropGonePlates(project: Project, front: Page): void {
+  const there = new Set(doorPanes(front).map((p) => `${p.col}:${p.row}`));
+  replate(project, front, (pn) => (there.has(`${pn[0]}:${pn[1]}`) ? pn : null));
+}
+
+/**
+ * Add a backplate for each door (v0.4.x M13): one sheet per door of a door
+ * front that has none yet, in column then row order, after the last GA sheet.
+ * Each starts at its door's size less a margin all round, titled
+ * *Backplate:* and the door's name. Returns the sheets made.
+ */
+export function addPlatesForDoors(project: Project, frontId: string, margin = PLATE_MARGIN): Page[] {
+  const front = doorFront(project, frontId);
+  const have = platesOf(project, front);
+  const made: Page[] = [];
+  let after = [...project.pages].reverse().find((p) => p.ga && p.ga.view !== "detail")?.id ?? front.id;
+  for (const pane of doorPanes(front)) {
+    if (have.has(`${pane.col}:${pane.row}`)) continue;
+    const w = Math.max(50, pane.w - 2 * margin);
+    const h = Math.max(50, pane.h - 2 * margin);
+    const page = addGaPage(project, `Backplate: ${paneName(pane)}`, { scale: fitScale(w, h), enclosure: { w, h }, view: "backplate", behind: { sheet: front.id, pane: [pane.col, pane.row] } }, after);
+    made.push(page);
+    after = page.id;
+  }
+  if (!made.length) throw new OpError("Every door already has a backplate");
+  return made;
+}
+
+/** Say which door a backplate is behind, or none (it's the panel's one backplate). Its size is left as it is. */
+export function setPlateBehind(project: Project, pageId: string, behind: { sheet: string; pane: [number, number] } | null): void {
+  const page = getPage(project, pageId);
+  if (page.ga?.view !== "backplate") throw new OpError("Only a backplate sits behind a door");
+  if (!behind) {
+    delete page.ga.behind;
+    return;
+  }
+  const front = doorFront(project, behind.sheet);
+  if (!doorPanes(front).some((p) => p.col === behind.pane[0] && p.row === behind.pane[1])) throw new OpError("No such door");
+  page.ga.behind = { sheet: front.id, pane: [behind.pane[0], behind.pane[1]] };
+}
+
+/** Size a backplate from its door again: the door's size less a margin all round. */
+export function sizePlateFromDoor(project: Project, pageId: string, margin = PLATE_MARGIN): void {
+  const page = getPage(project, pageId);
+  const d = page.ga ? plateDoor(project, page) : null;
+  if (!d) throw new OpError("This backplate isn't behind a door");
+  page.ga!.enclosure = { w: Math.max(50, d.pane.w - 2 * margin), h: Math.max(50, d.pane.h - 2 * margin) };
 }
 
 export function setGaSettings(
@@ -1604,6 +1675,7 @@ export function setGaSettings(
     if (ga.view !== "door-front" || ga.of) throw new OpError("Doors are set out on the door front that has the door");
     if (patch.columns === null) delete ga.columns;
     else setColumns(ga, patch.columns);
+    dropGonePlates(project, page);
   }
   if (patch.pane !== undefined) {
     if (patch.pane === null) delete ga.pane;

@@ -348,3 +348,10 @@ Judgement calls made while building, step by step.
 - Choosing *Columns of doors…* on a plain door splits it into two stacked doors to start from.
 - Each door is drawn with its own swing lines, hinge marks and joint lines; its name, if it has one, at its top left at the detail size. Hinge marks sit at a quarter and three quarters of a door 300 mm or shorter.
 - Check: *a device lies across two doors (C1 R1, Controls)* when an item on a modular door front overlaps two.
+
+**Step 1b, second PR (a backplate behind each door).**
+- `GaSettings.behind` is `{ sheet, pane }`, with `pane` null once its door is joined to another or gone (its column removed, or the door front set back to plain): the sheet stays an ordinary backplate and keeps everything on it, and Check gives an info line until a door is picked again or *Behind* is cleared. Splitting a door moves the plates of the doors after it with them (the split door's plate stays with its top or left half).
+- *Add a backplate for each door* (door front, Sheet settings) makes the sheets after the last GA sheet, in column then row order, each at its door's size less 25 mm all round, scale fitted, titled *Backplate:* and the door's name (or *C2 R1*). The margin isn't asked for each time: the size is then the user's, and *Size from its door* puts it back.
+- A backplate's Sheet settings have *Behind*: the whole panel, or any door of any door front.
+- The door front prints *BACKPLATE: SHEET n* small at each door's bottom left; the plate's title reads *BACKPLATE BEHIND Controls, DOOR ON SHEET 1*.
+- Check: an info line when a plate is larger than its door.

@@ -17,6 +17,8 @@
     parseCutout,
     scaleText,
     paneName,
+    plateDoor,
+    platesOf,
     sheetLeaves,
     sheetPanes,
     shownPane,
@@ -78,6 +80,8 @@
     sheetPanes(project, page).filter((p) => p.x + p.w > frame.x0 + 0.01 && p.x < frame.x0 + frame.w - 0.01 && p.y + p.h > fy0 + 0.01 && p.y < fy0 + frame.h - 0.01),
   );
   const modular = $derived(!!owner?.ga?.columns?.length);
+  // Plates behind the doors, so each door says where its plate is.
+  const plates = $derived(owner ? platesOf(project, owner) : new Map<string, Page>());
 
   /** What a device says: its tag(s), or its own text. */
   function label(it: GaItem): string {
@@ -123,6 +127,9 @@
     const one = shownPane(project, page);
     const leaf = modular && one ? ` · ${paneName(one).toUpperCase()}` : ga.leaf !== undefined && sheetLeaves(project, page).length > 1 ? (ga.leaf === 0 ? " · LEFT LEAF" : " · RIGHT LEAF") : "";
     const of = owner && owner !== page ? ` · DOOR ON SHEET ${owner.number}` : "";
+    // A compartment's plate names its door (v0.4.x M13).
+    const pd = ga.view === "backplate" ? plateDoor(project, page) : null;
+    if (pd) return `BACKPLATE BEHIND ${paneName(pd.pane).toUpperCase()}, DOOR ON SHEET ${pd.front.number}: ${frame.w} W × ${frame.h} H mm · SCALE ${scaleText(ga.scale)}`;
     return `${what}${leaf}${of}: ${frame.w} W × ${frame.h} H mm · SCALE ${scaleText(ga.scale)}`;
   });
 </script>
@@ -169,6 +176,7 @@
         <line class="split" x1={X(Math.max(l.x, frame.x0))} y1={Y(l.y)} x2={X(Math.min(l.x + l.w, frame.x0 + frame.w))} y2={Y(l.y)} />
       {/if}
       {#if modular && l.name}<text class="panename" x={X(Math.max(l.x, frame.x0)) + 0.8} y={Y(top) + SMALLEST * 1.6} font-size={SMALLEST}>{l.name}</text>{/if}
+      {#if plates.get(`${l.col}:${l.row}`)}<text class="panename" x={X(Math.max(l.x, frame.x0)) + 0.8} y={Y(Math.min(l.y + l.h, fy0 + frame.h)) - SMALLEST * 0.8} font-size={SMALLEST}>BACKPLATE: SHEET {plates.get(`${l.col}:${l.row}`)!.number}</text>{/if}
     {/each}
   {/if}
 

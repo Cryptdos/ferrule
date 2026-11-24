@@ -468,6 +468,10 @@ function parsePage(pg: Record<string, unknown>, i: number): Project["pages"][num
       .filter((c) => c.doors.length);
     if (ga.view === "door-front" && columns.length) ga.columns = columns;
     const pane = arr(pg.ga.pane);
+    if (ga.view === "backplate" && isObj(pg.ga.behind) && typeof pg.ga.behind.sheet === "string" && pg.ga.behind.sheet) {
+      const bp = arr(pg.ga.behind.pane);
+      ga.behind = { sheet: pg.ga.behind.sheet, pane: bp.length === 2 && bp.every((n) => typeof n === "number" && Number.isInteger(n) && n >= 0) ? [bp[0] as number, bp[1] as number] : null };
+    }
     if (ga.view !== "backplate" && pane.length === 2 && pane.every((n) => typeof n === "number" && Number.isInteger(n) && n >= 0)) ga.pane = [pane[0] as number, pane[1] as number];
     if (ga.view !== "backplate" && (pg.ga.leaf === 0 || pg.ga.leaf === 1)) ga.leaf = pg.ga.leaf;
     if (ga.view !== "backplate" && typeof pg.ga.of === "string" && pg.ga.of) ga.of = pg.ga.of;
