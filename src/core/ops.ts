@@ -34,7 +34,7 @@ import {
 } from "./model";
 import { benchOf, defaultParams, isBar, formatPoints, getSymbol, partPoints, poleMates, requireSymbol, terminalPoint } from "./symbols";
 import { moduleType, moduleTypeName } from "./modules";
-import { renamePointDesign, tidyDesign } from "./design";
+import { channelLabel, renamePointDesign, tidyDesign } from "./design";
 import { cleanPoints, formatQuickEntry, mergePoints, isInputForm, missingRefs, parseQuickEntry, pointOfPin, printedPin } from "./points";
 import { isOrthogonal, routeOf, simplifyRoute } from "./wires";
 import { isMaster, isSlave, locate } from "./xref";
@@ -813,9 +813,10 @@ const cleanTerminals = (list: string[]) => [...new Set(list.map((t) => t.trim())
  * per pin its number as printed, its id, and the label under its run (its
  * group, else its point's name). JSON: [[pin, printed, id, label], …].
  */
-export function plantPinsParam(item: PlantItem): string {
+export function plantPinsParam(item: PlantItem, project?: Project): string {
   const pointOf = pointOfPin(item);
-  const labelOf = new Map((item.points ?? []).map((p) => [p.name, p.label ?? ""]));
+  // A module's labels follow the points on its channels (design-v0.4 §4).
+  const labelOf = new Map((item.points ?? []).map((p) => [p.name, project ? channelLabel(project, item, p) : (p.label ?? "")]));
   return JSON.stringify(
     item.terminals.map((t) => {
       const point = pointOf.get(t) ?? "";
@@ -953,8 +954,8 @@ export function updatePlant(
       renamePointDesign(project, item.id, old.name, renamed.name);
     }
   }
-  syncPlantViews(project);
   tidyDesign(project);
+  syncPlantViews(project);
 }
 
 /** Point refs that named plant:<id>:<old> now name plant:<id>:<new>. */
@@ -1127,8 +1128,9 @@ export function deletePlant(project: Project, id: string): void {
     const views = page.elements.filter((e) => e.symbol === "plant-view" && e.params.plant === id).map((e) => e.id);
     if (views.length) deleteElements(project, page.id, views);
   }
-  // Points on its channels (a module) let them go.
+  // Points on its channels (a module) let them go; labels that followed it go back.
   tidyDesign(project);
+  syncPlantViews(project);
 }
 
 /** Place a view of a plant item, showing the given terminals (default: all). */
@@ -1166,7 +1168,7 @@ export function syncPlantViews(project: Project): void {
       el.params.show = show.join(",");
       el.params.pdesc = item?.description ?? "";
       el.params.pinfo = item?.info ?? "";
-      el.params.ppins = item ? plantPinsParam(item) : "[]";
+      el.params.ppins = item ? plantPinsParam(item, project) : "[]";
       delete el.params.pgroups;
       el.params.pbo = item?.powerByOthers === true;
       // A controller's module is drawn at the top of the sheet, terminals underneath (controller.md §5).

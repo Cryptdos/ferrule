@@ -59,6 +59,12 @@
   const where = (id: string) => viewsOf(editor.project, id).map((v) => v.address).join(", ");
 
   function place(item: PlantItem) {
+    // Draft draws it (design-v0.4 §4): placing a view goes there, on a schematic sheet.
+    if (editor.mode !== "draft") editor.mode = "draft";
+    if (editor.page.ga || editor.page.spare) {
+      editor.flash("Pick a schematic sheet in Draft, then Place view again");
+      return;
+    }
     editor.tool = "place";
     editor.placeSymbol = "plant-view";
     editor.placeParams = {
@@ -67,7 +73,7 @@
       terms: item.terminals.join(","),
       pdesc: item.description,
       pinfo: item.info ?? "",
-      ppins: plantPinsParam(item),
+      ppins: plantPinsParam(item, editor.project),
       pbo: false,
       pmod: moduleParam(item),
     };

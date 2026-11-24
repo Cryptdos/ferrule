@@ -25,7 +25,7 @@ import type { Conductor, Element, Page, Project } from "./model";
 import { assignAddresses, collisionSuffix, type Placed } from "./numbering";
 import { requireSymbol, terminalPoint } from "./symbols";
 import { tagPrefix } from "./tags";
-import { plantTag } from "./ops";
+import { plantTag, syncPlantViews } from "./ops";
 import { isMaster, masterOf, slavesOf } from "./xref";
 
 /**
@@ -227,6 +227,8 @@ export function renumber(project: Project): RenumberResult {
       result.wires++;
     }
   }
+  // Module labels follow the tags of the points on them (design-v0.4 §4).
+  syncPlantViews(project);
   return result;
 }
 

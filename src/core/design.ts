@@ -6,7 +6,7 @@
  * reference to something that's gone is let go, never guessed.
  */
 import { newId, type ChannelRef, type DesignTemplate, type IoPoint, type PlantItem, type PointForm, type Project } from "./model";
-import { OpError, getPlant, renamePointRefs } from "./ops";
+import { OpError, getPlant, renamePointRefs, syncPlantViews } from "./ops";
 
 /** What the controller needs for a point (design-v0.4 §2, Type): shown, never stored. */
 export type IoType = "DI" | "DO" | "AI" | "AO";
@@ -143,6 +143,7 @@ export function allocate(project: Project, plantId: string, pointName: string, c
   if (!point) throw new OpError(`No point "${pointName}" on that plant`);
   if (!channel) {
     delete point.channel;
+    syncPlantViews(project);
     return;
   }
   const type = pointType(point.form);
@@ -156,6 +157,7 @@ export function allocate(project: Project, plantId: string, pointName: string, c
   const taken = pointOnChannel(project, channel);
   if (taken && !(taken.plant === plant && taken.point === point)) throw new OpError(`${ch.name} already has ${taken.point.name} on it`);
   point.channel = { module: m.id, point: ch.name };
+  syncPlantViews(project);
 }
 
 /**
@@ -380,6 +382,7 @@ export function updateDesignPoint(project: Project, plantId: string, name: strin
     const t = pointType(p.form);
     if (!t || goesTo(p) === "panel" || !m || !ch || !channelTypes(m, ch).includes(t)) delete p.channel;
   }
+  syncPlantViews(project);
 }
 
 /** Remove a point; references to it are left for Check, as when one goes in Draft. */
@@ -388,6 +391,7 @@ export function deleteDesignPoint(project: Project, plantId: string, name: strin
   it.points = (it.points ?? []).filter((q) => q.name !== name);
   if (!it.points.length) delete it.points;
   tidyDesign(project);
+  syncPlantViews(project);
 }
 
 /** A channel as people say it: the module's tag and the channel's name, "A3-23 DI2". */
@@ -598,4 +602,14 @@ export function noChannelReason(project: Project, point: IoPoint): string | unde
   }
   if (!channelsFor(project, point).length) return `every ${t} channel is taken`;
   return undefined;
+}
+
+/**
+ * A module channel's label (design-v0.4 §4): it follows the point on it
+ * ("DPS1 flow"); a channel with no point keeps a label typed by hand.
+ */
+export function channelLabel(project: Project, module: PlantItem, channel: IoPoint): string {
+  if (!module.module) return channel.label ?? "";
+  const on = pointOnChannel(project, { module: module.id, point: channel.name });
+  return on ? `${plantLabelOf(on.plant)} ${on.point.name}` : (channel.label ?? "");
 }

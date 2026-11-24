@@ -250,6 +250,13 @@ README screenshots are retaken when the interface changes. Small judgement calls
 - **A point no channel can take** is shaded red in *Unallocated* and can't be dragged; picked, it says why: *no analogue outputs*, or *every DI channel is taken*.
 - **Modules show *A?*** until a view of them is drawn: they're tagged by where they're drawn, as before.
 
+**Step 5b (labels follow points; the controller leaves Draft)**
+
+- **A label that follows** is the point's plant tag and name as written (*DPS1 flow*), not upper-cased: typed labels keep the case they were typed in, and this matches §4's example. It changes when the plant is retagged (Renumber too) or the point renamed, and goes back to the typed label when the point is taken off.
+- **The typed label is kept underneath**, so taking a point off a channel shows what was typed before. While a point is on it, *Pins and points…* shows the label greyed, saying it follows the point.
+- **Modules were already out of the Plant window** and the plant schedule (v0.2 put them under Controllers); nothing more was needed for "modules stop being listed as plant".
+- **The Controllers button leaves Draft;** the window is *Controller…* in Design. Its *Place view* switches to Draft to place the module's view, until To draw (step 6) takes placing over. A window left open from Draft still closes from its own ×.
+
 ---
 
 ## 11. Decisions, as discussed (24/11/26)

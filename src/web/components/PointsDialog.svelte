@@ -4,6 +4,7 @@
   import { describeExpectation, isInputForm, isOutputForm, pointOfPin, pointRef, printedPin, things } from "../../core/points";
   import type { Editor } from "../editor.svelte";
   import Conditions from "./Conditions.svelte";
+  import { channelLabel, pointOnChannel } from "../../core/design";
   import Modal from "./Modal.svelte";
 
   /**
@@ -83,7 +84,12 @@
               <span class="pins">{pt.pins.map((t) => printedPin(t, pt.name)).join(" ")}</span>
             </div>
             <div class="what">{POINT_FORMS.find((f) => f.value === pt.form)?.hint}</div>
-            {#if item.module}
+            {#if item.module && pointOnChannel(editor.project, { module: item.id, point: pt.name })}
+              <label class="joblabel">
+                Label
+                <input value={channelLabel(editor.project, item, pt)} disabled title="It follows the point on this channel (Design → Controller)" />
+              </label>
+            {:else if item.module}
               <label class="joblabel">
                 Label
                 <input

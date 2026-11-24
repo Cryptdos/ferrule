@@ -140,9 +140,9 @@ export function generateModule(project: Project, plantId: string, pattern: Modul
   if (clean.length) item.points = clean;
   else delete item.points;
   if (pattern.channels && moduleType(item.module.type).channels) item.module.channels = pattern.channels;
-  syncPlantViews(project);
   // Points allocated to channels the module no longer has let them go.
   tidyDesign(project);
+  syncPlantViews(project);
 }
 
 /** Add a spare slot (Spare I/O) to a controller's rail. */

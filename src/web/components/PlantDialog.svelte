@@ -42,7 +42,7 @@
       terms: item.terminals.join(","),
       pdesc: item.description,
       pinfo: item.info ?? "",
-      ppins: plantPinsParam(item),
+      ppins: plantPinsParam(item, editor.project),
       pbo: item.powerByOthers === true,
     };
     onclose();
