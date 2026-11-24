@@ -120,6 +120,7 @@ bun test
 | `src/core` | Shared model: geometry, symbols, operations, numbering, loading. Used by the UI, the server and (later) the MCP tools. |
 | `src/server` | Bun + Hono server: project storage and the API, serves the UI. |
 | `src/web` | Svelte UI, drawing in SVG. |
+| `src/bench` | Example projects built through the core operations: LSP-01 (the example on the project list) and BMS-01, a generic BMS panel used as a before-and-after fixture (`bun scripts/build-bms01.ts out.ferrule`). |
 
 Drawings use [osifont](https://github.com/hikikomori82/osifont) (ISO 3098 lettering, LGPL-3 with font exception), bundled in `src/web/fonts`. It is the only font on drawings and is embedded in the PDFs.
 
