@@ -341,6 +341,8 @@ export interface Network {
   /** Free text: "BACnet IP", "Modbus RTU". */
   protocol: string;
   kind: "lan" | "bus";
+  /** The serial port it's on (v0.4.x M7, T5): a plant item or module and its port group ("COM A"). */
+  port?: { plant: string; group: string };
 }
 
 /** The generic module types Ferrule ships (controller.md §4). */
@@ -392,6 +394,8 @@ export interface ControllerSlot {
 export interface PinInfo {
   id?: string;
   group?: string;
+  /** Its group is a serial comms port (v0.4.x M7): RS485 and the like. Set on every pin of the group. */
+  port?: true;
 }
 
 /**

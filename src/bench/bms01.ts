@@ -102,6 +102,8 @@ export function buildBms01(avoid: Avoid | null): Bms01 {
   const drive = (tag: string, desc: string) =>
     sys(
       addPlant(p, tag, desc, driveTerms, {
+        // Its comms terminals are a serial port (M7).
+        pins: { "A+": { group: "Modbus", port: true }, "B-": { group: "Modbus", port: true } },
         points: [
           pt("Enable", "powered-in", ["DI1", "DCOM"]),
           pt("Run", "contact", ["RO1C", "RO1A"]),
@@ -191,6 +193,7 @@ export function buildBms01(avoid: Avoid | null): Bms01 {
     "5": { id: "B-", group: "COM B" },
     "6": { id: "GND", group: "COM B" },
   };
+  for (const pin of Object.values(modules.host.pins)) pin.port = true;
   // The universal inputs taking sensors are analogue.
   for (const q of modules.uio.points!.slice(0, 4)) q.form = "analogue-in";
   // Points used in the panel's own circuits, not on a channel.
@@ -203,6 +206,9 @@ export function buildBms01(avoid: Avoid | null): Bms01 {
   panelOnly(SFD, "Enable");
   panelOnly(EFD, "Enable");
   panelOnly(DMP2, "Open");
+  // Each bus is on one of the host's serial ports (T5).
+  drivesBus.port = { plant: modules.host.id, group: "COM A" };
+  metersBus.port = { plant: modules.host.id, group: "COM B" };
   const ch = (m: PlantItem, name: string) => ({ module: m.id, point: name });
   const al = (it: PlantItem, point: string, m: PlantItem, channel: string) => allocate(p, it.id, point, ch(m, channel));
   al(SFD, "Run", modules.di, "DI1");

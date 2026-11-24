@@ -1,6 +1,6 @@
 <script lang="ts">
   import { POINT_FORMS, type IoPoint } from "../../core/model";
-  import { addPin, deletePin, plantLabel, updatePin, updatePoint } from "../../core/ops";
+  import { addPin, deletePin, pinGroups, plantLabel, portGroups, setGroupPort, updatePin, updatePoint } from "../../core/ops";
   import { describeExpectation, isInputForm, isOutputForm, pointOfPin, pointRef, printedPin, things } from "../../core/points";
   import type { Editor } from "../editor.svelte";
   import Conditions from "./Conditions.svelte";
@@ -68,6 +68,13 @@
           <input bind:value={newPin} placeholder="New pin number" />
           <button type="submit">Add pin</button>
         </form>
+        {#if pinGroups(item).length}
+          <!-- A group of pins can be a serial port (v0.4.x M7): a network on it is built from the wiring. -->
+          <div class="sub">Serial ports</div>
+          {#each pinGroups(item) as g (g)}
+            <label class="port"><input type="checkbox" checked={portGroups(item).includes(g)} onchange={(e) => editor.apply((p) => setGroupPort(p, plantId, g, e.currentTarget.checked))} /> {g} is a serial port (RS485…)</label>
+          {/each}
+        {/if}
       </div>
       <div>
         <div class="sub">Points</div>
@@ -257,5 +264,9 @@
     font-size: 12px;
     color: #667;
     margin: 0 0 8px;
+  }
+  .port {
+    display: block;
+    font-size: 12px;
   }
 </style>

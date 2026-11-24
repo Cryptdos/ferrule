@@ -4,6 +4,7 @@
    * table, as the network sheet prints it. Networks at the side: name,
    * protocol and kind, and each one's devices in order (the row order).
    */
+  import { portGroups } from "../../core/ops";
   import { deleteNetwork, devicesOn, moveOnNetwork, networkData, networkDiagram, putOnNetwork, updateNetwork } from "../../core/network";
   import { plantLabel } from "../../core/ops";
   import type { Editor } from "../editor.svelte";
@@ -59,6 +60,13 @@
               </select>
             </label>
           </div>
+          <label>Port
+            <select value={net.port ? `${net.port.plant}|${net.port.group}` : ""} onchange={(e) => { const v = e.currentTarget.value; const [plant, group] = v.split("|"); editor.apply((p) => updateNetwork(p, net.id, { port: v ? { plant: plant!, group: group! } : null })); }}
+              title="The controller's (or a device's) serial port it's on: a group of pins marked as a serial port in Pins and points">
+              <option value="">Not set</option>
+              {#each editor.project.plant.flatMap((it) => portGroups(it).map((g) => ({ it, g }))) as o (o.it.id + o.g)}<option value="{o.it.id}|{o.g}">{plantLabel(o.it)} {o.g}</option>{/each}
+            </select>
+          </label>
           <div class="sub">Devices, in order {#if net.kind === "bus"}<span class="hint">(along the bus)</span>{/if}</div>
           <ol>
             {#each devices as d, i (d.id)}

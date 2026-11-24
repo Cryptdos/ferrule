@@ -888,9 +888,35 @@ function cleanPins(pins: Record<string, PinInfo> | undefined, terminals: string[
     if (!p) continue;
     const id = p.id?.trim();
     const group = p.group?.trim();
-    if (id || group) out[t] = { ...(id ? { id } : {}), ...(group ? { group } : {}) };
+    if (id || group) out[t] = { ...(id ? { id } : {}), ...(group ? { group } : {}), ...(group && p.port ? { port: true as const } : {}) };
   }
   return Object.keys(out).length ? out : undefined;
+}
+
+/** A plant item's or module's groups of pins that are serial ports (v0.4.x M7). */
+export function portGroups(item: PlantItem): string[] {
+  return [...new Set(Object.values(item.pins ?? {}).filter((p) => p.port && p.group).map((p) => p.group!))];
+}
+
+/** Every group of pins (in pin order) on a plant item or module. */
+export function pinGroups(item: PlantItem): string[] {
+  return [...new Set(item.terminals.map((t) => item.pins?.[t]?.group).filter((g): g is string => !!g))];
+}
+
+/**
+ * Mark a group of a device's pins as a serial port, or not (v0.4.x M7). A
+ * network on a port that's no longer one loses its port.
+ */
+export function setGroupPort(project: Project, plantId: string, group: string, on: boolean): void {
+  const item = getPlant(project, plantId);
+  const pins = item.terminals.filter((t) => item.pins?.[t]?.group === group);
+  if (!pins.length) throw new OpError(`${item.tag || "It"} has no group "${group}"`);
+  for (const t of pins) {
+    const p = item.pins![t]!;
+    if (on) p.port = true;
+    else delete p.port;
+  }
+  if (!on) for (const n of project.networks ?? []) if (n.port?.plant === item.id && n.port.group === group) delete n.port;
 }
 
 /** The letters a tag starts with: SF-01 → SF, U3-13 → U. */
