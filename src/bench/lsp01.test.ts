@@ -104,10 +104,11 @@ describe("LSP-01 benchmark", () => {
   });
 
   test("checks are clean: no errors, no warnings", () => {
-    // Only the note that the GA (deliberately) has more devices to place, and how full its rails are.
+    // Only the note that the GA (deliberately) has more devices to place, how full its rails are,
+    // and the hints where its tight sheets 8 and 9 have labels over other parts (v0.4.x T7).
     expect(checkProject(p).filter((f) => f.level !== "info")).toEqual([]);
     const notes = checkProject(p).map((f) => f.message);
-    expect(notes.filter((m) => !/rail \d+: .* mm used/.test(m))).toEqual([expect.stringMatching(/not on a GA yet/)]);
+    expect(notes.filter((m) => !/rail \d+: .* mm used/.test(m) && !/^Sheet [89]: .*'s label overlaps/.test(m))).toEqual([expect.stringMatching(/not on a GA yet/)]);
     expect(notes.some((m) => /rail \d+: .* mm used/.test(m))).toBe(true);
   });
 

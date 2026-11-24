@@ -36,6 +36,8 @@ export interface Element {
   /** Flipped top to bottom (before rotating): a contact drawn upside down still reads right. */
   flip?: boolean;
   zone: "internal" | "external";
+  /** Its label block (tag, label, rating; a plant view's text under its box) moved by this much from its place (v0.4.x T14). */
+  labelAt?: Vec;
   /** Symbol-specific settings (lamp colour, rail label, pole count…). */
   params: Record<string, ParamValue>;
   /** Linked elements (coil ↔ contacts). Filled in by milestone 4. */
@@ -68,6 +70,10 @@ export interface Segment {
   showNumber?: boolean;
   /** Print the core colour here. Unset: printed when the conductor has one. */
   showColour?: boolean;
+  /** Where its number sits along it, 0–1 of its drawn length (v0.4.x T13). Unset: the usual place. */
+  numberAt?: number;
+  /** Where its colour (and function) sits along it, 0–1 (v0.4.x T13). */
+  colourAt?: number;
 }
 
 export interface Conductor {

@@ -16,6 +16,7 @@
     resetRoute,
     reverseSegment,
     setWireKind,
+    setWireTextAt,
     flipElements,
     rotateElements,
     setConductorNumber,
@@ -356,6 +357,12 @@
         {/if}
       </p>
     {/if}
+    {#if one.labelAt}
+      <!-- Its label block was dragged clear (v0.4.x T14). -->
+      <div class="buttons">
+        <button onclick={() => { const id = one.id; editor.apply((p) => updateElement(p, editor.pageId, id, { labelAt: null })); }}>Label back to its place</button>
+      </div>
+    {/if}
     {#if isMaster(one) && (typeof one.params.xrefDx === "number" || typeof one.params.xrefDy === "number")}
       <div class="buttons">
         <button
@@ -614,7 +621,12 @@
       </p>
     {/if}
     <div class="row">Route: {seg.route === "manual" ? "adjusted by hand" : "automatic"}</div>
-    <p class="hint">Drag a leg of the wire to move it. The ends stay on their terminals.</p>
+    <p class="hint">Drag a leg of the wire to move it. The ends stay on their terminals. Drag its number or colour to slide it along the wire.</p>
+    {#if seg.numberAt !== undefined || seg.colourAt !== undefined}
+      <div class="buttons">
+        <button onclick={() => { const id = seg.id; editor.apply((p) => setWireTextAt(p, editor.pageId, id, { numberAt: null, colourAt: null })); }}>Number and colour back to their place</button>
+      </div>
+    {/if}
     <div class="buttons">
       <button
         disabled={seg.route !== "manual"}

@@ -32,6 +32,7 @@
     moveGaItems,
     updateGaItem,
     updateElement,
+    setWireTextAt,
     updateSection,
     setPartPoints,
     wire,
@@ -40,7 +41,7 @@
     type WireEnd,
   } from "../../core/ops";
   import { settings } from "../settings.svelte";
-  import { benchOf, isBar, localGeometry, defaultParams, formatPoints, partPoints, plantViewLayout, type Geometry } from "../../core/symbols";
+  import { benchOf, isBar, labelBlockRect, localGeometry, defaultParams, formatPoints, partPoints, plantViewLayout, type Geometry } from "../../core/symbols";
   import { isInputForm, parsePointRef, pointRef } from "../../core/points";
   import {
     GA_ORIGIN,
@@ -68,7 +69,7 @@
   import { elementTexts } from "../../core/tags";
   import { routePage } from "../../core/routing";
   import { stampTemplate } from "../../core/templates";
-  import { distanceToRoute, dragLeg, nearestPointOnRoute, routeOf, simpleRoute, simplifyRoute } from "../../core/wires";
+  import { distanceToRoute, dragLeg, fractionAlong, nearestPointOnRoute, routeOf, simpleRoute, simplifyRoute } from "../../core/wires";
   import type { Element, Page, Segment } from "../../core/model";
   import type { Editor } from "../editor.svelte";
   import { getAvoid } from "../avoid";
@@ -121,6 +122,8 @@
     | { kind: "ganew"; what: "rail" | "trunking" | "detail"; start: Vec; cur: Vec; through?: FrameView }
     | { kind: "cloudsize"; id: string; start: Vec; rect: Rect4; delta: Vec; edges: string }
     | { kind: "table"; coil: string; start: Vec; at: Vec; delta: Vec; row: number }
+    | { kind: "labelblock"; id: string; start: Vec; from: Vec; delta: Vec }
+    | { kind: "wiretext"; seg: string; what: "numberAt" | "colourAt"; f: number }
     | { kind: "boundary"; y: number }
     | null;
   type Rect4 = [number, number, number, number];
@@ -914,6 +917,24 @@
       return;
     }
 
+    // A wire's number or colour slides along its own wire (v0.4.x T13).
+    const wt = (e.target as globalThis.Element | null)?.closest?.("[data-wiretext]") as HTMLElement | SVGElement | null;
+    if (wt && bench === "draft" && !page.ga) {
+      const segId = wt.getAttribute("data-wiretext")!;
+      const seg = page.segments.find((x) => x.id === segId);
+      if (seg) {
+        const what = wt.getAttribute("data-role") === "number" ? "numberAt" : "colourAt";
+        gesture = { kind: "wiretext", seg: seg.id, what, f: fractionAlong(routeOf(page, seg), pt) };
+        editor.selection = [seg.id];
+        return;
+      }
+    }
+    // The selected part's label block moves as one (v0.4.x T14).
+    const lb = selectedLabelBlock();
+    if (lb && pointInRect(pt, { x: lb.r.x, y: lb.r.y, w: lb.r.w, h: lb.r.h }, 0.2)) {
+      gesture = { kind: "labelblock", id: lb.el.id, start: pt, from: lb.el.labelAt ?? [0, 0], delta: [0, 0] };
+      return;
+    }
     // Select tool. A coil's contact table sits outside the coil, so check it first.
     const table = hitTable(pt);
     if (table) {
@@ -1013,6 +1034,11 @@
       // A picture keeps its shape (hold Shift to stretch it).
       if (g.keepShape && !e.shiftKey) d = [d[0], Math.round(((g.size[0] + d[0]) * g.size[1]) / g.size[0]) - g.size[1]];
       g.delta = d;
+    } else if (g.kind === "labelblock") {
+      g.delta = [Math.round((pointer[0] - g.start[0]) * 2) / 2, Math.round((pointer[1] - g.start[1]) * 2) / 2];
+    } else if (g.kind === "wiretext") {
+      const seg = page.segments.find((x) => x.id === g.seg);
+      if (seg) g.f = fractionAlong(routeOf(page, seg), pointer);
     } else if (g.kind === "table") {
       // Half-unit steps: the table is text, it doesn't need to sit on the grid.
       g.delta = [Math.round((pointer[0] - g.start[0]) * 2) / 2, Math.round((pointer[1] - g.start[1]) * 2) / 2];
@@ -1110,6 +1136,14 @@
     const g = gesture;
     gesture = null;
     if (!g) return;
+    if (g.kind === "labelblock") {
+      if (g.delta[0] || g.delta[1]) editor.apply((p) => updateElement(p, editor.pageId, g.id, { labelAt: [g.from[0] + g.delta[0], g.from[1] + g.delta[1]] }));
+      return;
+    }
+    if (g.kind === "wiretext") {
+      editor.apply((p) => setWireTextAt(p, editor.pageId, g.seg, { [g.what]: g.f }));
+      return;
+    }
     if (g.kind === "drag" && (g.delta[0] || g.delta[1])) {
       editor.apply((p) => moveElements(p, editor.pageId, g.ids, g.delta));
     } else if (g.kind === "leg") {
@@ -1371,6 +1405,30 @@
     return el && g ? { el, g } : null;
   });
 
+  /** The one selected part's label block, if it has one (v0.4.x T14). */
+  function selectedLabelBlock(): { el: Element; r: { x: number; y: number; w: number; h: number } } | null {
+    if (bench !== "draft" || page.ga || editor.selection.length !== 1) return null;
+    const el = page.elements.find((x) => x.id === editor.selection[0]);
+    const g = el ? geoms.get(el.id) : undefined;
+    if (!el || !g) return null;
+    const r = labelBlockRect(el, g);
+    return r ? { el, r } : null;
+  }
+  const labelBlock = $derived.by(() => {
+    void editor.selection;
+    const lb = selectedLabelBlock();
+    if (!lb) return null;
+    const g = gesture as Gesture;
+    const d = g?.kind === "labelblock" ? g.delta : [0, 0];
+    return { x: lb.r.x + d[0], y: lb.r.y + d[1], w: lb.r.w, h: lb.r.h, moving: g?.kind === "labelblock" };
+  });
+  /** A wire text being slid: where it shows while dragged. */
+  const wireTextAt = (seg: { id: string; numberAt?: number; colourAt?: number }) => {
+    const g = gesture as Gesture;
+    if (g?.kind !== "wiretext" || g.seg !== seg.id) return null;
+    return { numberAt: seg.numberAt, colourAt: seg.colourAt, [g.what]: g.f };
+  };
+
   const tablePreview = $derived.by(() => {
     const g = gesture as Gesture;
     if (g?.kind !== "table" || (!g.delta[0] && !g.delta[1])) return null;
@@ -1578,6 +1636,7 @@
     {gaPreview}
     focus={sim || page.ga ? null : bench}
     {litLamps}
+    textAt={wireTextAt}
   >
     {#snippet under()}
       {#if sim}
@@ -1687,6 +1746,10 @@
       {/each}
     {/snippet}
     {#snippet over()}
+      {#if labelBlock}
+        <!-- The selected part's label block: drag it to move it (v0.4.x T14). -->
+        <rect class="labelblock" class:moving={labelBlock.moving} x={labelBlock.x - 0.25} y={labelBlock.y - 0.2} width={labelBlock.w + 0.5} height={labelBlock.h + 0.4} />
+      {/if}
       {#each liveRails as r, i (i)}
         <line class="sim-rail" class:bar={r.bar} x1={r.x1} y1={r.y1} x2={r.x2} y2={r.y2} />
       {/each}
@@ -1985,6 +2048,16 @@
   .sim-input.active {
     fill: rgba(230, 126, 30, 0.12);
     stroke-dasharray: none;
+  }
+  .labelblock {
+    fill: none;
+    stroke: #1e6ee6;
+    stroke-width: 0.1;
+    stroke-dasharray: 0.4 0.3;
+    cursor: move;
+  }
+  .labelblock.moving {
+    stroke-width: 0.15;
   }
   .handle {
     fill: #fff;

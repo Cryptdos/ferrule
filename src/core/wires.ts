@@ -293,10 +293,30 @@ export function wireTexts(
     /** Ends on a busbar: text too long for a short wire runs away from the bar instead of across it. */
     railFrom?: boolean;
     railTo?: boolean;
+    /** Slid along the wire by hand (v0.4.x T13): the number's, and the colour's (with its function), as 0–1 of its length. */
+    numberAt?: number;
+    colourAt?: number;
   },
 ): WireText[] {
   const out: WireText[] = [];
   if (points.length < 2) return out;
+  // Slid by hand: that part sits centred where it was put along its own wire, the rest as usual.
+  if (info.numberAt !== undefined || info.colourAt !== undefined) {
+    const rest = { ...info, numberAt: undefined, colourAt: undefined };
+    if (info.numberAt !== undefined && info.number) {
+      out.push(...placedAlong(points, [{ text: info.number, role: "number" }], info.numberAt));
+      rest.number = undefined;
+    }
+    if (info.colourAt !== undefined && (info.colour || info.func)) {
+      const parts: { text: string; role: WireText["role"] }[] = [];
+      if (info.colour) parts.push({ text: info.colour, role: "colour" });
+      if (info.func) parts.push({ text: info.func, role: "function" });
+      out.push(...placedAlong(points, parts, info.colourAt));
+      rest.colour = undefined;
+      rest.func = undefined;
+    }
+    return [...out, ...wireTexts(points, rest)];
+  }
   const along = (from: Vec, to: Vec, dist: number): Vec => {
     const len = Math.abs(to[0] - from[0]) + Math.abs(to[1] - from[1]) || 1;
     return [from[0] + ((to[0] - from[0]) / len) * dist, from[1] + ((to[1] - from[1]) / len) * dist];
@@ -334,6 +354,62 @@ export function wireTexts(
   for (const p of parts) {
     const w = textLen(p.text, p.role);
     out.push({ text: p.text, at: beside(along(a, b, d + w / 2), vertical), vertical, anchor: "middle", role: p.role, size: sizeOf(p.role) });
+    d += w + TEXT_GAP;
+  }
+  return out;
+}
+
+/** A point a fraction of the way along a route, and its leg (v0.4.x T13). */
+export function pointAlong(points: Vec[], f: number): { at: Vec; leg: number } {
+  const lens = points.slice(1).map((p, i) => Math.abs(p[0] - points[i]![0]) + Math.abs(p[1] - points[i]![1]));
+  const total = lens.reduce((a, b) => a + b, 0);
+  let d = Math.max(0, Math.min(1, f)) * total;
+  for (let i = 0; i < lens.length; i++) {
+    const l = lens[i]!;
+    if (d <= l || i === lens.length - 1) {
+      const a = points[i]!;
+      const b = points[i + 1]!;
+      const k = l ? Math.min(1, d / l) : 0;
+      return { at: [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k], leg: i };
+    }
+    d -= l;
+  }
+  return { at: points[0]!, leg: 0 };
+}
+
+/** The fraction along a route nearest a point (for dragging a wire's text along it). */
+export function fractionAlong(points: Vec[], p: Vec): number {
+  const lens = points.slice(1).map((q, i) => Math.abs(q[0] - points[i]![0]) + Math.abs(q[1] - points[i]![1]));
+  const total = lens.reduce((a, b) => a + b, 0) || 1;
+  let best = { d: Infinity, f: 0 };
+  let run = 0;
+  for (let i = 0; i < lens.length; i++) {
+    const a = points[i]!;
+    const b = points[i + 1]!;
+    const l = lens[i]!;
+    const k = l ? Math.max(0, Math.min(1, ((p[0] - a[0]) * (b[0] - a[0]) + (p[1] - a[1]) * (b[1] - a[1])) / (l * l))) : 0;
+    const q: Vec = [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k];
+    const d = Math.hypot(q[0] - p[0], q[1] - p[1]);
+    if (d < best.d) best = { d, f: (run + l * k) / total };
+    run += l;
+  }
+  return best.f;
+}
+
+/** Parts of a wire's text centred together at a fraction along it, on the leg there. */
+function placedAlong(points: Vec[], parts: { text: string; role: WireText["role"] }[], f: number): WireText[] {
+  const { at, leg } = pointAlong(points, f);
+  const a = points[leg]!;
+  const b = points[leg + 1] ?? a;
+  const vertical = a[0] === b[0] && a[1] !== b[1];
+  const need = parts.reduce((s, p) => s + textLen(p.text, p.role), 0) + TEXT_GAP * (parts.length - 1);
+  const dir: Vec = vertical ? [0, Math.sign(b[1] - a[1]) || 1] : [Math.sign(b[0] - a[0]) || 1, 0];
+  let d = -need / 2;
+  const out: WireText[] = [];
+  for (const p of parts) {
+    const w = textLen(p.text, p.role);
+    const c: Vec = [at[0] + dir[0] * (d + w / 2), at[1] + dir[1] * (d + w / 2)];
+    out.push({ text: p.text, at: vertical ? [c[0] - 0.35, c[1]] : [c[0], c[1] - 0.35], vertical, anchor: "middle", role: p.role, size: sizeOf(p.role) });
     d += w + TEXT_GAP;
   }
   return out;

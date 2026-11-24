@@ -358,7 +358,7 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
   const rr1 = runRelay(45, tag(SF1.id));
   const rr2 = runRelay(55, tag(SF2.id));
   // Volt-free running signals to the fire alarm system, below the enable loops.
-  const fam = placePlantView(p, page.id, FAM_SF.id, [31, 76]);
+  const fam = placePlantView(p, page.id, FAM_SF.id, [31, 74]);
   const xm = [31, 33, 35, 37].map((x) => add("terminal", x, 70));
   xm.forEach((t, i) => w([t, "2"], [fam, String(i + 1)]));
   const monitor = (x: number, rr: Element, xa: Element, xb: Element) => {
@@ -374,7 +374,7 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
     const k1 = add("contact-no", x, 13);
     const xa = add("terminal", x, 70);
     const xb = add("terminal", x + 2, 70);
-    const view = placePlantView(p, page.id, dps, [x, 76]);
+    const view = placePlantView(p, page.id, dps, [x, 74]);
     const pr = add("coil", x + 7, 56, { label: `${fanTag}\nPROVEN` });
     w(tap(c, x), [k1, "13"]);
     w([k1, "14"], [xa, "1"]);

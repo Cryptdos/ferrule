@@ -50,6 +50,8 @@ export type Prim =
       vertical?: boolean;
       /** Drawn with an outline as well as fill, which reads as bold in the one-weight font. */
       bold?: boolean;
+      /** Part of the element's label block, moved with it (v0.4.x T14). Tags and labels always are. */
+      block?: boolean;
       /** Slanted (Markdown italic). */
       italic?: boolean;
       /** Already placed for the element's rotation: left exactly where the symbol put it. */
@@ -224,7 +226,7 @@ function bool(el: Element, key: string, fallback: boolean): boolean {
  * the label under that. An empty cross-reference closes up.
  */
 function tagAndLabel(x: number, el: Element): Prim[] {
-  const out: Prim[] = [text(x, 0.5, "{tag}", TAG, "end", "tag"), text(x, 1.75, "{xref}", DETAIL, "end", "xref")];
+  const out: Prim[] = [text(x, 0.5, "{tag}", TAG, "end", "tag"), { ...text(x, 1.75, "{xref}", DETAIL, "end", "xref"), block: true } as Prim];
   if (el.label) out.push(text(x, 3.0, "{label}", TAG, "end", "label"));
   return out;
 }
@@ -862,7 +864,7 @@ const SYMBOLS: SymbolDef[] = [
         terminals.push({ name: a, at: [x, -3], dir: "up" }, { name: b, at: [x, 3], dir: "down" });
       }
       if (poles > 1) prims.push(dashed([0.6, 0], [(poles - 1) * 3 - 0.6, 0]));
-      if (rating) prims.push(text((poles - 1) * 3 + 1, 0.45, rating, DETAIL, "start", "note"));
+      if (rating) prims.push({ ...text((poles - 1) * 3 + 1, 0.45, rating, DETAIL, "start", "note"), block: true } as Prim);
       prims.push(...tagAndLabel(-1.2, el));
       return { prims, terminals, body: { x: -0.6, y: -1.6, w: (poles - 1) * 3 + 1.2, h: 3.2 } };
     },
@@ -1180,7 +1182,7 @@ const SYMBOLS: SymbolDef[] = [
         ...tagAndLabel(-1.2, el),
       ];
       if (bool(el, "screen", false)) prims.push(dashed([cx - 3, 0], [cx + 3, 0]), line([cx + 3, 0], [cx + 3.6, 0]));
-      if (rating) prims.push(text(cx + 3, 2.6, rating, DETAIL, "start", "note"));
+      if (rating) prims.push({ ...text(cx + 3, 2.6, rating, DETAIL, "start", "note"), block: true } as Prim);
       return {
         prims,
         terminals: [
@@ -1216,7 +1218,7 @@ const SYMBOLS: SymbolDef[] = [
           term(-3.45, -4.4, "U", "end"),
           term(0.45, -4.4, "V"),
           term(3.45, -4.4, "W"),
-          ...(rating ? [text(4.1, 2.5, rating, DETAIL, "start", "note")] : []),
+          ...(rating ? [{ ...text(4.1, 2.5, rating, DETAIL, "start", "note"), block: true } as Prim] : []),
           ...tagAndLabel(-4.2, el),
         ],
         terminals: [
@@ -1513,7 +1515,7 @@ const SYMBOLS: SymbolDef[] = [
       if (el.label) lines.push(["{label}", TAG, "label"]);
       let y = h + 1.8;
       for (const [tx, size, role] of lines) {
-        prims.push(text(mid, y, tx, size, "middle", role));
+        prims.push({ ...text(mid, y, tx, size, "middle", role), block: true } as Prim);
         y += size * 1.35;
       }
       const terminals: TerminalDef[] = lay.terms.map((t) => ({ name: t.id, at: [t.x, 0], dir: "up" as Dir }));
@@ -2385,6 +2387,16 @@ function rotatePrim(p: Prim, rot: Rotation): Prim {
   }
 }
 
+/** Where a line of text sits: its width from the font's measures, cap height up from its baseline. */
+export function textBounds(p: Extract<Prim, { t: "text" }>): Rect {
+  const w = textWidth(p.text, p.size);
+  const h = p.size * CAP_HEIGHT;
+  const k = p.anchor === "middle" ? 0.5 : p.anchor === "end" ? 1 : 0;
+  // Vertical text reads up the page: its length runs upwards from the anchor.
+  if (p.vertical) return { x: p.at[0] - h, y: p.at[1] - w * (1 - k), w: h, h: w };
+  return { x: p.at[0] - w * k, y: p.at[1] - h, w, h };
+}
+
 function primBounds(p: Prim): Rect | null {
   const fromPts = (pts: Vec[]): Rect => {
     const xs = pts.map((v) => v[0]);
@@ -2483,6 +2495,14 @@ export function localGeometry(el: Element, texts: string | GeometryText): Geomet
     }
     return [{ ...q, text: filled }];
   });
+  // The label block moved by hand (v0.4.x T14): tags, labels and what's marked part of it.
+  if (el.labelAt && (el.labelAt[0] || el.labelAt[1])) {
+    const [dx, dy] = el.labelAt;
+    for (let i = 0; i < prims.length; i++) {
+      const q = prims[i]!;
+      if (q.t === "text" && inLabelBlock(q)) prims[i] = { ...q, at: [q.at[0] + dx, q.at[1] + dy] };
+    }
+  }
   const terminals = d.terminals.map((t) => ({
     ...t,
     at: rotate(el.flip ? flipVec(t.at) : t.at, el.rot),
@@ -2494,7 +2514,23 @@ export function localGeometry(el: Element, texts: string | GeometryText): Geomet
     const b = primBounds(p);
     if (b) bbox = unionRect(bbox, b);
   }
+  // A plant view's text under its box is part of its extent (v0.4.x F4), so the router and checks see it.
+  if (el.symbol === "plant-view" && !el.params.pmod) for (const p of prims) if (p.t === "text" && p.block && p.text) bbox = unionRect(bbox, textBounds(p));
   return { prims, terminals, body, bbox };
+}
+
+/** Is a text prim part of its element's label block (v0.4.x T14)? Tags and labels, and what's marked. */
+export const inLabelBlock = (p: Extract<Prim, { t: "text" }>) => p.role === "tag" || p.role === "label" || p.block === true;
+
+/** An element's label block on the sheet: the box round its tags, labels and ratings, or null if it has none. */
+export function labelBlockRect(el: Element, g: Geometry): Rect | null {
+  let r: Rect | null = null;
+  for (const p of g.prims) {
+    if (p.t !== "text" || !inLabelBlock(p) || !p.text) continue;
+    const b = textBounds(p);
+    if (b) r = r ? unionRect(r, b) : b;
+  }
+  return r ? { x: r.x + el.pos[0], y: r.y + el.pos[1], w: r.w, h: r.h } : null;
 }
 
 /** Terminal names of an element, in drawing order. */
