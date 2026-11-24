@@ -14,7 +14,7 @@ import { api, ConflictError } from "./api";
 import { dropOn, findLeaf, leaves, removeLeaf, setContent, sheetLeaf, splitLeaf, tileId, type DropZone, type TileNode } from "./tiles";
 import { getAvoid } from "./avoid";
 
-export type Tool = "select" | "place" | "wire" | "section" | "cloud" | "polygon" | "stamp" | "ga-rail" | "ga-trunking" | "ga-dim" | "ga-label" | "ga-detail";
+export type Tool = "select" | "place" | "wire" | "section" | "cloud" | "polygon" | "stamp" | "ga-rail" | "ga-trunking" | "ga-dim" | "ga-label" | "ga-detail" | "ga-device";
 export type SaveState = "saved" | "pending" | "saving" | "error";
 
 const HISTORY_LIMIT = 200;

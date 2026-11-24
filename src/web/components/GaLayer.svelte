@@ -85,6 +85,8 @@
 
   /** What a device says: its tag(s), or its own text. */
   function label(it: GaItem): string {
+    // A device with no schematic part (v0.4.x M5) prints its tag.
+    if (it.kind === "device" && !it.refs?.length && !it.module && it.tag) return it.tag;
     if (it.text) return it.text;
     // A controller's module: its tag and type.
     if (it.module) {

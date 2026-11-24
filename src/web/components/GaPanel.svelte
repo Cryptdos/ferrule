@@ -17,12 +17,13 @@
   const left = $derived(gaCandidates(editor.project, (el) => displayTag(el, editor.project)).length);
   const unshown = $derived(allDetails(editor.project).filter((d) => !frameOf(editor.project, d.it.id)).length);
 
-  type ToolKey = "ga-rail" | "ga-trunking" | "ga-dim" | "ga-label" | "ga-detail";
+  type ToolKey = "ga-rail" | "ga-trunking" | "ga-dim" | "ga-label" | "ga-detail" | "ga-device";
   const TOOLS: { tool: ToolKey; kind: GaItem["kind"]; name: string; icon: "rail" | "trunking" | "dimension" | "plate" | "detail"; how: string }[] = [
     { tool: "ga-rail", kind: "rail", name: "DIN rail", icon: "rail", how: "Drag along where it goes (35 mm)." },
     { tool: "ga-trunking", kind: "trunking", name: "Trunking", icon: "trunking", how: "Drag out its size." },
     { tool: "ga-dim", kind: "dim", name: "Dimension", icon: "dimension", how: "Click each point (it snaps to edges and middles), then double-click where the line goes." },
     { tool: "ga-label", kind: "label", name: "Label plate", icon: "plate", how: "Click where it goes on the door; set its text and size in its properties." },
+    { tool: "ga-device", kind: "device", name: "Device (no schematic part)", icon: "plate", how: "Click where it goes: an operator screen and the like, on no schematic. Set its name, tag, size and cut-out in its properties." },
     { tool: "ga-detail", kind: "detail", name: "Detail", icon: "detail", how: "Drag a box round an area to show it larger on a detail sheet; give it a title in its properties." },
   ];
   const active = $derived(TOOLS.find((t) => t.tool === editor.tool));

@@ -767,6 +767,7 @@ const SYMBOLS: SymbolDef[] = [
           { value: "isolator", label: "Isolator / switch-disconnector (Q), hand operated" },
           { value: "contactor", label: "Contactor main contacts (Q), coil operated" },
           { value: "breaker", label: "Circuit breaker / MCB (F)" },
+          { value: "rcd", label: "RCD / RCBO (F): a breaker with the residual current mark" },
         ],
       },
       { key: "poles", label: "Main poles", type: "number", min: 1, max: 4, default: 3 },
@@ -789,7 +790,7 @@ const SYMBOLS: SymbolDef[] = [
     ],
     kind: (el) => {
       const f = str(el, "function", "isolator");
-      return f === "contactor" ? "contactor" : f === "breaker" ? "breaker" : "isolator";
+      return f === "contactor" ? "contactor" : f === "breaker" || f === "rcd" ? "breaker" : "isolator";
     },
     draw(el) {
       const fn = str(el, "function", "isolator");
@@ -806,7 +807,7 @@ const SYMBOLS: SymbolDef[] = [
         // IEC contactor function: a small arc at the fixed contact.
         if (fn === "contactor") prims.push({ t: "arc", from: [x, -1.5], to: [x, -0.5], r: 0.5, sweep: 1 });
         // Circuit breaker function: a cross at the fixed contact.
-        if (fn === "breaker") prims.push(line([x - 0.4, -1.9], [x + 0.4, -1.1]), line([x - 0.4, -1.1], [x + 0.4, -1.9]));
+        if (fn === "breaker" || fn === "rcd") prims.push(line([x - 0.4, -1.9], [x + 0.4, -1.1]), line([x - 0.4, -1.1], [x + 0.4, -1.9]));
         prims.push(term(x + 0.45, -2.2, a), term(x + 0.45, 2.9, b));
         terminals.push({ name: a, at: [x, -3], dir: "up" }, { name: b, at: [x, 3], dir: "down" });
       }
@@ -819,6 +820,8 @@ const SYMBOLS: SymbolDef[] = [
         lastX = x;
         lastMid = x + (p.nc ? NC_MID[0] : NO_MID[0]);
       }
+      // An RCD (v0.4.x M1): the residual current mark, a core round every pole's lead below the contacts.
+      if (fn === "rcd") prims.push({ t: "ellipse", c: [((poles - 1) * gap) / 2, 1.85], rx: ((poles - 1) * gap) / 2 + 0.8, ry: 0.32 }, dashed([(poles - 1) * gap + 0.8, 1.85], [lastMid + 0.6, 1.85], [lastMid + 0.6, 0]));
       // Only a switch-disconnector has a handle of its own; a contactor is worked by its coil.
       const op = fn === "isolator" ? str(el, "operator", "turn") : "none";
       const hx = -2.4;
@@ -1193,6 +1196,35 @@ const SYMBOLS: SymbolDef[] = [
         prims.push({ t: "text", at, text: "{label}", size: TAG, anchor: rot % 180 ? "middle" : "end", role: "label", placed: true });
       }
       return { prims, terminals, body: { x: -W, y: -1, w: 2 * W, h: H } };
+    },
+  },
+  {
+    id: "plug-socket",
+    name: "Connector (plug and socket)",
+    group: "Connection",
+    palette: true,
+    params: [{ key: "ways", label: "Ways", type: "number", min: 1, max: 12, default: 2 }],
+    // For flying leads (v0.4.x M1): each way a socket contact (in from above) and a plug pin (out below), one conductor.
+    kind: () => "terminal",
+    bridged: (el) => Array.from({ length: num(el, "ways", 2, 1, 12) }, (_, i) => [`S${i + 1}`, `P${i + 1}`]),
+    draw(el) {
+      const ways = num(el, "ways", 2, 1, 12);
+      const prims: Prim[] = [];
+      const terminals: TerminalDef[] = [];
+      for (let i = 0; i < ways; i++) {
+        const x = i * 3;
+        prims.push(
+          line([x, -3], [x, -1.3]),
+          { t: "arc", from: [x - 0.7, -0.6], to: [x + 0.7, -0.6], r: 0.7, sweep: 1 },
+          line([x, 3], [x, 0.2]),
+          rect(x - 0.25, -0.4, 0.5, 0.6, true),
+          term(x + 0.45, -2.2, String(i + 1)),
+        );
+        terminals.push({ name: `S${i + 1}`, at: [x, -3], dir: "up" }, { name: `P${i + 1}`, at: [x, 3], dir: "down" });
+      }
+      if (ways > 1) prims.push(dashed([0.8, 1.4], [(ways - 1) * 3 - 0.8, 1.4]));
+      prims.push(...tagAndLabel(-1.2, el));
+      return { prims, terminals, body: { x: -0.8, y: -1.4, w: (ways - 1) * 3 + 1.6, h: 2.8 } };
     },
   },
   {
@@ -1576,6 +1608,9 @@ const SYMBOLS: SymbolDef[] = [
         }
       }
       for (const g of lay.groups) g.lines.forEach((l, i) => prims.push(text((g.x0 + g.x1) / 2, lay.termH + lay.idH + 1.9 + i * PLANT.group * LINE, l, PLANT.group, "middle", "note")));
+      // Its mark, small, inside the box at the end away from the terminals' names (v0.4.x M1).
+      const mark = str(el, "pmark", "");
+      if (mark) prims.push(...markPrims(mark, right - 1.8, h / 2 + 0.3));
       // Tag, description and information under the box, centred, wrapped to
       // the box plus 1.5 units each side and never narrower than 12 (v0.4.x F4):
       // words at spaces; a tag only at a hyphen, and only when it must.
@@ -2395,6 +2430,8 @@ export function plantViewLayout(el: Element): {
   const termH = tall([...terms.map((t) => t.name), PLANT.minName], PLANT.termH, TAG);
   const ids = terms.map((t) => t.pinId).filter(Boolean);
   const idH = ids.length ? tall(ids, PLANT.idH, DETAIL) : 0;
+  // Room at the right end for a mark (v0.4.x M1).
+  if (str(el, "pmark", "") && !str(el, "pmod", "")) right += 3.4;
   // Room under the boxes for the tallest wrapped group name.
   const nameLines = Math.max(1, ...groups.map((g) => g.lines.length));
   const below = Math.max(PLANT.below, Math.ceil((1.9 + (nameLines - 1) * PLANT.group * LINE + 1.1) * 2) / 2);
@@ -2623,6 +2660,36 @@ export function localGeometry(el: Element, texts: string | GeometryText): Geomet
   // A plant view's text under its box is part of its extent (v0.4.x F4), so the router and checks see it.
   if (el.symbol === "plant-view" && !el.params.pmod) for (const p of prims) if (p.t === "text" && p.block && p.text) bbox = unionRect(bbox, textBounds(p));
   return { prims, terminals, body, bbox };
+}
+
+/** A field device's mark, drawn small inside its view's box, centred at (cx, cy) (v0.4.x M1). The picture only. */
+export function markPrims(mark: string, cx: number, cy: number): Prim[] {
+  const r = 1.1;
+  const letter = (s: string): Prim[] => [circle(cx, cy, r), text(cx, cy + (DETAIL * CAP_HEIGHT) / 2, s, DETAIL, "middle", "note")];
+  switch (mark) {
+    case "temperature":
+      return letter("T");
+    case "pressure":
+      return letter("P");
+    case "humidity":
+      return letter("H");
+    case "dp-switch":
+      return letter("ΔP");
+    case "meter":
+      return [rect(cx - 1.4, cy - 0.9, 2.8, 1.8), text(cx, cy + (DETAIL * CAP_HEIGHT) / 2, "kWh", DETAIL, "middle", "note")];
+    case "valve":
+      // Two triangles point to point: the valve body.
+      return [line([cx - 1.3, cy - 0.7], [cx + 1.3, cy + 0.7], [cx + 1.3, cy - 0.7], [cx - 1.3, cy + 0.7], [cx - 1.3, cy - 0.7])];
+    case "damper":
+      // A duct section with its blade across it.
+      return [circle(cx, cy, r), line([cx - r * 0.9, cy + r * 0.45], [cx + r * 0.9, cy - r * 0.45])];
+    case "power-supply":
+      return [rect(cx - 1.1, cy - 1.1, 2.2, 2.2), line([cx - 1.1, cy + 1.1], [cx + 1.1, cy - 1.1]), text(cx - 0.55, cy - 0.15, "~", DETAIL, "middle", "note"), text(cx + 0.55, cy + 0.95, "=", DETAIL, "middle", "note")];
+    case "battery":
+      return [line([cx - 1.2, cy - 0.3], [cx + 1.2, cy - 0.3]), line([cx - 0.6, cy + 0.4], [cx + 0.6, cy + 0.4]), line([cx, cy - 1.1], [cx, cy - 0.3]), line([cx, cy + 0.4], [cx, cy + 1.1])];
+    default:
+      return [];
+  }
 }
 
 /** A connector block's terminals, 1 to n (2–12). */

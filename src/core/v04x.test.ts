@@ -7,7 +7,7 @@ import { AvoidLib } from "libavoid-js";
 import { buildBms01 } from "../bench/bms01";
 import { blockHalf, cellHalfFor } from "./blocks";
 import { checkProject } from "./checks";
-import { addInterlockCondition, removeInterlockCondition, setPlantDesign, systemGroups, toDraw, updateDesignPoint, updateInterlock } from "./design";
+import { designTemplateOf, insertDesignTemplate, addInterlockCondition, removeInterlockCondition, setPlantDesign, systemGroups, toDraw, updateDesignPoint, updateInterlock } from "./design";
 import { describeInterlock, interlockExpectations, interlockStatus, proveInterlocks, provingJob } from "./interlocks";
 import { parseSupplies, parseSupply } from "./supplies";
 import { refreshConductors } from "./conductors";
@@ -17,10 +17,11 @@ import { elementTexts } from "./tags";
 import { textWidth } from "./textwidth";
 import { AREA_UNITS, textUnits } from "./geometry";
 import { moduleTitle, viewsOf } from "./modules";
-import { addElement, addPlant, connect, resetRoute, rotateElements, deletePlant, linkContact, setGroupSide, setViewSide, setViewSpan, setWireTextAt, moveElements, placePlantView, addGaDim, addGaItem, addGaPage, addPlatesForDoors, joinDoorBelow, setPlateBehind, setBoundary, setGaSettings, splitDoor, updateElement } from "./ops";
+import { addElement, addGaDevice, addPlant, connect, resetRoute, rotateElements, deletePlant, linkContact, setGroupSide, setViewSide, setViewSpan, setWireTextAt, moveElements, placePlantView, addGaDim, addGaItem, addGaPage, addPlatesForDoors, joinDoorBelow, setPlateBehind, setBoundary, setGaSettings, splitDoor, updateElement } from "./ops";
 import { earthConductors, removeLoops, fractionAlong, isFieldWire, numberByDefault, pointAlong, wireTexts } from "./wires";
 import { routePage } from "./routing";
-import { pointsSchedule } from "./schedules";
+import { billOfMaterials, pointsSchedule } from "./schedules";
+import { compile, initialState } from "./sim";
 import { ENCL, PLATE_MARGIN, gaCandidates, sizeKey, dimLayout, doorPanes, plateDoor, platesOf, drawnGaItems, gaFrame, paneOf, paneRef, sheetPanes } from "./ga";
 import { renumber } from "./renumber";
 import { stampSaved } from "../server/storage";
@@ -725,5 +726,84 @@ describe("step 9a: connector block, socket, motors (M9, T17, M8)", () => {
     const pics = ["motor", "fan", "pump"].map((picture) => localGeometry(addElement(p, pg, "motor", [60, 30], { params: { picture } }), ""));
     expect(new Set(pics.map((g) => JSON.stringify(g.prims))).size).toBe(3);
     expect(new Set(pics.map((g) => JSON.stringify(g.terminals))).size).toBe(1);
+  });
+});
+
+describe("step 9b: RCD, connector, plant marks (M1); door devices with no schematic part (M5)", () => {
+  test("M1: the fixture's power supply as a Design template, inserted into an empty project, supplies 24 V with nothing more set", () => {
+    const { project: src, plant } = fresh();
+    const t = designTemplateOf(src, [plant.PSU!.id], "24 V power supply");
+    const p = newProject("e");
+    const pg = p.pages[0]!.id;
+    const [psu] = insertDesignTemplate(p, t).plant;
+    expect(psu!.inPanel).toBe(true);
+    expect(psu!.points!.find((q) => q.form === "supply-out")!.gives).toEqual({ v: 24, ac: false });
+    // Its 24 V follows its own mains in the copy, not the original's.
+    expect(psu!.points!.find((q) => q.form === "supply-out")!.follows![0]!.ref).toBe(`plant:${psu!.id}:Mains`);
+    const inc = addElement(p, pg, "supply", [10, 5], { params: { system: "1ph-n" } });
+    const v = placePlantView(p, pg, psu!.id, [10, 30]);
+    const lamp = addElement(p, pg, "lamp", [30, 50]);
+    connect(p, pg, [inc.id, "L"], [v.id, "L"]);
+    connect(p, pg, [inc.id, "N"], [v.id, "N"]);
+    connect(p, pg, [v.id, "+"], [lamp.id, "+V"]);
+    connect(p, pg, [lamp.id, "-V"], [v.id, "-"]);
+    refreshConductors(p);
+    const c = compile(p);
+    expect(initialState(c).lamps[lamp.id]).toBe(true);
+  });
+
+  test("M1: RCD is a breaker with the residual current mark; tagged and simulated as one", () => {
+    const p = newProject("r");
+    const pg = p.pages[0]!.id;
+    const b = addElement(p, pg, "isolator", [20, 20], { params: { function: "breaker", poles: 2, operator: "none" } });
+    const r = addElement(p, pg, "isolator", [40, 20], { params: { function: "rcd", poles: 2, operator: "none" } });
+    const gb = localGeometry(b, "");
+    const gr = localGeometry(r, "");
+    expect(gr.prims.some((x) => x.t === "ellipse")).toBe(true);
+    expect(gb.prims.some((x) => x.t === "ellipse")).toBe(false);
+    expect(gr.terminals).toEqual(gb.terminals);
+    renumber(p);
+    expect(r.tag[0]).toBe(b.tag[0]);
+    expect(sizeKey(p, r)?.key).toBe("mcb");
+    expect(compile(p).inputs.some((i) => i.el === r.id && i.initial === 1)).toBe(true);
+  });
+
+  test("M1: a plug and socket connector of n ways passes each way straight through", () => {
+    const p = newProject("c");
+    const pg = p.pages[0]!.id;
+    const x = addElement(p, pg, "plug-socket", [20, 20], { params: { ways: 3 } });
+    expect(terminalNames(x)).toEqual(["S1", "P1", "S2", "P2", "S3", "P3"]);
+    const k = addElement(p, pg, "coil", [20, 40]);
+    connect(p, pg, [x.id, "P1"], [k.id, "A1"]);
+    const sw = addElement(p, pg, "contact-no", [20, 5]);
+    connect(p, pg, [sw.id, "14"], [x.id, "S1"]);
+    refreshConductors(p);
+    const cond = p.conductors.find((cd) => cd.terminals.some(([id]) => id === k.id))!;
+    expect(cond.terminals.some(([id]) => id === sw.id)).toBe(true);
+  });
+
+  test("M1: a plant item's mark is drawn inside its view; nothing else depends on it", () => {
+    const { project: p, plant } = fresh();
+    const v = viewsOf(p, plant.TT1!.id)[0]!.el;
+    const before = localGeometry(v, elementTexts(v, p));
+    setPlantDesign(p, plant.TT1!.id, { mark: "temperature" });
+    expect(v.params.pmark).toBe("temperature");
+    const after = localGeometry(v, elementTexts(v, p));
+    expect(after.prims.some((x) => x.t === "text" && x.text === "T")).toBe(true);
+    expect(after.terminals).toEqual(before.terminals);
+    const back = parseProject(JSON.parse(JSON.stringify(p)));
+    expect(back.plant.find((x) => x.id === plant.TT1!.id)!.mark).toBe("temperature");
+  });
+
+  test("M5: a door device with no schematic part prints its tag and is on the bill of materials", () => {
+    const { project: p } = fresh();
+    const door = p.pages.find((x) => x.ga?.view === "door-front")!;
+    const d = addGaDevice(p, door.id, { name: "Operator touch screen", tag: "HMI1", x: 300, y: 600, w: 190, h: 140, cutout: "186 x 138" });
+    expect(d.tag).toBe("HMI1");
+    const bom = billOfMaterials(p);
+    expect(JSON.stringify(bom)).toContain("Operator touch screen");
+    expect(JSON.stringify(bom)).toContain("HMI1");
+    const back = parseProject(JSON.parse(JSON.stringify(p)));
+    expect(back.pages.find((x) => x.id === door.id)!.gaItems!.find((i) => i.id === d.id)).toMatchObject({ tag: "HMI1", text: "Operator touch screen", cutout: "186 x 138" });
   });
 });

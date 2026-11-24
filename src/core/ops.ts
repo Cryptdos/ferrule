@@ -1240,7 +1240,7 @@ export function setGroupSide(project: Project, pageId: string, id: string, group
   else delete el.params.sides;
 }
 
-export const PLANT_VIEW_KEYS = ["plant", "show", "terms", "pdesc", "pinfo", "ppins", "pgroups", "pbo", "pmod"];
+export const PLANT_VIEW_KEYS = ["plant", "show", "terms", "pdesc", "pinfo", "ppins", "pgroups", "pbo", "pmod", "pmark"];
 
 export function syncPlantViews(project: Project): void {
   for (const page of project.pages) {
@@ -1256,6 +1256,8 @@ export function syncPlantViews(project: Project): void {
       el.params.ppins = item ? plantPinsParam(item, project) : "[]";
       delete el.params.pgroups;
       el.params.pbo = item?.powerByOthers === true;
+      if (item?.mark) el.params.pmark = item.mark;
+      else delete el.params.pmark;
       // A controller's module is drawn at the top of the sheet, terminals underneath (controller.md §5).
       if (item?.module) {
         el.params.pmod = moduleParam(item);
@@ -1821,6 +1823,15 @@ export function addGaItem(project: Project, pageId: string, item: Omit<GaItem, "
 }
 
 /** Put a dimension on a GA sheet: its points along the axis, its line at `at` across it. */
+/**
+ * A door device with no schematic part (v0.4.x M5): an operator screen and
+ * the like, with a name, a tag, a size and an optional cut-out. It prints its
+ * tag and is on the bill of materials.
+ */
+export function addGaDevice(project: Project, pageId: string, d: { name: string; tag?: string; x: number; y: number; w: number; h: number; cutout?: string }): GaItem {
+  return addGaItem(project, pageId, { kind: "device", x: d.x, y: d.y, w: d.w, h: d.h, text: d.name.trim() || "Device", ...(d.tag?.trim() ? { tag: d.tag.trim() } : {}), ...(d.cutout?.trim() ? { cutout: d.cutout.trim() } : {}) });
+}
+
 export function addGaDim(project: Project, pageId: string, dim: GaDim, frame?: string): GaItem {
   if (dim.points.length < 2) throw new OpError("A dimension needs two points at least");
   const page = gaPage(project, pageId);
@@ -1841,6 +1852,10 @@ export function updateGaItem(project: Project, pageId: string, id: string, patch
   if (patch.w !== undefined) it.w = Math.max(1, r(patch.w));
   if (patch.h !== undefined) it.h = Math.max(1, r(patch.h));
   if (patch.text !== undefined) it.text = patch.text;
+  if (patch.tag !== undefined) {
+    if (patch.tag.trim()) it.tag = patch.tag.trim();
+    else delete it.tag;
+  }
   if (patch.cutout !== undefined) {
     if (patch.cutout.trim()) it.cutout = patch.cutout.trim();
     else delete it.cutout;

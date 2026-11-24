@@ -28,6 +28,7 @@
     addAsset,
     addImage,
     addGaItem,
+    addGaDevice,
     addGaDim,
     moveGaItems,
     updateGaItem,
@@ -648,6 +649,22 @@
       }
       const s: Vec = [snapMm(mm[0], fine), snapMm(mm[1], fine)];
       gesture = { kind: "ganew", what, start: s, cur: s };
+      return;
+    }
+    if (editor.tool === "ga-device") {
+      // A device with no schematic part (v0.4.x M5).
+      if (!sheetTakes(editor.project, page, "device")) {
+        editor.flash("Devices go on the backplate or a door front");
+        return;
+      }
+      let id = "";
+      const ok = editor.apply((p) => {
+        id = addGaDevice(p, editor.pageId, { name: "Operator screen", x: snapMm(mm[0] - 50, fine), y: snapMm(mm[1] - 40, fine), w: 100, h: 80 }).id;
+      });
+      if (ok) {
+        editor.selection = [id];
+        editor.tool = "select";
+      }
       return;
     }
     if (editor.tool === "ga-label") {

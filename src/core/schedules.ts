@@ -167,6 +167,11 @@ export function billOfMaterials(project: Project): BomRow[] {
           add(`dev:${dev.id}`, { item: dev.name, maker: dev.maker, part: dev.part, quantity: qty, unit: "each" }, tags);
           continue;
         }
+        // A device with no schematic part (v0.4.x M5): by its name, with its tag.
+        if (!refs.length && !it.module && !it.refs?.length) {
+          add(`own:${it.text ?? "Device"}`, { item: it.text || "Device", maker: "", part: "", quantity: 1, unit: "each" }, it.tag ? [it.tag] : []);
+          continue;
+        }
         // A controller's module: by its type until a model's picked.
         if (it.module) {
           const m = project.plant.find((x) => x.id === it.module);

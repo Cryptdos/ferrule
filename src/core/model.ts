@@ -197,6 +197,8 @@ export interface GaItem {
   part?: "handle";
   /** A label for a device, instead of its tag; a label plate's engraving. */
   text?: string;
+  /** A door device with no schematic part (v0.4.x M5): its tag, printed on it and on the bill of materials. */
+  tag?: string;
   /** The device from the project's device table it is (its size came from there). */
   device?: string;
   /** A terminal strip: its name. The strip keeps up with the schematic (refs and length follow it). */
@@ -263,6 +265,8 @@ export interface PlantItem {
   terminals: string[];
   /** Its power supply isn't on these drawings: a break on the left, marked POWER BY OTHERS. */
   powerByOthers?: boolean;
+  /** A small picture inside its view's box (v0.4.x M1): what kind of device it is. The picture only. */
+  mark?: PlantMark;
   /**
    * In the panel (v0.4.x T3): a power supply, UPS or battery. Still plant
    * (points, pins, a view), but listed under *Panel* in Design, drawn above
@@ -417,6 +421,20 @@ export const INPUT_FORMS: PointForm[] = ["dry-in", "powered-in", "supply-in"];
 /** Forms the device switches: clicked in simulation, or following something. */
 export const OUTPUT_FORMS: PointForm[] = ["contact", "powered-out", "supply-out"];
 export const ANALOGUE_FORMS: PointForm[] = ["analogue-in", "analogue-out"];
+
+/** Field device marks drawn inside a plant view (v0.4.x M1). */
+export type PlantMark = "temperature" | "pressure" | "humidity" | "dp-switch" | "valve" | "damper" | "meter" | "power-supply" | "battery";
+export const PLANT_MARKS: { value: PlantMark; label: string }[] = [
+  { value: "temperature", label: "Temperature" },
+  { value: "pressure", label: "Pressure" },
+  { value: "humidity", label: "Humidity" },
+  { value: "dp-switch", label: "ΔP switch" },
+  { value: "valve", label: "Valve" },
+  { value: "damper", label: "Damper" },
+  { value: "meter", label: "Meter" },
+  { value: "power-supply", label: "Power supply" },
+  { value: "battery", label: "Battery" },
+];
 
 /** What a supply gives or a load takes (v0.4.x M11): 24 V DC, 230 V AC… */
 export interface SupplyType {
