@@ -1902,6 +1902,11 @@ export function updateGaItem(project: Project, pageId: string, id: string, patch
     else delete it.cutout;
   }
   if (patch.textMm !== undefined && patch.textMm > 0) it.textMm = patch.textMm;
+  // A label plate's text place (v0.4.x T12): null, or the middle, clears it.
+  if ("textAt" in patch && it.kind === "label") {
+    if (patch.textAt) it.textAt = patch.textAt;
+    else delete it.textAt;
+  }
   if (patch.dim !== undefined && it.kind === "dim") it.dim = { ...it.dim!, ...patch.dim };
   if (patch.letter !== undefined && it.kind === "detail") {
     const letter = patch.letter.trim().toUpperCase();

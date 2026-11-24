@@ -372,6 +372,7 @@ Reference drawings from other companies are proprietary. They are never committe
 | Networks from the drawing, v0.4.x step 10b second PR (2026-11-24) | M7: `networkChain` and `networkOrder` (`network.ts`), the network sheet and Design's network view from the wiring when the port is wired, `moveOnNetwork` refusing then; two checks where Design and the wiring differ |
 | Terminal strips, v0.4.x step 11 (2026-11-24) | T4: `numbering.strips` and `stripsBySection` at Renumber (`renumber.ts`), `stripAuto` on terminals; `splitGaStrip` (`ops.ts`), parts of one strip in `syncGaStrips`, `stripParts`, `stripLabel` (`ga.ts`) |
 | Exports and fit, v0.4.x step 12 (2026-11-24) | T18: `coresPerDevice`; M10: `wireMarkers`, `groupMarkers` (`schedules.ts`) and the marker info in `terminalNumberChecks`; T20: enclosure and leaf fit in Check; the bill of materials line counts schematic parts |
+| Stamp links, Duplicate's step, plate text, v0.4.x step 13 (2026-11-24) | T6: templates keep contacts' links out to coils; `stampTemplate` keeps them, returns `kept` and `relink`, shown after a stamp. T8: `TagStep` in `stepTag` and `duplicatePlant`. T12: `GaItem.textAt`, `plateTextLayout` |
 
 ## 16. Open questions
 

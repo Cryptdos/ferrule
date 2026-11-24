@@ -10,7 +10,7 @@
  * top-left corner; they're drawn at the sheet's scale.
  */
 import { AREA_UNITS, UNIT_MM, type Vec } from "./geometry";
-import type { DoorColumn, DoorLeaf, Element, GaDimPoint, GaItem, GaSettings, GaView, Page, PlantItem, Project } from "./model";
+import type { DoorColumn, DoorLeaf, Element, GaDimPoint, GaItem, GaSettings, GaView, Page, PlantItem, Project, TextPlace } from "./model";
 import { getSymbol } from "./symbols";
 import { controllerName, modulesOf, viewsOf } from "./modules";
 import { isSlave, slavesOf } from "./xref";
@@ -685,6 +685,28 @@ export function stripLabel(project: Project, it: GaItem): string | null {
   const tags = (it.refs ?? []).map((r) => els.get(r)?.tag || "?");
   if (!tags.length) return strip;
   return tags.length === 1 ? `${strip}: ${tags[0]}` : `${strip}: ${tags[0]}\u2013${tags[tags.length - 1]}`;
+}
+
+/**
+ * Where a label plate's lines go (v0.4.x T12): each line's middle height,
+ * and where they start across (x, with its text anchor). The text keeps
+ * `pad` clear of the plate's edges at the sides, top and bottom; at the
+ * middle it's centred, as before.
+ */
+export function plateTextLayout(
+  at: TextPlace | undefined,
+  box: { x: number; y: number; w: number; h: number },
+  size: number,
+  lines: number,
+  pad: number,
+): { x: number; anchor: "start" | "middle" | "end"; ys: number[] } {
+  const p = at ?? "";
+  const anchor = p.endsWith("left") ? "start" : p.endsWith("right") ? "end" : "middle";
+  const x = anchor === "start" ? box.x + pad : anchor === "end" ? box.x + box.w - pad : box.x + box.w / 2;
+  const step = size * 1.25;
+  const block = (lines - 1) * step;
+  const first = p.startsWith("top") ? box.y + pad + size / 2 : p.startsWith("bottom") ? box.y + box.h - pad - size / 2 - block : box.y + box.h / 2 - block / 2;
+  return { x, anchor, ys: Array.from({ length: lines }, (_, i) => first + i * step) };
 }
 
 /** Placed strips whose terminals changed since their GA sheet was last open. */

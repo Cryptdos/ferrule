@@ -904,9 +904,13 @@
     if (editor.tool === "stamp" && editor.stamp) {
       const st = editor.stamp;
       let ids: string[] = [];
+      let links: typeof editor.stampLinks = null;
       const ok = editor.apply((p) => {
-        ids = stampTemplate(p, st.templateId, { pageId: editor.pageId, at: snapVec(pt), plant: st.plant }).elementIds;
+        const r = stampTemplate(p, st.templateId, { pageId: editor.pageId, at: snapVec(pt), plant: st.plant });
+        ids = r.elementIds;
+        links = r.kept.length || r.relink.length ? { kept: r.kept, relink: r.relink } : null;
       });
+      if (ok) editor.stampLinks = links;
       editor.stamp = null;
       editor.tool = "select";
       if (ok) {

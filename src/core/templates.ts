@@ -23,6 +23,7 @@ import {
   newId,
 } from "./model";
 import { OpError, addPage, addPlant, distParamKeys, getPage, prefixOf, syncPlantViews, updateZones } from "./ops";
+import { isMaster, isSlave, locate } from "./xref";
 
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v));
 
@@ -53,7 +54,12 @@ function capture(
   const keep = new Set(elements.map((e) => e.id));
   const segments = page.segments.filter((s) => keep.has(s.from[0]) && keep.has(s.to[0]));
   const shift = (v: Vec): Vec => [v[0] - offset[0], v[1] - offset[1]];
-  const els = clone(elements).map((e) => ({ ...e, pos: shift(e.pos), links: e.links.filter((l) => keep.has(l)) }));
+  // A contact keeps its link out to a coil that isn't in the template (v0.4.x T6): a shared relay. Arrows' links out go.
+  const coilOut = (e: Element, l: string) => isSlave(e) && !keep.has(l) && (() => {
+    const m = locate(project, l);
+    return !!m && isMaster(m.el);
+  })();
+  const els = clone(elements).map((e) => ({ ...e, pos: shift(e.pos), links: e.links.filter((l) => keep.has(l) || coilOut(e, l)) }));
   const segs = clone(segments).map((s) => ({ ...s, conductor: "", points: s.points.map(shift) }));
   const secs = clone(sections).map((s) => ({ ...s, rect: [s.rect[0] - offset[0], s.rect[1] - offset[1], s.rect[2], s.rect[3]] as Section["rect"] }));
   const refs = plantRefs(els, secs);
@@ -132,12 +138,18 @@ export interface StampOptions {
 export interface StampResult {
   page: Page;
   elementIds: string[];
+  /** Contacts that kept their link to a coil outside the stamp (v0.4.x T6). */
+  kept: { contact: string; coil: string }[];
+  /** Stamped arrows with no partner, and contacts whose coil isn't in this project: to link by hand. */
+  relink: string[];
 }
 
 /**
  * Stamp a template. Every element gets a new id and loses its tag (Renumber
- * gives it a new one); links inside the stamp are kept, links out of it
- * are dropped. Plant is re-pointed per the mapping; plant with no mapping
+ * gives it a new one); links inside the stamp are kept. Links out of it:
+ * a contact's to a coil that's in this project is kept (a shared relay),
+ * an arrow's is dropped (arrows pair one to one), and the result lists
+ * both, to check and to link again. Plant is re-pointed per the mapping; plant with no mapping
  * keeps pointing at the same item if it exists in this project, or is
  * added to the project as it was saved.
  */
@@ -194,6 +206,19 @@ export function stampTemplate(project: Project, templateId: string, opts: StampO
     distMap.set(d.id, target.id);
   }
 
+  // Coils outside the stamp that its contacts are on (v0.4.x T6), found before
+  // the new sheet is made: walking the sheets after would read the new one
+  // through the editor's state before its parts are on it.
+  const coils = new Map<string, Element>();
+  for (const src of t.elements) {
+    if (!isSlave(src)) continue;
+    for (const l of src.links) {
+      if (t.elements.some((e) => e.id === l)) continue;
+      const m = locate(project, l);
+      if (m && isMaster(m.el)) coils.set(l, m.el);
+    }
+  }
+
   let page: Page;
   let offset: Vec = [0, 0];
   if (t.kind === "sheet") {
@@ -208,6 +233,8 @@ export function stampTemplate(project: Project, templateId: string, opts: StampO
 
   const ids = new Map<string, string>();
   for (const el of t.elements) ids.set(el.id, newId("e"));
+  const kept: StampResult["kept"] = [];
+  const relink: string[] = [];
   const elements: Element[] = t.elements.map((src) => {
     const el = clone(src);
     el.id = ids.get(src.id)!;
@@ -216,6 +243,19 @@ export function stampTemplate(project: Project, templateId: string, opts: StampO
     delete el.params.locked;
     delete el.params.pole;
     el.links = src.links.map((l) => ids.get(l)).filter((l): l is string => !!l);
+    // A contact's coil outside the stamp, still in this project: linked on both sides.
+    if (isSlave(src)) {
+      for (const l of src.links) {
+        if (ids.has(l)) continue;
+        const coil = coils.get(l);
+        if (coil) {
+          el.links.push(l);
+          coil.links.push(el.id);
+          kept.push({ contact: el.id, coil: l });
+        } else relink.push(el.id);
+      }
+    }
+    if (el.symbol === "offpage" && !el.links.length) relink.push(el.id);
     el.label = remapFields(el.label, plantMap);
     if (el.symbol === "plant-view" && typeof el.params.plant === "string") {
       el.params.plant = plantMap.get(el.params.plant) ?? el.params.plant;
@@ -251,7 +291,7 @@ export function stampTemplate(project: Project, templateId: string, opts: StampO
   syncPlantViews(project);
   refreshConductors(project);
   tidyDesign(project);
-  return { page, elementIds: elements.map((e) => e.id) };
+  return { page, elementIds: elements.map((e) => e.id), kept, relink };
 }
 
 /** A template as a library file. */

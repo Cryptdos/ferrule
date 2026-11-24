@@ -217,9 +217,15 @@ export interface GaItem {
   zoom?: number;
   /** A label plate's engraved text height, mm. */
   textMm?: number;
+  /** Where a label plate's text sits (v0.4.x T12): unset, in the middle. */
+  textAt?: TextPlace;
   /** A dimension: what it measures and where its line is (x, y, w and h are its extent, worked out). */
   dim?: GaDim;
 }
+
+/** One of nine places in a box, the middle being unset (v0.4.x T12). */
+export const TEXT_PLACES = ["top-left", "top", "top-right", "left", "right", "bottom-left", "bottom", "bottom-right"] as const;
+export type TextPlace = (typeof TEXT_PLACES)[number];
 
 /** A horizontal or vertical dimension on a GA, in mm from the GA's own scale. */
 export interface GaDim {

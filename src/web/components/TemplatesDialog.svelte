@@ -80,8 +80,16 @@
     if (!plant) return;
     if (t.kind === "sheet") {
       let pageId = "";
+      let links: typeof editor.stampLinks = null;
       const title = sheetTitle;
-      if (editor.apply((p) => (pageId = stampTemplate(p, t.id, { afterPageId: editor.pageId, plant, title }).page.id))) {
+      if (
+        editor.apply((p) => {
+          const r = stampTemplate(p, t.id, { afterPageId: editor.pageId, plant, title });
+          pageId = r.page.id;
+          links = r.kept.length || r.relink.length ? { kept: r.kept, relink: r.relink } : null;
+        })
+      ) {
+        editor.stampLinks = links;
         editor.setPage(pageId);
         editor.flash(`Stamped ${t.name} as a new sheet. Press Renumber to give it tags.`);
         stamping = null;
