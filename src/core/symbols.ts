@@ -291,8 +291,10 @@ const NC_MID: Vec = [0.65, -0.15];
  * the pole number. `names`: the terminal names when the marks differ (a
  * timed contact prints 17/18 on terminals 13/14).
  */
-function contactTerms(labels: [string, string], el?: Element, names: [string, string] = labels): { prims: Prim[]; terminals: TerminalDef[] } {
-  const marks = el ? poleMarks(el, labels) : labels;
+function contactTerms(labels: [string, string], el?: Element, names: [string, string] = labels, pins?: Record<string, string>): { prims: Prim[]; terminals: TerminalDef[] } {
+  const iec = el ? poleMarks(el, labels) : labels;
+  // A relay base's own numbers, when its device has a pin map (v0.4.x M4).
+  const marks: [string, string] = [pins?.[names[0]] ?? iec[0], pins?.[names[1]] ?? iec[1]];
   return {
     prims: [term(0.45, -2.2, marks[0]), term(0.45, 2.9, marks[1])],
     terminals: vterms(names[0], names[1]),
@@ -521,11 +523,12 @@ const SYMBOLS: SymbolDef[] = [
     kind: familyKind,
     draw(el, t) {
       const timed = t?.timed;
-      const c = contactTerms(timed ? ["17", "18"] : ["13", "14"], el, ["13", "14"]);
+      const c = contactTerms(timed ? ["17", "18"] : ["13", "14"], el, ["13", "14"], t?.pins);
       return {
-        prims: [...noContact(0, opOf(el)), ...(timed ? timingMark(NO_MID, -2.1, timed) : []), ...c.prims, ...tagAndLabel(timed ? -3.2 : -1.9, el)],
+        // On- and off-delay draws two arcs, reaching 0.9 further out: the tag stands clear of it.
+        prims: [...noContact(0, opOf(el)), ...(timed ? timingMark(NO_MID, -2.1, timed) : []), ...c.prims, ...tagAndLabel(timed ? (timed === "on-off" ? -4.1 : -3.2) : -1.9, el)],
         terminals: c.terminals,
-        body: { x: timed ? -2.7 : -1.3, y: -1.7, w: timed ? 2.8 : 1.4, h: 3.2 },
+        body: { x: timed ? (timed === "on-off" ? -3.6 : -2.7) : -1.3, y: -1.7, w: timed ? (timed === "on-off" ? 3.7 : 2.8) : 1.4, h: 3.2 },
       };
     },
   },
@@ -538,11 +541,11 @@ const SYMBOLS: SymbolDef[] = [
     kind: familyKind,
     draw(el, t) {
       const timed = t?.timed;
-      const c = contactTerms(timed ? ["15", "16"] : ["21", "22"], el, ["21", "22"]);
+      const c = contactTerms(timed ? ["15", "16"] : ["21", "22"], el, ["21", "22"], t?.pins);
       return {
-        prims: [...ncContact(0, opOf(el)), ...(timed ? timingMark(NC_MID, -2.1, timed) : []), ...c.prims, ...tagAndLabel(timed ? -3.2 : -0.8, el)],
+        prims: [...ncContact(0, opOf(el)), ...(timed ? timingMark(NC_MID, -2.1, timed) : []), ...c.prims, ...tagAndLabel(timed ? (timed === "on-off" ? -4.1 : -3.2) : -0.8, el)],
         terminals: c.terminals,
-        body: { x: timed ? -2.7 : -0.1, y: -1.9, w: timed ? 4.1 : 1.5, h: 3.4 },
+        body: { x: timed ? (timed === "on-off" ? -3.6 : -2.7) : -0.1, y: -1.9, w: timed ? (timed === "on-off" ? 5.0 : 4.1) : 1.5, h: 3.4 },
       };
     },
   },
@@ -565,9 +568,9 @@ const SYMBOLS: SymbolDef[] = [
           opOf(el) ? line([0, 1.5], [-0.25, -1.5]) : line([0, 1.5], [-1.1, -1.7]),
           // The timing mark goes out past the NC fixed contact.
           ...(timed ? timingMark([-0.55, 0], -3.2, timed) : []),
-          term(0.45, -2.2, poleMarks(el, [m14, m11])[0]),
-          term(-2.45, -2.2, poleMarks(el, [m12, m11])[0], "end"),
-          term(0.45, 2.9, poleMarks(el, [m14, m11])[1]),
+          term(0.45, -2.2, t?.pins?.["14"] ?? poleMarks(el, [m14, m11])[0]),
+          term(-2.45, -2.2, t?.pins?.["12"] ?? poleMarks(el, [m12, m11])[0], "end"),
+          term(0.45, 2.9, t?.pins?.["11"] ?? poleMarks(el, [m14, m11])[1]),
           ...tagAndLabel(timed ? -4.2 : -2.6, el).map((p) => (p.t === "text" ? { ...p, at: [p.at[0], p.at[1] + 1.2] as Vec } : p)),
         ],
         terminals: [
@@ -913,14 +916,14 @@ const SYMBOLS: SymbolDef[] = [
       VA_PARAM,
     ],
     kind: (el) => (str(el, "type", "relay") === "contactor" ? "contactor" : "relay"),
-    draw(el) {
+    draw(el, t) {
       return {
         prims: [
           line([0, -3], [0, -1.1]),
           line([0, 1.1], [0, 3]),
           rect(-1.6, -1.1, 3.2, 2.2),
-          term(0.45, -1.6, "A1"),
-          term(0.45, 2.9, "A2"),
+          term(0.45, -1.6, t?.pins?.A1 ?? "A1"),
+          term(0.45, 2.9, t?.pins?.A2 ?? "A2"),
           ...tagAndLabel(-2.1, el),
         ],
         terminals: vterms("A1", "A2"),
@@ -954,7 +957,7 @@ const SYMBOLS: SymbolDef[] = [
       VA_PARAM,
     ],
     kind: () => "timer",
-    draw(el) {
+    draw(el, t) {
       const mode = timerFunction(el);
       const time = str(el, "time", "");
       const code = str(el, "code", "");
@@ -972,8 +975,8 @@ const SYMBOLS: SymbolDef[] = [
         line([0, 1.1], [0, 3]),
         rect(-1.6, -1.1, 3.2, 2.2),
         ...mark,
-        term(0.45, -1.6, "A1"),
-        term(0.45, 2.9, "A2"),
+        term(0.45, -1.6, t?.pins?.A1 ?? "A1"),
+        term(0.45, 2.9, t?.pins?.A2 ?? "A2"),
         text(tx, 0.5, "{tag}", TAG, "end", "tag"),
         text(tx, 1.75, fn, DETAIL, "end", "note"),
       ];
@@ -2633,6 +2636,8 @@ export interface GeometryText {
   rows?: string[][];
   /** One of each part used (symbol legend). */
   legend?: LegendEntry[];
+  /** A relay's own terminal numbers from its device (v0.4.x M4), by terminal name: A1 → "13", 13 → "9"… */
+  pins?: Record<string, string>;
 }
 
 /**

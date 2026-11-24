@@ -1,7 +1,7 @@
 <script lang="ts">
   import { SUITS } from "../../core/ga";
   import { addProjectDevice, removeProjectDevice, updateProjectDevice, useLibraryDevice } from "../../core/ops";
-  import type { DeviceEntry, ProjectDevice } from "../../core/devices";
+  import { formatRelayPins, parseRelayPins, type DeviceEntry, type ProjectDevice, type RelayPins } from "../../core/devices";
   import { api } from "../api";
   import { deviceLibrary } from "../devices.svelte";
   import type { Editor } from "../editor.svelte";
@@ -35,15 +35,15 @@
   const used = $derived(new Set(editor.project.pages.flatMap((pg) => (pg.gaItems ?? []).map((i) => i.device).filter(Boolean))));
 
   // New / edit form.
-  type Form = { id: string | null; where: "library" | "project"; name: string; maker: string; part: string; kind: string; w: number; h: number; d: number; va: number; notes: string };
-  const blank = (): Form => ({ id: null, where: useLib ? "library" : "project", name: "", maker: "", part: "", kind: "", w: 18, h: 90, d: 0, va: 0, notes: "" });
+  type Form = { id: string | null; where: "library" | "project"; name: string; maker: string; part: string; kind: string; w: number; h: number; d: number; va: number; pins: string; notes: string };
+  const blank = (): Form => ({ id: null, where: useLib ? "library" : "project", name: "", maker: "", part: "", kind: "", w: 18, h: 90, d: 0, va: 0, pins: "", notes: "" });
   let form: Form | null = $state(null);
 
   function editLibrary(d: DeviceEntry) {
-    form = { id: d.id, where: "library", name: d.name, maker: d.maker, part: d.part, kind: d.kind, w: d.w, h: d.h, d: d.d, va: d.va ?? 0, notes: d.notes };
+    form = { id: d.id, where: "library", name: d.name, maker: d.maker, part: d.part, kind: d.kind, w: d.w, h: d.h, d: d.d, va: d.va ?? 0, pins: formatRelayPins(d.relayPins), notes: d.notes };
   }
   function editMine(d: ProjectDevice) {
-    form = { id: d.id, where: "project", name: d.name, maker: d.maker, part: d.part, kind: d.kind, w: d.w, h: d.h, d: d.d, va: d.va ?? 0, notes: "" };
+    form = { id: d.id, where: "project", name: d.name, maker: d.maker, part: d.part, kind: d.kind, w: d.w, h: d.h, d: d.d, va: d.va ?? 0, pins: formatRelayPins(d.relayPins), notes: "" };
   }
 
   async function run(what: string, fn: () => Promise<void>) {
@@ -65,10 +65,18 @@
       error = "Give the device a name";
       return;
     }
-    const fields = { name: f.name, maker: f.maker, part: f.part, kind: f.kind, w: Number(f.w), h: Number(f.h), d: Number(f.d) || 0, va: Number(f.va) || 0 };
+    let relayPins: RelayPins | undefined;
+    try {
+      relayPins = parseRelayPins(f.pins);
+    } catch (e) {
+      error = (e as Error).message;
+      return;
+    }
+    const fields = { name: f.name, maker: f.maker, part: f.part, kind: f.kind, w: Number(f.w), h: Number(f.h), d: Number(f.d) || 0, va: Number(f.va) || 0, relayPins };
     await run("save", async () => {
       if (f.where === "library") {
-        const e = f.id ? await api.devices.update(f.id, { ...fields, notes: f.notes }) : await api.devices.add({ ...fields, notes: f.notes });
+        // null clears a pin map the entry had (undefined wouldn't be sent).
+        const e = f.id ? await api.devices.update(f.id, { ...fields, relayPins: fields.relayPins ?? null, notes: f.notes } as never) : await api.devices.add({ ...fields, notes: f.notes });
         deviceLibrary.put(e);
         // The project's copy (and GA items still at the old size) follow.
         if (mine.some((d) => d.id === e.id)) editor.apply((p) => void useLibraryDevice(p, e));
@@ -256,6 +264,7 @@
         <label>Width (mm) <input type="number" min="1" step="0.1" bind:value={form.w} /></label>
         <label>Height (mm) <input type="number" min="1" step="0.1" bind:value={form.h} /></label>
         <label>Depth (mm) <input type="number" min="0" step="0.1" bind:value={form.d} /></label>
+        <label class="wide" title="A relay base's own terminal numbers, printed on its coil, contacts and contact table in place of A1/A2 and 11/12/14: the coil's two, then | and each pole's common, NC and NO (a dash for one it hasn't)">Relay pins <input bind:value={form.pins} placeholder="e.g. A1 A2 | 11 12 14 | 21 22 24" /></label>
         <label title="Its expected draw from its data sheet: the default for parts that use it, which Simulate adds up on the supply that feeds them">Draw (VA) <input type="number" min="0" step="0.1" bind:value={form.va} /></label>
         {#if form.where === "library"}
           <label class="wide">Notes <input bind:value={form.notes} placeholder="e.g. coil 24V DC, 4 changeover" /></label>

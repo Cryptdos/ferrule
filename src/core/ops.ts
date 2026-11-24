@@ -831,6 +831,17 @@ export function setConductorInfo(project: Project, conductorId: string, info: { 
   }
 }
 
+/** A function's colour in the project's table (v0.4.x M3); empty clears it. */
+export function setFunctionColour(project: Project, func: string, colour: string): void {
+  const f = func.trim();
+  if (!f) throw new OpError("Name the function");
+  const table = { ...(project.wireColours ?? {}) };
+  for (const k of Object.keys(table)) if (k.replace(/\s+/g, "").toLowerCase() === f.replace(/\s+/g, "").toLowerCase()) delete table[k];
+  if (colour.trim()) table[f] = colourCode(colour);
+  if (Object.keys(table).length) project.wireColours = table;
+  else delete project.wireColours;
+}
+
 export function setNumberingScheme(project: Project, scheme: Project["numbering"]["scheme"]): void {
   project.numbering = { ...project.numbering, scheme };
 }
@@ -2075,6 +2086,10 @@ export function updateProjectDevice(project: Project, id: string, patch: Partial
   if (patch.va !== undefined) {
     if (patch.va > 0) dev.va = patch.va;
     else delete dev.va;
+  }
+  if ("relayPins" in patch) {
+    if (patch.relayPins) dev.relayPins = patch.relayPins;
+    else delete dev.relayPins;
   }
   if (old.w !== dev.w || old.h !== dev.h) resizeDeviceItems(project, id, old, dev);
 }

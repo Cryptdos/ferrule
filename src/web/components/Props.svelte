@@ -32,9 +32,9 @@
   } from "../../core/ops";
   import { controllerName, moduleTitle } from "../../core/modules";
   import { readImage } from "../images";
-  import { address, contactMarks, contactType, isMaster, isSlave, masterOf, partnerOf, slavesOf } from "../../core/xref";
+  import { address, contactMarks, relayPinMarks, contactType, isMaster, isSlave, masterOf, partnerOf, slavesOf } from "../../core/xref";
   import { isBar, paramApplies, parsePlantPins, plantViewLayout, requireSymbol, terminalNames, viewSides, type ViewSide } from "../../core/symbols";
-  import { WIRE_FUNCTIONS } from "../../core/wirecolours";
+  import { WIRE_FUNCTIONS, conductorLooks, functionRows } from "../../core/wirecolours";
   import ColourSelect from "./ColourSelect.svelte";
   import { displayTag, tagPrefix } from "../../core/tags";
   import type { ParamValue } from "../../core/model";
@@ -141,7 +141,7 @@
       {/if}
       {#each slaves as s (s.el.id)}
         <button class="link-btn" onclick={() => editor.goTo(s.el.id)}>
-          {contactType(s.el)} {contactMarks(s.el)} at {address(s.page, s.el.pos)} →
+          {contactType(s.el)} {contactMarks(s.el, false, relayPinMarks(editor.project, s.el))} at {address(s.page, s.el.pos)} →
         </button>
       {/each}
     {/if}
@@ -587,8 +587,11 @@
           />
         </label>
       </div>
+      {@const look = conductorLooks(editor.project).get(cond.id)}
+      {#if look?.fromTable}<p class="hint">Colour {look.colour}, from the project's table for {look.func} (Project… → Wire colours).</p>
+      {:else if look?.func && !cond.function}<p class="hint">Function {look.func}, from its distribution.</p>{/if}
       <datalist id="ferrule-wire-functions">
-        {#each WIRE_FUNCTIONS as f (f)}<option value={f}></option>{/each}
+        {#each [...functionRows(editor.project), ...WIRE_FUNCTIONS] as f (f)}<option value={f}></option>{/each}
       </datalist>
       {@const isField = isFieldWire(page, seg)}
       <label>

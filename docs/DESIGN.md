@@ -374,6 +374,7 @@ Reference drawings from other companies are proprietary. They are never committe
 | Exports and fit, v0.4.x step 12 (2026-11-24) | T18: `coresPerDevice`; M10: `wireMarkers`, `groupMarkers` (`schedules.ts`) and the marker info in `terminalNumberChecks`; T20: enclosure and leaf fit in Check; the bill of materials line counts schematic parts |
 | Stamp links, Duplicate's step, plate text, v0.4.x step 13 (2026-11-24) | T6: templates keep contacts' links out to coils; `stampTemplate` keeps them, returns `kept` and `relink`, shown after a stamp. T8: `TagStep` in `stepTag` and `duplicatePlant`. T12: `GaItem.textAt`, `plateTextLayout` |
 | Supply load, v0.4.x step 14 (2026-11-24) | M12: `va` and `ratingVa` parameters, `IoPoint.va` / `ratingVa` / `efficiency`, `ModuleInfo.va`, device `va`; `supplyLoads`, `loadText`, `usesLoads` (`supplyload.ts`); Simulate's Supplies list and figures beside supplies; Check's undrawn count and over-rating warning |
+| Wire colours and relay pins, v0.4.x step 15 (2026-11-24) | M3: `Project.wireColours`, `conductorLooks`, `functionRows`, `setFunctionColour` (`wirecolours.ts`, `ops.ts`). M4: device `relayPins`, `parseRelayPins`, `relayPinMarks` (`xref.ts`) into `GeometryText.pins`; on- and off-delay contacts' tag moved clear of the mark |
 
 ## 16. Open questions
 
