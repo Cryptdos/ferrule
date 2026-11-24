@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
   import { AREA_MM, AREA_UNITS, SHEET_MM, UNIT_MM, lineUnits, textUnits } from "../../core/geometry";
-  import type { Page, Project } from "../../core/model";
+  import type { Page, Project, Segment } from "../../core/model";
   import type { Vec } from "../../core/geometry";
   import { blockHalf } from "../../core/blocks";
   import { BLOCK_INSET, blockLabels, connectionDots, earthConductors, isFieldWire, isScreenWire, numberedSegments, routeOf, wireTexts } from "../../core/wires";
@@ -33,6 +33,7 @@
     over,
     focus = null,
     litLamps = null,
+    textAt,
   }: {
     project: Project;
     page: Page;
@@ -66,6 +67,8 @@
     focus?: "draft" | "annotate" | null;
     /** Simulate: lamps lit, by schematic id, drawn lit on a door GA (design-v0.3 §4). */
     litLamps?: Set<string> | null;
+    /** A wire's number or colour being slid along it (v0.4.x T13): where it shows while dragged. */
+    textAt?: (seg: Segment) => { numberAt?: number; colourAt?: number } | null;
   } = $props();
   const dimDraft = $derived(focus === "annotate");
   const dimAnnotate = $derived(focus === "draft");
@@ -164,9 +167,12 @@
           func: c.function,
           railFrom: onBusbar(seg.from),
           railTo: onBusbar(seg.to),
+          ...(textAt?.(seg) ?? { numberAt: seg.numberAt, colourAt: seg.colourAt }),
         }) as t, i (i)}
           <text
             class="wirenum"
+            data-wiretext={seg.id}
+            data-role={t.role}
             class:tagsize={t.size === "tag"}
             x={t.at[0]}
             y={t.at[1]}

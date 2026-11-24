@@ -230,6 +230,8 @@ export interface ElementPatch {
   zone?: Element["zone"];
   rot?: Rotation;
   params?: Record<string, ParamValue>;
+  /** Move its label block by this much from its place; null puts it back (v0.4.x T14). */
+  labelAt?: Vec | null;
 }
 
 /** A legend written as words ("HAND OFF AUTO", "1  2") as position names, when there's one word per position. */
@@ -253,6 +255,10 @@ export function updateElement(project: Project, pageId: string, id: string, patc
   if (patch.label !== undefined) el.label = el.symbol === "text" ? patch.label : patch.label.replace(/\s*\n\s*/g, " ");
   if (patch.zone !== undefined) el.zone = patch.zone;
   if (patch.rot !== undefined) el.rot = patch.rot;
+  if (patch.labelAt !== undefined) {
+    if (patch.labelAt && (patch.labelAt[0] || patch.labelAt[1])) el.labelAt = [Math.round(patch.labelAt[0] * 2) / 2, Math.round(patch.labelAt[1] * 2) / 2];
+    else delete el.labelAt;
+  }
   if (patch.params) el.params = normaliseParams(el.symbol, { ...el.params, ...patch.params });
   // A terminal's number changed: the block fits its numbers at once, not at the next route (F8).
   if (el.symbol === "terminal") fitBlock(getPage(project, pageId));
@@ -419,6 +425,20 @@ export function resetRoute(project: Project, pageId: string, ids: string[]): voi
  * wire's number or colour here (true/false), or null for the usual rule
  * (numbers on panel wires, not field wires; colour whenever there is one).
  */
+/**
+ * Slide a wire's number or colour along it (v0.4.x T13): a fraction 0–1 of
+ * its drawn length, kept through re-routing; null puts it back in its usual place.
+ */
+export function setWireTextAt(project: Project, pageId: string, id: string, at: { numberAt?: number | null; colourAt?: number | null }): void {
+  const seg = getSegment(getPage(project, pageId), id);
+  for (const k of ["numberAt", "colourAt"] as const) {
+    const v = at[k];
+    if (v === undefined) continue;
+    if (v === null) delete seg[k];
+    else seg[k] = Math.round(Math.max(0, Math.min(1, v)) * 1000) / 1000;
+  }
+}
+
 export function setWireKind(
   project: Project,
   pageId: string,

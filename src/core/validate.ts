@@ -404,6 +404,7 @@ function parsePage(pg: Record<string, unknown>, i: number): Project["pages"][num
       pos: e.pos,
       rot,
       ...(e.flip === true ? { flip: true } : {}),
+      ...(isVec(e.labelAt) && (e.labelAt[0] || e.labelAt[1]) ? { labelAt: [e.labelAt[0], e.labelAt[1]] as [number, number] } : {}),
       zone: e.zone === "external" ? ("external" as const) : ("internal" as const),
       params: isObj(e.params)
         ? (Object.fromEntries(
@@ -431,6 +432,8 @@ function parsePage(pg: Record<string, unknown>, i: number): Project["pages"][num
         ...(typeof s.field === "boolean" ? { field: s.field } : {}),
         ...(typeof s.showNumber === "boolean" ? { showNumber: s.showNumber } : {}),
         ...(s.showColour === false ? { showColour: false } : {}),
+        ...(typeof s.numberAt === "number" && s.numberAt >= 0 && s.numberAt <= 1 ? { numberAt: s.numberAt } : {}),
+        ...(typeof s.colourAt === "number" && s.colourAt >= 0 && s.colourAt <= 1 ? { colourAt: s.colourAt } : {}),
       };
     });
   const sections = arr(pg.sections)

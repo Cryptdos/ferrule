@@ -12,13 +12,14 @@ import { describeInterlock, interlockExpectations, interlockStatus, proveInterlo
 import { parseSupplies, parseSupply } from "./supplies";
 import { refreshConductors } from "./conductors";
 import { newProject, type Element, type Project } from "./model";
-import { localGeometry, moduleViewLayout, plantViewLayout, wrapTag, wrapTitle } from "./symbols";
+import { labelBlockRect, localGeometry, moduleViewLayout, plantViewLayout, wrapTag, wrapTitle } from "./symbols";
 import { elementTexts } from "./tags";
 import { textWidth } from "./textwidth";
 import { textUnits } from "./geometry";
 import { moduleTitle, viewsOf } from "./modules";
-import { addElement, addPlant, deletePlant, moveElements, placePlantView, addGaDim, addGaItem, addGaPage, addPlatesForDoors, joinDoorBelow, setPlateBehind, setBoundary, setGaSettings, splitDoor, updateElement } from "./ops";
-import { earthConductors, isFieldWire, numberByDefault } from "./wires";
+import { addElement, addPlant, deletePlant, linkContact, setWireTextAt, moveElements, placePlantView, addGaDim, addGaItem, addGaPage, addPlatesForDoors, joinDoorBelow, setPlateBehind, setBoundary, setGaSettings, splitDoor, updateElement } from "./ops";
+import { earthConductors, fractionAlong, isFieldWire, numberByDefault, pointAlong, wireTexts } from "./wires";
+import { routePage } from "./routing";
 import { pointsSchedule } from "./schedules";
 import { ENCL, PLATE_MARGIN, gaCandidates, dimLayout, doorPanes, plateDoor, platesOf, drawnGaItems, gaFrame, paneOf, paneRef, sheetPanes } from "./ga";
 import { renumber } from "./renumber";
@@ -417,5 +418,74 @@ describe("step 5: view text wraps (F4, F5)", () => {
     const lay = moduleViewLayout(v);
     const title = textsOf(p, v).filter((t) => t.role === "tag");
     for (const t of title) expect(textWidth(t.text, t.size)).toBeLessThanOrEqual(lay.right - lay.left + 1e-6);
+  });
+});
+
+describe("step 6: movable labels (T14, T7, T13)", () => {
+  test("T14: a part's label block moves as one; the contact table keeps its place; it round-trips and goes back", () => {
+    const p = newProject("l");
+    const pg = p.pages[0]!.id;
+    const k = addElement(p, pg, "coil", [20, 30], { label: "PUMP RUN" });
+    const c = addElement(p, pg, "contact-no", [40, 30]);
+    linkContact(p, c.id, k.id);
+    renumber(p);
+    const before = localGeometry(k, elementTexts(k, p)).prims.filter((x) => x.t === "text");
+    updateElement(p, pg, k.id, { labelAt: [3, -2] });
+    const after = localGeometry(k, elementTexts(k, p)).prims.filter((x) => x.t === "text");
+    before.forEach((b, i) => {
+      const a = after[i]!;
+      if (b.t !== "text" || a.t !== "text") return;
+      const moved = b.role === "tag" || b.role === "label" || b.block;
+      expect(a.at).toEqual(moved ? [b.at[0] + 3, b.at[1] - 2] : b.at);
+    });
+    const back = parseProject(JSON.parse(JSON.stringify(p)));
+    expect(back.pages[0]!.elements.find((e) => e.id === k.id)!.labelAt).toEqual([3, -2]);
+    updateElement(p, pg, k.id, { labelAt: null });
+    expect(k.labelAt).toBeUndefined();
+  });
+
+  test("T14: a plant view's tag, description and information move together", () => {
+    const { project: p, plant } = fresh();
+    const pg = p.pages.find((x) => x.title === "Controller: digital inputs")!;
+    const v = pg.elements.find((e) => e.params.plant === plant.DPS1!.id)!;
+    const r0 = labelBlockRect(v, localGeometry(v, elementTexts(v, p)))!;
+    updateElement(p, pg.id, v.id, { labelAt: [5, 0] });
+    const r1 = labelBlockRect(v, localGeometry(v, elementTexts(v, p)))!;
+    expect(r1.x - r0.x).toBeCloseTo(5);
+    expect(r1.y - r0.y).toBeCloseTo(0);
+    expect(r1.w).toBeCloseTo(r0.w);
+  });
+
+  test("T7: Check hints when a label overlaps another part, and not once it's moved clear", () => {
+    const p = newProject("o");
+    const pg = p.pages[0]!.id;
+    const a = addElement(p, pg, "coil", [20, 30], { label: "A VERY LONG LABEL HERE" });
+    addElement(p, pg, "coil", [10, 30], { label: "B" });
+    const hints = () => checkProject(p).filter((f) => /label overlaps/.test(f.message));
+    expect(hints().length).toBeGreaterThan(0);
+    updateElement(p, pg, a.id, { labelAt: [0, 25] });
+    expect(hints().length).toBe(0);
+  });
+
+  test("T13: a wire's number slides along its own wire, and the fraction survives a re-route", () => {
+    const pts: [number, number][] = [[0, 0], [0, 10], [20, 10]];
+    expect(pointAlong(pts, 0.5).at).toEqual([5, 10]);
+    expect(fractionAlong(pts, [5, 12])).toBeCloseTo(0.5);
+    const t = wireTexts(pts, { number: "3-12", numberAt: 0.25 });
+    expect(t.length).toBe(1);
+    // On the first leg, vertical, centred at y 7.5 beside it.
+    expect(t[0]!.vertical).toBe(true);
+    expect(t[0]!.at[1]).toBeCloseTo(7.5);
+    const { project: p } = fresh();
+    const pg = p.pages[1]!;
+    const seg = pg.segments[0]!;
+    setWireTextAt(p, pg.id, seg.id, { numberAt: 0.8, colourAt: 2 });
+    expect([seg.numberAt, seg.colourAt]).toEqual([0.8, 1]);
+    routePage(AvoidLib.getInstance(), pg);
+    expect(seg.numberAt).toBe(0.8);
+    const back = parseProject(JSON.parse(JSON.stringify(p)));
+    expect(back.pages[1]!.segments[0]!.numberAt).toBe(0.8);
+    setWireTextAt(p, pg.id, seg.id, { numberAt: null, colourAt: null });
+    expect(seg.numberAt).toBeUndefined();
   });
 });

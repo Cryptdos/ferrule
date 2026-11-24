@@ -8,9 +8,9 @@ import { compile, pinNode } from "./sim";
 import { controllerName, modulesOf, moduleTypeName, slotAddress, viewsOf } from "./modules";
 import { contactPins, isAnalogueForm, isInputForm, missingRefs, describeExpectation, things } from "./points";
 import type { Element, Page, Project } from "./model";
-import { benchOf, isBar, terminalNames } from "./symbols";
+import { benchOf, getSymbol, isBar, labelBlockRect, localGeometry, terminalNames } from "./symbols";
 import { numberingTerminal } from "./renumber";
-import { displayTag } from "./tags";
+import { displayTag, elementTexts } from "./tags";
 import { isMaster, isSlave, masterOf, partnerOf, slavesOf } from "./xref";
 import { drawnOn, fieldPlant, needsChannel, onNetworkOnly } from "./design";
 import { Nets, wiringOf } from "./wiring";
@@ -164,6 +164,7 @@ export function checkProject(project: Project, opts: { proofs?: Proofs | null } 
   out.push(...pointChecks(project));
   out.push(...controllerChecks(project));
   out.push(...designChecks(project, { proofs: opts.proofs }));
+  out.push(...labelOverlaps(project));
   // What supplies give and loads take (v0.4.x M11), and distributions nothing supplies (F2).
   if (project.pages.some((pg) => pg.segments.length)) {
     const circuit = compile(project);
@@ -442,6 +443,45 @@ const NOT_EQUIPMENT = new Set(["terminal", "plant-view", "junction", "offpage", 
  * channel (direct, via one relay, confirmed, or to review). Modules not
  * drawn are in controllerChecks.
  */
+/** Parts whose body doesn't count as something a label can overlap: rails, blocks, annotations. */
+const NOT_A_BODY = new Set(["busbar", "rail", "terminal", "junction", "text", "box", "arrow", "highlight", "callout", "polygon", "image", "revtable", "ctrlmap", "netmap", "legend", "strip-line", "screen"]);
+
+/**
+ * A hint, not a solver (v0.4.x T7): a part's label block that overlaps
+ * another part's body or label block. Nothing moves by itself: drag the
+ * label clear (T14).
+ */
+export function labelOverlaps(project: Project): Finding[] {
+  const out: Finding[] = [];
+  const over = (a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }) =>
+    Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x) > 0.15 && Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y) > 0.15;
+  for (const page of project.pages) {
+    if (page.ga) continue;
+    const parts = page.elements
+      .filter((el) => benchOf(el) === "draft" && !NOT_A_BODY.has(el.symbol))
+      .map((el) => {
+        const g = localGeometry(el, elementTexts(el, project));
+        const b = g.body;
+        return { el, body: { x: el.pos[0] + b.x, y: el.pos[1] + b.y, w: b.w, h: b.h }, block: labelBlockRect(el, g) };
+      });
+    const said = new Set<string>();
+    for (const a of parts) {
+      if (!a.block) continue;
+      for (const b of parts) {
+        if (a === b) continue;
+        const hit = over(a.block, b.body) || (!!b.block && over(a.block, b.block));
+        if (!hit) continue;
+        const key = [a.el.id, b.el.id].sort().join("|");
+        if (said.has(key)) continue;
+        said.add(key);
+        const name = (el: Element) => displayTag(el, project) || getSymbol(el.symbol)?.name || el.symbol;
+        out.push({ level: "info", message: `Sheet ${page.number}: ${name(a.el)}'s label overlaps ${name(b.el)}: drag the label clear`, pageId: page.id, ids: [a.el.id, b.el.id] });
+      }
+    }
+  }
+  return out;
+}
+
 export function designChecks(project: Project, opts: { oneHop?: boolean; proofs?: Proofs | null } = {}): Finding[] {
   const oneHop = opts.oneHop ?? true;
   const out: Finding[] = [];
