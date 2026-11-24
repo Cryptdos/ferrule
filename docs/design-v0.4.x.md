@@ -112,7 +112,7 @@ interface SupplyType { v: number; ac: boolean }
 - on a sheet with no boundary, nothing is external, plant views included;
 - `Segment.field` set by hand still wins.
 
-So plant drawn above the boundary, or on a sheet without one, has solid, numbered wires. **This changes how old drawings look:** a plant view on a boundary-less sheet turns from dashed to solid and shows its wire numbers. Note it under *Changed during build*.
+So plant drawn above the boundary, or on a sheet without one, has solid, numbered wires. **This changes how old drawings look (accepted by the user):** a plant view on a boundary-less sheet turns from dashed to solid and shows its wire numbers. Note it under *Changed during build*.
 
 **T3. Panel devices.** A plant item can be marked *In the panel* (`PlantItem.inPanel`). It's still plant (points, pins, a view), and:
 
@@ -165,7 +165,7 @@ Acceptance, on the fixture's module and damper sheets: no route lies within one 
 
 **M9. Connector block** (symbol `connector-block`). Parameters: *Terminals* (2–12, default 2) and a label (*EARTH BLOCK*, *0V*, *SCREENS*). The box is one column wide and grows by a row for every two terminals: odd-numbered terminals enter at the top edge, even at the bottom, in line, so a conductor passes straight through. Two connection points on the border, centre left and centre right. Every point is one potential: one node in Simulate, one conductor for numbering. Designated as a terminal (X). On the GA its length follows its terminal count.
 
-> **Decide (M9):** how it grows. Recommended: pairs top and bottom, the box getting taller, as above. The alternative is a row of terminals along the top and a matching row along the bottom, the box getting wider, which reads better for a distribution block with many ways.
+Decided: it grows taller, in pairs, and it can be rotated like any part, so turned a quarter it's a wide block with its terminals left and right. Its label and terminal numbers stay upright at every rotation.
 
 **T17. Socket.** Redrawn: a solid box with three socket contacts side by side (each a cup open downwards), L, N and E entering from the top. L and N stay where they are today (0 and 3 units), E at 6. Label under the box. Old drawings: the E end of its wire moves from the side to the top; an auto route re-routes, a manual route has its last point moved and is flagged once in Check.
 
@@ -200,7 +200,7 @@ Wire numbers aren't merged: each drawn wire keeps its own.
 
 **T9. Module tags.** When the project has a controller map sheet, modules take their tags from their place on it; with no map, from their first view, as now.
 
-> **Decide (T9):** recommended as above (the map wins when there is one). The alternative is a setting per controller.
+Decided: the map wins when there is one.
 
 ### Step 10b: serial ports
 
@@ -226,9 +226,13 @@ Two PRs: the port and the network's `port` field; then the chain from the drawin
 
 **T18. Cores per device.** The cable schedule gains a second table, one row per field device: tag, description, cores (its wired terminals, earth included), and the terminals. Exported as its own CSV.
 
-**M10. Wire markers.** A CSV of wire numbers for a marker supplier: one line per wire end (two per wire), panel wiring only, with an option to group duplicates into *number, count*.
+**M10. Wire and cable markers.** A CSV for a marker supplier, with an option to group duplicates into *text, count*.
 
-> **Decide (M10):** recommended two markers per wire. Say if one per wire, or field wires too, is what your supplier takes.
+- **Panel wires:** four markers per wire, two at each end, each the wire's number.
+- **Field cables:** two markers at each end of every field cable (four per cable), each the cable's tag, for the installers. Until cables are objects (M2), a field device has one cable and its marker is the device's tag; with M2, the cable's own tag.
+- A column says which each line is (*wire* or *cable*), so the two can be ordered separately.
+
+Decided by the user: four per wire, and two per end of each field cable.
 
 **T20. Enclosure fit.** Check warns when a GA item lies outside its enclosure (backplate) or its leaf (door). Arithmetic only.
 
@@ -265,14 +269,14 @@ This is the largest entry and the least specified. Before it starts, write its d
 
 ## 4. Decisions for the user
 
-| # | Entry | Question | Recommended |
+| # | Entry | Question | Answer |
 |---|---|---|---|
-| 1 | F7 | Old drawings: plant on a sheet with no boundary turns from dashed to solid wiring with numbers. Accept? | Yes: it's the fix |
-| 2 | M9 | Connector block grows taller in pairs, or wider in rows? | Taller, in pairs |
-| 3 | T9 | Module tags from the controller map when there is one? | Yes |
-| 4 | M10 | Wire markers: two per wire, panel wiring only? | Yes |
-| 5 | M1 | DC UPS as a panel device with points, not a symbol? | Yes |
-| 6 | M2 | Cables as objects in this sprint, or after it? | After the rest, with its own design |
+| 1 | F7 | Old drawings: plant on a sheet with no boundary turns from dashed to solid wiring with numbers. Accept? | **Decided:** yes |
+| 2 | M9 | Connector block grows taller in pairs, or wider in rows? | **Decided:** taller, and it rotates |
+| 3 | T9 | Module tags from the controller map when there is one? | **Decided:** yes |
+| 4 | M10 | Wire markers: how many, and which wires? | **Decided:** four per wire; two per end of each field cable |
+| 5 | M1 | DC UPS as a panel device with points, not a symbol? | Open. Recommended: yes |
+| 6 | M2 | Cables as objects in this sprint, or after it? | Open. Recommended: after the rest, with its own design |
 
 ## 5. Changed during build
 
