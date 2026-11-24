@@ -21,6 +21,7 @@ import {
   type Expectation,
   type Condition,
   type Asset,
+  type DoorColumn,
   type DoorLeaf,
   type GaDim,
   type GaItem,
@@ -39,7 +40,7 @@ import { cleanPoints, formatQuickEntry, mergePoints, isInputForm, missingRefs, p
 import { isOrthogonal, routeOf, simplifyRoute } from "./wires";
 import { isMaster, isSlave, locate } from "./xref";
 import { colourCode, knownColour, lampColour } from "./wirecolours";
-import { DETAIL_ZOOMS, allDetails, detailOf, detailSpace, doorOwner, fitScale, fitZoom, frameOf, itemStrip, nextDetailLetter, sheetTakes, syncDetailFrames, viewTakes } from "./ga";
+import { DETAIL_ZOOMS, MAX_COLUMNS, MAX_DOORS, allDetails, detailOf, detailSpace, doorColumns, doorOwner, fitScale, fitZoom, frameOf, itemStrip, nextDetailLetter, sheetTakes, syncDetailFrames, viewTakes } from "./ga";
 
 export class OpError extends Error {}
 
@@ -1417,7 +1418,9 @@ export function addGaPage(project: Project, title: string, ga: GaSettings, after
     page.ga.enclosure = { ...project.pages.find((p) => p.id === ga.of)!.ga!.enclosure };
   }
   if (ga.view === "door-front" && !ga.of && ga.leaves?.length) setLeaves(page.ga, ga.leaves);
+  if (ga.view === "door-front" && !ga.of && ga.columns?.length) setColumns(page.ga, ga.columns);
   if (ga.leaf !== undefined && ga.view !== "backplate") page.ga.leaf = ga.leaf;
+  if (ga.pane && ga.view !== "backplate") page.ga.pane = [ga.pane[0], ga.pane[1]];
   page.gaItems = [];
   return page;
 }
@@ -1436,7 +1439,115 @@ function setLeaves(ga: GaSettings, leaves: DoorLeaf[]): void {
   if (!ga.leaves || ga.leaves.length < 2) delete ga.leaf;
 }
 
-export function setGaSettings(project: Project, pageId: string, patch: Partial<Omit<GaSettings, "of" | "leaf">> & { of?: string | null; leaf?: 0 | 1 | null }): void {
+/**
+ * A modular door's columns (v0.4.x M13): up to 6, each up to 8 doors.
+ * Stored as given (sized to fit when drawn: the last column and door take
+ * what's left); none, or one column of one door, is the plain door again.
+ */
+function setColumns(ga: GaSettings, columns: DoorColumn[]): void {
+  const cols = columns
+    .slice(0, MAX_COLUMNS)
+    .map((c) => ({
+      w: Math.max(1, Math.round(c.w)),
+      doors: c.doors.slice(0, MAX_DOORS).map((d) => ({ h: Math.max(1, Math.round(d.h)), hinge: d.hinge === "right" ? ("right" as const) : ("left" as const), ...(d.name?.trim() ? { name: d.name.trim() } : {}) })),
+    }))
+    .filter((c) => c.doors.length);
+  if (!cols.length || (cols.length === 1 && cols[0]!.doors.length === 1 && !cols[0]!.doors[0]!.name)) {
+    delete ga.columns;
+    if (cols[0]?.doors[0]?.hinge === "right") ga.leaves = [{ w: ga.enclosure.w, hinge: "right" }];
+    else delete ga.leaves;
+    return;
+  }
+  if (cols.reduce((a, c) => a + c.w, 0) - cols[cols.length - 1]!.w >= ga.enclosure.w) throw new OpError("The columns are wider than the door");
+  ga.columns = cols;
+  delete ga.leaves;
+}
+
+/** A door front's columns as they're drawn: its own, or its leaves as columns of one door. */
+function columnsOf(page: Page): DoorColumn[] {
+  return doorColumns(page).map((c) => ({ w: c.w, doors: c.doors.map((d) => ({ ...d })) }));
+}
+
+/** A door front that has its own door, for changing its doors. */
+function doorFront(project: Project, pageId: string): Page & { ga: GaSettings } {
+  const page = getPage(project, pageId);
+  if (page.ga?.view !== "door-front" || page.ga.of) throw new OpError("Doors are set out on the door front that has the door");
+  return page as Page & { ga: GaSettings };
+}
+
+/**
+ * Split one door in two (v0.4.x M13): `down` makes two side by side (its
+ * column split, the doors above and below it split with it), `across` two
+ * stacked; at `at` mm from the door's own left or top edge (default its middle).
+ */
+export function splitDoor(project: Project, pageId: string, col: number, row: number, dir: "across" | "down", at?: number): void {
+  const page = doorFront(project, pageId);
+  const cols = columnsOf(page);
+  const c = cols[col];
+  const d = c?.doors[row];
+  if (!c || !d) throw new OpError("No such door");
+  if (dir === "across") {
+    if (c.doors.length >= MAX_DOORS) throw new OpError(`A column has up to ${MAX_DOORS} doors`);
+    const a = Math.round(at ?? d.h / 2);
+    if (!(a >= 20 && d.h - a >= 20)) throw new OpError("Split it at least 20 mm from its edge");
+    c.doors.splice(row, 1, { ...d, h: a }, { h: d.h - a, hinge: d.hinge });
+  } else {
+    if (cols.length >= MAX_COLUMNS) throw new OpError(`A door has up to ${MAX_COLUMNS} columns`);
+    const a = Math.round(at ?? c.w / 2);
+    if (!(a >= 20 && c.w - a >= 20)) throw new OpError("Split it at least 20 mm from its edge");
+    const right = { w: c.w - a, doors: c.doors.map((x) => ({ h: x.h, hinge: "right" as const })) };
+    cols.splice(col, 1, { ...c, w: a }, right);
+  }
+  setColumns(page.ga, cols);
+  page.ga.columns ??= cols;
+}
+
+/** Join a door with the one below it (v0.4.x M13): one door, the top one's hinge and name. */
+export function joinDoorBelow(project: Project, pageId: string, col: number, row: number): void {
+  const page = doorFront(project, pageId);
+  const cols = columnsOf(page);
+  const c = cols[col];
+  const d = c?.doors[row];
+  const below = c?.doors[row + 1];
+  if (!c || !d) throw new OpError("No such door");
+  if (!below) throw new OpError("There's no door below it");
+  c.doors.splice(row, 2, { ...d, h: d.h + below.h });
+  setColumns(page.ga, cols);
+  // Sheets showing the door below now show the joined one; rows below move up.
+  for (const p of project.pages) {
+    const pn = p.ga?.of === page.id ? p.ga.pane : undefined;
+    if (!pn || pn[0] !== col) continue;
+    if (pn[1] > row) p.ga!.pane = [col, pn[1] - 1];
+  }
+}
+
+/** Change one door of a modular door: its height, hinge or name; or a column's width. */
+export function updateDoor(project: Project, pageId: string, col: number, row: number | null, patch: { w?: number; h?: number; hinge?: "left" | "right"; name?: string }): void {
+  const page = doorFront(project, pageId);
+  const cols = columnsOf(page);
+  const c = cols[col];
+  if (!c) throw new OpError("No such column");
+  if (patch.w !== undefined) c.w = patch.w;
+  if (row !== null) {
+    const d = c.doors[row];
+    if (!d) throw new OpError("No such door");
+    if (patch.h !== undefined) d.h = patch.h;
+    if (patch.hinge) d.hinge = patch.hinge;
+    if (patch.name !== undefined) {
+      if (patch.name.trim()) d.name = patch.name.trim();
+      else delete d.name;
+    }
+  }
+  // A plain door stays plain unless named: keep it modular once it's had columns set.
+  setColumns(page.ga, cols);
+  if (!page.ga.columns && (cols.length > 1 || cols[0]!.doors.length > 1 || cols[0]!.doors[0]!.name)) page.ga.columns = cols;
+}
+
+export function setGaSettings(
+  project: Project,
+  pageId: string,
+  patch: Partial<Omit<GaSettings, "of" | "leaf" | "pane" | "columns">> & { of?: string | null; leaf?: 0 | 1 | null; pane?: [number, number] | null; columns?: DoorColumn[] | null },
+): void {
   const page = getPage(project, pageId);
   if (!page.ga) throw new OpError("That isn't a GA sheet");
   const ga = page.ga;
@@ -1488,6 +1599,18 @@ export function setGaSettings(project: Project, pageId: string, patch: Partial<O
   if (patch.leaf !== undefined) {
     if (patch.leaf === null) delete ga.leaf;
     else if (ga.view !== "backplate") ga.leaf = patch.leaf;
+  }
+  if (patch.columns !== undefined) {
+    if (ga.view !== "door-front" || ga.of) throw new OpError("Doors are set out on the door front that has the door");
+    if (patch.columns === null) delete ga.columns;
+    else setColumns(ga, patch.columns);
+  }
+  if (patch.pane !== undefined) {
+    if (patch.pane === null) delete ga.pane;
+    else if (ga.view !== "backplate") {
+      ga.pane = [patch.pane[0], patch.pane[1]];
+      delete ga.leaf;
+    }
   }
 }
 

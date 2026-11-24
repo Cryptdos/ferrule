@@ -51,10 +51,10 @@
     toSourceMm,
     type FrameView,
     dimLayout,
+    dimFrame,
     dimTargets,
     drawnGaItems,
     gaFrame,
-    gaSize,
     mmToUnits,
     nearestDimTarget,
     sheetTakes,
@@ -393,7 +393,7 @@
   const gaRect = (it: Pick<GaItem, "x" | "y" | "w" | "h"> & { kind?: GaItem["kind"]; dim?: GaItem["dim"]; id?: string }) => {
     if (!frame) return null;
     if (it.kind === "dim" && it.dim) return dimLayout(editor.project, page, it as GaItem).box;
-    return { x: GA_ORIGIN[0] + mmToUnits(frame, it.x - frame.x0), y: GA_ORIGIN[1] + mmToUnits(frame, it.y), w: mmToUnits(frame, it.w), h: mmToUnits(frame, it.h) };
+    return { x: GA_ORIGIN[0] + mmToUnits(frame, it.x - frame.x0), y: GA_ORIGIN[1] + mmToUnits(frame, it.y - (frame.y0 ?? 0)), w: mmToUnits(frame, it.w), h: mmToUnits(frame, it.h) };
   };
 
   function hitGa(pt: Vec): GaItem | null {
@@ -501,11 +501,12 @@
     const drawn = drawnGaItems(editor.project, on).filter(
       (d) => !det || (d.own && d.it.x < det.x + det.w && d.it.x + d.it.w > det.x && d.it.y < det.y + det.h && d.it.y + d.it.h > det.y),
     );
-    const size = gaSize(editor.project, on);
+    // Measured from the part the sheet shows (a leaf, or one door), and each door's own edges (v0.4.x M13).
+    const { size, panes } = dimFrame(editor.project, on);
     return {
       mm,
-      h: nearestDimTarget(dimTargets(drawn, size, "h"), mm[0], mm[1], dimReach()),
-      v: nearestDimTarget(dimTargets(drawn, size, "v"), mm[1], mm[0], dimReach()),
+      h: nearestDimTarget(dimTargets(drawn, size, "h", panes), mm[0], mm[1], dimReach()),
+      v: nearestDimTarget(dimTargets(drawn, size, "v", panes), mm[1], mm[0], dimReach()),
     };
   }
   /** The dimension being drawn, with its line at `across` (mm). */
