@@ -400,3 +400,9 @@ Judgement calls made while building, step by step.
 **Step 7b, second PR (sides per group).**
 - `params.sides`: a JSON map from group name (the pin's group, else its point) to side, set from *Groups* in a view's Properties (`setGroupSide`); a group on the view's own side isn't stored. Groups on the same side keep their order; each side's groups are centred along it, or spread along the top and bottom when the view has a width (T2). The box is as wide as its widest top or bottom run, or its left and right depths with 4 units between, and as tall as its tallest side run, or its top and bottom depths.
 - Acceptance as written: on the fixture's controller sheets every route is loop-free; a drive with its mains on top and its control on the bottom, wired up to a breaker and down to the boundary, has no wire crossing its body.
+
+**Step 8 (routing).**
+- Re-measured after 7a and 7b, before changing the router: on the fixture's controller, drives and damper sheets, wires still ran along the terminal block's edge (14 units on the DI sheet alone) and along pin rows.
+- F6: the terminal block is one obstacle (`blockRect`), its whole drawn length, out past its cells to just short of the stub (`ROW_CLEAR`, 0.7, so with the router's 0.25 buffer a wire keeps 0.95 off and only the 1-unit stub crosses). Its cells are no longer obstacles one by one. A plant or module view's obstacle is pushed out the same distance on every side that has pins, in place of being pulled in.
+- The repair pass (`judge`) leaves each route's stubs out when checking it against obstacles (`lessStubs`), since a stub is meant to cross that clearance.
+- Wires already left a pin in its direction for a unit (`stubPoint`, `dirFlags`); unchanged.

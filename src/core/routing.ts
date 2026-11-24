@@ -6,12 +6,29 @@
  * can each load the wasm their own way. Without it, routes fall back to a
  * simple one-bend route.
  */
-import { applyStripLines, fitBlock } from "./blocks";
+import { BLOCK_INSET, applyStripLines, blockHalf, fitBlock } from "./blocks";
+import { AREA_UNITS } from "./geometry";
 import type { Avoid, ConnRef } from "libavoid-js";
 import type { Rect, Vec } from "./geometry";
 import type { Element, Page, Segment, TerminalRef } from "./model";
 import { benchOf, isBar, localGeometry, type Prim } from "./symbols";
 import { endDir, endPoint, findElement, refitManual, removeLoops, simpleRoute, simplifyRoute } from "./wires";
+
+/** How far a wire runs straight out of a terminal before it may turn. */
+const STUB_LEN = 1;
+
+/**
+ * The terminal block along a sheet's boundary as one obstacle (v0.4.x F6):
+ * its whole length, out past its cells' ends to just short of the stub, so
+ * no wire runs along its top or bottom edge, only the stubs into its cells.
+ */
+export function blockRect(page: Page): Rect | null {
+  if (page.boundaryY === null) return null;
+  const cells = page.elements.filter((e) => e.symbol === "terminal" && e.params.onBlock === true);
+  if (!cells.length) return null;
+  const half = blockHalf(page) + ROW_CLEAR;
+  return { x: BLOCK_INSET, y: page.boundaryY - half, w: AREA_UNITS.w - 2 * BLOCK_INSET, h: 2 * half };
+}
 
 /** Gap kept between parallel wires, and between wires and symbol bodies. */
 const NUDGE = 1;
@@ -39,10 +56,29 @@ function textRect(el: Element, p: Extract<Prim, { t: "text" }>): Rect | null {
   return { x: el.pos[0] + r.x, y: el.pos[1] + r.y, w: r.w, h: r.h };
 }
 
+/** How far past a terminal block's edge, or a view's pin row, wires are kept: just short of the stub (v0.4.x F6). */
+const ROW_CLEAR = STUB_LEN - BUFFER - 0.05;
+
 function obstacleRect(el: Element): Rect | null {
   // Annotations (text, boxes, tables, pictures) are drawn over; wires don't avoid them.
   if (NOT_OBSTACLES.has(el.symbol) || benchOf(el) === "annotate") return null;
+  // A cell of the terminal block: the block is one obstacle (blockRect), not a row of cells with gaps.
+  if (el.symbol === "terminal" && el.params.onBlock === true) return null;
   const g = localGeometry(el, "");
+  if (el.symbol === "plant-view") {
+    // A view's pin row is kept clear like the block (v0.4.x F6): pushed out past its pins,
+    // so nothing runs along it but each wire's stub into its own pin.
+    const b = g.body;
+    let [x0, y0, x1, y1] = [b.x, b.y, b.x + b.w, b.y + b.h];
+    const on = (v: number, edge: number) => Math.abs(v - edge) < 0.01;
+    for (const t of g.terminals) {
+      if (on(t.at[1], b.y)) y0 = Math.min(y0, b.y - ROW_CLEAR);
+      if (on(t.at[1], b.y + b.h)) y1 = Math.max(y1, b.y + b.h + ROW_CLEAR);
+      if (on(t.at[0], b.x)) x0 = Math.min(x0, b.x - ROW_CLEAR);
+      if (on(t.at[0], b.x + b.w)) x1 = Math.max(x1, b.x + b.w + ROW_CLEAR);
+    }
+    return { x: el.pos[0] + x0, y: el.pos[1] + y0, w: x1 - x0, h: y1 - y0 };
+  }
   // Outline of everything drawn (leads included), pulled in on the sides
   // that carry terminals so the terminals sit just outside it.
   const r = g.bbox;
@@ -113,11 +149,30 @@ function throughRect(p: Vec, q: Vec, r: Rect): boolean {
   return x1 > r.x + e && x0 < r.x + r.w - e && y1 > r.y + e && y0 < r.y + r.h - e;
 }
 
+/** A route less its stubs: the clearance round a pin row or the terminal block is the stub's to cross (v0.4.x F6). */
+function lessStubs(pts: Vec[]): Vec[] {
+  const out = pts.map((p) => [p[0], p[1]] as Vec);
+  const cut = (i: number, j: number) => {
+    const a = out[i]!;
+    const b = out[j]!;
+    const len = Math.abs(b[0] - a[0]) + Math.abs(b[1] - a[1]);
+    if (!len) return;
+    const k = Math.min(1, (STUB_LEN - 0.01) / len);
+    out[i] = [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k];
+  };
+  if (out.length >= 2) {
+    cut(0, 1);
+    cut(out.length - 1, out.length - 2);
+  }
+  return out;
+}
+
 /** What's wrong with a route: it meets itself, goes through a part, or touches a wire it isn't joined to. */
 function judge(pts: Vec[], others: Vec[][], rects: Rect[]): { ok: boolean; crossings: number } {
+  const inner = lessStubs(pts);
   for (let i = 0; i < pts.length - 1; i++) {
     for (let j = i + 2; j < pts.length - 1; j++) if (meet(pts[i]!, pts[i + 1]!, pts[j]!, pts[j + 1]!)) return { ok: false, crossings: 0 };
-    for (const r of rects) if (throughRect(pts[i]!, pts[i + 1]!, r)) return { ok: false, crossings: 0 };
+    for (const r of rects) if (throughRect(inner[i]!, inner[i + 1]!, r)) return { ok: false, crossings: 0 };
   }
   let crossings = 0;
   for (const o of others) {
@@ -180,7 +235,7 @@ const length = (pts: Vec[]) => pts.slice(1).reduce((n, p, i) => n + Math.abs(p[0
  * crossings, then shortest) that clears every part and every other wire.
  */
 function repairRoutes(page: Page, segs: Segment[]): void {
-  const rects = page.elements.map(obstacleRect).filter((r): r is Rect => !!r);
+  const rects = [blockRect(page), ...page.elements.map(obstacleRect)].filter((r): r is Rect => !!r);
   for (const seg of segs) {
     const others = page.segments.filter((o) => o.id !== seg.id && o.conductor !== seg.conductor && o.points.length >= 2).map((o) => o.points);
     const a = endPoint(page, seg.from);
@@ -233,7 +288,7 @@ function cleanRoute(points: Vec[], a: Vec, b: Vec): Vec[] {
 }
 
 /** How far a wire runs straight out of a terminal before it may turn. */
-const STUB = 1;
+const STUB = STUB_LEN;
 
 /** The point a wire's route starts from: a little way out from a symbol's terminal. */
 function stubPoint(page: Page, ref: TerminalRef, at: Vec): Vec {
@@ -293,6 +348,8 @@ export function routePage(avoid: Avoid | null, page: Page, opts: RouteOptions = 
     router.setRoutingParameter(avoid.RoutingParameter.segmentPenalty, 20);
     router.setRoutingOption(avoid.RoutingOption.nudgeOrthogonalSegmentsConnectedToShapes, true);
     router.setRoutingOption(avoid.RoutingOption.nudgeSharedPathsWithCommonEndPoint, true);
+    const blk = blockRect(page);
+    if (blk) router.addShape({ x: blk.x, y: blk.y, width: blk.w, height: blk.h });
     for (const el of page.elements) {
       const r = obstacleRect(el);
       if (r) router.addShape({ x: r.x, y: r.y, width: r.w, height: r.h });
