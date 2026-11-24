@@ -226,13 +226,18 @@ Two PRs: the port and the network's `port` field; then the chain from the drawin
 
 **T18. Cores per device.** The cable schedule gains a second table, one row per field device: tag, description, cores (its wired terminals, earth included), and the terminals. Exported as its own CSV.
 
-**M10. Wire and cable markers.** A CSV for a marker supplier, with an option to group duplicates into *text, count*.
+**M10. Wire and core markers.** A CSV for a marker supplier, one marker per line, with an option to group duplicates into *text, count*. A marker always matches the terminal its wire goes into.
 
-- **Panel wires:** four markers per wire, two at each end, each the wire's number.
-- **Field cables:** two markers at each end of every field cable (four per cable), each the cable's tag, for the installers. Until cables are objects (M2), a field device has one cable and its marker is the device's tag; with M2, the cable's own tag.
-- A column says which each line is (*wire* or *cable*), so the two can be ordered separately.
+| What | Markers | Text |
+|---|---|---|
+| A panel wire | 2, one at each end | The number of the boundary terminal it lands on. With no boundary terminal on it, the wire's own number, which comes from where the wire starts. |
+| A field core | 2, one at each end | Panel end: the number of the boundary terminal it goes into. Field end: what identifies the cable outside the panel: the device's tag, or the cable's own tag once cables are objects (M2). |
 
-Decided by the user: four per wire, and two per end of each field cable.
+So a boundary terminal feeding plant accounts for four markers: two on the panel wire and two on the field core. The terminal's number, from the sheet and column it's placed at, is the authority.
+
+No numbering change is needed: Renumber already gives a wire on a terminal that terminal's number (`renumber.ts`), so the wire's number on the sheet and its marker agree. The export reads the terminal's number directly, so a wire whose number was typed by hand still gets the terminal's. Check gains an info line when a wire's number differs from the boundary terminal it lands on.
+
+A column says what each line is (*wire*, *core, panel end*, *core, field end*), so they can be ordered separately.
 
 **T20. Enclosure fit.** Check warns when a GA item lies outside its enclosure (backplate) or its leaf (door). Arithmetic only.
 
@@ -274,7 +279,7 @@ This is the largest entry and the least specified. Before it starts, write its d
 | 1 | F7 | Old drawings: plant on a sheet with no boundary turns from dashed to solid wiring with numbers. Accept? | **Decided:** yes |
 | 2 | M9 | Connector block grows taller in pairs, or wider in rows? | **Decided:** taller, and it rotates |
 | 3 | T9 | Module tags from the controller map when there is one? | **Decided:** yes |
-| 4 | M10 | Wire markers: how many, and which wires? | **Decided:** four per wire; two per end of each field cable |
+| 4 | M10 | Wire markers: how many, and what text? | **Decided:** two per panel wire and two per field core, one at each end; a marker matches the boundary terminal its wire goes into; a core's field end carries the cable's identity |
 | 5 | M1 | DC UPS as a panel device with points, not a symbol? | Open. Recommended: yes |
 | 6 | M2 | Cables as objects in this sprint, or after it? | Open. Recommended: after the rest, with its own design |
 
