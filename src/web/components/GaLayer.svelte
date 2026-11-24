@@ -23,6 +23,7 @@
     sheetPanes,
     shownPane,
     stripLabel,
+    plateTextLayout,
     type DrawnGaItem,
   } from "../../core/ga";
   import { textUnits } from "../../core/geometry";
@@ -242,10 +243,10 @@
         {@const fit = fitLabel(lines.reduce((a, b) => (a.length >= b.length ? a : b), ""), w * 0.92, h / lines.length, Math.max(SMALLEST, u(it.textMm ?? 5)))}
         <rect class="plate" {x} {y} width={w} height={h} />
         <rect class="plate-in" x={x + Math.min(0.3, w * 0.05)} y={y + Math.min(0.3, h * 0.08)} width={Math.max(0, w - 2 * Math.min(0.3, w * 0.05))} height={Math.max(0, h - 2 * Math.min(0.3, h * 0.08))} />
+        <!-- Its text in one of nine places (v0.4.x T12), clear of the edge by half its height. -->
+        {@const at = plateTextLayout(it.textAt, { x, y, w, h }, fit.size, lines.length, Math.max(0.6, Math.min(fit.size * 0.5, w * 0.1, h * 0.1)))}
         {#each lines as line, i (i)}
-          <text class="tag" class:halo={fit.halo} x={x + w / 2} y={y + h / 2 + (i - (lines.length - 1) / 2) * fit.size * 1.25} font-size={fit.size} text-anchor="middle" dominant-baseline="central"
-            >{line}</text
-          >
+          <text class="tag" class:halo={fit.halo} x={at.x} y={at.ys[i]} font-size={fit.size} text-anchor={at.anchor} dominant-baseline="central">{line}</text>
         {/each}
       {/if}
     {:else if it.kind === "device"}

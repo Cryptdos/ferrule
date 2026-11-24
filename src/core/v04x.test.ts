@@ -30,8 +30,11 @@ import { designChecks } from "./checks";
 import { networkDiagram } from "./networkdraw";
 import { ENCL, PLATE_MARGIN, gaCandidates, sizeKey, dimLayout, doorPanes, plateDoor, platesOf, drawnGaItems, gaFrame, paneOf, paneRef, sheetPanes } from "./ga";
 import { renumber } from "./renumber";
-import { deleteGaItems, deleteElements, setTerminalStrips, splitGaStrip, updateSection } from "./ops";
-import { itemStrip, stripLabel, stripParts, syncGaStrips } from "./ga";
+import { deleteGaItems, deleteElements, setTerminalStrips, splitGaStrip, updateGaItem, updateSection } from "./ops";
+import { itemStrip, plateTextLayout, stripLabel, stripParts, syncGaStrips } from "./ga";
+import { importTemplate, saveSheetTemplate, stampTemplate } from "./templates";
+import { duplicatePlant, stepTag } from "./design";
+import { masterOf } from "./xref";
 import { stampSaved } from "../server/storage";
 import { parseProject } from "./validate";
 import { VERSION } from "./version";
@@ -1078,5 +1081,65 @@ describe("step 12: cores per device, markers, enclosure fit (T18, M10, T20)", ()
     expect(msgs()).toContain(`Sheet ${door.number}: a label plate lies across both leaves of the door`);
     plateText.y = 1180;
     expect(msgs()).toContain(`Sheet ${door.number}: a label plate lies outside the door (800 × 1200 mm)`);
+  });
+});
+
+describe("step 13: stamp links, Duplicate's step, label plate text (T6, T8, T12)", () => {
+  test("stamping keeps a contact's link to a coil outside the template, and lists the arrows and contacts to link again", () => {
+    const { project: p } = fresh();
+    const src = p.pages.find((pg) => pg.title.includes("drives and dampers"))!;
+    const outside = src.elements.filter((e) => masterOf(p, e) && !src.elements.some((x) => x.id === masterOf(p, e)!.el.id));
+    expect(outside.length).toBe(5);
+    const t = saveSheetTemplate(p, src.id, "Drives");
+    const r = stampTemplate(p, t.id, {});
+    expect(r.kept).toHaveLength(5);
+    for (const k of r.kept) {
+      const c = r.page.elements.find((e) => e.id === k.contact)!;
+      expect(masterOf(p, c)!.el.id).toBe(k.coil);
+      // Linked on both sides: the coil lists its new contact.
+      expect(masterOf(p, c)!.el.links).toContain(c.id);
+    }
+    expect(r.kept.map((k) => k.coil).sort()).toEqual(outside.map((e) => masterOf(p, e)!.el.id).sort());
+    // Into another project, where the coils aren't: the contacts are to link again.
+    const q = newProject("Other");
+    const r2 = stampTemplate(q, importTemplate(q, t).id, {});
+    expect(r2.kept).toEqual([]);
+    expect(r2.relink).toHaveLength(5);
+    // An arrow with no partner in the stamp is listed too.
+    const arrow = addElement(p, src.id, "offpage", [140, 30]);
+    const r3 = stampTemplate(p, saveSheetTemplate(p, src.id, "Drives 2").id, {});
+    expect(r3.relink).toHaveLength(1);
+    expect(r3.page.elements.find((e) => e.id === r3.relink[0])!.symbol).toBe("offpage");
+    expect(arrow.symbol).toBe("offpage");
+  });
+
+  test("Duplicate steps the last number, the first, or leaves tags blank for Renumber", () => {
+    expect(stepTag("P1-12", 1)).toBe("P1-13");
+    expect(stepTag("P1-12", 1, "first")).toBe("P2-12");
+    expect(stepTag("AHU-01-SF-01", 1, "first")).toBe("AHU-02-SF-01");
+    expect(stepTag("P1-12", 1, "blank")).toBe("");
+    const { project: p, plant } = fresh();
+    const first = duplicatePlant(p, [plant.TT1!.id], 1, 1, "first");
+    expect(first.plant[0]!.tag).toBe("AHU-02-TT-01");
+    const blank = duplicatePlant(p, [plant.TT1!.id], 2, 1, "blank");
+    expect(blank.plant.map((x) => x.tag)).toEqual(["", ""]);
+    expect(blank.untagged).toBe(0);
+    expect(blank.plant.every((x) => !x.locked && x.prefix === plant.TT1!.prefix)).toBe(true);
+  });
+
+  test("a label plate's text sits at any of nine places; middle as before", () => {
+    const box = { x: 10, y: 20, w: 100, h: 30 };
+    expect(plateTextLayout(undefined, box, 5, 1, 2)).toEqual({ x: 60, anchor: "middle", ys: [35] });
+    expect(plateTextLayout("top-left", box, 5, 1, 2)).toEqual({ x: 12, anchor: "start", ys: [24.5] });
+    expect(plateTextLayout("bottom-right", box, 5, 2, 2)).toEqual({ x: 108, anchor: "end", ys: [39.25, 45.5] });
+    expect(plateTextLayout("right", box, 5, 2, 2).ys).toEqual([31.875, 38.125]);
+    const { project: p } = fresh();
+    const door = p.pages.find((pg) => pg.ga?.view === "door-front")!;
+    const plate = door.gaItems!.find((it) => it.kind === "label")!;
+    updateGaItem(p, door.id, plate.id, { textAt: "top-left" });
+    expect(plate.textAt).toBe("top-left");
+    expect(parseProject(JSON.parse(JSON.stringify(p))).pages.find((pg) => pg.id === door.id)!.gaItems!.find((it) => it.id === plate.id)!.textAt).toBe("top-left");
+    updateGaItem(p, door.id, plate.id, { textAt: undefined });
+    expect(plate.textAt).toBeUndefined();
   });
 });

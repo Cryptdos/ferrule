@@ -92,6 +92,8 @@ export class Editor {
   colourCheck: boolean = $state(false);
   saveState: SaveState = $state("saved");
   message: string = $state("");
+  /** After a stamp (v0.4.x T6): contacts that kept their coil outside it, and arrows (or contacts) to link again. */
+  stampLinks: { kept: { contact: string; coil: string }[]; relink: string[] } | null = $state(null);
   /** A schematic device (or terminal strip) being placed on a GA sheet. */
   gaPlace: { refs: string[]; part?: "handle"; modules?: { id: string; w: number; h: number }[]; detail?: string; w: number; h: number; label: string } | null = $state(null);
   /** How the Dimension tool measures: the gaps along a run, or each distance from the first point. */

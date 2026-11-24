@@ -34,6 +34,7 @@
   import ChecksDialog from "./ChecksDialog.svelte";
   import RenumberDialog from "./RenumberDialog.svelte";
   import SchedulesDialog from "./SchedulesDialog.svelte";
+  import StampLinks from "./StampLinks.svelte";
   import TableView from "./TableView.svelte";
   import DesignView from "./DesignView.svelte";
   import DuplicateDialog from "./DuplicateDialog.svelte";
@@ -632,6 +633,7 @@
       </div>
     {/if}
     {#if editor.message}<div class="toast">{editor.message}</div>{/if}
+    {#if editor.stampLinks}<StampLinks {editor} />{/if}
   </main>
 </div>
 {#if savingAs}

@@ -453,13 +453,18 @@ export function channelText(project: Project, ref: ChannelRef | undefined): stri
 // Duplicate ×n and Design templates (design-v0.4 §3): general tools that
 // copy rows, with no idea what kind of plant they are.
 
+/** Which number of a tag Duplicate steps (v0.4.x T8), or none: tags left for Renumber. */
+export type TagStep = "last" | "first" | "blank";
+
 /**
  * A tag moved on by `by`: its last number plus `by`, keeping leading zeros
- * (P1 → P2, AHU-01 → AHU-02). A tag with no number, or an empty one, gives
- * an empty tag, for Renumber or typing.
+ * (P1 → P2, AHU-01 → AHU-02); or its first (P1-12 → P2-12); or, `blank`,
+ * no tag. A tag with no number, or an empty one, gives an empty tag, for
+ * Renumber or typing.
  */
-export function stepTag(tag: string, by: number): string {
-  const m = /^(.*?)(\d+)(\D*)$/.exec(tag);
+export function stepTag(tag: string, by: number, at: TagStep = "last"): string {
+  if (at === "blank") return "";
+  const m = at === "first" ? /^(\D*)(\d+)(.*)$/.exec(tag) : /^(.*?)(\d+)(\D*)$/.exec(tag);
   if (!m) return "";
   const n = Number(m[2]) + by;
   if (n < 0) return "";
@@ -467,13 +472,13 @@ export function stepTag(tag: string, by: number): string {
 }
 
 /** What copying would give each source row's tag, copy by copy, and whether it's free. */
-export function tagPlan(project: Project, tags: string[], copies: number, step: number, first: number): { tag: string; taken: boolean }[][] {
+export function tagPlan(project: Project, tags: string[], copies: number, step: number, first: number, at: TagStep = "last"): { tag: string; taken: boolean }[][] {
   const used = new Set(project.plant.map((p) => p.tag).filter(Boolean));
   const out: { tag: string; taken: boolean }[][] = [];
   for (let k = 0; k < copies; k++) {
     out.push(
       tags.map((t) => {
-        const tag = stepTag(t, step * (first + k));
+        const tag = stepTag(t, step * (first + k), at);
         const taken = !!tag && used.has(tag);
         if (tag && !taken) used.add(tag);
         return { tag, taken };
@@ -493,10 +498,10 @@ export function tagPlan(project: Project, tags: string[], copies: number, step: 
 function copyRows(
   project: Project,
   source: PlantItem[],
-  opts: { copies: number; step: number; first: number; system?: string; after?: string },
+  opts: { copies: number; step: number; first: number; system?: string; after?: string; at?: TagStep },
 ): { plant: PlantItem[]; untagged: number } {
   const copies = Math.max(1, Math.min(200, Math.floor(opts.copies)));
-  const plan = tagPlan(project, source.map((p) => p.tag), copies, opts.step, opts.first);
+  const plan = tagPlan(project, source.map((p) => p.tag), copies, opts.step, opts.first, opts.at);
   const made: PlantItem[] = [];
   let untagged = 0;
   let after = opts.after;
@@ -512,7 +517,7 @@ function copyRows(
       const it: PlantItem = { ...rest, id: ids.get(src.id)! };
       const t = plan[k]![i]!;
       it.tag = t.taken ? "" : t.tag;
-      if (src.tag && !it.tag) untagged++;
+      if (src.tag && !it.tag && opts.at !== "blank") untagged++;
       if (it.tag) it.locked = true;
       else delete it.locked;
       if (opts.system !== undefined) {
@@ -559,9 +564,9 @@ function rowsOf(project: Project, ids: string[]): PlantItem[] {
  * Duplicate ×n (design-v0.4 §3): any picked rows, one item or a group,
  * copied n times after the last of them, tags stepping (P1 → P2, P3…).
  */
-export function duplicatePlant(project: Project, ids: string[], copies = 1, step = 1): { plant: PlantItem[]; untagged: number } {
+export function duplicatePlant(project: Project, ids: string[], copies = 1, step = 1, at: TagStep = "last"): { plant: PlantItem[]; untagged: number } {
   const rows = rowsOf(project, ids);
-  return copyRows(project, rows, { copies, step, first: 1, after: rows[rows.length - 1]!.id });
+  return copyRows(project, rows, { copies, step, first: 1, after: rows[rows.length - 1]!.id, at });
 }
 
 /** Save picked rows as a Design template: copies, with no module, channels or system. */

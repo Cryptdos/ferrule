@@ -4,7 +4,7 @@
    * copied n times, each copy's tags stepping on. A tag that's taken is
    * shown in red and left empty, for typing or Renumber.
    */
-  import { duplicatePlant, tagPlan } from "../../core/design";
+  import { duplicatePlant, tagPlan, type TagStep } from "../../core/design";
   import { plantLabel } from "../../core/ops";
   import type { Editor } from "../editor.svelte";
   import Modal from "./Modal.svelte";
@@ -13,14 +13,16 @@
 
   let copies = $state(1);
   let step = $state(1);
+  /** Which number steps, or none (v0.4.x T8). */
+  let at: TagStep = $state("last");
   const rows = $derived(editor.project.plant.filter((p) => !p.module && editor.designPick.plant.includes(p.id)));
-  const plan = $derived(tagPlan(editor.project, rows.map((p) => p.tag), Math.max(1, Math.min(200, Math.floor(copies) || 1)), Math.floor(step) || 0, 1));
+  const plan = $derived(tagPlan(editor.project, rows.map((p) => p.tag), Math.max(1, Math.min(200, Math.floor(copies) || 1)), Math.floor(step) || 0, 1, at));
 
   function go() {
     let ids: string[] = [];
     let untagged = 0;
     const ok = editor.apply((p) => {
-      const r = duplicatePlant(p, rows.map((x) => x.id), copies, step);
+      const r = duplicatePlant(p, rows.map((x) => x.id), copies, step, at);
       ids = r.plant.map((x) => x.id);
       untagged = r.untagged;
     });
@@ -39,13 +41,20 @@
       <p class="hint">Copies of {rows.map(plantLabel).join(", ")}, after the last of them, with their points. Copies aren't on any channel, and aren't drawn.</p>
       <div class="fields">
         <label>Copies <input type="number" min="1" max="200" bind:value={copies} /></label>
-        <label>Tags step by <input type="number" min="0" bind:value={step} /></label>
+        <label>Step
+          <select bind:value={at} title="P1-12: the last number gives P1-13, the first P2-12; blank leaves the tags to Renumber">
+            <option value="last">the last number</option>
+            <option value="first">the first number</option>
+            <option value="blank">leave tags blank</option>
+          </select>
+        </label>
+        {#if at !== "blank"}<label>by <input type="number" min="0" bind:value={step} /></label>{/if}
       </div>
       <div class="plan">
         {#each plan.slice(0, 12) as copy, k (k)}
           <div class="copy">
             <span class="n">{k + 1}</span>
-            {#each copy as t, i (i)}<span class:taken={t.taken} class:none={!t.tag} title={t.taken ? "Taken: this copy's tag is left empty" : ""}>{t.tag || (rows[i]?.tag ? "—" : "?")}</span>{/each}
+            {#each copy as t, i (i)}<span class:taken={t.taken} class:none={!t.tag} title={t.taken ? "Taken: this copy's tag is left empty" : ""}>{t.tag || (at === "blank" ? "?" : rows[i]?.tag ? "—" : "?")}</span>{/each}
           </div>
         {/each}
         {#if plan.length > 12}<div class="hint">…and {plan.length - 12} more</div>{/if}

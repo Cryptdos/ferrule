@@ -11,7 +11,7 @@ import { AREA_UNITS } from "./geometry";
 import { tidyDesign } from "./design";
 import { RELEASES_URL, VERSION } from "./version";
 import { MAX_CONDITIONS } from "./interlocks";
-import { PLANT_MARKS, DISTRIBUTION_KINDS, type DistributionKind, POINT_FORMS, type Condition, type Controller, type ControllerSlot, type DesignTemplate, type ModuleInfo, type ModuleType, type PlantItem, type Expectation, type IoPoint, type Interlock, type Network, type PinInfo, type PointForm, FORMAT, FORMAT_VERSION, type GaDim, type GaDimPoint, type GaItem, type Page, type Project, emptyInfo } from "./model";
+import { PLANT_MARKS, TEXT_PLACES, type TextPlace, DISTRIBUTION_KINDS, type DistributionKind, POINT_FORMS, type Condition, type Controller, type ControllerSlot, type DesignTemplate, type ModuleInfo, type ModuleType, type PlantItem, type Expectation, type IoPoint, type Interlock, type Network, type PinInfo, type PointForm, FORMAT, FORMAT_VERSION, type GaDim, type GaDimPoint, type GaItem, type Page, type Project, emptyInfo } from "./model";
 import { defaultParams, getSymbol } from "./symbols";
 import { gaToSheet } from "./ga";
 import { MODULE_TYPES } from "./modules";
@@ -537,6 +537,7 @@ function parsePage(pg: Record<string, unknown>, i: number): Project["pages"][num
       ...(Array.isArray(it.seen) ? { seen: it.seen.filter((r): r is string => typeof r === "string") } : {}),
       ...(typeof it.cutout === "string" && it.cutout.trim() ? { cutout: it.cutout.trim() } : {}),
       ...(typeof it.textMm === "number" && it.textMm > 0 ? { textMm: it.textMm } : {}),
+      ...(it.kind === "label" && (TEXT_PLACES as readonly unknown[]).includes(it.textAt) ? { textAt: it.textAt as TextPlace } : {}),
       ...(it.kind === "detail" && typeof it.letter === "string" && it.letter.trim() ? { letter: it.letter.trim() } : {}),
       ...(it.kind === "frame" && typeof it.detail === "string" ? { detail: it.detail } : {}),
       ...(it.kind === "frame" && typeof it.zoom === "number" && it.zoom > 0 ? { zoom: it.zoom } : {}),

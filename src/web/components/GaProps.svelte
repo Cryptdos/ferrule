@@ -29,7 +29,9 @@
     frameOf,
     zoomText,
   } from "../../core/ga";
-  import type { DoorLeaf, GaView } from "../../core/model";
+  import type { DoorLeaf, GaView, TextPlace } from "../../core/model";
+  /** The nine places for a label plate's text, row by row. */
+  const PLACES: (TextPlace | "middle")[] = ["top-left", "top", "top-right", "left", "middle", "right", "bottom-left", "bottom", "bottom-right"];
   import { deviceLabel } from "../../core/devices";
   import { api } from "../api";
   import { deviceLibrary } from "../devices.svelte";
@@ -183,6 +185,13 @@
         Engraved text height (mm)
         <input type="number" min="1" step="0.5" value={one.textMm ?? 5} onchange={(e) => editor.apply((p) => updateGaItem(p, ip.id, one.id, { textMm: num(e.currentTarget.value) }))} />
       </label>
+      <!-- Where the text sits on the plate (v0.4.x T12). -->
+      <div class="placelabel">Text position</div>
+      <div class="places">
+        {#each PLACES as pl (pl)}
+          <button class:on={(one.textAt ?? "middle") === pl} title={pl} aria-label={`Text ${pl}`} onclick={() => editor.apply((p) => updateGaItem(p, ip.id, one.id, { textAt: pl === "middle" ? undefined : pl }))}><span class="dot"></span></button>
+        {/each}
+      </div>
     {/if}
     {#if one.kind === "device" && one.refs?.length}
       <div class="refs">
@@ -641,5 +650,32 @@
   }
   .sizes td {
     padding: 1px 3px;
+  }
+  .placelabel {
+    font-size: 12px;
+    color: #556;
+  }
+  .places {
+    display: grid;
+    grid-template-columns: repeat(3, 22px);
+    gap: 3px;
+    margin-bottom: 6px;
+  }
+  .places button {
+    width: 22px;
+    height: 18px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .places .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #bbc;
+  }
+  .places .on .dot {
+    background: #246;
   }
 </style>
