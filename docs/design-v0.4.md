@@ -278,6 +278,12 @@ README screenshots are retaken when the interface changes. Small judgement calls
 - **What's kept for a confirmation** is a short fingerprint (`confirmed` on the point) of every terminal on the nets of the point's own pins and the channel's own pins, and which channel. Wiring added or taken away at either end changes it; anything else doesn't. Allocating it elsewhere, or taking it off, drops the confirmation.
 - **Where it's shown:** each allocated point in Design's Properties says how it's wired (✓ straight, ✓ confirmed, not drawn yet, or to review with *Confirm by hand*); Check lists only what's to review. Check is in Design's top bar too.
 
+**Step 7b (one hop)**
+
+- **Proved on the example project** before being turned on: LSP-01 has no controller, so the tests add a DI module to sheet 8 and allocate DPS-SF-01's *Airflow proven* to DI1. The switch drives coil K8-37 (through terminal 8-35); a K8-37 contact wired to DI1 comes out *via K8-37*. A contact of a relay it doesn't drive, two relays in a row, and a plain switch between all come out *to review*; the switch case can still be confirmed by hand. The reverse (a DO channel driving a relay whose contact switches a plant input) comes out *via* too.
+- **A relay is a coil or timer coil with its linked contacts**, matched exactly: the coil on one side's nets, one of its own contacts on the other's. A contactor's main poles (isolators driven by a coil) aren't counted as its contacts here; they switch power, not signals.
+- **First relay found wins** if more than one would do: each would be a true one hop, so the result can't pass anything wrong.
+
 ---
 
 ## 11. Decisions, as discussed (24/11/26)

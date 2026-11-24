@@ -420,7 +420,7 @@ const NOT_EQUIPMENT = new Set(["terminal", "plant-view", "junction", "offpage", 
  * channel (direct, via one relay, confirmed, or to review). Modules not
  * drawn are in controllerChecks.
  */
-export function designChecks(project: Project, oneHop = false): Finding[] {
+export function designChecks(project: Project, oneHop = true): Finding[] {
   const out: Finding[] = [];
   if (!usesDesign(project)) return out;
   const hasController = !!project.controllers?.length;
