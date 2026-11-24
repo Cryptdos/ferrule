@@ -5,7 +5,7 @@
    * protocol and kind, and each one's devices in order (the row order).
    */
   import { portGroups } from "../../core/ops";
-  import { deleteNetwork, devicesOn, moveOnNetwork, networkData, networkDiagram, putOnNetwork, updateNetwork } from "../../core/network";
+  import { deleteNetwork, devicesOn, moveOnNetwork, networkData, networkOrder, networkDiagram, putOnNetwork, updateNetwork } from "../../core/network";
   import { plantLabel } from "../../core/ops";
   import type { Editor } from "../editor.svelte";
   import Prims from "./Prims.svelte";
@@ -16,7 +16,11 @@
   const nets = $derived(editor.project.networks ?? []);
   let picked = $state("");
   const net = $derived(nets.find((n) => n.id === picked) ?? nets[0]);
-  const devices = $derived(net ? devicesOn(editor.project, net.id) : []);
+  /** In order: from the drawing when its serial port is wired (v0.4.x M7), else Design's row order. */
+  const order = $derived(net ? networkOrder(editor.project, net) : { drawn: false, devices: [] });
+  const devices = $derived(order.devices);
+  /** On it in Design but not reached by the wiring from its port. */
+  const unreached = $derived(net && order.drawn ? devicesOn(editor.project, net.id).filter((d) => !order.devices.includes(d)) : []);
   /** Field plant that could go on it: comms first, then the rest. */
   const candidates = $derived(
     editor.project.plant
@@ -67,17 +71,28 @@
               {#each editor.project.plant.flatMap((it) => portGroups(it).map((g) => ({ it, g }))) as o (o.it.id + o.g)}<option value="{o.it.id}|{o.g}">{plantLabel(o.it)} {o.g}</option>{/each}
             </select>
           </label>
-          <div class="sub">Devices, in order {#if net.kind === "bus"}<span class="hint">(along the bus)</span>{/if}</div>
+          <div class="sub">Devices, in order {#if order.drawn}<span class="hint">(from the drawing)</span>{:else if net.kind === "bus"}<span class="hint">(along the bus)</span>{/if}</div>
           <ol>
             {#each devices as d, i (d.id)}
               <li>
-                <span class="tag">{plantLabel(d)}</span><span class="desc">{d.description}</span>
-                <button disabled={i === 0} title="Earlier" onclick={() => editor.apply((p) => moveOnNetwork(p, d.id, -1))}>↑</button>
-                <button disabled={i === devices.length - 1} title="Later" onclick={() => editor.apply((p) => moveOnNetwork(p, d.id, 1))}>↓</button>
-                <button class="x" title="Take it off this network" onclick={() => editor.apply((p) => putOnNetwork(p, [d.id], ""))}>×</button>
+                <span class="tag">{plantLabel(d)}</span><span class="desc">{d.description}{#if order.drawn && d.network !== net.id} <em class="warn">wired on it, not on it in Design</em>{/if}</span>
+                {#if !order.drawn}
+                  <button disabled={i === 0} title="Earlier" onclick={() => editor.apply((p) => moveOnNetwork(p, d.id, -1))}>↑</button>
+                  <button disabled={i === devices.length - 1} title="Later" onclick={() => editor.apply((p) => moveOnNetwork(p, d.id, 1))}>↓</button>
+                {/if}
+                {#if d.network === net.id}<button class="x" title="Take it off this network" onclick={() => editor.apply((p) => putOnNetwork(p, [d.id], ""))}>×</button>
+                {:else}<button title="Put it on this network" onclick={() => editor.apply((p) => putOnNetwork(p, [d.id], net.id))}>+</button>{/if}
               </li>
             {/each}
           </ol>
+          {#if unreached.length}
+            <div class="sub">On it in Design, not reached by the wiring</div>
+            <ul class="unreached">
+              {#each unreached as d (d.id)}
+                <li><span class="tag">{plantLabel(d)}</span><span class="desc">{d.description}</span><button class="x" title="Take it off this network" onclick={() => editor.apply((p) => putOnNetwork(p, [d.id], ""))}>×</button></li>
+              {/each}
+            </ul>
+          {/if}
           {#if candidates.length}
             <select value="" onchange={(e) => {
               const v = e.currentTarget.value;
@@ -88,7 +103,7 @@
               {#each candidates as c (c.id)}<option value={c.id}>{plantLabel(c)} {c.description}{c.connects ? "" : " (hardwired now)"}</option>{/each}
             </select>
           {/if}
-          <p class="hint">Order is the row order in the table: moving a device here moves its row. Addresses aren't kept in v0.4.</p>
+          <p class="hint">{#if order.drawn}Its port is wired, so its devices and their order come from the drawing: followed from the port to each device's serial port and on.{:else}Order is the row order in the table: moving a device here moves its row.{/if} Addresses aren't kept in v0.4.</p>
           <button class="danger" onclick={() => {
             if (confirm(`Delete ${net.name}? Its devices stay, on no network.`)) editor.apply((p) => deleteNetwork(p, net.id));
           }}>Delete network</button>
@@ -186,7 +201,8 @@
     font-size: 12px;
     color: #556;
   }
-  ol {
+  ol,
+  .unreached {
     margin: 0;
     padding-left: 22px;
     font-size: 13px;
@@ -213,6 +229,13 @@
   li button {
     padding: 0 6px;
     font-size: 12px;
+  }
+  .unreached {
+    color: #a60;
+  }
+  .warn {
+    color: #a60;
+    font-style: normal;
   }
   .x {
     border: none;
