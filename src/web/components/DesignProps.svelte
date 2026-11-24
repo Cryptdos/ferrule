@@ -28,6 +28,7 @@
   import { confirmWiring, wiringOf } from "../../core/wiring";
   import { interlockStatus, mergeProofs, proveInterlocks } from "../../core/interlocks";
   import ChannelSelect from "./ChannelSelect.svelte";
+  import { SUPPLY_CHOICES, formatSupplies, formatSupply } from "../../core/supplies";
 
   let { editor }: { editor: Editor } = $props();
 
@@ -178,6 +179,7 @@
           <div class="ilst {st?.kind ?? ''}">
             {#if st?.kind === "proved"}✓ Proved: the drawing can't break it
             {:else if st?.kind === "fails"}Not proved: it fails. Check logic in Simulate shows how
+            {:else if st?.kind === "never-on"}Never on: is it powered? Its point can't come on, so this proves nothing
             {:else if st?.kind === "not-drawn"}Not proved yet: {st.what} isn't drawn
             {:else if st?.kind === "unknown"}Not proved: too many sequences to try them all
             {:else if st?.kind === "unchecked"}Not proved yet: Prove, or Check logic in Simulate{/if}
@@ -220,6 +222,11 @@
               </select>
               {#if goesTo(pt) !== "panel"}<ChannelSelect {editor} {plant} point={pt} />{/if}
             </div>
+          {/if}
+          {#if pt.form === "supply-out" || pt.form === "powered-out"}
+            <div class="line"><label class="supply">Gives <input value={pt.gives ? formatSupply(pt.gives) : ""} list="ferrule-supplies" placeholder="e.g. 24 V DC" onchange={(e) => setPoint(pt.name, { gives: e.currentTarget.value })} title="What it supplies; Check compares it with what its loads take" /></label></div>
+          {:else if pt.form === "supply-in" || pt.form === "powered-in"}
+            <div class="line"><label class="supply">Takes <input value={pt.accepts ? formatSupplies(pt.accepts) : ""} list="ferrule-supplies" placeholder="e.g. 24 V AC, 24 V DC" onchange={(e) => setPoint(pt.name, { accepts: e.currentTarget.value })} title="What supply it takes; two, comma between, for either" /></label></div>
           {/if}
           <div class="pins">{pt.pins.length ? `Pins ${pt.pins.map((x) => printedPin(x, pt.name)).join(" ")}` : "No pins yet"}</div>
           {#if pt.channel}
@@ -289,6 +296,7 @@
       <p class="hint">Pick a row to see it here. A system is a name that groups plant; plant is a row with its points. Nothing is drawn in Design: Draft draws what's listed here.</p>
     {/if}
   </div>
+  <datalist id="ferrule-supplies">{#each SUPPLY_CHOICES as s (s)}<option value={s}></option>{/each}</datalist>
   <datalist id="ferrule-signals">{#each SIGNAL_SUGGESTIONS as s (s)}<option value={s}></option>{/each}</datalist>
   <datalist id="ferrule-protocols"><option value="BACnet IP"></option><option value="BACnet MS/TP"></option><option value="Modbus RTU"></option><option value="Modbus TCP"></option><option value="M-Bus"></option></datalist>
 </div>
@@ -407,6 +415,13 @@
     flex: none !important;
     width: 5em;
   }
+  .supply {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    font-size: 12px;
+    color: #556;
+  }
   .ilst {
     font-size: 12px;
     color: #667;
@@ -416,6 +431,9 @@
   }
   .ilst.fails {
     color: #b00;
+  }
+  .ilst.never-on {
+    color: #b36b00;
   }
   .wired {
     font-size: 12px;

@@ -95,6 +95,25 @@ export interface ParamDef {
   hidden?: boolean;
 }
 
+/** What a load takes (v0.4.x M11): typed, "24 V DC" or "24 V AC, 24 V DC"; empty is not stated. */
+const ACCEPTS_PARAM: ParamDef = {
+  key: "accepts",
+  label: "Takes (supply)",
+  type: "text",
+  default: "",
+  placeholder: "e.g. 24 V DC",
+  help: "What supply it takes: 24 V AC, 24 V DC, 230 V AC, 400 V AC, 12 V DC, or any other typed the same way. Two, comma between, for a part that takes either (24 V AC, 24 V DC). Check warns when it's fed from a supply that gives something else.",
+};
+/** What a supply gives (v0.4.x M11). */
+const GIVES_PARAM: ParamDef = {
+  key: "gives",
+  label: "Gives (supply)",
+  type: "text",
+  default: "",
+  placeholder: "e.g. 230 V AC",
+  help: "What it supplies: 24 V AC, 24 V DC, 230 V AC, 400 V AC, 12 V DC, or any other typed the same way. Check compares it with what the loads it feeds take.",
+};
+
 export interface SymbolDef {
   id: string;
   name: string;
@@ -864,6 +883,7 @@ const SYMBOLS: SymbolDef[] = [
         ],
         default: "relay",
       },
+      ACCEPTS_PARAM,
     ],
     kind: (el) => (str(el, "type", "relay") === "contactor" ? "contactor" : "relay"),
     draw(el) {
@@ -903,6 +923,7 @@ const SYMBOLS: SymbolDef[] = [
         help: "A number and a unit: 500ms, 5s, 1.5s, 2min (or 2m). Decimals are fine; a number on its own is seconds.",
       },
       { key: "code", label: "Maker's function code", type: "text", default: "", placeholder: "e.g. A" },
+      ACCEPTS_PARAM,
     ],
     kind: () => "timer",
     draw(el) {
@@ -947,6 +968,7 @@ const SYMBOLS: SymbolDef[] = [
         default: "Wh",
       },
       { key: "testPin", label: "Lamp test terminal (T)", type: "bool", default: false },
+      ACCEPTS_PARAM,
     ],
     kind: () => "lamp",
     draw(el) {
@@ -1134,6 +1156,7 @@ const SYMBOLS: SymbolDef[] = [
     params: [
       { key: "screen", label: "Earthed screen", type: "bool", default: false },
       { key: "rating", label: "Rating", type: "text", default: "", placeholder: "e.g. 230/24V 100VA" },
+      GIVES_PARAM,
     ],
     kind: () => "transformer",
     draw(el) {
@@ -1808,6 +1831,7 @@ const SYMBOLS: SymbolDef[] = [
           { value: "dc", label: "DC (+ -)" },
         ],
       },
+      GIVES_PARAM,
     ],
     kind: () => null,
     draw(el) {

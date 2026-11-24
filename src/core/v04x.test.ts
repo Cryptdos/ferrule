@@ -7,10 +7,13 @@ import { AvoidLib } from "libavoid-js";
 import { buildBms01 } from "../bench/bms01";
 import { cellHalfFor } from "./blocks";
 import { checkProject } from "./checks";
-import { setPlantDesign, toDraw } from "./design";
+import { setPlantDesign, toDraw, updateDesignPoint } from "./design";
+import { interlockStatus, proveInterlocks } from "./interlocks";
+import { parseSupplies, parseSupply } from "./supplies";
+import { refreshConductors } from "./conductors";
 import { newProject } from "./model";
 import { moduleTitle, viewsOf } from "./modules";
-import { addElement, addGaDim, addGaItem, addGaPage, addPlatesForDoors, joinDoorBelow, setPlateBehind, setBoundary, setGaSettings, splitDoor, updateElement } from "./ops";
+import { addElement, deletePlant, addGaDim, addGaItem, addGaPage, addPlatesForDoors, joinDoorBelow, setPlateBehind, setBoundary, setGaSettings, splitDoor, updateElement } from "./ops";
 import { ENCL, PLATE_MARGIN, dimLayout, doorPanes, plateDoor, platesOf, drawnGaItems, gaFrame, paneOf, paneRef, sheetPanes } from "./ga";
 import { renumber } from "./renumber";
 import { stampSaved } from "../server/storage";
@@ -210,5 +213,53 @@ describe("step 1b: modular doors (M13)", () => {
     // Put behind a door again by hand.
     setPlateBehind(p, plates[3]!.id, { sheet: front.id, pane: [1, 0] });
     expect(plateDoor(p, plates[3]!)?.pane.h).toBe(1200);
+  });
+});
+
+describe("step 2: supplies (M11, F2, F1)", () => {
+  test("M11: supply types parse and print; a load fed from a supply it can't take is a warning", () => {
+    expect(parseSupply("24VDC")).toEqual({ v: 24, ac: false });
+    expect(parseSupplies("24 V AC/DC")).toEqual([{ v: 24, ac: true }, { v: 24, ac: false }]);
+    expect(parseSupply("about 24")).toBeUndefined();
+    const { project: p } = fresh();
+    // Clean as built: the dampers take either, the controller's PSU 24 V DC.
+    const before = checkProject(p);
+    expect(before.filter((f) => /takes .*; it's fed from/.test(f.message))).toEqual([]);
+    expect(before.some((f) => /\d+ loads don't say what supply they take/.test(f.message))).toBe(true);
+    // A coil that takes 24 V AC, on the 24 V DC rails: the warning names both.
+    const k = p.pages[1]!.elements.find((e) => e.symbol === "coil")!;
+    updateElement(p, p.pages[1]!.id, k.id, { params: { accepts: "24 V AC" } });
+    const w = checkProject(p).filter((f) => /takes 24 V AC; it's fed from PSU-01 24V out, 24 V DC/.test(f.message));
+    expect(w.map((f) => f.ids)).toEqual([[k.id]]);
+  });
+
+  test("M11: a point's gives and accepts are set in Design and round-trip", () => {
+    const { project: p, plant } = fresh();
+    updateDesignPoint(p, plant.BAT!.id, "Charge", { accepts: "24 V DC" });
+    expect(plant.BAT!.points![0]!.accepts).toEqual([{ v: 24, ac: false }]);
+    expect(() => updateDesignPoint(p, plant.BAT!.id, "Charge", { accepts: "lots" })).toThrow();
+    const back = parseProject(JSON.parse(JSON.stringify(p)));
+    expect(back.plant.find((x) => x.id === plant.PSU!.id)!.points![1]!.gives).toEqual({ v: 24, ac: false });
+  });
+
+  test("F2 and F1: with its power supply deleted, 24DC feeds parts and nothing supplies it; every interlock is never on", () => {
+    const { project: p, plant } = fresh();
+    expect(checkProject(p).some((f) => /nothing supplies it/.test(f.message))).toBe(false);
+    deletePlant(p, plant.PSU!.id);
+    refreshConductors(p);
+    const f2 = checkProject(p).filter((f) => /nothing supplies it/.test(f.message)).map((f) => f.message);
+    expect(f2.some((m) => /^24DC feeds \d+ parts and nothing supplies it$/.test(m))).toBe(true);
+    const proofs = proveInterlocks(p);
+    expect(Object.values(proofs.results)).toEqual(["never-on", "never-on"]);
+    const st = interlockStatus(p, proofs);
+    expect([...st.values()].map((x) => x.kind)).toEqual(["never-on", "never-on"]);
+    expect(checkProject(p, { proofs }).filter((f) => /never on: is it powered\?/.test(f.message)).length).toBe(2);
+  });
+
+  test("F2: the legacy rule stays quiet: no Incoming supply part, rails named for a supply feed it", () => {
+    const { project: p } = fresh();
+    for (const pg of p.pages) pg.elements = pg.elements.filter((e) => e.symbol !== "supply");
+    refreshConductors(p);
+    expect(checkProject(p).some((f) => /nothing supplies it/.test(f.message))).toBe(false);
   });
 });

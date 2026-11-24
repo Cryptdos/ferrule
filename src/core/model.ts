@@ -406,6 +406,12 @@ export const INPUT_FORMS: PointForm[] = ["dry-in", "powered-in", "supply-in"];
 export const OUTPUT_FORMS: PointForm[] = ["contact", "powered-out", "supply-out"];
 export const ANALOGUE_FORMS: PointForm[] = ["analogue-in", "analogue-out"];
 
+/** What a supply gives or a load takes (v0.4.x M11): 24 V DC, 230 V AC… */
+export interface SupplyType {
+  v: number;
+  ac: boolean;
+}
+
 /** One signal made of pins, e.g. `Airflow proven` (C, NO) or `Mains` (L, N, PE). */
 export interface IoPoint {
   /** Unique on its device. */
@@ -421,6 +427,10 @@ export interface IoPoint {
   delay?: number;
   /** Supply out: the distribution each pin feeds, by pin number. */
   dists?: Record<string, string>;
+  /** Supply out or powered out: what it gives (v0.4.x M11). Unset: not stated. */
+  gives?: SupplyType;
+  /** Supply in or powered in: what it accepts, any of these (v0.4.x M11). Unset: not stated. */
+  accepts?: SupplyType[];
   /** What it does on this job, printed along its wire under a module's terminals: "SF-01 RUNNING". */
   label?: string;
   // Design (design-v0.4 §2, §4). A point made in Design may have no pins yet.

@@ -2,6 +2,7 @@
  * Rule checks (DESIGN.md §6, §7, §10). Each finding names the elements
  * involved so the UI can jump to them.
  */
+import { distributionChecks, supplyChecks } from "./supplies";
 import { allDetails, allFrames, changedGaStrips, detailOf, doorOwner, frameOf, gaCandidates, paneName, panesUnder, plateDoor, railFill, railNumber } from "./ga";
 import { compile, pinNode } from "./sim";
 import { controllerName, modulesOf, moduleTypeName, slotAddress, viewsOf } from "./modules";
@@ -163,6 +164,11 @@ export function checkProject(project: Project, opts: { proofs?: Proofs | null } 
   out.push(...pointChecks(project));
   out.push(...controllerChecks(project));
   out.push(...designChecks(project, { proofs: opts.proofs }));
+  // What supplies give and loads take (v0.4.x M11), and distributions nothing supplies (F2).
+  if (project.pages.some((pg) => pg.segments.length)) {
+    const circuit = compile(project);
+    out.push(...distributionChecks(project, circuit), ...supplyChecks(project, circuit));
+  }
 
   // With a GA drawn, say what isn't on it yet; and GA devices whose schematic part has gone.
   if (project.pages.some((p) => p.ga)) {
@@ -473,6 +479,7 @@ export function designChecks(project: Project, opts: { oneHop?: boolean; proofs?
       const st = status.get(il.id);
       const what = `Interlock ${describeInterlock(project, plant, il)}`;
       if (st?.kind === "fails") out.push({ level: "warning", message: `${what} fails: Check logic in Simulate shows how`, ids: [], design: { plant: plant.id } });
+      else if (st?.kind === "never-on") out.push({ level: "warning", message: `${what}: never on: is it powered? Its point can't be on in the drawing as it is, so the interlock proves nothing`, ids: [], design: { plant: plant.id } });
       else if (st?.kind === "not-drawn") out.push({ level: "info", message: `${what} isn't proved yet: ${st.what} isn't drawn`, ids: [], design: { plant: plant.id } });
       else if (st?.kind === "unknown") out.push({ level: "info", message: `${what} isn't proved: too many sequences to try them all`, ids: [], design: { plant: plant.id } });
       else if (st?.kind === "unchecked") out.push({ level: "info", message: `${what} isn't proved yet: Prove in Design, or Check logic in Simulate`, ids: [], design: { plant: plant.id } });

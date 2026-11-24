@@ -301,6 +301,8 @@ function parseControllers(v: unknown, plant: PlantItem[]): Controller[] | undefi
   return out.length ? out : undefined;
 }
 
+const isSupplyType = (v: unknown): v is { v: number; ac: boolean } => isObj(v) && typeof v.v === "number" && v.v > 0 && typeof v.ac === "boolean";
+
 const FORMS = new Set(POINT_FORMS.map((f) => f.value));
 
 function parseConditions(v: unknown): Condition[] {
@@ -331,6 +333,8 @@ function parsePoints(points: unknown, pins: unknown): { points?: IoPoint[]; pins
         ...(dists && Object.keys(dists).length ? { dists } : {}),
         ...(typeof p.label === "string" && p.label.trim() ? { label: p.label.trim() } : {}),
         ...(text(p.signal) ? { signal: text(p.signal) } : {}),
+        ...(isSupplyType(p.gives) ? { gives: { v: p.gives.v, ac: p.gives.ac } } : {}),
+        ...(arr(p.accepts).filter(isSupplyType).length ? { accepts: arr(p.accepts).filter(isSupplyType).map((x) => ({ v: x.v, ac: x.ac })) } : {}),
         ...(p.goesTo === "relay" || p.goesTo === "panel" ? { goesTo: p.goesTo } : {}),
         ...(isObj(p.channel) && text(p.channel.module) && text(p.channel.point) ? { channel: { module: text(p.channel.module), point: text(p.channel.point) } } : {}),
         ...(text(p.confirmed) ? { confirmed: text(p.confirmed) } : {}),

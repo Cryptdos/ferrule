@@ -5,6 +5,7 @@
  * here decides anything for the engineer: allocation is by hand, and a
  * reference to something that's gone is let go, never guessed.
  */
+import { parseSupplies, parseSupply } from "./supplies";
 import { newId, type ChannelRef, type Condition, type DesignTemplate, type Interlock, type IoPoint, type PlantItem, type PointForm, type Project } from "./model";
 import { OpError, getPlant, renamePointRefs, syncPlantViews } from "./ops";
 import { newInterlock, syncInterlocks } from "./interlocks";
@@ -339,6 +340,10 @@ export interface PointDesign {
   form?: PointForm;
   signal?: string;
   goesTo?: "channel" | "relay" | "panel";
+  /** What it gives, typed (v0.4.x M11): "24 V DC"; empty clears it. */
+  gives?: string;
+  /** What it takes, typed: "24 V AC, 24 V DC"; empty clears it. */
+  accepts?: string;
 }
 
 /** Add a point with no pins (design-v0.4 §2, `+ Point`): a form, a name and a signal. */
@@ -383,6 +388,18 @@ export function updateDesignPoint(project: Project, plantId: string, name: strin
   if (patch.goesTo !== undefined) {
     if (patch.goesTo === "channel") delete p.goesTo;
     else p.goesTo = patch.goesTo;
+  }
+  if (patch.gives !== undefined) {
+    const g = parseSupply(patch.gives);
+    if (patch.gives.trim() && !g) throw new OpError(`Write what it gives as a voltage and AC or DC: 24 V DC`);
+    if (g) p.gives = g;
+    else delete p.gives;
+  }
+  if (patch.accepts !== undefined) {
+    const a = parseSupplies(patch.accepts);
+    if (patch.accepts.trim() && !a.length) throw new OpError(`Write what it takes as a voltage and AC or DC: 24 V DC, or 24 V AC, 24 V DC`);
+    if (a.length) p.accepts = a;
+    else delete p.accepts;
   }
   // What it now is: a channel that can't take it lets it go.
   if (p.channel) {
