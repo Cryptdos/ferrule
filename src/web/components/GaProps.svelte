@@ -1,13 +1,16 @@
 <script lang="ts">
   import { setModuleDevice } from "../../core/controllers";
   import { moduleTypeName } from "../../core/modules";
-  import { deleteGaItems, rotateGaItems, setGaItemDevice, setGaSettings, setGaSize, updateGaItem, useLibraryDevice } from "../../core/ops";
+  import { deleteGaItems, joinDoorBelow, rotateGaItems, setGaItemDevice, setGaSettings, setGaSize, splitDoor, updateDoor, updateGaItem, useLibraryDevice } from "../../core/ops";
   import {
     GA_SCALES,
     VIEW_NAMES,
     deviceSize,
+    doorColumns,
     doorLeaves,
     doorOwner,
+    paneName,
+    sheetPanes,
     fitScale,
     gaFrame,
     gaSizes,
@@ -98,6 +101,11 @@
   const owner = $derived(page.ga ? doorOwner(editor.project, page) : null);
   const ownDoor = $derived(!!owner && owner.id === page.id);
   const leaves = $derived(owner ? doorLeaves(owner) : []);
+  // A modular door (v0.4.x M13): columns of stacked doors.
+  const modular = $derived(!!owner?.ga?.columns?.length);
+  const columns = $derived(owner ? doorColumns(owner) : []);
+  const panes = $derived(owner ? sheetPanes(editor.project, owner) : []);
+  const door = (col: number, row: number | null, patch: { w?: number; h?: number; hinge?: "left" | "right"; name?: string }) => editor.apply((p) => updateDoor(p, editor.pageId, col, row, patch));
   const doorFronts = $derived(editor.project.pages.filter((p) => p.ga?.view === "door-front" && !p.ga.of && p.id !== page.id));
   const frame = $derived(page.ga ? gaFrame(editor.project, page) : null);
   const fits = $derived(frame ? fitScale(frame.w, frame.h) : 1);
@@ -322,9 +330,13 @@
       <label>
         Leaves
         <select
-          value={leaves.length}
+          value={modular ? 3 : leaves.length}
           onchange={(e) =>
-            setLeaves(
+            e.currentTarget.value === "3"
+              ? editor.apply((p) => splitDoor(p, editor.pageId, 0, 0, "across"))
+              : modular
+              ? editor.apply((p) => setGaSettings(p, editor.pageId, { columns: null }))
+              : setLeaves(
               e.currentTarget.value === "2"
                 ? [
                     { w: page.ga!.enclosure.w / 2, hinge: "left" },
@@ -335,8 +347,31 @@
         >
           <option value={1}>One door</option>
           <option value={2}>Two doors</option>
+          <option value={3}>Columns of doors…</option>
         </select>
       </label>
+      {#if modular}
+        <!-- Columns left to right, each with its doors top to bottom (v0.4.x M13). The last column, and each column's last door, take what's left. -->
+        {#each columns as c, ci (ci)}
+          <div class="column">
+            <label class="colw">Column {ci + 1} width (mm)<input type="number" step="10" value={c.w} disabled={ci === columns.length - 1} onchange={(e) => door(ci, null, { w: num(e.currentTarget.value) })} /></label>
+            {#each c.doors as d, ri (ri)}
+              <div class="pane">
+                <input class="pname" placeholder={paneName({ col: ci, row: ri })} value={d.name ?? ""} onchange={(e) => door(ci, ri, { name: e.currentTarget.value })} title="Its name, printed small at its top left" />
+                <input class="ph" type="number" step="10" value={d.h} disabled={ri === c.doors.length - 1} onchange={(e) => door(ci, ri, { h: num(e.currentTarget.value) })} title="Height (mm); the last door takes what's left" />
+                <select value={d.hinge} onchange={(e) => door(ci, ri, { hinge: e.currentTarget.value as "left" | "right" })} title="Hinged on">
+                  <option value="left">Hinge left</option>
+                  <option value="right">Hinge right</option>
+                </select>
+                <button onclick={() => editor.apply((p) => splitDoor(p, editor.pageId, ci, ri, "across"))} title="Split this door into two, one above the other, at its middle">⇕ Split</button>
+                <button onclick={() => editor.apply((p) => splitDoor(p, editor.pageId, ci, ri, "down"))} title="Split this door's column into two side by side, at its middle">⇔ Split</button>
+                {#if ri < c.doors.length - 1}<button onclick={() => editor.apply((p) => joinDoorBelow(p, editor.pageId, ci, ri))} title="Join with the door below">Join ↓</button>{/if}
+              </div>
+            {/each}
+          </div>
+        {/each}
+        <p class="hint">Each door is its own piece of steel: a device belongs to the door its centre is on, and is dimensioned from that door's edges.</p>
+      {:else}
       <div class="grid">
         {#each leaves as l, i (i)}
           <label>
@@ -355,8 +390,23 @@
           <label>Right leaf (mm)<input disabled value={leaves[1]!.w} /></label>
         {/if}
       </div>
+      {/if}
     {/if}
-    {#if owner && leaves.length > 1}
+    {#if owner && modular}
+      <label>
+        Shows
+        <select
+          value={page.ga.pane ? page.ga.pane.join(":") : ""}
+          onchange={(e) => {
+            const v = e.currentTarget.value;
+            editor.apply((p) => setGaSettings(p, editor.pageId, { pane: v ? (v.split(":").map(Number) as [number, number]) : null, leaf: null }));
+          }}
+        >
+          <option value="">The whole door</option>
+          {#each panes as pn (pn.col + ":" + pn.row)}<option value="{pn.col}:{pn.row}">{paneName(pn)} (column {pn.col + 1}, door {pn.row + 1})</option>{/each}
+        </select>
+      </label>
+    {:else if owner && leaves.length > 1}
       <label>
         Shows
         <select
@@ -449,6 +499,27 @@
     width: 100%;
     box-sizing: border-box;
     min-width: 0;
+  }
+  .column {
+    border-left: 2px solid #dde;
+    padding-left: 6px;
+    margin: 4px 0;
+  }
+  .pane {
+    display: flex;
+    gap: 3px;
+    align-items: center;
+    margin: 2px 0;
+  }
+  .pane input.pname {
+    width: 7em;
+  }
+  .pane input.ph {
+    width: 5em;
+  }
+  .pane button {
+    padding: 1px 4px;
+    font-size: 11px;
   }
   .grid {
     display: grid;

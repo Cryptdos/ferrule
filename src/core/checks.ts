@@ -2,7 +2,7 @@
  * Rule checks (DESIGN.md §6, §7, §10). Each finding names the elements
  * involved so the UI can jump to them.
  */
-import { allDetails, allFrames, changedGaStrips, detailOf, doorOwner, frameOf, gaCandidates, railFill, railNumber } from "./ga";
+import { allDetails, allFrames, changedGaStrips, detailOf, doorOwner, frameOf, gaCandidates, paneName, panesUnder, railFill, railNumber } from "./ga";
 import { compile, pinNode } from "./sim";
 import { controllerName, modulesOf, moduleTypeName, slotAddress, viewsOf } from "./modules";
 import { contactPins, isAnalogueForm, isInputForm, missingRefs, describeExpectation, things } from "./points";
@@ -186,6 +186,14 @@ export function checkProject(project: Project, opts: { proofs?: Proofs | null } 
         }
         for (const d of f.overhang) {
           out.push({ level: "warning", message: `Sheet ${page.number}, rail ${n}: a device runs off the end of the rail`, pageId: page.id, ids: [d.id] });
+        }
+      }
+      // A modular door's items each belong to one door (v0.4.x M13): one across a joint is drilled through two.
+      if (page.ga?.view === "door-front" && !page.ga.of && page.ga.columns?.length) {
+        for (const it of page.gaItems ?? []) {
+          if (it.kind !== "device" && it.kind !== "label") continue;
+          const under = panesUnder(page, it);
+          if (under.length > 1) out.push({ level: "warning", message: `Sheet ${page.number}: ${it.kind === "label" ? "a label plate" : "a device"} lies across two doors (${under.map(paneName).join(", ")})`, pageId: page.id, ids: [it.id] });
         }
       }
       if (page.ga?.view === "door-back" && !doorOwner(project, page)) {

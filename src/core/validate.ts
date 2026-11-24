@@ -451,6 +451,24 @@ function parsePage(pg: Record<string, unknown>, i: number): Project["pages"][num
       .slice(0, 2)
       .map((l) => ({ w: l.w as number, hinge: l.hinge === "right" ? ("right" as const) : ("left" as const) }));
     if (ga.view === "door-front" && leaves.length) ga.leaves = leaves;
+    // A modular door's columns of stacked doors (v0.4.x M13).
+    const hinge = (v: unknown) => (v === "right" ? ("right" as const) : ("left" as const));
+    const columns = arr(pg.ga.columns)
+      .filter(isObj)
+      .filter((c) => typeof c.w === "number" && c.w > 0)
+      .slice(0, 6)
+      .map((c) => ({
+        w: c.w as number,
+        doors: arr(c.doors)
+          .filter(isObj)
+          .filter((d) => typeof d.h === "number" && d.h > 0)
+          .slice(0, 8)
+          .map((d) => ({ h: d.h as number, hinge: hinge(d.hinge), ...(typeof d.name === "string" && d.name.trim() ? { name: d.name.trim() } : {}) })),
+      }))
+      .filter((c) => c.doors.length);
+    if (ga.view === "door-front" && columns.length) ga.columns = columns;
+    const pane = arr(pg.ga.pane);
+    if (ga.view !== "backplate" && pane.length === 2 && pane.every((n) => typeof n === "number" && Number.isInteger(n) && n >= 0)) ga.pane = [pane[0] as number, pane[1] as number];
     if (ga.view !== "backplate" && (pg.ga.leaf === 0 || pg.ga.leaf === 1)) ga.leaf = pg.ga.leaf;
     if (ga.view !== "backplate" && typeof pg.ga.of === "string" && pg.ga.of) ga.of = pg.ga.of;
   }

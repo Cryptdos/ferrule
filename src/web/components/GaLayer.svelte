@@ -16,7 +16,10 @@
     mmToUnits,
     parseCutout,
     scaleText,
+    paneName,
     sheetLeaves,
+    sheetPanes,
+    shownPane,
     type DrawnGaItem,
   } from "../../core/ga";
   import { textUnits } from "../../core/geometry";
@@ -60,7 +63,7 @@
   const size = $derived(gaSize(project, page));
   const u = (mm: number) => mmToUnits(frame, mm);
   const X = (mm: number) => GA_ORIGIN[0] + u(mm - frame.x0);
-  const Y = (mm: number) => GA_ORIGIN[1] + u(mm);
+  const Y = (mm: number) => GA_ORIGIN[1] + u(mm - (frame.y0 ?? 0));
   const W = $derived(u(frame.w));
   const H = $derived(u(frame.h));
   const byId = $derived(new Map(project.pages.flatMap((pg) => pg.elements.map((e) => [e.id, e]))));
@@ -68,8 +71,13 @@
     drawnGaItems(project, page).map((d): DrawnGaItem => (d.own && preview?.get(d.it.id) ? { ...d, it: preview.get(d.it.id)! } : d)),
   );
   const door = $derived(isDoorView(ga.view));
-  const leaves = $derived(sheetLeaves(project, page).filter((l) => l.x + l.w > frame.x0 + 0.01 && l.x < frame.x0 + frame.w - 0.01));
   const owner = $derived(doorOwner(project, page));
+  // Each door (a leaf, or one door of a modular door) the sheet shows, as it sees it (v0.4.x M13).
+  const fy0 = $derived(frame.y0 ?? 0);
+  const panes = $derived(
+    sheetPanes(project, page).filter((p) => p.x + p.w > frame.x0 + 0.01 && p.x < frame.x0 + frame.w - 0.01 && p.y + p.h > fy0 + 0.01 && p.y < fy0 + frame.h - 0.01),
+  );
+  const modular = $derived(!!owner?.ga?.columns?.length);
 
   /** What a device says: its tag(s), or its own text. */
   function label(it: GaItem): string {
@@ -112,7 +120,8 @@
   const LENS: Record<string, string> = { Rd: "#e03131", Ye: "#fcc419", Gn: "#2f9e44", Bu: "#1c7ed6", Wh: "#ffffff", Cl: "#f1f3f5" };
   const title = $derived.by(() => {
     const what = ga.view === "door-front" ? "DOOR FRONT" : ga.view === "door-back" ? "DOOR BACK, FROM INSIDE" : "BACKPLATE";
-    const leaf = ga.leaf !== undefined && sheetLeaves(project, page).length > 1 ? (ga.leaf === 0 ? " · LEFT LEAF" : " · RIGHT LEAF") : "";
+    const one = shownPane(project, page);
+    const leaf = modular && one ? ` · ${paneName(one).toUpperCase()}` : ga.leaf !== undefined && sheetLeaves(project, page).length > 1 ? (ga.leaf === 0 ? " · LEFT LEAF" : " · RIGHT LEAF") : "";
     const of = owner && owner !== page ? ` · DOOR ON SHEET ${owner.number}` : "";
     return `${what}${leaf}${of}: ${frame.w} W × ${frame.h} H mm · SCALE ${scaleText(ga.scale)}`;
   });
@@ -143,18 +152,23 @@
   {/if}
 
   {#if door}
-    <!-- Each leaf: the split between two, and the hinge side shown by the usual converging swing lines. -->
-    {#each leaves as l (l.index)}
+    <!-- Each door: its outline where it meets another, and the hinge side shown by the usual converging swing lines. -->
+    {#each panes as l (l.col + ":" + l.row)}
       {@const x0 = X(Math.max(l.x, frame.x0))}
+      {@const top = Math.max(l.y, fy0)}
       {@const hingeX = l.hinge === "left" ? X(l.x) : X(l.x + l.w)}
       {@const openX = l.hinge === "left" ? X(l.x + l.w) : X(l.x)}
-      <polyline class="swing" points="{openX},{Y(0)} {hingeX},{Y(size.h / 2)} {openX},{Y(size.h)}" />
-      {#each [0.15, 0.85] as f (f)}
-        <rect class="hinge" x={hingeX - 0.35} y={Y(size.h * f) - 1.2} width="0.7" height="2.4" />
+      <polyline class="swing" points="{openX},{Y(l.y)} {hingeX},{Y(l.y + l.h / 2)} {openX},{Y(l.y + l.h)}" />
+      {#each !modular || l.h > 300 ? [0.15, 0.85] : [0.25, 0.75] as f (f)}
+        <rect class="hinge" x={hingeX - 0.35} y={Y(l.y + l.h * f) - 1.2} width="0.7" height="2.4" />
       {/each}
       {#if l.x > 0.01 && l.x > frame.x0 + 0.01}
-        <line class="split" x1={x0} y1={Y(0)} x2={x0} y2={Y(size.h)} />
+        <line class="split" x1={x0} y1={Y(top)} x2={x0} y2={Y(Math.min(l.y + l.h, fy0 + frame.h))} />
       {/if}
+      {#if l.y > 0.01 && l.y > fy0 + 0.01}
+        <line class="split" x1={X(Math.max(l.x, frame.x0))} y1={Y(l.y)} x2={X(Math.min(l.x + l.w, frame.x0 + frame.w))} y2={Y(l.y)} />
+      {/if}
+      {#if modular && l.name}<text class="panename" x={X(Math.max(l.x, frame.x0)) + 0.8} y={Y(top) + SMALLEST * 1.6} font-size={SMALLEST}>{l.name}</text>{/if}
     {/each}
   {/if}
 
@@ -375,6 +389,9 @@
     stroke: #000;
     stroke-width: 0.07;
     stroke-dasharray: 1.2 0.5 0.2 0.5;
+  }
+  .panename {
+    fill: #333;
   }
   .hinge {
     fill: #000;

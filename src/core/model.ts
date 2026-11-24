@@ -122,6 +122,10 @@ export interface GaSettings {
   view: GaView;
   /** Door front: its leaves, left to right as seen from the front (one or two). Unset: one leaf, hinged on the left. */
   leaves?: DoorLeaf[];
+  /** Door front: a modular door, columns of stacked doors (v0.4.x M13). Set, it takes the place of `leaves`. */
+  columns?: DoorColumn[];
+  /** A door view showing one door of a modular door: its column and row (from the front, from 0). */
+  pane?: [number, number];
   /** Door views: the leaf this sheet shows (0: the left one from the front, 1: the right one). Unset: the whole door. */
   leaf?: 0 | 1;
   /**
@@ -139,6 +143,24 @@ export interface DoorLeaf {
   /** Width, mm. The leaves add up to the door's width. */
   w: number;
   hinge: "left" | "right";
+}
+
+/**
+ * A modular door's column (v0.4.x M13): stacked doors, top to bottom, each
+ * its own piece of steel with its own hinge. Columns run left to right from
+ * the front; their widths add up to the door's, the last taking what's left.
+ */
+export interface DoorColumn {
+  /** Width, mm. */
+  w: number;
+  doors: DoorPane[];
+}
+
+/** One door in a column: its height (the last in a column takes what's left), hinge and name. */
+export interface DoorPane {
+  h: number;
+  hinge: "left" | "right";
+  name?: string;
 }
 
 /** Something on a GA sheet, in real mm from the enclosure's (or door's) top-left corner, as the sheet sees it. */

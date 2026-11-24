@@ -10,7 +10,7 @@
  * top-left corner; they're drawn at the sheet's scale.
  */
 import { AREA_UNITS, UNIT_MM, type Vec } from "./geometry";
-import type { DoorLeaf, Element, GaDimPoint, GaItem, GaSettings, GaView, Page, PlantItem, Project } from "./model";
+import type { DoorColumn, DoorLeaf, Element, GaDimPoint, GaItem, GaSettings, GaView, Page, PlantItem, Project } from "./model";
 import { getSymbol } from "./symbols";
 import { controllerName, modulesOf, viewsOf } from "./modules";
 import { isSlave, slavesOf } from "./xref";
@@ -34,18 +34,20 @@ export function mmToUnits(ga: Pick<GaSettings, "scale">, mm: number): number {
 export interface GaFrame {
   scale: number;
   x0: number;
+  /** From the top: one door of a modular door starts lower down (v0.4.x M13). Unset: 0. */
+  y0?: number;
   w: number;
   h: number;
 }
 
 /** A real position on the panel (mm from the enclosure's corner) to grid units on the sheet. */
-export function gaToSheet(ga: Pick<GaFrame, "scale"> & { x0?: number }, p: Vec): Vec {
-  return [GA_ORIGIN[0] + mmToUnits(ga, p[0] - (ga.x0 ?? 0)), GA_ORIGIN[1] + mmToUnits(ga, p[1])];
+export function gaToSheet(ga: Pick<GaFrame, "scale"> & { x0?: number; y0?: number }, p: Vec): Vec {
+  return [GA_ORIGIN[0] + mmToUnits(ga, p[0] - (ga.x0 ?? 0)), GA_ORIGIN[1] + mmToUnits(ga, p[1] - (ga.y0 ?? 0))];
 }
 
 /** The other way: a point on the sheet to real mm on the panel. */
-export function sheetToGa(ga: Pick<GaFrame, "scale"> & { x0?: number }, p: Vec): Vec {
-  return [(p[0] - GA_ORIGIN[0]) * UNIT_MM * ga.scale + (ga.x0 ?? 0), (p[1] - GA_ORIGIN[1]) * UNIT_MM * ga.scale];
+export function sheetToGa(ga: Pick<GaFrame, "scale"> & { x0?: number; y0?: number }, p: Vec): Vec {
+  return [(p[0] - GA_ORIGIN[0]) * UNIT_MM * ga.scale + (ga.x0 ?? 0), (p[1] - GA_ORIGIN[1]) * UNIT_MM * ga.scale + (ga.y0 ?? 0)];
 }
 
 // ---------------------------------------------------------------------------
@@ -99,10 +101,117 @@ export function sheetLeaves(project: Project, page: Page): { x: number; w: numbe
   return out.map((l) => ({ ...l, x: W - l.x - l.w, hinge: l.hinge === "left" ? ("right" as const) : ("left" as const) })).sort((a, b) => a.x - b.x);
 }
 
-/** What the sheet shows: all of it, or one leaf of a door. */
+// ---------------------------------------------------------------------------
+// Modular doors (v0.4.x M13): columns of stacked doors
+
+export const MAX_COLUMNS = 6;
+export const MAX_DOORS = 8;
+
+/** One door of a door, where it is (mm from the front's top-left), its hinge and name. */
+export interface Pane {
+  col: number;
+  row: number;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  hinge: "left" | "right";
+  name?: string;
+}
+
+/**
+ * A door's columns, as set or as its leaves make them (a leaf is a column
+ * with one door the full height), sized to fit: the last column takes the
+ * width that's left, the last door in each column the height.
+ */
+export function doorColumns(owner: Page): DoorColumn[] {
+  const ga = owner.ga!;
+  const { w: W, h: H } = ga.enclosure;
+  const raw: DoorColumn[] = ga.columns?.length
+    ? ga.columns.slice(0, MAX_COLUMNS)
+    : doorLeaves(owner).map((l) => ({ w: l.w, doors: [{ h: H, hinge: l.hinge }] }));
+  let left = W;
+  return raw.map((c, i) => {
+    const last = i === raw.length - 1;
+    const w = last ? left : Math.min(Math.max(1, c.w), left - (raw.length - 1 - i));
+    left -= w;
+    const doors = (c.doors.length ? c.doors : [{ h: H, hinge: "left" as const }]).slice(0, MAX_DOORS);
+    let down = H;
+    return {
+      w,
+      doors: doors.map((d, j) => {
+        const lastD = j === doors.length - 1;
+        const h = lastD ? down : Math.min(Math.max(1, d.h), down - (doors.length - 1 - j));
+        down -= h;
+        return { h, hinge: d.hinge, ...(d.name ? { name: d.name } : {}) };
+      }),
+    };
+  });
+}
+
+/** Every door of a door, from the front: column by column, top to bottom. */
+export function doorPanes(owner: Page): Pane[] {
+  const out: Pane[] = [];
+  let x = 0;
+  doorColumns(owner).forEach((c, col) => {
+    let y = 0;
+    c.doors.forEach((d, row) => {
+      out.push({ col, row, x, y, w: c.w, h: d.h, hinge: d.hinge, ...(d.name ? { name: d.name } : {}) });
+      y += d.h;
+    });
+    x += c.w;
+  });
+  return out;
+}
+
+/** The doors as a sheet sees them: mirrored left to right on the door back, hinges with them. */
+export function sheetPanes(project: Project, page: Page): Pane[] {
+  const owner = doorOwner(project, page);
+  if (!owner) return [];
+  const panes = doorPanes(owner);
+  if (page.ga!.view !== "door-back") return panes;
+  const W = owner.ga!.enclosure.w;
+  return panes.map((p) => ({ ...p, x: W - p.x - p.w, hinge: p.hinge === "left" ? ("right" as const) : ("left" as const) }));
+}
+
+/** The door a sheet shows on its own: its `pane`, or with `leaf` that column's only door. */
+export function shownPane(project: Project, page: Page): Pane | undefined {
+  const ga = page.ga!;
+  const panes = sheetPanes(project, page);
+  if (panes.length < 2) return undefined;
+  if (ga.pane) return panes.find((p) => p.col === ga.pane![0] && p.row === ga.pane![1]);
+  if (ga.leaf !== undefined) {
+    const col = panes.filter((p) => p.col === ga.leaf);
+    return col.length === 1 ? col[0] : undefined;
+  }
+  return undefined;
+}
+
+/** A door's printed name: its own, or by column and row (*C2 R1*). */
+export const paneName = (p: Pick<Pane, "col" | "row" | "name">) => p.name || `C${p.col + 1} R${p.row + 1}`;
+
+/** The door (from the front) an item on a door front belongs to: the one its centre is on. */
+export function paneOf(owner: Page, it: Pick<GaItem, "x" | "y" | "w" | "h">): Pane | undefined {
+  const cx = it.x + it.w / 2;
+  const cy = it.y + it.h / 2;
+  return doorPanes(owner).find((p) => cx >= p.x - 0.01 && cx <= p.x + p.w + 0.01 && cy >= p.y - 0.01 && cy <= p.y + p.h + 0.01);
+}
+
+/** The doors an item on a door front lies across (more than one: it's across a joint). */
+export function panesUnder(owner: Page, it: Pick<GaItem, "x" | "y" | "w" | "h">): Pane[] {
+  const e = 0.5;
+  return doorPanes(owner).filter((p) => it.x < p.x + p.w - e && it.x + it.w > p.x + e && it.y < p.y + p.h - e && it.y + it.h > p.y + e);
+}
+
+/** What the sheet shows: all of it, one leaf of a door, or one door of a modular door. */
 export function gaFrame(project: Project, page: Page): GaFrame {
   const ga = page.ga!;
   const size = gaSize(project, page);
+  if (isDoorView(ga.view) && (ga.pane || ga.columns?.length || doorOwner(project, page)?.ga?.columns?.length)) {
+    const p = shownPane(project, page);
+    if (p) return { scale: ga.scale, x0: p.x, ...(p.y ? { y0: p.y } : {}), w: p.w, h: p.h };
+    return { scale: ga.scale, x0: 0, w: size.w, h: size.h };
+  }
   const leaf = ga.leaf !== undefined ? sheetLeaves(project, page).find((l) => l.index === ga.leaf) : undefined;
   return leaf && sheetLeaves(project, page).length > 1 ? { scale: ga.scale, x0: leaf.x, w: leaf.w, h: size.h } : { scale: ga.scale, x0: 0, w: size.w, h: size.h };
 }
@@ -142,8 +251,11 @@ export interface DrawnGaItem {
 export function drawnGaItems(project: Project, page: Page): DrawnGaItem[] {
   const out: DrawnGaItem[] = [];
   const frame = gaFrame(project, page);
+  const y0 = frame.y0 ?? 0;
   const inFrame = (it: GaItem) =>
-    it.kind === "dim" || page.ga!.view === "detail" || (it.x + it.w / 2 >= frame.x0 - 0.01 && it.x + it.w / 2 <= frame.x0 + frame.w + 0.01);
+    it.kind === "dim" ||
+    page.ga!.view === "detail" ||
+    (it.x + it.w / 2 >= frame.x0 - 0.01 && it.x + it.w / 2 <= frame.x0 + frame.w + 0.01 && it.y + it.h / 2 >= y0 - 0.01 && it.y + it.h / 2 <= y0 + frame.h + 0.01);
   const owner = doorOwner(project, page);
   if (owner && owner !== page) {
     const back = page.ga!.view === "door-back";
@@ -524,9 +636,9 @@ export const ENCL = "@encl";
 const along = (it: Pick<GaItem, "x" | "y" | "w" | "h">, axis: "h" | "v") => (axis === "h" ? { a: it.x, len: it.w } : { a: it.y, len: it.h });
 
 /** Where a dimension point is along its axis now: on the item it's attached to, or where it was put. */
-export function dimValue(p: GaDimPoint, axis: "h" | "v", items: Map<string, Pick<GaItem, "x" | "y" | "w" | "h">>, size: { w: number; h: number }): number {
+export function dimValue(p: GaDimPoint, axis: "h" | "v", items: Map<string, Pick<GaItem, "x" | "y" | "w" | "h">>, size: { w: number; h: number; x0?: number; y0?: number }): number {
   const k = p.edge === "mid" ? 0.5 : p.edge === "end" ? 1 : 0;
-  if (p.item === ENCL) return (axis === "h" ? size.w : size.h) * k;
+  if (p.item === ENCL) return axis === "h" ? (size.x0 ?? 0) + size.w * k : (size.y0 ?? 0) + size.h * k;
   const it = p.item ? items.get(p.item) : undefined;
   if (!it) return p.v;
   const { a, len } = along(it, axis);
@@ -541,16 +653,45 @@ export interface DimTarget {
   cross: [number, number];
 }
 
-/** What a dimension can snap to along an axis: the enclosure's edges, each item's edges and middle. */
-export function dimTargets(drawn: DrawnGaItem[], size: { w: number; h: number }, axis: "h" | "v"): DimTarget[] {
+/** A door of a modular door as a dimension's target: `@pane:col:row` (v0.4.x M13). */
+export const paneRef = (p: Pick<Pane, "col" | "row">) => `@pane:${p.col}:${p.row}`;
+
+/**
+ * What a sheet's dimensions measure from as "the enclosure": the part it
+ * shows (a leaf, or one door of a modular door, by its own edges) or all of
+ * it; and, on a door view, each door's own rectangle by `paneRef`.
+ */
+export function dimFrame(project: Project, page: Page): { size: { w: number; h: number; x0: number; y0: number }; panes: { id: string; x: number; y: number; w: number; h: number }[] } {
+  const f = gaFrame(project, page);
+  const panes = sheetPanes(project, page);
+  return {
+    size: { w: f.w, h: f.h, x0: f.x0, y0: f.y0 ?? 0 },
+    panes: panes.length > 1 ? panes.map((p) => ({ id: paneRef(p), x: p.x, y: p.y, w: p.w, h: p.h })) : [],
+  };
+}
+
+/** What a dimension can snap to along an axis: the enclosure's edges (or the part shown), each door's, each item's edges and middle. */
+export function dimTargets(
+  drawn: DrawnGaItem[],
+  size: { w: number; h: number; x0?: number; y0?: number },
+  axis: "h" | "v",
+  panes: { id: string; x: number; y: number; w: number; h: number }[] = [],
+): DimTarget[] {
   const out: DimTarget[] = [];
-  const crossAll: [number, number] = axis === "h" ? [0, size.h] : [0, size.w];
+  const [x0, y0] = [size.x0 ?? 0, size.y0 ?? 0];
+  const crossAll: [number, number] = axis === "h" ? [y0, y0 + size.h] : [x0, x0 + size.w];
+  const start = axis === "h" ? x0 : y0;
   const full = axis === "h" ? size.w : size.h;
   out.push(
-    { v: 0, item: ENCL, edge: "start", cross: crossAll },
-    { v: full / 2, item: ENCL, edge: "mid", cross: crossAll },
-    { v: full, item: ENCL, edge: "end", cross: crossAll },
+    { v: start, item: ENCL, edge: "start", cross: crossAll },
+    { v: start + full / 2, item: ENCL, edge: "mid", cross: crossAll },
+    { v: start + full, item: ENCL, edge: "end", cross: crossAll },
   );
+  for (const p of panes) {
+    const { a, len } = along(p, axis);
+    const cross: [number, number] = axis === "h" ? [p.y, p.y + p.h] : [p.x, p.x + p.w];
+    out.push({ v: a, item: p.id, edge: "start", cross }, { v: a + len, item: p.id, edge: "end", cross });
+  }
   for (const { it } of drawn) {
     if (it.kind === "dim" || it.kind === "detail") continue;
     const { a, len } = along(it, axis);
@@ -660,19 +801,19 @@ export interface DimLayout {
 export function dimLayout(project: Project, page: Page, it: GaItem, drawn = drawnGaItems(project, page)): DimLayout {
   const d = it.dim!;
   const frame = gaFrame(project, page);
-  const size = gaSize(project, page);
-  const items = new Map(drawn.map((x) => [x.it.id, x.it] as const));
+  const { size, panes } = dimFrame(project, page);
+  const items = new Map<string, Pick<GaItem, "x" | "y" | "w" | "h">>([...drawn.map((x) => [x.it.id, x.it] as const), ...panes.map((p) => [p.id, p] as const)]);
   const vals = d.points.map((p) => dimValue(p, d.axis, items, size));
   const crossOf = (i: number): [number, number] | null => {
     const p = d.points[i]!;
-    if (p.item === ENCL) return d.axis === "h" ? [0, size.h] : [0, size.w];
+    if (p.item === ENCL) return d.axis === "h" ? [size.y0, size.y0 + size.h] : [size.x0, size.x0 + size.w];
     const t = p.item ? items.get(p.item) : undefined;
     if (!t) return null;
     return d.axis === "h" ? [t.y, t.y + t.h] : [t.x, t.x + t.w];
   };
   const S = (mm: Vec): Vec => gaToSheet(frame, mm);
   const stepMm = DIM_STEP_UNITS * UNIT_MM * frame.scale;
-  const mid = d.axis === "h" ? size.h / 2 : size.w / 2;
+  const mid = d.axis === "h" ? size.y0 + size.h / 2 : size.x0 + size.w / 2;
   const away = d.at < mid ? -1 : 1;
   const lineAt = (k: number) => (d.style === "baseline" ? d.at + away * k * stepMm : d.at);
   const lines: DimLayout["lines"] = [];

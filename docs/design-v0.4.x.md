@@ -339,3 +339,12 @@ Judgement calls made while building, step by step.
 - T10: `fitScale` picks from `STANDARD_SCALES` (1, 2, 2.5, 5, 10, 20, 25, 50); past 1:50 it rounds up to a multiple of 50. A 1000 × 1600 enclosure is 1:20 (it was 1:10.5). No 2:1: detail frames fitted with *Fit* are 1:1 at the largest. Sheets keep the scale they have.
 - T16: the number is `slotAddress` (the map's circle: the bus address if set, else rail order), after the tag: *A9-5 · Module 6 · DO-8 · Generic DO-8X · part of …*. Continuation views say it too.
 - T19: `stampSaved` (storage) writes `savedBy` after `format` and `version` on every save and on *Download*; `parseProject` reads it only for the newer-file message. `VERSION` and `RELEASES_URL` moved to `src/core/version.ts`.
+
+**Step 1b, first PR (modular doors).**
+- `GaSettings.columns` and `pane` as planned. `doorColumns` sizes them to fit (last column and last door in each take what's left); leaves read as columns of one door, so every door view goes through `doorPanes` / `sheetPanes`. A door front only gets `columns` when it's more than one plain door: setting it back to one unnamed door clears them (and keeps a right hinge as a one-leaf `leaves`).
+- `gaFrame` gains `y0`, for a sheet showing one door lower down; `gaToSheet`, `sheetToGa`, the canvas and the layer all take it.
+- Dimensions: on a sheet showing one door (or one leaf), *the enclosure*'s edges are that door's own edges (`dimFrame`). On any door view each door's edges are snap targets too, as `@pane:col:row`, so a dimension can run from the door an item is on. This also changes old leaf sheets: there the enclosure's start was the whole door's left edge, off the sheet for the right leaf; now it's the leaf's.
+- *Split this door* is a button per door in Sheet settings, splitting at the door's middle (sizes are then typed), not at the pointer. ⇕ splits it into two stacked doors; ⇔ splits its **column** into two side by side (columns are full height, so a door can't be split down on its own). *Join ↓* joins it with the one below; sheets showing a door further down the column move up with it.
+- Choosing *Columns of doors…* on a plain door splits it into two stacked doors to start from.
+- Each door is drawn with its own swing lines, hinge marks and joint lines; its name, if it has one, at its top left at the detail size. Hinge marks sit at a quarter and three quarters of a door 300 mm or shorter.
+- Check: *a device lies across two doors (C1 R1, Controls)* when an item on a modular door front overlaps two.

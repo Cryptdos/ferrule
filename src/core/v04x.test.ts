@@ -10,7 +10,8 @@ import { checkProject } from "./checks";
 import { setPlantDesign, toDraw } from "./design";
 import { newProject } from "./model";
 import { moduleTitle, viewsOf } from "./modules";
-import { addElement, setBoundary, updateElement } from "./ops";
+import { addElement, addGaDim, addGaItem, addGaPage, joinDoorBelow, setBoundary, setGaSettings, splitDoor, updateElement } from "./ops";
+import { ENCL, dimLayout, doorPanes, drawnGaItems, gaFrame, paneOf, paneRef, sheetPanes } from "./ga";
 import { renumber } from "./renumber";
 import { stampSaved } from "../server/storage";
 import { parseProject } from "./validate";
@@ -80,5 +81,99 @@ describe("step 1: small fixes", () => {
     expect(() => parseProject(newer)).toThrow(`Saved by Ferrule 0.9.1 (format 99). This is ${VERSION} (format 3). Open it in 0.9.1 or later: https://github.com/Cryptdos/ferrule/releases`);
     const { savedBy: _, ...old } = newer;
     expect(() => parseProject(old)).toThrow("saved by a newer Ferrule (format 99)");
+  });
+});
+
+describe("step 1b: modular doors (M13)", () => {
+  const twoByThree = () => {
+    const p = newProject("d");
+    const front = addGaPage(p, "Door", {
+      scale: 10,
+      enclosure: { w: 1000, h: 1800 },
+      view: "door-front",
+      columns: [
+        { w: 400, doors: [{ h: 300, hinge: "left", name: "Incomer" }, { h: 900, hinge: "left" }, { h: 1, hinge: "left" }] },
+        { w: 1, doors: [{ h: 600, hinge: "right" }, { h: 600, hinge: "right" }, { h: 1, hinge: "right", name: "Controls" }] },
+      ],
+    });
+    return { p, front };
+  };
+
+  test("two columns of three doors: each door's outline, sized to fit", () => {
+    const { front } = twoByThree();
+    expect(doorPanes(front).map((d) => [d.col, d.row, d.x, d.y, d.w, d.h, d.hinge])).toEqual([
+      [0, 0, 0, 0, 400, 300, "left"],
+      [0, 1, 0, 300, 400, 900, "left"],
+      [0, 2, 0, 1200, 400, 600, "left"],
+      [1, 0, 400, 0, 600, 600, "right"],
+      [1, 1, 400, 600, 600, 600, "right"],
+      [1, 2, 400, 1200, 600, 600, "right"],
+    ]);
+  });
+
+  test("an item belongs to the door its centre is on; Check warns when it lies across two", () => {
+    const { p, front } = twoByThree();
+    const it = addGaItem(p, front.id, { kind: "device", x: 600, y: 700, w: 30, h: 30 });
+    expect(paneOf(front, it)).toMatchObject({ col: 1, row: 1 });
+    const across = addGaItem(p, front.id, { kind: "device", x: 380, y: 100, w: 40, h: 40 });
+    expect(checkProject(p).filter((f) => /lies across two doors/.test(f.message)).map((f) => f.ids)).toEqual([[across.id]]);
+  });
+
+  test("a dimension from its own door's edge, and a sheet of one door measures from its edges", () => {
+    const { p, front } = twoByThree();
+    const it = addGaItem(p, front.id, { kind: "device", x: 600, y: 700, w: 30, h: 30 });
+    const d = addGaDim(p, front.id, { axis: "h", style: "chain", points: [{ v: 400, item: paneRef({ col: 1, row: 1 }), edge: "start" }, { v: 615, item: it.id, edge: "mid" }], at: 650 });
+    expect(dimLayout(p, front, d).texts.map((t) => t.text)).toEqual(["215"]);
+    // A door view of that one door: framed on it, the item drawn, ENCL its own edges.
+    const one = addGaPage(p, "One door", { scale: 5, enclosure: { w: 1, h: 1 }, view: "door-front", of: front.id, pane: [1, 1] });
+    expect(gaFrame(p, one)).toEqual({ scale: 5, x0: 400, y0: 600, w: 600, h: 600 });
+    expect(drawnGaItems(p, one).map((x) => x.it.id)).toEqual([it.id]);
+    const e = addGaDim(p, one.id, { axis: "v", style: "chain", points: [{ v: 600, item: ENCL, edge: "start" }, { v: 715, item: it.id, edge: "mid" }], at: 500 });
+    expect(dimLayout(p, one, e).texts.map((t) => t.text)).toEqual(["115"]);
+  });
+
+  test("the door back mirrors the columns, hinges with them", () => {
+    const { p, front } = twoByThree();
+    const back = addGaPage(p, "Back", { scale: 10, enclosure: { w: 1, h: 1 }, view: "door-back", of: front.id });
+    const panes = sheetPanes(p, back);
+    expect(panes.filter((x) => x.row === 0).map((x) => [x.col, x.x, x.w, x.hinge])).toEqual([
+      [0, 600, 400, "right"],
+      [1, 0, 600, "left"],
+    ]);
+  });
+
+  test("an old two-leaf door is two columns of one door, framed as before", () => {
+    const p = newProject("o");
+    const front = addGaPage(p, "Door", { scale: 10, enclosure: { w: 1000, h: 1600 }, view: "door-front", leaves: [{ w: 600, hinge: "left" }, { w: 400, hinge: "right" }] });
+    expect(front.ga!.columns).toBeUndefined();
+    expect(doorPanes(front).map((d) => [d.x, d.y, d.w, d.h, d.hinge])).toEqual([
+      [0, 0, 600, 1600, "left"],
+      [600, 0, 400, 1600, "right"],
+    ]);
+    const leaf = addGaPage(p, "Right leaf", { scale: 10, enclosure: { w: 1, h: 1 }, view: "door-front", of: front.id, leaf: 1 });
+    expect(gaFrame(p, leaf)).toEqual({ scale: 10, x0: 600, w: 400, h: 1600 });
+    // Saved and read back: unchanged, no columns written.
+    const back = parseProject(JSON.parse(JSON.stringify(p)));
+    expect(back.pages.find((x) => x.id === front.id)!.ga).toEqual(front.ga!);
+  });
+
+  test("split and join: Split this door, then Join with the door below; columns round-trip", () => {
+    const p = newProject("s");
+    const front = addGaPage(p, "Door", { scale: 10, enclosure: { w: 800, h: 1200 }, view: "door-front" });
+    splitDoor(p, front.id, 0, 0, "across", 400);
+    splitDoor(p, front.id, 0, 1, "down");
+    expect(doorPanes(front).map((d) => [d.col, d.row, d.w, d.h])).toEqual([
+      [0, 0, 400, 400],
+      [0, 1, 400, 800],
+      [1, 0, 400, 400],
+      [1, 1, 400, 800],
+    ]);
+    joinDoorBelow(p, front.id, 1, 0);
+    expect(doorPanes(front).filter((d) => d.col === 1).map((d) => d.h)).toEqual([1200]);
+    const back = parseProject(JSON.parse(JSON.stringify(p)));
+    expect(back.pages.find((x) => x.id === front.id)!.ga!.columns).toEqual(front.ga!.columns!);
+    // Back to one plain door: no columns kept.
+    setGaSettings(p, front.id, { columns: null });
+    expect(doorPanes(front).length).toBe(1);
   });
 });
