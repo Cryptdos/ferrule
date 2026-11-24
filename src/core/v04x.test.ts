@@ -11,9 +11,13 @@ import { addInterlockCondition, removeInterlockCondition, setPlantDesign, system
 import { describeInterlock, interlockExpectations, interlockStatus, proveInterlocks, provingJob } from "./interlocks";
 import { parseSupplies, parseSupply } from "./supplies";
 import { refreshConductors } from "./conductors";
-import { newProject } from "./model";
+import { newProject, type Element, type Project } from "./model";
+import { localGeometry, moduleViewLayout, plantViewLayout, wrapTag, wrapTitle } from "./symbols";
+import { elementTexts } from "./tags";
+import { textWidth } from "./textwidth";
+import { textUnits } from "./geometry";
 import { moduleTitle, viewsOf } from "./modules";
-import { addElement, deletePlant, moveElements, placePlantView, addGaDim, addGaItem, addGaPage, addPlatesForDoors, joinDoorBelow, setPlateBehind, setBoundary, setGaSettings, splitDoor, updateElement } from "./ops";
+import { addElement, addPlant, deletePlant, moveElements, placePlantView, addGaDim, addGaItem, addGaPage, addPlatesForDoors, joinDoorBelow, setPlateBehind, setBoundary, setGaSettings, splitDoor, updateElement } from "./ops";
 import { earthConductors, isFieldWire, numberByDefault } from "./wires";
 import { pointsSchedule } from "./schedules";
 import { ENCL, PLATE_MARGIN, gaCandidates, dimLayout, doorPanes, plateDoor, platesOf, drawnGaItems, gaFrame, paneOf, paneRef, sheetPanes } from "./ga";
@@ -361,5 +365,57 @@ describe("step 4: panel wiring and panel devices (F7, T3)", () => {
     expect(checkProject(p).some((f) => /BAT-01 is in the panel but drawn below the boundary/.test(f.message))).toBe(true);
     // And marking plant drawn below as in the panel is refused.
     expect(() => setPlantDesign(p, plant.DPS1!.id, { inPanel: true })).toThrow(/below the panel boundary/);
+  });
+});
+
+describe("step 5: view text wraps (F4, F5)", () => {
+  const textsOf = (p: Project, el: Element) => localGeometry(el, elementTexts(el, p)).prims.flatMap((x) => (x.t === "text" ? [x] : []));
+
+  test("F4: tag, description and information wrap to the box plus 1.5 each side (12 at least), at 2.5 mm, centred", () => {
+    const { project: p, plant } = fresh();
+    const di = p.pages.find((pg) => pg.title === "Controller: digital inputs")!;
+    for (const v of di.elements.filter((e) => e.symbol === "plant-view")) {
+      const g = localGeometry(v, elementTexts(v, p));
+      const lay = plantViewLayout(v);
+      const limit = Math.max(lay.right - lay.left + 3, 12);
+      for (const t of g.prims) {
+        if (t.t !== "text" || t.at[1] < lay.h) continue;
+        expect(textWidth(t.text, t.size)).toBeLessThanOrEqual(limit + 1e-6);
+        expect(t.anchor).toBe("middle");
+      }
+    }
+    const v = di.elements.find((e) => e.params.plant === plant.SFD!.id)!;
+    const under = textsOf(p, v).filter((t) => t.at[1] > plantViewLayout(v).h);
+    expect(under.filter((t) => t.role === "note").every((t) => Math.abs(t.size - textUnits("tag")) < 1e-9)).toBe(true);
+    expect(under.map((t) => t.text).join(" ")).toBe("AHU-01-SF-01-VSD Supply fan variable speed drive");
+  });
+
+  test("F4: a tag breaks only at a hyphen, only when it's wider than the limit", () => {
+    expect(wrapTag("AHU-01-DPS-25-44", 2, 100)).toEqual(["AHU-01-DPS-25-44"]);
+    const parts = wrapTag("AHU-01-DPS-25-44", 2, 9);
+    expect(parts.length).toBeGreaterThan(1);
+    expect(parts.join("")).toBe("AHU-01-DPS-25-44");
+    expect(parts.slice(0, -1).every((x) => x.endsWith("-"))).toBe(true);
+    expect(wrapTag("NOHYPHENSHERE", 2, 5)).toEqual(["NOHYPHENSHERE"]);
+  });
+
+  test("F4: a group's name wraps to its group plus a unit each side (8 at least), and groups sit closer", () => {
+    const p = newProject("g");
+    const it = addPlant(p, "FA-1", "Fire alarm", ["1", "2", "3", "4"], { pins: { "1": { group: "Fire alarm healthy" }, "2": { group: "Fire alarm healthy" }, "3": { group: "Fire alarm stage two" }, "4": { group: "Fire alarm stage two" } } });
+    const v = placePlantView(p, p.pages[0]!.id, it.id, [20, 40]);
+    const lay = plantViewLayout(v);
+    for (const g of lay.groups) for (const l of g.lines) expect(textWidth(l, textUnits("tag"))).toBeLessThanOrEqual(Math.max(g.x1 - g.x0 + 2, 8) + 1e-6);
+    expect(lay.groups[0]!.lines.length).toBeGreaterThan(1);
+    // The second group starts well within what a one-line name would have pushed it to.
+    expect(lay.groups[1]!.x0 - lay.groups[0]!.x1).toBeLessThan(textWidth("FIRE ALARM HEALTHY", textUnits("tag")));
+  });
+
+  test("F5: a module view's title wraps at its separators to the view's width", () => {
+    expect(wrapTitle("A9-5 · Module 6 · DO-8 · Generic DO-8X", 2, 20)).toEqual(["A9-5 · Module 6 ·", "DO-8 · Generic DO-8X"]);
+    const { project: p, modules } = fresh();
+    const v = viewsOf(p, modules.ao.id)[0]!.el;
+    const lay = moduleViewLayout(v);
+    const title = textsOf(p, v).filter((t) => t.role === "tag");
+    for (const t of title) expect(textWidth(t.text, t.size)).toBeLessThanOrEqual(lay.right - lay.left + 1e-6);
   });
 });
