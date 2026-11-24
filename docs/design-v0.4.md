@@ -347,3 +347,88 @@ README screenshots are retaken when the interface changes. Small judgement calls
 Mode tables (a mode against what each output does: a cheaper statement of intent than a function block diagram); function block diagrams; points schedule import; addresses on the network; 24 V load and cable schedules from Design; commissioning checksheets; generated description-of-operations text.
 
 At the v0.4 release, remove `preRelease()` in `src/core/validate.ts` as CLAUDE.md says.
+
+
+## 13. Testing
+
+Targeted checks for the v0.4 build (`ferrule-windows-v0.4.0-pre.zip`, after PR 73), to go with the v0.3 testing. Each says what to do and what should happen; tick it, or note what happened instead. Where a check is about a judgement call made while building, it says so: say whether to keep it.
+
+### Old projects and Draft
+
+- [ ] **An older project opens unchanged.** Open a v0.3 project (or the LSP-01 example): every sheet, wire and number as before; Check lists what it did before and nothing from Design. Its plant shows in Design under *No system*.
+- [ ] **A Draft-only project still works.** A project with no plant and no controller: Draft, Annotate, Layout and Simulate as in v0.3; Design shows an empty table.
+- [ ] **Saving keeps Design's data.** Make systems, plant, points, a controller, networks and an interlock; close and reopen: all there.
+- [ ] **Layout is the old GA workbench.** The tab reads *Layout*, its browser section *Layout tools*; GA sheets, *New GA sheet*, the *GA* badge and the bill of materials still say GA.
+- [ ] **v0.3 fix (PR 67):** a controller module not drawn yet is reported once in Check (*Module A? (DI-8) … isn't drawn*), not also as *Plant : terminal 1, 2… not shown*.
+
+### Step 3: the Design table
+
+- [ ] **+ System, + Plant, + Point** build a system with a plant row and points; a point added in Design shows ○ (no pins yet).
+- [ ] **Properties edit everything:** tag, description, prefix, system, connects by (comms shows protocol and network), enabled by, source, information, *power by others*, pins line, and each point's name, form, signal, goes to and channel.
+- [ ] **Type follows form, from the plant's side:** a contact is DI, a dry or powered input DO, an analogue out AI, an analogue in AO; supplies and comms have none.
+- [ ] **The Needs line** counts points that go to a channel (not *panel only*); with a controller, *Have* and *Spare*, a shortfall in red.
+- [ ] **Systems fold** (▸) with a count; renaming one moves its plant with it; deleting one leaves its plant under *No system*.
+- [ ] **Judgement call:** projects still open in Draft, not Design. Keep?
+
+### Step 4: Duplicate ×n and templates
+
+- [ ] **Duplicate ×n** on one row and on a group (Ctrl+click): the window shows each copy's tags; copies land after the last picked row, with their points and signals, on no channel.
+- [ ] **A taken tag** (duplicate P1 when P3 exists, ×3) is struck through in the window and left empty on the copy. **Judgement call:** empty rather than the next free number. Keep?
+- [ ] **Templates…:** the list starts empty; *Save selection as template…*; insert into a system with copies and a step; DI/DO/AI/AO totals shown first. Inserted rows are ordinary plant: editing the template later changes nothing inserted.
+- [ ] **Templates go to every project:** they're saved in `library/design` beside the projects folder. Open another project: the template is in its list. Draft's *Templates* doesn't list it.
+- [ ] **Judgement call:** only tags step, not descriptions (*Pump 1* is copied as *Pump 1*). Keep?
+
+### Step 5: the controller in Design
+
+- [ ] **One controller per panel:** *Add the controller* in the Controller view; *Controller…* offers no second one. A file with two shows both.
+- [ ] **Drag a point onto a channel:** only channels that can take it light up (a UIO channel takes any type); drop it there. Drag it back to *Unallocated* to take it off.
+- [ ] **Pick the channel in the table** (Channel column) or Properties: only free channels of the right type are offered.
+- [ ] **A point nothing can take** (an AO with no AO or UIO channels) is shaded and says why.
+- [ ] **Labels follow points:** a placed module view's channel label reads the point's tag and name (*DPS1 flow*); it changes when the plant is retagged (Renumber too) or the point renamed; taken off, the typed label comes back. Same in the IO schedule.
+- [ ] **Draft has no Controllers button;** the window opens from Design's *Controller…*.
+
+### Step 6: To draw, and Draft placing only
+
+- [ ] **To draw** lists plant and modules not drawn (red), and what's drawn (ticked, with sheets).
+- [ ] **Place on sheet** for plant made in Design with no pins: the pins line appears with a numbered suggestion; correct it, *Give pins, then place*; Draft opens ready to drop it.
+- [ ] **Place another view** of a drawn module splits it across sheets, as before.
+- [ ] **Draft's Plant window** lists plant to give pins and place, with no *New plant…* or delete.
+- [ ] **A pins line edited in Draft** keeps points that have no pins yet.
+- [ ] **Judgement call:** unallocated plant can be placed (To draw says *not all allocated*), rather than *Allocate first*. Keep?
+
+### Step 7: checks
+
+- [ ] **Design's findings** once a project uses Design: a point with no channel (with a controller), plant not drawn, equipment drawn below the boundary that isn't plant. *Show* opens the row in Design.
+- [ ] **Direct:** wire a point straight to its channel's pin: Properties says *✓ Wired straight to its channel*; nothing in Check.
+- [ ] **A shared common doesn't count:** wire only the point's common to the module's shared common: *to review*.
+- [ ] **Via one relay:** point → relay coil, a contact of that relay → the channel: *✓ via K…*. Two relays in a row, or a switch between: *to review*.
+- [ ] **Confirm by hand** (Check or Properties): *✓ confirmed*. Add a wire at either end: back to *to review* by itself. Change something elsewhere: still confirmed.
+- [ ] **Judgement call:** local isolators drawn below the boundary aren't reported as *not in the table* (they're drawn as switches at the motor). Keep, or should they be plant?
+
+### Step 8: interlocks
+
+- [ ] **+ Interlock** in a plant's Properties: its point, *never on while*, a point in the table, on or off. Expectations… shows the generated one greyed, and it can't be edited or deleted there.
+- [ ] **It follows:** rename either point, or duplicate the plant: the expectation follows; delete the interlock: it goes.
+- [ ] **Prove** (Properties), **Prove all** (To draw), or **Check logic** in Simulate: on the example, *FA-SF SF-01 running never on while FA-SF SF-02 running* is proved; *… while FA Fire alarm off* fails.
+- [ ] **Not proved yet** after changing the drawing, until proved again; **not drawn** when a point it names isn't on a sheet.
+- [ ] **Judgement call:** proving is asked for, not run on every edit (it takes seconds on a real drawing). Keep?
+- [ ] **Judgement call:** one condition per interlock; a second condition is a second interlock. Keep?
+
+### Step 9: the network
+
+- [ ] **+ Network** (LAN or bus, protocol); put comms plant on it from its Properties or the network's list.
+- [ ] **The Network view** draws the controller, a switch when there's a LAN, each LAN's devices four to a row, each bus as a chain; past 16 (LAN) or 8 (bus) the rest are counted.
+- [ ] **Order is row order:** ↑ ↓ on a bus moves the device, and its row in the table.
+- [ ] **Place as sheet:** a spare sheet *Network diagram* at the end; it prints with the set and is redrawn when networks change (rename one and look).
+- [ ] **Judgement call:** the switch isn't data (no tag or ports), only drawn. Keep, or should it be plant with a tag?
+
+### Step 10: points schedule
+
+- [ ] **Export points schedule:** a CSV with System, Tag, Description, Point, Form, Signal, Type, Goes to, Controller, Module, Channel, Via, Wired; by system; unallocated points with the channel empty; plant with no points as a row.
+- [ ] **Via and Wired** agree with Properties (direct, via K…, confirmed, to review, not drawn).
+
+### Step 11: Suggest
+
+- [ ] **Suggest…** (Controller view) proposes channels for the unallocated points; points already on channels aren't moved; a point with no room says so.
+- [ ] **Change a line** or untick it, then **Accept ticked**: only those are allocated, as one undo step. **Throw away** changes nothing.
+- [ ] **It never runs by itself:** nothing is allocated until you accept.
