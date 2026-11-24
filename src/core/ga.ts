@@ -622,9 +622,29 @@ export function syncGaStrips(project: Project): boolean {
       byStrip.set(s, [...(byStrip.get(s) ?? []), t.id]);
     }
   }
+  // A strip split on the GA (v0.4.x T4) is in parts, in order along it: each
+  // part runs from the first of its terminals still on the strip to the next
+  // part's; the first part from the start, the last to the end. Deleting a
+  // part gives its terminals back to the one before.
+  const parts = new Map<GaItem, string[]>();
+  const byName = new Map<string, GaItem[]>();
+  for (const { it, strip } of stripItems) byName.set(strip, [...(byName.get(strip) ?? []), it]);
+  for (const [strip, items] of byName) {
+    const list = byStrip.get(strip) ?? [];
+    const startOf = (it: GaItem) => {
+      const at = (it.refs ?? []).map((r) => list.indexOf(r)).filter((i) => i >= 0);
+      return at.length ? Math.min(...at) : Infinity;
+    };
+    const sorted = items.map((it) => ({ it, start: startOf(it) })).sort((a, b) => a.start - b.start);
+    sorted.forEach((p, i) => {
+      const from = i === 0 ? 0 : p.start;
+      const to = sorted[i + 1]?.start ?? list.length;
+      parts.set(p.it, Number.isFinite(from) ? list.slice(from, Math.min(to, list.length)) : []);
+    });
+  }
   const taken = new Set<string>();
   for (const { it, strip } of stripItems) {
-    const now = (byStrip.get(strip) ?? []).filter((id) => !taken.has(id));
+    const now = (parts.get(it) ?? byStrip.get(strip) ?? []).filter((id) => !taken.has(id));
     now.forEach((id) => taken.add(id));
     // By sheet, then left to right along the boundary: always the order it's built in (v0.3 §2, 28).
     const refs = now;
@@ -646,6 +666,25 @@ export function syncGaStrips(project: Project): boolean {
     }
   }
   return changed;
+}
+
+/** The GA items a strip is placed as: one, or its parts once split (v0.4.x T4). */
+export function stripParts(project: Project, strip: string): GaItem[] {
+  return project.pages.flatMap((pg) => (pg.gaItems ?? []).filter((it) => itemStrip(project, it) === strip));
+}
+
+/**
+ * What a placed strip prints: its name, and once it's split, the range of
+ * terminals in each part (X1: 1–48).
+ */
+export function stripLabel(project: Project, it: GaItem): string | null {
+  const strip = itemStrip(project, it);
+  if (!strip) return null;
+  if (stripParts(project, strip).length < 2) return strip;
+  const els = new Map(project.pages.flatMap((pg) => pg.elements.map((e) => [e.id, e] as const)));
+  const tags = (it.refs ?? []).map((r) => els.get(r)?.tag || "?");
+  if (!tags.length) return strip;
+  return tags.length === 1 ? `${strip}: ${tags[0]}` : `${strip}: ${tags[0]}\u2013${tags[tags.length - 1]}`;
 }
 
 /** Placed strips whose terminals changed since their GA sheet was last open. */

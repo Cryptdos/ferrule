@@ -55,6 +55,7 @@ export function parseProject(input: unknown): Project {
     ) as unknown as Project["project"],
     numbering: {
       scheme: isObj(input.numbering) && input.numbering.scheme === "sequential" ? "sequential" : "position",
+      ...(isObj(input.numbering) && input.numbering.strips === "section" ? { strips: "section" as const } : {}),
     },
     designation: {
       standard: isObj(input.designation) ? strOr(input.designation.standard, "iec-81346-2-2019") : "iec-81346-2-2019",

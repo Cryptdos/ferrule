@@ -1,7 +1,7 @@
 <script lang="ts">
   import { setModuleDevice } from "../../core/controllers";
   import { moduleTypeName } from "../../core/modules";
-  import { addPlatesForDoors, deleteGaItems, joinDoorBelow, setPlateBehind, sizePlateFromDoor, rotateGaItems, setGaItemDevice, setGaSettings, setGaSize, splitDoor, updateDoor, updateGaItem, useLibraryDevice } from "../../core/ops";
+  import { addPlatesForDoors, deleteGaItems, joinDoorBelow, setPlateBehind, sizePlateFromDoor, rotateGaItems, setGaItemDevice, setGaSettings, setGaSize, splitDoor, splitGaStrip, updateDoor, updateGaItem, useLibraryDevice } from "../../core/ops";
   import {
     GA_SCALES,
     VIEW_NAMES,
@@ -196,6 +196,26 @@
         {/each}
         {#if one.refs.length > 12}<span class="hint">and {one.refs.length - 12} more</span>{/if}
       </div>
+    {/if}
+    {#if first?.symbol === "terminal" && !one.part && (one.refs?.length ?? 0) > 1}
+      <!-- A strip longer than its rail is split, the rest on the next rail (v0.4.x T4). -->
+      <label title="This terminal and the ones after it go on a second item, on the next rail down; delete that item to join them again">
+        Split here
+        <select value="" onchange={(e) => {
+          const at = e.currentTarget.value;
+          e.currentTarget.value = "";
+          if (!at) return;
+          let made = "";
+          editor.apply((p) => (made = splitGaStrip(p, ip.id, one.id, at).id));
+          if (made) editor.selection = [made];
+        }}>
+          <option value="">Split the strip at…</option>
+          {#each (one.refs ?? []).slice(1) as r (r)}
+            {@const x = byId.get(r)}
+            <option value={r}>{x ? displayTag(x.e, editor.project) || "?" : r}{x ? ` (sheet ${x.pg.number})` : ""}</option>
+          {/each}
+        </select>
+      </label>
     {/if}
     {#if mod?.module}
       <p class="hint">{mod.tag || `${mod.prefix || "A"}?`} · {moduleTypeName(mod.module)}{mod.module.maker || mod.module.model ? ` · ${[mod.module.maker, mod.module.model].filter(Boolean).join(" ")}` : ""}, a controller's module (Controllers… in Draft).</p>

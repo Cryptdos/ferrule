@@ -30,6 +30,8 @@ import { designChecks } from "./checks";
 import { networkDiagram } from "./networkdraw";
 import { ENCL, PLATE_MARGIN, gaCandidates, sizeKey, dimLayout, doorPanes, plateDoor, platesOf, drawnGaItems, gaFrame, paneOf, paneRef, sheetPanes } from "./ga";
 import { renumber } from "./renumber";
+import { deleteGaItems, deleteElements, setTerminalStrips, splitGaStrip, updateSection } from "./ops";
+import { itemStrip, stripLabel, stripParts, syncGaStrips } from "./ga";
 import { stampSaved } from "../server/storage";
 import { parseProject } from "./validate";
 import { VERSION } from "./version";
@@ -932,5 +934,87 @@ describe("step 10b: serial ports (M7, T5)", () => {
     // A device whose comms pins aren't a serial port ends the trail: not reached.
     for (const t of ["A+", "B-"]) delete EFD.pins![t]!.port;
     expect(networkChain(p, drives)).toEqual({ drawn: true, devices: [] });
+  });
+});
+
+describe("step 11: terminal strips by section (T4)", () => {
+  const stripsOf = (p: Project) => p.pages.filter((pg) => !pg.ga).map((pg) => [...new Set(pg.elements.filter((e) => e.symbol === "terminal").map((e) => String(e.params.strip ?? "X1")))].join(","));
+
+  test("by section, each section's terminals take a strip of their own at Renumber; a strip set by hand wins; back to one undoes it", () => {
+    const { project: p } = fresh();
+    const one = stripsOf(p);
+    expect(new Set(one.filter(Boolean))).toEqual(new Set(["X1"]));
+    // Old files: no setting, nothing changes.
+    renumber(p);
+    expect(stripsOf(p)).toEqual(one);
+    setTerminalStrips(p, "section");
+    renumber(p);
+    // Sheets 2–8 each have a section with terminals, in the boundary's block below it.
+    expect(stripsOf(p).filter(Boolean)).toEqual(["X1", "X2", "X3", "X4", "X5", "X6", "X7"]);
+    // A strip set by hand wins, and isn't given to a section.
+    const di = p.pages.find((pg) => pg.title === "Controller: digital inputs")!;
+    const t = di.elements.find((e) => e.symbol === "terminal")!;
+    updateElement(p, di.id, t.id, { params: { strip: "X3" } });
+    renumber(p);
+    expect(t.params.strip).toBe("X3");
+    expect(stripsOf(p).filter(Boolean)).toEqual(["X1", "X2", "X4", "X5", "X3,X6", "X7", "X8"]);
+    // Two sections of the same name are one strip.
+    const ui = p.pages.find((pg) => pg.title === "Controller: universal inputs")!;
+    updateSection(p, ui.id, ui.sections[0]!.id, { label: di.sections[0]!.label });
+    renumber(p);
+    expect(stripsOf(p).filter(Boolean)).toEqual(["X1", "X2", "X4", "X5", "X3,X6", "X6", "X7"]);
+    // A terminal outside every section is on X1, and the sections start at X2.
+    const sheet2 = p.pages.find((pg) => pg.title === "Fire alarm interface and enables")!;
+    sheet2.sections = [];
+    renumber(p);
+    expect(stripsOf(p).filter(Boolean)).toEqual(["X1", "X2", "X4", "X5", "X3,X6", "X6", "X7"]);
+    // Back to one: the strips given by section go; the one set by hand stays.
+    setTerminalStrips(p, "one");
+    renumber(p);
+    expect(stripsOf(p).filter(Boolean)).toEqual(["X1", "X1", "X1", "X1", "X3,X1", "X1", "X1"]);
+    expect(parseProject(JSON.parse(JSON.stringify({ ...p, numbering: { scheme: "position", strips: "section" } }))).numbering.strips).toBe("section");
+    expect(parseProject(JSON.parse(JSON.stringify(p))).numbering.strips).toBeUndefined();
+  });
+
+  test("a strip on the GA splits at a terminal onto the next rail; each part prints its range and keeps up with the schematic", () => {
+    const { project: p } = fresh();
+    const ga = p.pages.find((pg) => pg.ga?.view === "backplate")!;
+    const x1 = ga.gaItems!.find((it) => itemStrip(p, it) === "X1")!;
+    const all = [...x1.refs!];
+    const w = x1.w;
+    expect(stripLabel(p, x1)).toBe("X1");
+    expect(() => splitGaStrip(p, ga.id, x1.id, all[0]!)).toThrow(/after the first/);
+    const part = splitGaStrip(p, ga.id, x1.id, all[30]!);
+    expect(x1.refs).toEqual(all.slice(0, 30));
+    expect(part.refs).toEqual(all.slice(30));
+    expect(Math.abs(x1.w + part.w - w)).toBeLessThan(0.5);
+    // On the next rail down, from its left end.
+    const rails = ga.gaItems!.filter((r) => r.kind === "rail").sort((a, b) => a.y - b.y);
+    const next = rails.find((r) => r.y > x1.y + x1.h / 2)!;
+    expect(part.x).toBe(next.x);
+    expect(part.y + part.h / 2).toBeCloseTo(next.y + next.h / 2, 0);
+    const els = new Map(p.pages.flatMap((pg) => pg.elements.map((e) => [e.id, e] as const)));
+    const tag = (id: string) => els.get(id)!.tag;
+    expect(stripLabel(p, x1)).toBe(`X1: ${tag(all[0]!)}\u2013${tag(all[29]!)}`);
+    expect(stripLabel(p, part)).toBe(`X1: ${tag(all[30]!)}\u2013${tag(all[all.length - 1]!)}`);
+    expect(stripParts(p, "X1")).toHaveLength(2);
+    // Sync keeps the split where it is.
+    syncGaStrips(p);
+    expect(x1.refs).toEqual(all.slice(0, 30));
+    expect(part.refs).toEqual(all.slice(30));
+    // A terminal deleted from the first part leaves it; the second part is untouched.
+    const pg5 = p.pages.find((pg) => pg.elements.some((e) => e.id === all[3]))!;
+    deleteElements(p, pg5.id, [all[3]!]);
+    syncGaStrips(p);
+    expect(x1.refs).toEqual(all.slice(0, 30).filter((_, i) => i !== 3));
+    expect(part.refs).toEqual(all.slice(30));
+    // The BOM counts both parts as one strip.
+    const bom = billOfMaterials(p).filter((r) => r.tags === "X1");
+    expect(bom.reduce((a, r) => a + r.quantity, 0)).toBe(all.length - 1);
+    // Delete the second part: its terminals go back to the first.
+    deleteGaItems(p, ga.id, [part.id]);
+    syncGaStrips(p);
+    expect(x1.refs).toEqual(all.filter((_, i) => i !== 3));
+    expect(stripLabel(p, x1)).toBe("X1");
   });
 });

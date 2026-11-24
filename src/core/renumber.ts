@@ -105,9 +105,78 @@ function assign(
   return out;
 }
 
+/**
+ * Terminal strips by section (v0.4.x T4). Each section with terminals in it
+ * takes a strip of its own, X1, X2… in order across the sheets (by sheet,
+ * then left to right, then top down); sections with the same name share one,
+ * so a section carried on over two sheets is one strip. A terminal below the
+ * sections, in the panel boundary's block, is in the nearest one above it.
+ * Terminals outside any section are on X1, and when there are some the
+ * sections start at X2.
+ * A strip set by hand (Properties, or a strip line) to anything but X1 (the
+ * default) wins, and its name isn't given to a section; a locked terminal keeps its strip. With strips back to
+ * one, the strips given by section are taken off again.
+ */
+export function stripsBySection(project: Project): void {
+  const terms: { el: Element; page: Page }[] = [];
+  for (const page of project.pages) {
+    if (page.ga) continue;
+    for (const el of page.elements) if (el.symbol === "terminal") terms.push({ el, page });
+  }
+  // X1 is the default, so a terminal on X1 hasn't had its strip set.
+  const auto = (el: Element) => el.params.stripAuto === true || String(el.params.strip ?? "X1").trim() === "X1";
+  if (project.numbering.strips !== "section") {
+    for (const { el } of terms) {
+      if (el.params.stripAuto !== true) continue;
+      el.params.strip = "X1";
+      delete el.params.stripAuto;
+    }
+    return;
+  }
+  const handNames = new Set(terms.filter(({ el }) => !auto(el)).map(({ el }) => String(el.params.strip).trim()));
+  // Inside a section; or, for a terminal below the sections (in the boundary's
+  // terminal block), the nearest section above it, across its width.
+  const sectionOf = (el: Element, page: Page) => {
+    const [x, y] = el.pos;
+    const across = page.sections.filter((s) => x >= s.rect[0] && x <= s.rect[0] + s.rect[2]);
+    const inside = across.find((s) => y >= s.rect[1] && y <= s.rect[1] + s.rect[3]);
+    if (inside) return inside;
+    const above = across.filter((s) => s.rect[1] + s.rect[3] < y).sort((a, b) => b.rect[1] + b.rect[3] - (a.rect[1] + a.rect[3]));
+    return above[0];
+  };
+  // Which section key each terminal Renumber decides for is in.
+  const decided = terms.filter(({ el }) => auto(el) && !isLocked(el)).map((t) => {
+    const s = sectionOf(t.el, t.page);
+    return { ...t, key: s ? s.label.trim() || `\u0000${s.id}` : null };
+  });
+  const order: { key: string; page: number; x: number; y: number }[] = [];
+  for (const page of project.pages)
+    for (const s of page.sections) order.push({ key: s.label.trim() || `\u0000${s.id}`, page: page.number, x: s.rect[0], y: s.rect[1] });
+  order.sort((a, b) => a.page - b.page || a.x - b.x || a.y - b.y);
+  const used = new Set(decided.map((d) => d.key));
+  const names = new Map<string, string>();
+  let n = decided.some((d) => d.key === null) ? 2 : 1;
+  for (const o of order) {
+    if (!used.has(o.key) || names.has(o.key)) continue;
+    while (handNames.has(`X${n}`)) n++;
+    names.set(o.key, `X${n++}`);
+  }
+  for (const d of decided) {
+    const name = d.key === null ? "X1" : names.get(d.key)!;
+    if (name === "X1") {
+      d.el.params.strip = "X1";
+      delete d.el.params.stripAuto;
+    } else {
+      d.el.params.strip = name;
+      d.el.params.stripAuto = true;
+    }
+  }
+}
+
 export function renumber(project: Project): RenumberResult {
   const scheme = project.numbering.scheme;
   const result: RenumberResult = { tags: 0, terminals: 0, wires: 0, plant: 0 };
+  stripsBySection(project);
 
   // --- Component tags and terminals --------------------------------------
   const tagItems: Item[] = [];
