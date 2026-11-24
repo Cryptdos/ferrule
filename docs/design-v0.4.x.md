@@ -21,6 +21,7 @@ Small and safe first; then the data other steps need; then layout, where three e
 |---|---|---|---|
 | 0 | — | A generic BMS panel fixture (`src/bench/bms01.ts`) | Small |
 | 1 | F3, F8, T10, T16, T19, T21 | Small fixes | Small |
+| 1b | M13 | Modular doors: columns of stacked doors | Medium |
 | 2 | M11, F2, F1 | What a supply gives; unpowered distributions; honest proofs | Medium |
 | 3 | T1, T11 | Interlocks with several conditions; proving shows progress | Small |
 | 4 | F7, T3 | Panel wiring and panel devices | Medium |
@@ -30,7 +31,7 @@ Small and safe first; then the data other steps need; then layout, where three e
 | 7b | T15 | Terminal groups on any side | Large |
 | 8 | F6 | Routing clear of strips and pin rows | Medium |
 | 9a | M9, T17, M8 | Connector block, socket, motors | Medium |
-| 9b | M1, M5 | RCD, resistor, connector, plant marks; door devices | Small |
+| 9b | M1, M5 | RCD function, connector, plant marks; door devices | Small |
 | 10a | M6, T9 | Module commons; module tags | Small |
 | 10b | M7, T5 | Serial ports build their network | Large |
 | 11 | T4 | Terminal strips by section | Medium |
@@ -72,6 +73,34 @@ Laid out from coordinates, untidied, on purpose: it's the "before" picture. Not 
 **T19. A file says which Ferrule saved it.** Write `savedBy: "<version>"` at the top level on every save (`storage.ts`); `validate.ts` reads it and otherwise ignores it. When a file's format is newer than the build's, the message becomes *Saved by Ferrule 0.5.1 (format 4). This is 0.4.0 (format 3). Open it in 0.5.1 or later:* with the releases link. A file with no `savedBy` gives today's message.
 
 **T21. README.** Under the download line: *Ferrule is provided free, as is, with no support. Issues and pull requests are welcome, with no promise of a response.*
+
+### Step 1b: modular doors
+
+**M13.** Brought forward: the user needs it to draw a panel door for QA.
+
+A door today is one or two leaves, side by side, each the enclosure's full height (`GaSettings.leaves`, `doorLeaves` and `sheetLeaves` in `ga.ts`). A modular door is columns of stacked doors, each its own piece of steel with its own hinge.
+
+**Model.** `GaSettings.columns?: DoorColumn[]`, on a door-front sheet:
+
+```ts
+interface DoorColumn { w: number; doors: DoorPane[] }           // left to right from the front
+interface DoorPane { h: number; hinge: "left" | "right"; name?: string }  // top to bottom
+```
+
+- Column widths add up to the enclosure's width; the last column takes what's left. A column's door heights add up to the enclosure's height; its last door takes what's left.
+- Unset, the door is its `leaves`, as now: a leaf is a column with one door. Old files aren't rewritten.
+- Up to 6 columns and 8 doors in a column.
+- A sheet that shows one door of a door laid out elsewhere names it by column and row (`GaSettings.pane?: [col, row]`); `leaf` keeps working and means that column's only door.
+
+**Drawing.** Each door is drawn with its own outline and hinge marks, and its name if it has one, small, at its top left. The door-back view mirrors the columns left to right, as it mirrors two leaves now.
+
+**Devices and plates.** An item on the door belongs to the door its centre is on. Drill centres and dimensions are taken from that door's own edges, by the rule a leaf uses today, so each door can be drilled as a separate piece. Check warns when an item lies across two doors (with T20, when it lies outside its door).
+
+**Setting it out.** In the door sheet's settings, where leaves are set now: a list of columns with their widths, and under each its doors with height, hinge and name. Two quick tools on the sheet: *Split this door* (across or down, at the pointer) and *Join with the door below*.
+
+**Not in this entry.** The interior behind each door: a backplate sheet stays one plate for the enclosure. Compartments with their own mounting plates are a later entry if they're needed.
+
+Tests: a door of two columns, three doors each, of different heights: every door's outline, an item's owner, and a dimension from its own door's edge; the door back mirrored; an old two-leaf sheet draws exactly as before.
 
 ### Step 2: supplies
 
@@ -183,8 +212,7 @@ What M1 still adds:
 
 | Part | Terminals | Notes |
 |---|---|---|
-| RCD | as the two-pole breaker | A *function* of the existing isolator part, with the RCD mark. Not a new symbol. |
-| Resistor | 1 2 | Value as its label (120 Ω). A closed link in Simulate. |
+| RCD | as the breaker it is | Not a new symbol: one more choice in the existing switch part's *Function* list (isolator, breaker, contactor…), *RCD*, which draws the residual current mark on it. Tagged and simulated as a breaker. |
 | Connector | plug and socket pair, 1–12 ways | For flying leads. |
 
 Field device marks: a plant item gets an optional *Mark* (temperature, pressure, humidity, ΔP switch, valve, damper, meter, power supply, battery) drawn small inside its view's box. The picture only; nothing depends on it.
