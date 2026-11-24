@@ -37,6 +37,10 @@ import { duplicatePlant, stepTag } from "./design";
 import { masterOf } from "./xref";
 import { loadText, supplyLoads } from "./supplyload";
 import { setModuleVa } from "./controllers";
+import { conductorLooks, distributionFunction, functionRows } from "./wirecolours";
+import { formatRelayPins, parseRelayPins } from "./devices";
+import { contactTable, relayPinMarks, slavesOf } from "./xref";
+import { setFunctionColour } from "./ops";
 import { stampSaved } from "../server/storage";
 import { parseProject } from "./validate";
 import { VERSION } from "./version";
@@ -1220,5 +1224,95 @@ describe("step 14: supply load in Simulate (M12)", () => {
     // A fresh fixture says no draws: no lines at all.
     const { project: q } = fresh();
     expect(checkProject(q).some((f) => /no draw set|over its rating/.test(f.message))).toBe(false);
+  });
+});
+
+describe("step 15: wire colour by function, relay pins from the part (M3, M4)", () => {
+  test("a wire with no colour takes its function's from the project's table; its function from its distribution, or set on the wire", () => {
+    const { project: p } = fresh();
+    // Empty table: every wire as before.
+    const before = conductorLooks(p);
+    for (const c of p.conductors) expect(before.get(c.id)?.colour).toBe(c.colour);
+    expect(p.distributions.map(distributionFunction)).toEqual(["phase", "neutral", "24 V +", "0 V"]);
+    expect(functionRows(p).slice(0, 8)).toEqual(["phase", "neutral", "earth", "24 V +", "0 V", "DC signal", "AC signal", "external supply"]);
+    // 0 V by function: a wire on the 0V distribution with no colour of its own takes it.
+    const zero = p.distributions.find((d) => d.kind === "dc0")!;
+    const onZero = p.conductors.filter((c) => p.pages.some((pg) => pg.elements.some((e) => e.params.dist === zero.id && c.terminals.some(([id]) => id === e.id))));
+    expect(onZero.length).toBeGreaterThan(0);
+    const bare = onZero.find((c) => !c.colour) ?? onZero[0]!;
+    delete bare.colour;
+    setFunctionColour(p, "0 V", "bk");
+    expect(p.wireColours).toEqual({ "0 V": "Bk" });
+    expect(conductorLooks(p).get(bare.id)).toEqual({ func: "0 V", colour: "Bk", fromTable: true });
+    // Its own colour wins.
+    bare.colour = "Wh";
+    expect(conductorLooks(p).get(bare.id)!.colour).toBe("Wh");
+    // A function set on a wire that's on no distribution, matched without regard to case or spaces.
+    const loose = p.conductors.find((c) => !onZero.includes(c) && !p.pages.some((pg) => pg.elements.some((e) => typeof e.params.dist === "string" && c.terminals.some(([id]) => id === e.id))))!;
+    delete loose.colour;
+    loose.function = "dc signal";
+    setFunctionColour(p, "DC signal", "Og");
+    expect(conductorLooks(p).get(loose.id)).toMatchObject({ func: "dc signal", colour: "Og", fromTable: true });
+    // Saved and read back; cleared.
+    expect(parseProject(JSON.parse(JSON.stringify(p))).wireColours).toEqual({ "0 V": "Bk", "DC signal": "Og" });
+    setFunctionColour(p, "0 v", "");
+    setFunctionColour(p, "DC signal", "");
+    expect(p.wireColours).toBeUndefined();
+  });
+
+  test("a relay whose device has a pin map prints its own numbers on its coil, its contacts and its contact table", () => {
+    const { project: p } = fresh();
+    const coil = p.pages.flatMap((pg) => pg.elements).find((e) => e.symbol === "coil" && slavesOf(p, e).length === 4)!;
+    const item = p.pages.flatMap((pg) => pg.gaItems ?? []).find((it) => it.refs?.includes(coil.id))!;
+    const iec = contactTable(p, coil).map((r) => r[1]);
+    expect(iec).toEqual(["13-14", "23-24", "33-34", "43-44"]);
+    expect(relayPinMarks(p, coil)).toBeUndefined();
+    const pins = parseRelayPins("13 14 | 9 1 5 | 10 2 6 | 11 3 7 | 12 4 8")!;
+    expect(formatRelayPins(pins)).toBe("13 14 | 9 1 5 | 10 2 6 | 11 3 7 | 12 4 8");
+    expect(() => parseRelayPins("A1 | 11 12 14")).toThrow(/coil/);
+    p.devices = [{ id: "rly", name: "Relay 4CO", maker: "", part: "", kind: "relay", w: 27, h: 80, d: 0, library: false, relayPins: pins }];
+    item.device = "rly";
+    expect(elementTexts(coil, p).pins).toEqual({ A1: "13", A2: "14" });
+    expect(contactTable(p, coil).map((r) => r[1])).toEqual(["9-5", "10-6", "11-7", "12-8"]);
+    // Drawn on the coil and the contact in place of A1/A2 and 13/14; terminal names unchanged.
+    const texts = (e: Element) => localGeometry(e, elementTexts(e, p)).prims.flatMap((x) => (x.t === "text" ? [x.text] : []));
+    expect(texts(coil)).toEqual(expect.arrayContaining(["13", "14"]));
+    expect(texts(coil)).not.toContain("A1");
+    const contact = slavesOf(p, coil).find((s) => s.el.params.pole === 2)!.el;
+    expect(texts(contact)).toEqual(expect.arrayContaining(["10", "6"]));
+    expect(terminalNames(contact)).toEqual(["13", "14"]);
+    // Saved and read back.
+    expect(parseProject(JSON.parse(JSON.stringify(p))).devices![0]!.relayPins).toEqual(pins);
+    // No map: IEC as before.
+    item.device = undefined;
+    expect(contactTable(p, coil).map((r) => r[1])).toEqual(iec);
+  });
+});
+
+describe("§13 tests to add: timed contacts", () => {
+  test("NC and changeover contacts on a timer print 15-16 and 15-16/18 with the delay mark, the coil's table matching; unlinked they're plain again", () => {
+    const p = newProject("t");
+    const pg = p.pages[0]!.id;
+    const t = addElement(p, pg, "timer-coil", [20, 70], { params: { mode: "off", time: "5s" } });
+    const nc = addElement(p, pg, "contact-nc", [40, 30]);
+    const co = addElement(p, pg, "contact-co", [60, 30]);
+    linkContact(p, nc.id, t.id);
+    linkContact(p, co.id, t.id);
+    const marks = (el: Element) => localGeometry(el, elementTexts(el, p)).prims.flatMap((x) => (x.t === "text" ? [x.text] : []));
+    const arcs = (el: Element) => localGeometry(el, elementTexts(el, p)).prims.filter((x) => x.t === "arc").length;
+    expect(contactTable(p, t).map((r) => r[1])).toEqual(["15-16", "15-16/18"]);
+    expect(marks(nc)).toEqual(expect.arrayContaining(["15", "16"]));
+    expect(marks(co)).toEqual(expect.arrayContaining(["15", "16", "18"]));
+    expect([arcs(nc), arcs(co)]).toEqual([1, 1]);
+    // An off-delay's arc faces the other way from an on-delay's: the drawing follows the function.
+    const off = localGeometry(nc, elementTexts(nc, p)).prims.find((x) => x.t === "arc");
+    t.params.mode = "on";
+    const on = localGeometry(nc, elementTexts(nc, p)).prims.find((x) => x.t === "arc");
+    expect(JSON.stringify(on)).not.toBe(JSON.stringify(off));
+    // Unlinked: a plain contact, IEC marks, no delay mark.
+    linkContact(p, nc.id, null);
+    expect(arcs(nc)).toBe(0);
+    expect(marks(nc)).toEqual(expect.arrayContaining(["21", "22"]));
+    expect(contactTable(p, t).map((r) => r[1])).toEqual(["15-16/18"]);
   });
 });

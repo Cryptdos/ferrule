@@ -83,6 +83,8 @@ export interface DeviceEntry {
   module?: ModuleTemplate;
   /** Its expected draw, VA (v0.4.x M12): the default for parts that use it. */
   va?: number;
+  /** A relay's own terminal numbers (v0.4.x M4): its coil's two, and each pole's common, NC and NO. */
+  relayPins?: RelayPins;
 }
 
 /** A device a project uses: a copy of the library entry's details (or the project's own). */
@@ -101,6 +103,47 @@ export interface ProjectDevice {
   module?: ModuleTemplate;
   /** Its expected draw, VA (v0.4.x M12). */
   va?: number;
+  /** A relay's own terminal numbers (v0.4.x M4). */
+  relayPins?: RelayPins;
+}
+
+/** A relay base's terminal numbers (v0.4.x M4). A pole may have no NC or no NO (""). */
+export interface RelayPins {
+  coil: [string, string];
+  poles: { c: string; nc: string; no: string }[];
+}
+
+/**
+ * A pin map as typed: the coil's two, then each pole's common, NC and NO,
+ * groups split by "|": "A1 A2 | 11 12 14 | 21 22 24". A dash for a pole's
+ * missing NC or NO. Empty: none.
+ */
+export function parseRelayPins(text: string): RelayPins | undefined {
+  const groups = text.split("|").map((g) => g.trim().split(/\s+/).filter(Boolean));
+  if (!groups[0]?.length) return undefined;
+  if (groups[0].length !== 2) throw new Error("Start with the coil's two terminals, then | and each pole's common, NC and NO");
+  const poles = groups.slice(1).map((g) => {
+    if (g.length !== 3) throw new Error("Each pole is its common, NC and NO (a dash for one it hasn't)");
+    const v = (x: string) => (x === "-" ? "" : x);
+    return { c: g[0]!, nc: v(g[1]!), no: v(g[2]!) };
+  });
+  return { coil: [groups[0][0]!, groups[0][1]!], poles };
+}
+
+export function formatRelayPins(p: RelayPins | undefined): string {
+  if (!p) return "";
+  return [p.coil.join(" "), ...p.poles.map((x) => [x.c, x.nc || "-", x.no || "-"].join(" "))].join(" | ");
+}
+
+function relayPinsFrom(v: unknown): { relayPins?: RelayPins } {
+  if (typeof v !== "object" || v === null) return {};
+  const o = v as Record<string, unknown>;
+  const coil = Array.isArray(o.coil) && o.coil.length === 2 && o.coil.every((x) => typeof x === "string" && x) ? (o.coil as [string, string]) : null;
+  if (!coil) return {};
+  const poles = (Array.isArray(o.poles) ? o.poles : [])
+    .filter((p): p is Record<string, unknown> => typeof p === "object" && p !== null && typeof (p as Record<string, unknown>).c === "string")
+    .map((p) => ({ c: String(p.c), nc: typeof p.nc === "string" ? p.nc : "", no: typeof p.no === "string" ? p.no : "" }));
+  return { relayPins: { coil: [coil[0], coil[1]], poles } };
 }
 
 const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
@@ -131,6 +174,7 @@ export function parseDeviceEntry(v: unknown, id?: string): DeviceEntry {
     files: Array.isArray(o.files) ? o.files.map(parseDeviceFile).filter((f): f is DeviceFile => !!f) : [],
     ...withModule(o.module),
     ...withVa(o.va),
+    ...relayPinsFrom(o.relayPins),
   };
 }
 
@@ -162,6 +206,7 @@ export function parseProjectDevices(v: unknown): ProjectDevice[] {
       library: o.library === true,
       ...withModule(o.module),
       ...withVa(o.va),
+      ...relayPinsFrom(o.relayPins),
     });
   }
   return out;
@@ -169,7 +214,7 @@ export function parseProjectDevices(v: unknown): ProjectDevice[] {
 
 /** The project's copy of a library entry. */
 export function projectCopy(e: DeviceEntry): ProjectDevice {
-  return { id: e.id, name: e.name, maker: e.maker, part: e.part, kind: e.kind, w: e.w, h: e.h, d: e.d, library: true, ...(e.module ? { module: structuredClone(e.module) } : {}), ...(e.va ? { va: e.va } : {}) };
+  return { id: e.id, name: e.name, maker: e.maker, part: e.part, kind: e.kind, w: e.w, h: e.h, d: e.d, library: true, ...(e.module ? { module: structuredClone(e.module) } : {}), ...(e.va ? { va: e.va } : {}), ...(e.relayPins ? { relayPins: structuredClone(e.relayPins) } : {}) };
 }
 
 /** "Relay 4CO (Weidmüller DRM 7760…) 30.6 × 101.8" for lists. */

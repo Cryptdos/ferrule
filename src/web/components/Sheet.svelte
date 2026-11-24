@@ -7,7 +7,7 @@
   import { BLOCK_INSET, blockLabels, connectionDots, earthConductors, isFieldWire, isScreenWire, numberedSegments, routeOf, wireTexts } from "../../core/wires";
   import { resolveFields } from "../../core/fields";
   import { cloudsOn } from "../../core/ops";
-  import { coreCss } from "../../core/wirecolours";
+  import { conductorLooks, coreCss } from "../../core/wirecolours";
   import { cloudPath } from "../../core/titleblock";
   import ElementView from "./ElementView.svelte";
   import { benchOf, isBar } from "../../core/symbols";
@@ -93,6 +93,8 @@
   const screen = $derived(new Set(page.segments.filter((s) => isScreenWire(page, s)).map((s) => s.id)));
 
   const condById = $derived(new Map(project.conductors.map((c) => [c.id, c])));
+  /** Each wire's colour: its own, else its function's from the project's table (v0.4.x M3). */
+  const looks = $derived(conductorLooks(project));
   /** Which wires print their number: once per conductor per sheet, none on field or earth wires by default (15, 24). */
   const numbered = $derived(numberedSegments(page, earthConductors(project), (s) => routes?.get(s.id) ?? routeOf(page, s)));
   /** Terminal strip lines are drawn over the terminals they cross (v0.2.1 note 1). */
@@ -148,7 +150,7 @@
       <!-- Live wires are red, whatever their core colour: a black or grey core would hide it. -->
       <polyline class:field={field.has(seg.id)} class:screen={screen.has(seg.id)} class:live={!!live?.has(seg.conductor)} points={pts.map((p) => p.join(",")).join(" ")} />
       {#if colourCheck}
-        {@const css = coreCss(c?.colour)}
+        {@const css = coreCss(c ? looks.get(c.id)?.colour : undefined)}
         {@const line = pts.map((p) => p.join(",")).join(" ")}
         {#if !css.length}
           <!-- No colour set: drawn hatched grey, so it stands out. -->
@@ -163,7 +165,7 @@
         {#each wireTexts(pts, {
           // Shown by the usual rules, unless the wire says otherwise.
           number: numbered.has(seg.id) ? c.number : "",
-          colour: seg.showColour === false ? undefined : c.colour,
+          colour: seg.showColour === false ? undefined : looks.get(c.id)?.colour,
           func: c.function,
           railFrom: onBusbar(seg.from),
           railTo: onBusbar(seg.to),

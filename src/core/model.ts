@@ -645,6 +645,11 @@ export interface Project {
   networks?: Network[];
   /** Supplies busbars, link arrows and the incoming supply pick from. Starts empty. */
   distributions: Distribution[];
+  /**
+   * Wire colour by function (v0.4.x M3): function → core colour code. A
+   * wire with no colour of its own takes its function's. Starts empty.
+   */
+  wireColours?: Record<string, string>;
   pages: Page[];
   conductors: Conductor[];
   revisions: Revision[];

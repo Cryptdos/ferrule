@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { addAsset, addRevision, deleteRevision, setLogo, setNumberingScheme, setTerminalStrips, updateProjectInfo, updateRevision } from "../../core/ops";
+  import { addAsset, addRevision, deleteRevision, setLogo, setFunctionColour, setNumberingScheme, setTerminalStrips, updateProjectInfo, updateRevision } from "../../core/ops";
   import { readImage } from "../images";
   import type { ProjectInfo, Revision } from "../../core/model";
   import type { Editor } from "../editor.svelte";
@@ -36,6 +36,9 @@
     { key: "drawnBy", label: "Drawn", w: "5em" },
     { key: "description", label: "Description", w: "auto" },
   ];
+  import { WIRE_COLOURS, functionColour, functionRows } from "../../core/wirecolours";
+  let newFunction = $state("");
+  let newFunctionColour = $state("");
 </script>
 
 <svelte:window
@@ -126,6 +129,27 @@
       </select>
     </label>
     <p class="hint">Takes effect next time you press Renumber.</p>
+    <h3>Wire colours by function</h3>
+    <!-- v0.4.x M3: a wire with no colour of its own takes its function's (from its distribution, or set on the wire). -->
+    <table class="wirecolours">
+      <tbody>
+        {#each functionRows(editor.project) as f (f)}
+          <tr>
+            <td>{f}</td>
+            <td>
+              <input value={functionColour(editor.project, f) ?? ""} list="ferrule-core-colours" placeholder="—" onchange={(e) => { const v = e.currentTarget.value; editor.apply((p) => setFunctionColour(p, f, v)); }} />
+            </td>
+          </tr>
+        {/each}
+      </tbody>
+    </table>
+    <form class="inline" onsubmit={(e) => { e.preventDefault(); const f = newFunction.trim(); const c = newFunctionColour.trim(); if (f && c) editor.apply((p) => setFunctionColour(p, f, c)); newFunction = ""; newFunctionColour = ""; }}>
+      <input bind:value={newFunction} placeholder="Another function" />
+      <input bind:value={newFunctionColour} list="ferrule-core-colours" placeholder="Colour, e.g. Og" />
+      <button type="submit">Add</button>
+    </form>
+    <datalist id="ferrule-core-colours">{#each WIRE_COLOURS as c (c.code)}<option value={c.code}>{c.name}</option>{/each}</datalist>
+    <p class="hint">A wire's function comes from its distribution when it's on one, else from the function set on the wire. Its own colour, if set, wins.</p>
     <h3>GA devices</h3>
     <label class="inline">
       <input
@@ -244,5 +268,12 @@
     font-size: 12px;
     color: #667;
     margin: 0;
+  }
+  .wirecolours td {
+    padding: 1px 8px 1px 0;
+    font-size: 13px;
+  }
+  .wirecolours input {
+    width: 6em;
   }
 </style>

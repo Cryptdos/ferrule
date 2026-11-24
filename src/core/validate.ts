@@ -149,6 +149,11 @@ export function parseProject(input: unknown): Project {
   if (devices.length) project.devices = devices;
   if (input.useDeviceLibrary === false) project.useDeviceLibrary = false;
   project.conductors = parseConductors(input.conductors);
+  if (isObj(input.wireColours)) {
+    const wc: Record<string, string> = {};
+    for (const [k, v] of Object.entries(input.wireColours)) if (k.trim() && typeof v === "string" && v.trim()) wc[k.trim()] = colourCode(v);
+    if (Object.keys(wc).length) project.wireColours = wc;
+  }
   return project;
 }
 
