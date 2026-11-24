@@ -3,6 +3,7 @@
  * involved so the UI can jump to them.
  */
 import { distributionChecks, supplyChecks } from "./supplies";
+import { loadText, supplyLoads, usesLoads } from "./supplyload";
 import { allDetails, allFrames, sheetLeaves, changedGaStrips, detailOf, doorOwner, frameOf, gaCandidates, paneName, panesUnder, plateDoor, railFill, railNumber } from "./ga";
 import { compile, pinNode } from "./sim";
 import { controllerName, modulesOf, moduleTypeName, slotAddress, viewsOf } from "./modules";
@@ -175,6 +176,14 @@ export function checkProject(project: Project, opts: { proofs?: Proofs | null } 
   if (project.pages.some((pg) => pg.segments.length)) {
     const circuit = compile(project);
     out.push(...distributionChecks(project, circuit), ...supplyChecks(project, circuit));
+    // Supply load (v0.4.x M12): once draws are used, how many parts have none; and a supply its worst case is over.
+    if (usesLoads(project)) {
+      const sl = supplyLoads(project, circuit);
+      if (sl.undrawn) out.push({ level: "info", message: `${sl.undrawn} part${sl.undrawn === 1 ? " has" : "s have"} no draw set (coils, lamps, plant supply in, modules), so ${sl.undrawn === 1 ? "counts" : "count"} as nothing in a supply's load`, ids: [] });
+      for (const x of sl.supplies)
+        if (x.ratingVa && x.worstVa > x.ratingVa)
+          out.push({ level: "warning", message: `${x.name}: worst case ${loadText(x.worstVa, x.gives)} is over its rating, ${loadText(x.ratingVa, x.gives)} (see Simulate)`, ids: /^plant:|^rails$/.test(x.id) ? [] : [x.id] });
+    }
   }
 
   // With a GA drawn, say what isn't on it yet; and GA devices whose schematic part has gone.

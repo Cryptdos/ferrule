@@ -10,7 +10,7 @@
     moveSlot,
     removeSlot,
     setSlotAddress,
-    setModuleCommons,
+    setModuleCommons, setModuleVa,
     sharedPins,
     updateController,
     updateModule,
@@ -170,6 +170,9 @@
                       <input type="checkbox" checked={!!m.commons?.length} onchange={(e) => editor.apply((p) => setModuleCommons(p, item.id, e.currentTarget.checked))} /> Commons linked
                     </label>
                   {/if}
+                  <label class="commons" title="Its expected draw from its data sheet, in VA; Simulate counts the controller's modules on its power supply module">
+                    VA <input class="va" type="number" min="0" step="0.1" value={m.va ?? ""} placeholder="—" onchange={(e) => editor.apply((p) => setModuleVa(p, item.id, Number(e.currentTarget.value) || null))} />
+                  </label>
                   {#if !m.device}
                     <button title="Save it as a model in the device table, pins and all, so the next one takes seconds (and from there to the shared library with its datasheet)"
                       onclick={() => editor.apply((p) => void saveModuleDevice(p, item.id))}>Save model</button>
@@ -364,5 +367,8 @@
     font-size: 12px;
     color: #667;
     margin: 0 0 10px;
+  }
+  .va {
+    width: 4.5em;
   }
 </style>

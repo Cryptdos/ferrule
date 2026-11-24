@@ -105,6 +105,15 @@ export function setModuleCommons(project: Project, plantId: string, on: boolean)
   syncPlantViews(project);
 }
 
+/** A module's expected draw, VA (v0.4.x M12); 0 or null clears it. */
+export function setModuleVa(project: Project, plantId: string, va: number | null): void {
+  const item = getPlant(project, plantId);
+  if (!item.module) throw new OpError(`${item.tag || "That"} isn't a controller's module`);
+  if (va !== null && (!Number.isFinite(va) || va < 0)) throw new OpError("A draw is a number of VA");
+  if (va) item.module.va = va;
+  else delete item.module.va;
+}
+
 /** Change a module's type, channel count, maker, model or bus address. */
 export function updateModule(
   project: Project,

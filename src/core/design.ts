@@ -365,6 +365,10 @@ export interface PointDesign {
   gives?: string;
   /** What it takes, typed: "24 V AC, 24 V DC"; empty clears it. */
   accepts?: string;
+  /** Its draw, rating (VA) and efficiency (0–1) (v0.4.x M12); null or 0 clears one. */
+  va?: number | null;
+  ratingVa?: number | null;
+  efficiency?: number | null;
 }
 
 /** Add a point with no pins (design-v0.4 §2, `+ Point`): a form, a name and a signal. */
@@ -421,6 +425,13 @@ export function updateDesignPoint(project: Project, plantId: string, name: strin
     if (patch.accepts.trim() && !a.length) throw new OpError(`Write what it takes as a voltage and AC or DC: 24 V DC, or 24 V AC, 24 V DC`);
     if (a.length) p.accepts = a;
     else delete p.accepts;
+  }
+  for (const k of ["va", "ratingVa", "efficiency"] as const) {
+    const v = patch[k];
+    if (v === undefined) continue;
+    if (v !== null && (!Number.isFinite(v) || v < 0 || (k === "efficiency" && v > 1))) throw new OpError(k === "efficiency" ? "An efficiency is between 0 and 1 (0.85 for 85%)" : "A draw or rating is a number of VA");
+    if (v) p[k] = v;
+    else delete p[k];
   }
   // What it now is: a channel that can't take it lets it go.
   if (p.channel) {

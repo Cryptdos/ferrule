@@ -116,6 +116,27 @@ const GIVES_PARAM: ParamDef = {
   help: "What it supplies: 24 V AC, 24 V DC, 230 V AC, 400 V AC, 12 V DC, or any other typed the same way. Check compares it with what the loads it feeds take.",
 };
 
+/** A load's expected draw (v0.4.x M12): VA, from its data sheet. 0: not set (its device's, or none). */
+const VA_PARAM: ParamDef = {
+  key: "va",
+  label: "Draw (VA)",
+  type: "number",
+  min: 0,
+  max: 100000,
+  default: 0,
+  help: "Its expected draw from its data sheet, in VA. Simulate adds it up on the supply that feeds it. 0: not set (the device's from the device table, if it has one).",
+};
+/** A supply's rating (v0.4.x M12). */
+const RATING_PARAM: ParamDef = {
+  key: "ratingVa",
+  label: "Rating (VA)",
+  type: "number",
+  min: 0,
+  max: 1000000,
+  default: 0,
+  help: "What it can supply, in VA. In Simulate its load turns red when over. 0: not set.",
+};
+
 export interface SymbolDef {
   id: string;
   name: string;
@@ -889,6 +910,7 @@ const SYMBOLS: SymbolDef[] = [
         default: "relay",
       },
       ACCEPTS_PARAM,
+      VA_PARAM,
     ],
     kind: (el) => (str(el, "type", "relay") === "contactor" ? "contactor" : "relay"),
     draw(el) {
@@ -929,6 +951,7 @@ const SYMBOLS: SymbolDef[] = [
       },
       { key: "code", label: "Maker's function code", type: "text", default: "", placeholder: "e.g. A" },
       ACCEPTS_PARAM,
+      VA_PARAM,
     ],
     kind: () => "timer",
     draw(el) {
@@ -974,6 +997,7 @@ const SYMBOLS: SymbolDef[] = [
       },
       { key: "testPin", label: "Lamp test terminal (T)", type: "bool", default: false },
       ACCEPTS_PARAM,
+      VA_PARAM,
     ],
     kind: () => "lamp",
     draw(el) {
@@ -1236,6 +1260,7 @@ const SYMBOLS: SymbolDef[] = [
       { key: "screen", label: "Earthed screen", type: "bool", default: false },
       { key: "rating", label: "Rating", type: "text", default: "", placeholder: "e.g. 230/24V 100VA" },
       GIVES_PARAM,
+      RATING_PARAM,
     ],
     kind: () => "transformer",
     draw(el) {
@@ -1949,6 +1974,7 @@ const SYMBOLS: SymbolDef[] = [
         ],
       },
       GIVES_PARAM,
+      RATING_PARAM,
     ],
     kind: () => null,
     draw(el) {

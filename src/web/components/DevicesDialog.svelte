@@ -35,15 +35,15 @@
   const used = $derived(new Set(editor.project.pages.flatMap((pg) => (pg.gaItems ?? []).map((i) => i.device).filter(Boolean))));
 
   // New / edit form.
-  type Form = { id: string | null; where: "library" | "project"; name: string; maker: string; part: string; kind: string; w: number; h: number; d: number; notes: string };
-  const blank = (): Form => ({ id: null, where: useLib ? "library" : "project", name: "", maker: "", part: "", kind: "", w: 18, h: 90, d: 0, notes: "" });
+  type Form = { id: string | null; where: "library" | "project"; name: string; maker: string; part: string; kind: string; w: number; h: number; d: number; va: number; notes: string };
+  const blank = (): Form => ({ id: null, where: useLib ? "library" : "project", name: "", maker: "", part: "", kind: "", w: 18, h: 90, d: 0, va: 0, notes: "" });
   let form: Form | null = $state(null);
 
   function editLibrary(d: DeviceEntry) {
-    form = { id: d.id, where: "library", name: d.name, maker: d.maker, part: d.part, kind: d.kind, w: d.w, h: d.h, d: d.d, notes: d.notes };
+    form = { id: d.id, where: "library", name: d.name, maker: d.maker, part: d.part, kind: d.kind, w: d.w, h: d.h, d: d.d, va: d.va ?? 0, notes: d.notes };
   }
   function editMine(d: ProjectDevice) {
-    form = { id: d.id, where: "project", name: d.name, maker: d.maker, part: d.part, kind: d.kind, w: d.w, h: d.h, d: d.d, notes: "" };
+    form = { id: d.id, where: "project", name: d.name, maker: d.maker, part: d.part, kind: d.kind, w: d.w, h: d.h, d: d.d, va: d.va ?? 0, notes: "" };
   }
 
   async function run(what: string, fn: () => Promise<void>) {
@@ -65,7 +65,7 @@
       error = "Give the device a name";
       return;
     }
-    const fields = { name: f.name, maker: f.maker, part: f.part, kind: f.kind, w: Number(f.w), h: Number(f.h), d: Number(f.d) || 0 };
+    const fields = { name: f.name, maker: f.maker, part: f.part, kind: f.kind, w: Number(f.w), h: Number(f.h), d: Number(f.d) || 0, va: Number(f.va) || 0 };
     await run("save", async () => {
       if (f.where === "library") {
         const e = f.id ? await api.devices.update(f.id, { ...fields, notes: f.notes }) : await api.devices.add({ ...fields, notes: f.notes });
@@ -256,6 +256,7 @@
         <label>Width (mm) <input type="number" min="1" step="0.1" bind:value={form.w} /></label>
         <label>Height (mm) <input type="number" min="1" step="0.1" bind:value={form.h} /></label>
         <label>Depth (mm) <input type="number" min="0" step="0.1" bind:value={form.d} /></label>
+        <label title="Its expected draw from its data sheet: the default for parts that use it, which Simulate adds up on the supply that feeds them">Draw (VA) <input type="number" min="0" step="0.1" bind:value={form.va} /></label>
         {#if form.where === "library"}
           <label class="wide">Notes <input bind:value={form.notes} placeholder="e.g. coil 24V DC, 4 changeover" /></label>
         {/if}

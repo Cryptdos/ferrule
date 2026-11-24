@@ -35,6 +35,8 @@ import { itemStrip, plateTextLayout, stripLabel, stripParts, syncGaStrips } from
 import { importTemplate, saveSheetTemplate, stampTemplate } from "./templates";
 import { duplicatePlant, stepTag } from "./design";
 import { masterOf } from "./xref";
+import { loadText, supplyLoads } from "./supplyload";
+import { setModuleVa } from "./controllers";
 import { stampSaved } from "../server/storage";
 import { parseProject } from "./validate";
 import { VERSION } from "./version";
@@ -1141,5 +1143,82 @@ describe("step 13: stamp links, Duplicate's step, label plate text (T6, T8, T12)
     expect(parseProject(JSON.parse(JSON.stringify(p))).pages.find((pg) => pg.id === door.id)!.gaItems!.find((it) => it.id === plate.id)!.textAt).toBe("top-left");
     updateGaItem(p, door.id, plate.id, { textAt: undefined });
     expect(plate.textAt).toBeUndefined();
+  });
+});
+
+describe("step 14: supply load in Simulate (M12)", () => {
+  const setup = () => {
+    const f = fresh();
+    const { project: p } = f;
+    const loads = p.pages.flatMap((pg) => pg.elements.filter((e) => e.symbol === "coil" || e.symbol === "timer-coil" || e.symbol === "lamp"));
+    for (const e of loads) e.params.va = 1.5;
+    return { ...f, loads };
+  };
+  const fig = (p: Project, state?: ReturnType<typeof initialState>) => {
+    const c = compile(p);
+    const r = supplyLoads(p, c, state ?? initialState(c));
+    return { ...r, by: (name: RegExp) => r.supplies.find((x) => name.test(x.name))! };
+  };
+
+  test("worst case is everything a supply reaches; live is what's energised; a power supply's load passes up divided by its efficiency", () => {
+    const { project: p, loads, modules } = setup();
+    const r = fig(p);
+    const psu = r.by(/24V out/);
+    const mains = r.by(/SUPPLY/);
+    // Every coil and lamp is on the 24 V DC side.
+    expect(psu.worstVa).toBeCloseTo(loads.length * 1.5, 6);
+    expect(mains.worstVa).toBeCloseTo(psu.worstVa / 0.85, 6);
+    expect(psu.liveVa!).toBeLessThan(psu.worstVa);
+    // The modules are carried by the controller's power supply module.
+    for (const m of Object.values(modules)) setModuleVa(p, m.id, 3);
+    expect(fig(p).by(/24V out/).worstVa).toBeCloseTo(loads.length * 1.5 + 6 * 3, 6);
+    // A set efficiency.
+    const out = p.plant.flatMap((x) => x.points ?? []).find((q) => q.name === "24V out")!;
+    out.efficiency = 0.9;
+    const r2 = fig(p);
+    expect(r2.by(/SUPPLY/).worstVa).toBeCloseTo(r2.by(/24V out/).worstVa / 0.9, 6);
+    // Amps at the supply's own voltage.
+    expect(loadText(48, { v: 24, ac: false })).toBe("2.00 A");
+    expect(loadText(12)).toBe("12 VA");
+  });
+
+  test("live follows the simulation; a device's draw is the default for parts that use it", () => {
+    const { project: p, loads } = setup();
+    const c = compile(p);
+    const s = initialState(c);
+    const before = supplyLoads(p, c, s).supplies.find((x) => /24V out/.test(x.name))!.liveVa!;
+    // Switch something on: live goes up by what it energises, never past worst case.
+    const changes = c.inputs.filter((i) => i.kind !== "press").map((i) => supplyLoads(p, c, toggle(c, s, i.el)).supplies.find((x) => /24V out/.test(x.name))!);
+    expect(changes.some((x) => x.liveVa !== before)).toBe(true);
+    for (const x of changes) expect(x.liveVa!).toBeLessThanOrEqual(x.worstVa + 1e-9);
+    // A coil with no draw of its own takes its device's.
+    const coil = loads.find((e) => e.symbol === "coil")!;
+    const item = p.pages.flatMap((pg) => pg.gaItems ?? []).find((it) => it.refs?.includes(coil.id))!;
+    expect(item).toBeDefined();
+    p.devices = [{ id: "dev1", name: "Relay", maker: "", part: "", kind: "", w: 16, h: 80, d: 0, library: false, va: 0.6 }];
+    item.device = "dev1";
+    const w0 = fig(p).by(/24V out/).worstVa;
+    coil.params.va = 0;
+    expect(fig(p).by(/24V out/).worstVa).toBeCloseTo(w0 - 1.5 + 0.6, 6);
+  });
+
+  test("a rating, red when over; parts with no draw counted in one line; old files have none of it", () => {
+    const { project: p } = setup();
+    const supply = p.pages.flatMap((pg) => pg.elements).find((e) => e.symbol === "supply")!;
+    const msgs = () => checkProject(p).map((f) => f.message);
+    expect(msgs()).toContain("7 parts have no draw set (coils, lamps, plant supply in, modules), so count as nothing in a supply's load");
+    supply.params.ratingVa = 10;
+    expect(fig(p).by(/SUPPLY/).ratingVa).toBe(10);
+    expect(msgs().some((m) => /SUPPLY: worst case .* is over its rating/.test(m))).toBe(true);
+    supply.params.ratingVa = 1000;
+    expect(msgs().some((m) => /over its rating/.test(m))).toBe(false);
+    // Point draws, ratings and efficiency, and a module's draw, are saved and read back.
+    const out = p.plant.flatMap((x) => x.points ?? []).find((q) => q.name === "24V out")!;
+    Object.assign(out, { ratingVa: 120, efficiency: 0.88 });
+    const back = parseProject(JSON.parse(JSON.stringify(p)));
+    expect(back.plant.flatMap((x) => x.points ?? []).find((q) => q.name === "24V out")).toMatchObject({ ratingVa: 120, efficiency: 0.88 });
+    // A fresh fixture says no draws: no lines at all.
+    const { project: q } = fresh();
+    expect(checkProject(q).some((f) => /no draw set|over its rating/.test(f.message))).toBe(false);
   });
 });

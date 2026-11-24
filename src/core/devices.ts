@@ -81,6 +81,8 @@ export interface DeviceEntry {
   files: DeviceFile[];
   /** A controller module's model: its pins as entered from the datasheet. */
   module?: ModuleTemplate;
+  /** Its expected draw, VA (v0.4.x M12): the default for parts that use it. */
+  va?: number;
 }
 
 /** A device a project uses: a copy of the library entry's details (or the project's own). */
@@ -97,6 +99,8 @@ export interface ProjectDevice {
   library: boolean;
   /** A controller module's model: its pins as entered from the datasheet. */
   module?: ModuleTemplate;
+  /** Its expected draw, VA (v0.4.x M12). */
+  va?: number;
 }
 
 const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
@@ -126,8 +130,11 @@ export function parseDeviceEntry(v: unknown, id?: string): DeviceEntry {
     notes: typeof o.notes === "string" ? o.notes : "",
     files: Array.isArray(o.files) ? o.files.map(parseDeviceFile).filter((f): f is DeviceFile => !!f) : [],
     ...withModule(o.module),
+    ...withVa(o.va),
   };
 }
+
+const withVa = (v: unknown): { va?: number } => (typeof v === "number" && Number.isFinite(v) && v > 0 ? { va: v } : {});
 
 const withModule = (v: unknown): { module?: ModuleTemplate } => {
   const m = parseModuleTemplate(v);
@@ -154,6 +161,7 @@ export function parseProjectDevices(v: unknown): ProjectDevice[] {
       d: typeof o.d === "number" && o.d > 0 ? mm(o.d, 0) : 0,
       library: o.library === true,
       ...withModule(o.module),
+      ...withVa(o.va),
     });
   }
   return out;
@@ -161,7 +169,7 @@ export function parseProjectDevices(v: unknown): ProjectDevice[] {
 
 /** The project's copy of a library entry. */
 export function projectCopy(e: DeviceEntry): ProjectDevice {
-  return { id: e.id, name: e.name, maker: e.maker, part: e.part, kind: e.kind, w: e.w, h: e.h, d: e.d, library: true, ...(e.module ? { module: structuredClone(e.module) } : {}) };
+  return { id: e.id, name: e.name, maker: e.maker, part: e.part, kind: e.kind, w: e.w, h: e.h, d: e.d, library: true, ...(e.module ? { module: structuredClone(e.module) } : {}), ...(e.va ? { va: e.va } : {}) };
 }
 
 /** "Relay 4CO (Weidmüller DRM 7760…) 30.6 × 101.8" for lists. */

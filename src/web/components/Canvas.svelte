@@ -71,6 +71,7 @@
   import { elementTexts } from "../../core/tags";
   import { routePage } from "../../core/routing";
   import { stampTemplate } from "../../core/templates";
+  import { loadText, supplyLoads, usesLoads } from "../../core/supplyload";
   import { distanceToRoute, dragLeg, fractionAlong, nearestPointOnRoute, routeOf, simpleRoute, simplifyRoute } from "../../core/wires";
   import type { Element, Page, Segment } from "../../core/model";
   import type { Editor } from "../editor.svelte";
@@ -1606,6 +1607,8 @@
   });
   const lampColour = lampGlow;
   /** Lamps lit in Simulate, for the door GA (design-v0.3 §4). */
+  /** Supplies' loads in Simulate (v0.4.x M12), by supply id; only once the project gives draws or ratings. */
+  const supplyFigures = $derived(sim && usesLoads(editor.project) ? new Map(supplyLoads(editor.project, sim.circuit, sim.state).supplies.map((x) => [x.id, x])) : null);
   const litLamps = $derived(sim ? new Set(Object.entries(sim.state.lamps).filter(([, on]) => on).map(([id]) => id)) : null);
 
   const cursorClass = $derived(
@@ -1811,6 +1814,18 @@
       {#each liveRails as r, i (i)}
         <line class="sim-rail" class:bar={r.bar} x1={r.x1} y1={r.y1} x2={r.x2} y2={r.y2} />
       {/each}
+      {#if sim && supplyFigures}
+        <!-- Each supply's load beside it (v0.4.x M12): live / worst case, red over its rating. -->
+        {#each page.elements as el (el.id)}
+          {@const f = supplyFigures.get(el.id)}
+          {#if f && (el.symbol === "supply" || el.symbol === "transformer")}
+            {@const g = localGeometry(el, elementTexts(el, editor.project))}
+            <text class="supplyload" class:over={!!f.ratingVa && ((f.liveVa ?? 0) > f.ratingVa || f.worstVa > f.ratingVa)} x={el.pos[0] + g.bbox.x + g.bbox.w + 1} y={el.pos[1] + g.bbox.y + 1.5}
+              >{loadText(f.liveVa ?? 0, f.gives)} / {loadText(f.worstVa, f.gives)}{f.ratingVa ? ` (of ${loadText(f.ratingVa, f.gives)})` : ""}</text
+            >
+          {/if}
+        {/each}
+      {/if}
       {#if sim}
         {#each page.elements as el (el.id)}
           {#if el.symbol === "timer-coil"}
@@ -2155,5 +2170,16 @@
     stroke: #e66e1e;
     stroke-width: 0.15;
     stroke-dasharray: 0.6 0.4;
+  }
+  .supplyload {
+    font-size: 1.8px;
+    fill: #246;
+    paint-order: stroke;
+    stroke: #fff;
+    stroke-width: 0.5px;
+  }
+  .supplyload.over {
+    fill: #c00;
+    font-weight: 600;
   }
 </style>

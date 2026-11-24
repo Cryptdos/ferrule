@@ -6,6 +6,7 @@
   import type { Element } from "../../core/model";
   import type { Editor } from "../editor.svelte";
   import type { Simulator } from "../sim.svelte";
+  import { loadText, supplyLoads, usesLoads } from "../../core/supplyload";
 
   let { editor, sim, onexpectations }: { editor: Editor; sim: Simulator; onexpectations?: () => void } = $props();
 
@@ -51,6 +52,9 @@
       })
       .sort((a, b) => a.worst - b.worst);
   });
+  /** Each supply's load (v0.4.x M12): live and worst case, red over its rating. */
+  const loadsOn = $derived(usesLoads(editor.project) ? supplyLoads(editor.project, sim.circuit, s) : null);
+  const supplyAt = (id: string) => byId.get(id) ?? viewOf(id);
   const neverBroken = $derived(exps.filter((e) => e.kind === "never" && judged.get(e.id) === "bad"));
 </script>
 
@@ -74,6 +78,21 @@
     down (Shift+click holds it until clicked again). Plant inputs turn green when they see what's expected, red when they
     don't. Double-click a contact or link arrow to follow it.
   </p>
+
+  {#if loadsOn}
+    <div class="sub">Supplies <span class="where">live / worst case</span></div>
+    {#each loadsOn.supplies as x (x.id)}
+      {@const at = supplyAt(x.id)}
+      <div class="row">
+        <button class="go" onclick={() => at && editor.goTo(at.el.id)} title={x.ratingVa ? `Rated ${x.ratingVa} VA` : "No rating set"}>{x.name}</button>
+        <span class="load" class:over={!!x.ratingVa && (x.liveVa ?? 0) > x.ratingVa}>{loadText(x.liveVa ?? 0, x.gives)}</span>
+        <span class="where">/</span>
+        <span class="load" class:over={!!x.ratingVa && x.worstVa > x.ratingVa}>{loadText(x.worstVa, x.gives)}</span>
+        {#if x.ratingVa}<span class="where">of {loadText(x.ratingVa, x.gives)}</span>{/if}
+      </div>
+    {/each}
+    {#if loadsOn.undrawn}<p class="hint">{loadsOn.undrawn} part{loadsOn.undrawn === 1 ? " has" : "s have"} no draw set, so count{loadsOn.undrawn === 1 ? "s" : ""} as nothing.</p>{/if}
+  {/if}
 
   {#if devices.length}
     <div class="sub">Plant points</div>
@@ -321,5 +340,13 @@
   }
   .rule .box {
     margin-top: 2px;
+  }
+  .load {
+    font-variant-numeric: tabular-nums;
+    font-size: 12px;
+  }
+  .load.over {
+    color: #c00;
+    font-weight: 600;
   }
 </style>
