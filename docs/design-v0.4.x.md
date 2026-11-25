@@ -2,7 +2,7 @@
 
 The plan for the sprint that works through the master list in `docs/design-v0.4.md` §13, *Fixes and tweaks for v0.4.x*: every F, T and M entry there, and its tests. That list says **what** is wanted and why; this document says **how** each one is to be built, in what order, and what has to be true when it's done. Where the two disagree on what's wanted, the list wins and this document is corrected.
 
-The version stays `0.4.0-pre` through the sprint. The working agreement in `CLAUDE.md` holds: one step, one PR, a build per code PR, the list ticked with the PR number, both documents synced after each PR.
+The version stayed `0.4.0-pre` through the sprint; once it was built, it became `0.4.5` (PR 117), and each build after moves the last number on. The working agreement in `CLAUDE.md` holds: one step, one PR, a build per code PR, the list ticked with the PR number, both documents synced after each PR.
 
 ## 1. Ground rules for the sprint
 
@@ -477,3 +477,5 @@ Judgement calls made while building, step by step.
 - M3: a colour set on the wire wins; else its function's, from the table. It prints and shows in Colour check like any colour code. The printed function text is still only what's typed on the wire, so drawings with an empty table, and every old file, look as they did. A wire's Properties say when its colour comes from the table, or its function from its distribution.
 - M4: `relayPins` on a device table entry (library and project copy): the coil's two, then each pole's common, NC and NO, typed `A1 A2 | 11 12 14 | 21 22 24` (a dash for a pole's missing NC or NO). A coil placed on a GA as that device prints them in place of A1/A2 (`relayPinMarks` into `GeometryText.pins`). So do its contacts, by their pole from Renumber: NO 13/14 → common/NO, NC 21/22 → common/NC, changeover 11/12/14. So does its contact table. Terminal names (what wires refer to) don't change; a contact with no pole number yet, or a pole the map doesn't have, keeps IEC marks.
 - §13 *Tests to add*, timed contacts: a test for NC and changeover contacts on a timer (15-16, 15-16/18, the table matching, the mark following the function) and unlinking back to plain. NO 17-18 and *Instantaneous* were already covered (`audit.test.ts`). The print check found the on- and off-delay mark (two arcs) running into the contact's 2.5 mm tag on NO and NC contacts. Their tag now stands 0.9 further out for that function, and the print is clear.
+
+**After the sprint: version 0.4.5 (PR 117).** The version stayed `0.4.0-pre` through v0.4 and this sprint, so builds couldn't be told apart by their number. It's `0.4.5` now: in Settings, in the console, and in every file a build saves (`savedBy`, T19). From here each build sent for testing moves the last number on (0.4.6, 0.4.7…), noted in `CLAUDE.md`. Old files open as before: the file format is unchanged (3), and `preRelease()` stays until a version is called the release. The notes folder keeps its name, `v0.4.0-pre Notes`.
