@@ -4,7 +4,7 @@ Read this first. The design record is `docs/DESIGN.md`; the plan being built is 
 
 ## Where the work is
 
-v0.4, version `0.4.0-pre`: planned in `docs/design-v0.4.md` (§10 *Order of work* and its *Changed during build*, §11 the decisions as discussed, §12 what isn't in v0.4). It puts a **Design** workbench in front of Draft (systems, plant and points in one table; the controller and its allocation), renames the GA workbench **Layout** (the sheets and `ga` data keep their name), and takes in the network drawing v0.3 deferred. v0.4 is built on top of v0.3 (PRs 46–58), which the user tests together with it.
+v0.4, version `0.4.5` (was `0.4.0-pre` through v0.4 and the v0.4.x sprint, PRs 59–116; from here every build the user is sent moves the last number on, 0.4.6, 0.4.7…, so a build says which it is): planned in `docs/design-v0.4.md` (§10 *Order of work* and its *Changed during build*, §11 the decisions as discussed, §12 what isn't in v0.4). It puts a **Design** workbench in front of Draft (systems, plant and points in one table; the controller and its allocation), renames the GA workbench **Layout** (the sheets and `ga` data keep their name), and takes in the network drawing v0.3 deferred. v0.4 is built on top of v0.3 (PRs 46–58), which the user tests together with it.
 
 - **v0.4 steps:** 1 start (version, docs, GA renamed Layout, "highlight"); 2 the model (systems, connects-by, protocol, network, enabled-by and source on plant; points without pins; signal, goes-to and channel on points; interlocks; networks); 3 the Design table; 4 Duplicate ×n and Design templates; 5 the controller in Design; 6 To draw, and Draft placing only; 7 checks (direct, confirm by hand, one hop); 8 interlocks; 9 the network; 10 the points schedule export; 11 Suggest.
 - **Built:** every step, as PRs 59–73 (step 5 as 5a–5b, 7 as 7a–7b, 9 as 9a–9b; PR 67 a v0.3 fix). What's left is the user's testing of the builds; fixes go in as small PRs the same way, noted under *Changed during build*.
@@ -17,14 +17,14 @@ v0.4, version `0.4.0-pre`: planned in `docs/design-v0.4.md` (§10 *Order of work
 - Tiles: `src/web/tiles.ts` (the tree), `Tiles.svelte`; the active tile's sheet is `editor.pageId`. Detail frames: `frameView` (`ga.ts`) maps a frame to its source sheet.
 - Modules are plant items with `module` set (`src/core/modules.ts` helpers, `src/core/controllers.ts` ops); a module view is a `plant-view` with `params.pmod`.
 - Builds made off Windows have no exe icon (Bun sets it only on Windows); CI's exe job runs on Windows and its artifact has it.
-- At the v0.4 release, remove `preRelease()` in `src/core/validate.ts` (maps test-build files).
+- `preRelease()` in `src/core/validate.ts` (maps test-build files) stays until the user calls a version the release; 0.4.5 is a test build.
 
 ## How a step runs
 
 - One step, one PR, from a branch. CI (`check`, `exe`) must pass; the PR is set to auto-merge (`PUT repos/Cryptdos/ferrule/pulls/<n>/ccr/auto_merge`, squash). GraphQL isn't available; use REST (`gh api`).
 - Stop only at a PR boundary. The PR body ends by saying what's next.
 - Small judgement calls: decide, and note them under *Changed during build* in the design doc being built (`docs/design-v0.4.x.md` §5). Anything costly to reverse: push-notify and wait.
-- Each code PR: build `dist/ferrule-windows-v<version>.zip`, now `ferrule-windows-v0.4.0-pre.zip` (`bun scripts/build-exe.ts`, then `cd dist && zip -q -9 ferrule-windows-v<version>.zip ferrule.exe`), and send it to the user.
+- Each code PR: move the version in `package.json` on by one (the last number) and build `dist/ferrule-windows-v<version>.zip`, now `ferrule-windows-v0.4.5.zip` (`bun scripts/build-exe.ts`, then `cd dist && zip -q -9 ferrule-windows-v<version>.zip ferrule.exe`), and send it to the user.
 - After each PR, sync both `docs/design-v0.4.x.md` and `docs/design-v0.4.md` to the user's `C:\Temp\eCAD\v0.4.0-pre Notes\` under the same names: copy each to `/mnt/user-data/outputs/<unique name>.md`, wait a few seconds, list the folder for a fresh `mtimeMs`, then `device_commit_files` with `expectedMtimeMs`. Never `force`. List the folder again afterwards and check each file's size against the repo's: a copy just written can be read stale.
 - Update `README.md` and add a row to the decisions table in `docs/DESIGN.md` for what changed; retake README screenshots when the interface changes.
 - Before a PR: `bun test`, `bun run typecheck`, and look at the result (print view screenshots or the browser).

@@ -375,6 +375,7 @@ Reference drawings from other companies are proprietary. They are never committe
 | Stamp links, Duplicate's step, plate text, v0.4.x step 13 (2026-11-24) | T6: templates keep contacts' links out to coils; `stampTemplate` keeps them, returns `kept` and `relink`, shown after a stamp. T8: `TagStep` in `stepTag` and `duplicatePlant`. T12: `GaItem.textAt`, `plateTextLayout` |
 | Supply load, v0.4.x step 14 (2026-11-24) | M12: `va` and `ratingVa` parameters, `IoPoint.va` / `ratingVa` / `efficiency`, `ModuleInfo.va`, device `va`; `supplyLoads`, `loadText`, `usesLoads` (`supplyload.ts`); Simulate's Supplies list and figures beside supplies; Check's undrawn count and over-rating warning |
 | Wire colours and relay pins, v0.4.x step 15 (2026-11-24) | M3: `Project.wireColours`, `conductorLooks`, `functionRows`, `setFunctionColour` (`wirecolours.ts`, `ops.ts`). M4: device `relayPins`, `parseRelayPins`, `relayPinMarks` (`xref.ts`) into `GeometryText.pins`; on- and off-delay contacts' tag moved clear of the mark |
+| Version 0.4.5 (2026-11-25) | After the v0.4.x sprint the version moves from `0.4.0-pre` to `0.4.5` (`package.json`, read by `src/core/version.ts`), and each test build after moves the last number on, so a build and the files it saves say which build it is. File format unchanged |
 
 ## 16. Open questions
 
