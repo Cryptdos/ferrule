@@ -108,7 +108,10 @@ describe("LSP-01 benchmark", () => {
     // and the hints where its tight sheets 8 and 9 have labels over other parts (v0.4.x T7).
     expect(checkProject(p).filter((f) => f.level !== "info")).toEqual([]);
     const notes = checkProject(p).map((f) => f.message);
-    expect(notes.filter((m) => !/rail \d+: .* mm used/.test(m) && !/^Sheet [89]: .*'s label overlaps/.test(m))).toEqual([expect.stringMatching(/aren.t on a layout sheet/)]);
+    // Each fan starter's own CCT and 0V rails, after its isolator's auxiliary poles, and the lamp test rail
+    // are on no supply: switched power, numbered by position.
+    expect(notes.filter((m) => /is on no supply/.test(m)).map((m) => m.slice(0, 7))).toEqual(["Sheet 3", "Sheet 3", "Sheet 4", "Sheet 4", "Sheet 5", "Sheet 5", "Sheet 6", "Sheet 6", "Sheet 7"]);
+    expect(notes.filter((m) => !/rail \d+: .* mm used/.test(m) && !/^Sheet [89]: .*'s label overlaps/.test(m) && !/is on no supply/.test(m))).toEqual([expect.stringMatching(/aren.t on a layout sheet/)]);
     expect(notes.some((m) => /rail \d+: .* mm used/.test(m))).toBe(true);
   });
 

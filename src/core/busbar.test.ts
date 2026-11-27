@@ -25,7 +25,8 @@ describe("distributions (design-v0.2 §2)", () => {
     const b = addElement(p, pg, "busbar", [10, 20], { params: { name: "La", length: 30 } });
     const c = addElement(p, pg, "rail", [10, 30], { params: { name: "LT", length: 30, bothEnds: true } });
     renumber(p);
-    expect(elementTexts(a, p).name).toBe("L1");
+    // With its supply's tag beside the name (v0.5 A23): L1 is the first supply, tagged 1.
+    expect(elementTexts(a, p).name).toBe("L1 1");
     expect(elementTexts(b, p).name).toBe("La");
     expect(displayTag(a, p)).toMatch(/^W1-/);
     expect(displayTag(c, p)).toBe("");

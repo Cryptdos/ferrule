@@ -53,16 +53,15 @@ export function elementTexts(el: Element, project: Project): GeometryText {
   if (el.symbol === "revtable") t.rows = revisionRows(project);
   else if (el.symbol === "legend") t.legend = legendEntries(project);
   else if (isBar(el) || el.symbol === "offpage") {
-    // On a distribution: a busbar is named after it, an unlabelled arrow says which it carries.
-    const d = typeof el.params.dist === "string" && el.params.dist ? project.distributions.find((x) => x.id === el.params.dist) : undefined;
-    if (isBar(el)) t.name = d?.name ?? String(el.params.name ?? "");
+    // On a supply: a block or rail is named after it, with its tag (CCT 4, design-wire-numbering §2).
+    const d = isBar(el) && typeof el.params.dist === "string" && el.params.dist ? project.distributions.find((x) => x.id === el.params.dist) : undefined;
+    if (isBar(el)) t.name = d ? [d.name, d.tag].filter((x) => x !== undefined && x !== "").join(" ") : String(el.params.name ?? "");
     else {
       // A linked destination says what its source says, unless told not to (70).
       if (el.params.source === false && el.params.sameLabel !== false && el.links[0]) {
         const src = project.pages.flatMap((pg) => pg.elements).find((e) => e.id === el.links[0]);
         if (src?.label) t.label = resolveFields(src.label, project);
       }
-      if (d && !t.label) t.label = d.name;
       const c = project.conductors.find((x) => x.terminals.some(([id]) => id === el.id));
       if (c?.number) t.wire = c.number;
     }

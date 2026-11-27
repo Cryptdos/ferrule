@@ -273,13 +273,13 @@
       </label>
       <p class="hint">Its modules in rail order: tag, bus address, maker, model, type and where each is drawn; spare slots dashed. It keeps up by itself.</p>
     {/if}
-    {#if isBar(one) || one.symbol === "offpage"}
+    {#if isBar(one)}
       <label>
         Distribution
         <select value={String(one.params.dist ?? "")} onchange={(e) => setParam("dist", e.currentTarget.value)}>
-          <option value="">{isBar(one) ? "Local (this one alone)" : "None"}</option>
+          <option value="">None (local: joins nothing, gives no number)</option>
           {#each editor.project.distributions as d (d.id)}
-            <option value={d.id}>{d.name}{d.voltage ? ` (${d.voltage})` : ""}</option>
+            <option value={d.id}>{d.name}{d.tag !== undefined ? ` ${d.tag}` : ""}{d.voltage ? ` (${d.voltage})` : ""}</option>
           {/each}
         </select>
       </label>

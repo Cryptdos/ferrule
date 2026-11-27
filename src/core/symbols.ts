@@ -1534,7 +1534,6 @@ const SYMBOLS: SymbolDef[] = [
     palette: true,
     params: [
       { key: "source", label: "Source (where the conductor comes from)", type: "bool", default: true },
-      { key: "ref", label: "Reference (if not linked)", type: "text", default: "", placeholder: "e.g. 8-34" },
       // A destination shows its source's label unless it has its own (70).
       {
         key: "sameLabel",
@@ -1545,7 +1544,6 @@ const SYMBOLS: SymbolDef[] = [
         fixed: "For a linked destination arrow",
       },
       // Picked from the project's distribution list (Props): the arrow carries that supply.
-      { key: "dist", label: "Distribution", type: "text", default: "", hidden: true },
     ],
     kind: () => null,
     draw(el, t) {

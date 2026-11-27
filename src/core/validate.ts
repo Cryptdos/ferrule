@@ -216,6 +216,7 @@ export function parseDistributions(v: unknown): Project["distributions"] {
       voltage: strOr(d.voltage),
       ...(typeof d.colour === "string" && d.colour ? { colour: colourCode(d.colour) } : {}),
       ...(typeof d.function === "string" && d.function ? { function: d.function } : {}),
+      ...(typeof d.tag === "number" && Number.isInteger(d.tag) && d.tag >= 0 ? { tag: d.tag } : {}),
     }));
 }
 

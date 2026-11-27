@@ -199,7 +199,8 @@ export function xrefText(project: Project, el: Element, masterTag: string): stri
   if (el.symbol === "offpage") {
     // In brackets: brackets always mean a place, a bare number a wire (v0.3 §2).
     const p = partnerOf(project, el);
-    const ref = p ? address(p.page, p.el.pos, here) : typeof el.params.ref === "string" ? el.params.ref.trim().replace(/^\((.*)\)$/, "$1") : "";
+    // An arrow shows its partner's place; there's nothing to type (design-wire-numbering §3).
+    const ref = p ? address(p.page, p.el.pos, here) : "";
     return ref ? `(${ref})` : "";
   }
   const m = masterOf(project, el);

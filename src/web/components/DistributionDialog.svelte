@@ -38,19 +38,32 @@
 
 <Modal title="Distribution" {onclose} wide>
   <p class="hint">
-    The supplies this project distributes. Distribution blocks, control rails, link arrows and the incoming supply pick
+    The supplies this project distributes, each with a number, its <strong>tag</strong>, that every wire on it carries. Distribution blocks, control rails, link arrows and the incoming supply pick
     one from this list, so everything on the same distribution is joined on every sheet. A block or rail on no distribution
     is <strong>local</strong> and joins nothing else. Wires drawn from them take their colour and function from here unless they say otherwise.
   </p>
   {#if editor.project.distributions.length}
     <table>
       <thead>
-        <tr><th>Name</th><th>Kind</th><th>Voltage</th><th>Colour</th><th>Function</th><th>Sheets</th><th></th></tr>
+        <tr><th>Name</th><th title="Every wire on this supply carries this number (0 is fine for the controls' 0 V)">Tag</th><th>Kind</th><th>Voltage</th><th>Colour</th><th>Function</th><th>Sheets</th><th></th></tr>
       </thead>
       <tbody>
         {#each editor.project.distributions as d (d.id)}
           <tr>
             <td><input value={d.name} onchange={(e) => update(d.id, { name: e.currentTarget.value })} /></td>
+            <td class="tag">
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={d.tag ?? ""}
+                title="Every wire on this supply carries this number"
+                onchange={(e) => {
+                  const el = e.currentTarget;
+                  if (!update(d.id, { tag: Number(el.value) })) el.value = String(d.tag ?? "");
+                }}
+              />
+            </td>
             <td>
               <select value={d.kind} onchange={(e) => update(d.id, { kind: e.currentTarget.value as DistributionKind })}>
                 {#each DISTRIBUTION_KINDS as k (k.value)}<option value={k.value}>{k.label}</option>{/each}
@@ -113,6 +126,9 @@
 </Modal>
 
 <style>
+  td.tag input {
+    width: 4.5em;
+  }
   table.wirecolours {
     width: auto;
   }

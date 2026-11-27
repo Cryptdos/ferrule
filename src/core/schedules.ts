@@ -11,6 +11,7 @@ import { controllerName, controllerOfModule, controllersInOrder, moduleTypeName,
 import { formLabel, printedPin } from "./points";
 import { isBar } from "./symbols";
 import { isFieldWire } from "./wires";
+import { supplyOf } from "./conductors";
 
 export interface TerminalRow {
   strip: string;
@@ -174,8 +175,11 @@ export function wireMarkers(project: Project): MarkerRow[] {
       if (ends.some((e) => !e.el)) continue;
       const own = wireNumber(project, seg);
       const terms = ends.filter((e) => e.el!.symbol === "terminal").map((e) => ({ el: e.el!, page })).sort(order);
-      const panelText = terms[0] ? displayTag(terms[0].el, project) || own : own;
       const field = isFieldWire(page, seg);
+      // A panel wire on a supply says the supply's number, terminal or not (v0.5 A23); a field core still says its terminal.
+      const cond = project.conductors.find((c) => c.id === seg.conductor);
+      const supply = !field && cond ? supplyOf(project, cond) : undefined;
+      const panelText = supply ? String(supply.tag) : terms[0] ? displayTag(terms[0].el, project) || own : own;
       // A field core's field end: a device out in the field, not the terminal.
       const fieldEnd = field ? (ends.find((e) => e.el!.zone === "external" && e.el!.symbol !== "terminal") ?? ends.find((e) => e.el!.symbol !== "terminal")) : undefined;
       for (const e of ends) {

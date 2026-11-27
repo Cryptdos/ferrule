@@ -392,16 +392,16 @@ The electrical drawing: parts, wires, rails, plant views, numbering and links. I
 - **DR-43** ~~An arrow shows the wire number it carries, horizontal and in line with it, and its partner's reference in brackets after its label, `(4-24)`. Brackets always mean a place; a bare number always a wire.~~ *(v0.5: A27)*
 - **DR-44** ~~A destination shows its source's label unless *Same label as its source* is unticked.~~ *(v0.5: A27)*
 - **DR-45** ~~An arrow dropped straight onto a part's pin is on that pin's wire and shows its number.~~ *(v0.5: A27)*
-- **DR-46** ~~An unlinked arrow can carry a typed *Reference*.~~ *(v0.5: A27, A23)*
-- **DR-47** ~~An arrow can pick a distribution, joining it to everything on that distribution.~~ *(v0.5: A27, A23)*
+- **DR-46** An unlinked arrow carries no reference: there's nothing to type, and *Check* reports it as unpaired. *(v0.5: A27. The link arrow part goes)*
+- **DR-47** An arrow can't pick a distribution: a wire reaches a supply only by being drawn onto its block or rail. *(v0.5: A27. The link arrow part goes)*
 
 ### Distribution blocks, rails and distributions
 
-- **DR-48** *Distribution* (top bar) lists the project's supplies: name, kind (AC line, AC neutral, DC +, DC 0 V, Earth), voltage, colour, function, and the sheets each is used on. New projects start with none. Below the list, **Wire colours by function**: a table of functions (phase, neutral, earth, 24 V +, 0 V, DC signal, AC signal, external supply, and any added) and their colours, empty to start. Colours are IEC codes: Bk, Bn, Rd, Og, Ye, Gn, Bu, Vt, Gy, Wh, Pk, Tq, GnYe.
+- **DR-48** *Distribution* (top bar) lists the project's supplies: name, **tag** (a whole number, given from 1 in the order they're added, changeable, 0 allowed), kind (AC line, AC neutral, DC +, DC 0 V, Earth), voltage, colour, function, and the sheets each is used on. New projects start with none. Below the list, **Wire colours by function**: a table of functions (phase, neutral, earth, 24 V +, 0 V, DC signal, AC signal, external supply, and any added) and their colours, empty to start. Colours are IEC codes: Bk, Bn, Rd, Og, Ye, Gn, Bu, Vt, Gy, Wh, Pk, Tq, GnYe.
 - **DR-49** A **Distribution block** is the physical busbar or block: drawn heavy, tagged W, placed on the GA, counted in the bill of materials. ~~A **Control rail** is the common rail of a control drawing: drawn lighter, no tag, not a GA part.~~ *(v0.5: A23)*
-- **DR-50** A block, rail, ~~link arrow~~ *(v0.5: A23, A27)* ~~or incoming supply terminal~~ *(v0.5: A57)* picks a distribution. Everything on the same distribution is joined on every sheet.
+- **DR-50** A block, rail ~~or incoming supply terminal~~ *(v0.5: A57)* picks a distribution. Everything on the same distribution is joined on every sheet.
 - **DR-51** A block or rail on no distribution is *local* and joins nothing else. Deleting a distribution makes its blocks and rails local.
-- **DR-52** A block or rail's name sits at its left end beside its tag; *Name at both ends* prints it at both.
+- **DR-52** A block or rail's name sits at its left end beside its tag; on a supply it's the supply's name and number (`CCT 4`). *Name at both ends* prints it at both.
 - **DR-53** Length is 2 to 150 units. Colour and function come from the distribution unless set on the part.
 
 ### The panel boundary and terminals
@@ -496,9 +496,9 @@ Tag prefixes follow IEC 81346-2 as applied in `docs/designations.md`. Untagged p
 - **NU-2** *Renumber* first shows a table of what would change (What, Where, Now, Becomes) for tags, plant, terminals and wire numbers, with a filter. Nothing changes until *Apply n changes*. With nothing to change it says so.
 - **NU-3** **Position scheme** (default): a tag is its prefix plus the sheet-column where the part is (`K3-16`); a terminal's number is its sheet-column (`3-13`).
 - **NU-4** Where several items share a column, the highest on the sheet keeps the plain number and the rest, working down, get A, B, C (`3-22`, `3-22A`, `3-22B`).
-- **NU-5** **A wire on a terminal takes the terminal's number.** If it reaches several, it takes the first along the strip, by sheet then left to right. *(v0.5: A23. Still true, unless the wire is on a supply)*
+- **NU-5** **A wire on a terminal takes the terminal's number,** unless it's on a supply (NU-7). If it reaches several, it takes the first along the strip, by sheet then left to right. The terminal keeps its own number either way.
 - **NU-6** Any other wire is numbered from its highest end (`3-22`).
-- **NU-7** ~~Numbering stops at distribution blocks and rails: each wire leaving one gets its own number. Wires on a named rail or block take its name.~~ *(v0.5: A23)*
+- **NU-7** **A wire on a supply carries the supply's tag**, before any other rule: every wire drawn onto a block or rail assigned that supply, and every wire looped on from it, on every sheet. A supply ends at the first part: the wire leaving a breaker, fuse or contact is a new potential, numbered by terminal or position. A block or rail on no supply gives no number.
 - **NU-8** A contact linked to a coil takes the coil's tag; it isn't numbered separately.
 - **NU-9** *Tag fixed* on a part, or *Lock number* on a wire, keeps it through Renumber.
 - **NU-10** Plant is tagged prefix plus the sheet-column of its first view (`SEF-3-13`; `U3-13` with the default prefix) unless its tag was typed in Design.
@@ -670,6 +670,8 @@ The same sheets, live. Editing is off. Entering Simulate starts from everything 
 | **CK-13** | info | A wire lands on a terminal and its number doesn't match yet: Renumber |
 | **CK-14** | warning | One wire number is on several wires through different terminals |
 | **CK-50** | error | A part has two terminals of one number (a wire to it can't say which) |
+| **CK-51** | error | Two supplies have the same tag |
+| **CK-52** | info | A block or rail is on no supply, so its wires are numbered by position (as is right for switched power after a part) |
 
 ### Supplies and loads
 
@@ -734,7 +736,7 @@ Design's findings appear only once a project uses Design.
 - **SC-2** CSV files are named `<drawing ref., or the project id> <schedule>.csv`.
 - **SC-3** **Terminals:** Strip, Terminal, Sheet-col, Wire, Internal, External. A terminal is listed as `X1:3-13`.
 - **SC-4** **Field cables:** Plant, Description, Plant terminal, Wire, Panel terminal, Sheet-col; and below, **cores per device** (how many cores each field device needs and on which terminals), with its own CSV.
-- **SC-5** ~~**Markers:** two on every wire. A panel wire's say the terminal it lands on, or its own number when it reaches none. A field core's say the terminal at the panel end and the device's tag at the field end. *Group duplicates* gives each marker once with a count. Renumber first.~~ *(v0.5: A23, A28)*
+- **SC-5** ~~**Markers:** two on every wire.~~ *(v0.5: A28)* A panel wire on a supply says the supply's number; any other panel wire says the terminal it lands on, or its own number when it reaches none. A field core's say the terminal at the panel end and the device's tag at the field end. *Group duplicates* gives each marker once with a count. Renumber first.
 - **SC-6** **IO points:** Controller, Module, Point, Form, Pins, Label, Wired to (followed through link arrows). With no controller it says *No controller yet (Design → Controller)*.
 - **SC-7** **Plant points:** Device, Description, Point, Form, Pins, Wired to.
 - **SC-8** **Bill of materials:** GA sheet, Item, Maker, Part number, Qty, Unit, Tags. It's counted from the GA sheets only: devices by the device picked (or their generic size), terminals each, label plates, and DIN rail and trunking by length. A schematic part never placed on a GA isn't on it (CK-41). *(v0.5: A71. Also as a table placed on a GA sheet)*

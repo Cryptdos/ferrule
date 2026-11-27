@@ -77,8 +77,8 @@ describe("MCP tools", () => {
     const page = (await call("get_page", { project, sheet: 1 })).data;
     expect(page.elements.find((e: { id: string }) => e.id === k1.id).tag).toBe("K1-16");
     const wire = page.wires.find((w: { between: string }) => w.between === "S1-16:14 → K1-16:A1");
-    // The wire off the CCT busbar is 1-16; this one, below it in the same column, 1-16A.
-    expect(wire.number).toBe("1-16A");
+    // The wire off the CCT rail carries its supply's number (v0.5 A23); this one is the column's first by position.
+    expect(wire.number).toBe("1-16");
     // Routed on the server: a straight drop.
     const saved = await storage.load(project);
     expect(saved.pages[0]!.segments.find((s) => s.id === wire.id)!.points).toEqual([[30, 33], [30, 54]]);

@@ -36,15 +36,16 @@ describe("renumber (position scheme)", () => {
     expect([a.tag, c.tag, b.tag]).toEqual(["P1-31", "P1-31A", "P1-31B"]);
   });
 
-  test("wire numbers come from the conductor's start; numbering stops at busbars", () => {
-    const { p, s1, k1 } = rung();
+  test("a wire on a supply carries its tag; any other is numbered from its start (v0.5 A23)", () => {
+    const { p, s1, k1, cct, ov } = rung();
     renumber(p);
     const byTerm = (id: string, t: string) =>
       p.conductors.find((c) => c.terminals.some(([e, n]) => e === id && n === t))!.number;
-    // The wire off the CCT busbar starts at the busbar: the column's first number.
-    expect(byTerm(s1.id, "13")).toBe("1-16");
-    expect(byTerm(s1.id, "14")).toBe("1-16A");
-    expect(byTerm(k1.id, "A2")).toBe("1-16B");
+    const tagOf = (bar: typeof cct) => String(p.distributions.find((d) => d.id === bar.params.dist)!.tag);
+    // Off the CCT rail and back to 0V: the supplies' numbers. Between: a new potential, by position.
+    expect(byTerm(s1.id, "13")).toBe(tagOf(cct));
+    expect(byTerm(s1.id, "14")).toBe("1-16");
+    expect(byTerm(k1.id, "A2")).toBe(tagOf(ov));
   });
 
   test("locked tags and wire numbers are kept, and nobody else takes them", () => {

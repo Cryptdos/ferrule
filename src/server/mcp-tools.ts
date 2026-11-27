@@ -1113,7 +1113,7 @@ export const TOOLS: Tool[] = [
   {
     name: "add_distribution",
     description:
-      "Add a distribution (a supply the project distributes: L1, N, CCT, 0V…), or update one (give its name or id as 'distribution'). Busbars, link arrows and the incoming supply pick one with params.dist (supply: params.dist_<terminal>, e.g. dist_L1); everything on the same distribution is joined on every sheet. A busbar with no distribution is local. Returns the list.",
+      "Add a distribution (a supply the project distributes: L1, N, CCT, 0V…), or update one (give its name or id as 'distribution'). Each has a numerical tag, given from 1 if not set (0 is fine for the controls' 0 V): every wire on the supply carries it as its number. Distribution blocks and control rails pick one with params.dist, and the incoming supply with params.dist_<terminal>, e.g. dist_L1; everything on the same distribution is joined on every sheet. A block or rail with no distribution is local and gives no number. Returns the list.",
     inputSchema: obj(
       {
         project,
@@ -1123,6 +1123,7 @@ export const TOOLS: Tool[] = [
         voltage: { type: "string", description: "As written, e.g. 230 V or 24 V DC" },
         colour: { type: "string", description: "Core colour code, e.g. Bn, Bu, Wh" },
         function: { type: "string", description: "e.g. L, N, +24V, 0V" },
+        tag: { type: "number", description: "Its numerical tag, a whole number from 0: every wire on it carries this number" },
       },
       ["project"],
     ),
@@ -1130,7 +1131,7 @@ export const TOOLS: Tool[] = [
       edit(ctx, str(a, "project"), (p) => {
         const s = (k: string) => (typeof a[k] === "string" ? (a[k] as string) : undefined);
         const kind = s("kind") as "line" | "neutral" | "dc+" | "dc0" | "earth" | undefined;
-        const patch = { name: s("name"), kind, voltage: s("voltage"), colour: s("colour"), function: s("function") };
+        const patch = { name: s("name"), kind, voltage: s("voltage"), colour: s("colour"), function: s("function"), ...(typeof a.tag === "number" ? { tag: a.tag } : {}) };
         if (typeof a.distribution === "string") {
           const d = p.distributions.find((x) => x.id === a.distribution || x.name === a.distribution);
           if (!d) throw new ArgError(`No distribution "${a.distribution}"`);
