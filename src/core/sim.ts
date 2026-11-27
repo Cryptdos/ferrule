@@ -23,7 +23,7 @@
 import type { Condition, Element, Expectation, Project } from "./model";
 import { contactPins, isAnalogueForm, pointRef, signalPins } from "./points";
 import { pointLabel, viewsOf } from "./modules";
-import { changeoverTerms, contactKind, isolatorAux, isTimerCoil, pushPoles, selectorPoles } from "./symbols";
+import { changeoverTerms, contactKind, isolatorAux, isTimerCoil, pushPoles, selectorPoles, selectorPositions } from "./symbols";
 import { masterOf } from "./xref";
 import { netJoins } from "./conductors";
 import { displayTag } from "./tags";
@@ -254,7 +254,7 @@ export function compile(project: Project): Circuit {
           selectorPoles(el).forEach((p, i) => {
             const k = i + 1;
             if (p.kind === "co") {
-              const t = changeoverTerms(k, el.params.positions === "3");
+              const t = changeoverTerms(k, selectorPositions(el) === "3");
               link(el, t.com, t.second, (s) => p.closed.includes(at(s)));
               link(el, t.com, t.first, (s) => (p.closed12 ?? []).includes(at(s)));
             } else if (p.kind === "nc") {
@@ -263,8 +263,8 @@ export function compile(project: Project): Circuit {
               link(el, `${k}3`, `${k}4`, (s) => p.closed.includes(at(s)));
             }
           });
-          const three = el.params.positions === "3";
-          inputs.push({ el: el.id, kind: "select", label: el.label || "Selector", initial: 0, positions: three ? ["0", "I", "II"] : ["0", "I"] });
+          const pos = selectorPositions(el);
+          inputs.push({ el: el.id, kind: "select", label: el.label || "Selector", initial: 0, positions: pos === "4" ? ["1", "2", "3", "4"] : pos === "3" ? ["0", "I", "II"] : ["0", "I"] });
           break;
         }
         case "isolator": {

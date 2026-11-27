@@ -251,6 +251,16 @@ Judgement calls made while building, by step, with the reason.
 - **D9 built to the recommended answer:** Rotate stays on every part A39 doesn't name.
 - **File format 5.**
 
+### Step 4b
+
+- **A 4 position selector at rest** is drawn with every pole open: it has no off position, and each pole is closed in one of the four. In Simulate it starts in 1 and each pole is drawn as it is in the position the switch is in.
+- **Pole choices come from the positions** (`optionsFor`), and a change of positions tidies the poles at once (A41), rather than leaving a choice the list no longer shows.
+- ***Changeover* is greyed on a 4 position selector**, with the reason, rather than hidden, so it's plain why it can't be ticked; the pole lists hide while it's ticked.
+- **Names on a 4 position selector** are typed in *Position 1 (I)*, *Position 2 (II)*, *Position 3* and *Position 4*; *Off / mid position (0)* hides.
+- **CK-50 is an error,** since a wire to a repeated number can't say which terminal it means. No part can be set up that way now; it's there so nothing like it can hide again (A43).
+- **LSP-01's duty selector** is set with *Changeover* ticked in place of its first pole's old changeover choice: it prints as before.
+- **File format 6.**
+
 ## 7. After the build
 
 What QA on v0.5 starts from:

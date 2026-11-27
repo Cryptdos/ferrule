@@ -465,7 +465,7 @@ Tag prefixes follow IEC 81346-2 as applied in `docs/designations.md`. Untagged p
 |---|---|---|---|---|
 | **PT-1** | Contact | K, Q (from its coil) | *Contact*: normally open, normally closed or changeover; *Instantaneous*, shown only on a contact linked to a timer | One part, its kind picked in its properties. Unlinked, it's a K: terminals 13-14, 21-22 or 11-12/14 by its kind. Linked: its coil's tag and pole numbers, and timed when the coil is a timer |
 | **PT-2** | Push button | S | Poles 1–4; each pole NO or NC | One head. Pole *n* is numbered *n*3/*n*4 when NO and *n*1/*n*2 when NC (13/14 or 11/12, 23/24 or 21/22…) |
-| **PT-3** | Selector / keyswitch | S | 2 position (0–I) or 3 (I–0–II); poles 1–4; each pole NO closed in I, in II, or in both, NC opened in I or II, ~~or changeover~~ *(v0.5: A43)*; *Key operated*; a name per position | Position names print under the head as `SUPPLY 1 – OFF – SUPPLY 2`. A 3-position changeover is numbered common 2, to 3 in I, to 1 in II; the next pole 7, 6, 5 *(v0.5: A41, A43, A46. The pole choices, changeover and the part's name change; a 4 position selector is added)* |
+| **PT-3** | Selector | S | *Positions*: 2 (0–I), 3 (I–0–II) or 4 (1–2–3–4, no off); poles 1–4; *Changeover* (2 or 3 position): every pole a changeover; otherwise each pole picks from the choices its positions have: on 2, NO closed in I or NC opened in I; on 3, NO closed in I, in II or in both, NC opened in I or II; on 4, closed in one position, 1 to 4; *Key operated*; a name per position | Position names print under the head as `SUPPLY 1 – OFF – SUPPLY 2`. A pole is numbered *n*3/*n*4 when NO and *n*1/*n*2 when NC; a changeover *n*1 common, *n*2, *n*4 on a 2-position switch, and as makers do on a 3 (common 2, to 3 in I, to 1 in II; the next pole 7, 6, 5). Changing the positions puts a pole on a choice they don't have back to its default |
 | **PT-4** | Isolator / MCB / contactor | Q or F | *Function*: Isolator (Q), Contactor main contacts (Q), Circuit breaker / MCB (F), RCD / RCBO (F); main poles 1–4; aux NO 0–3; aux NC 0–3; *Operator* (an isolator only): rotary handle, door handle or key; every isolator has one | Contactor poles are worked by the coil picked under *Driven by coil*. A breaker draws no operator. An RCD carries the residual current mark |
 | **PT-5** | Fuse / fuse carrier | F | Poles 1–4; *Rating* | Rating prints beside it |
 | **PT-6** | Coil | K for a relay or timer, Q for a contactor | *Type*: Relay, Contactor or Timer; ~~*Takes (supply)*; *Draw (VA)*~~ *(v0.5: A38)* | One part: the symbol changes with the type. Terminals A1, A2; contact table once contacts are linked. Its contacts follow the type: set to Timer, they're timed |
@@ -599,7 +599,7 @@ The same sheets, live. Editing is off. Entering Simulate starts from everything 
 
 - **SM-1** Clicking a switch, selector, isolator, breaker or plant output on the drawing operates it. Operable things are outlined in orange.
 - **SM-2** A push button is held while the mouse is down; `Shift`+click latches it until clicked again.
-- **SM-3** A selector steps to its next position at each click; the position it's in is boxed.
+- **SM-3** A selector steps to its next position at each click; the position it's in is boxed, and each of its poles is drawn open or closed as it is in that position.
 - **SM-4** Clicking a fuse blows it, drawn broken; clicking again replaces it.
 - **SM-5** Coils pull in, contacts move, lamps glow in their colour, and energised parts, live wires, blocks and rails turn red.
 - **SM-6** A timing timer shows its countdown. Functions run as set: TON, TOF, TON+TOF, TP, and both flashers.
@@ -669,6 +669,7 @@ The same sheets, live. Editing is off. Entering Simulate starts from everything 
 | **CK-12** | warning | A locked wire number disagrees with the terminal it lands on |
 | **CK-13** | info | A wire lands on a terminal and its number doesn't match yet: Renumber |
 | **CK-14** | warning | One wire number is on several wires through different terminals |
+| **CK-50** | error | A part has two terminals of one number (a wire to it can't say which) |
 
 ### Supplies and loads
 

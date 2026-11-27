@@ -101,6 +101,11 @@ export function checkProject(project: Project, opts: { proofs?: Proofs | null } 
       }
 
       const names = terminalNames(el);
+      // Two terminals of one number on a part (A43): a wire to it can't say which.
+      const twice = [...new Set(names.filter((n, i) => names.indexOf(n) !== i))];
+      if (twice.length) {
+        out.push({ level: "error", message: `Sheet ${page.number}: ${tag || el.symbol} has two terminals numbered ${twice.join(", ")}`, pageId: page.id, ids: [el.id] });
+      }
       if (!NO_TERMINAL_CHECK.has(el.symbol) && names.length) {
         const w = wired.get(el.id) ?? new Set<string>();
         if (w.size === 0) {

@@ -1921,7 +1921,8 @@
         {#each page.elements as el (el.id)}
           {@const g = geoms.get(el.id)}
           {#if g && !isBar(el)}
-            {#each g.terminals as t (t.name)}
+            <!-- By position, not name: a part with two terminals of one number mustn't blank the tool (A43). -->
+            {#each g.terminals as t, ti (ti)}
               <circle class="term" cx={el.pos[0] + t.at[0]} cy={el.pos[1] + t.at[1]} r="0.3" />
             {/each}
           {/if}
