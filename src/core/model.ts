@@ -14,8 +14,9 @@ export const FORMAT = "ferrule";
  * 6: v0.5 step 4b, a selector's changeover on the whole switch, 4 positions.
  * 7: v0.5 step 4c, a motor's picture is its type.
  * 8: v0.5 step 5, no numbering settings (position only; strips follow on).
+ * 9: v0.5 step 6a, a supply's tag; a link arrow has no distribution or typed reference.
  */
-export const FORMAT_VERSION = 8;
+export const FORMAT_VERSION = 9;
 
 export type ParamValue = string | number | boolean;
 
@@ -613,6 +614,12 @@ export interface Distribution {
   colour?: string;
   /** Function (L, N, +24V, 0V…), likewise. */
   function?: string;
+  /**
+   * Its numerical tag (v0.5 A23, design-wire-numbering §2): every wire on it
+   * carries this number. Given from 1 in the order supplies are added; 0 is
+   * allowed (the controls' 0 V). Unique, or Check says so.
+   */
+  tag?: number;
 }
 
 /** What a distribution is: a line or neutral, a DC + or 0 V, or earth. */

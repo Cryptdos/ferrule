@@ -15,12 +15,13 @@
  * Position numbering is the only scheme (v0.5 A50): it's part of the
  * design, and where it falls short it's fixed.
  *
- * Wires on a named rail or busbar take its name (CCT, 0V, L1…). Contacts
+ * A wire on a supply (a block or rail assigned one with a tag) carries the
+ * supply's number, ahead of every other rule (v0.5 A23). Contacts
  * linked to a coil take its tag and get pole numbers 1, 2, 3… (13/14,
  * 21/22, 33/34…).
  */
 import { fitBlock } from "./blocks";
-import { refreshConductors } from "./conductors";
+import { refreshConductors, supplyOf } from "./conductors";
 import { columnOf, type Vec } from "./geometry";
 import type { Conductor, Element, Page, Project } from "./model";
 import { assignAddresses, collisionSuffix, type Placed } from "./numbering";
@@ -235,10 +236,19 @@ export function renumber(project: Project): RenumberResult {
   const condItems: Item[] = [];
   const takenWires = new Set<string>();
   for (const c of project.conductors) if (c.locked && c.number) takenWires.add(c.number);
-  // A wire on a terminal takes the terminal's number: the two always agree (v0.3 §2).
+  // 1. A wire on a supply carries the supply's number (v0.5 A23), terminal or not.
   const fromTerminal = new Set<string>();
   for (const c of project.conductors) {
     if (c.locked && c.number) continue;
+    const d = supplyOf(project, c);
+    if (!d) continue;
+    c.number = String(d.tag);
+    fromTerminal.add(c.id);
+    result.wires++;
+  }
+  // 2. A wire on a terminal takes the terminal's number: the two always agree (v0.3 §2).
+  for (const c of project.conductors) {
+    if ((c.locked && c.number) || fromTerminal.has(c.id)) continue;
     const t = numberingTerminal(project, c);
     if (!t) continue;
     c.number = t.el.tag;
@@ -248,7 +258,7 @@ export function renumber(project: Project): RenumberResult {
   }
   for (const c of project.conductors) {
     if ((c.locked && c.number) || fromTerminal.has(c.id)) continue;
-    // Numbering stops at busbars: each wire leaving one is numbered by where it starts, like any other.
+    // 3. Otherwise by where it starts (a wire off a block or rail on no supply, too).
     let start: { page: number; at: Vec } | null = null;
     for (const [id, term] of c.terminals) {
       const w = where.get(id);

@@ -277,6 +277,14 @@ Judgement calls made while building, by step, with the reason.
 - **A1:** a client name longer than its 24 mm cell is squeezed to fit, as every title block cell already is.
 - **File format 8** (the numbering settings are gone from the file).
 
+### Step 6
+
+- **A rail or block on no supply is reported as information, not a warning** (design-wire-numbering §4a says only that Check reports it). LSP-01 has nine on purpose: each fan starter's own CCT and 0 V rails after its isolator's auxiliary poles, and the lamp test rail. They carry switched power, which §2a numbers by position, and a warning would flag a drawing that's right.
+- **A link arrow loses its distribution and its typed reference in 6a** (§3 of the note), ahead of step 7b replacing the arrow, so no wire reaches a supply except by being drawn onto its block or rail.
+- **A tag is a whole number from 0 to 999**, typed in the Distribution window. An empty box isn't allowed: every supply has a tag, given from 1 when it's added.
+- **Markers follow the number** (note §5): a panel wire on a supply says the supply's tag at both ends, terminal or not; a field core still says its terminal at the panel end.
+- **The terminal checks leave supply wires alone:** a supply wire landing on a terminal isn't *a wire whose number doesn't match its terminal*, and one tag on many wires isn't *one number on several wires*.
+
 ## 7. After the build
 
 What QA on v0.5 starts from:

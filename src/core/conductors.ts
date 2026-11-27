@@ -13,7 +13,7 @@
  * number of each conductor that still exists (matched by the terminals it
  * shares with its old self), so numbers don't jump about while drawing.
  */
-import { type Conductor, type Project, type TerminalRef, newId } from "./model";
+import { type Conductor, type Distribution, type Project, type TerminalRef, newId } from "./model";
 import { isBar, requireSymbol, terminalPoint } from "./symbols";
 
 const key = (r: TerminalRef) => `${r[0]}\u0000${r[1]}`;
@@ -161,6 +161,24 @@ export function refreshConductors(project: Project): void {
  * link arrows and incoming supply terminals that pick it). Each join is two
  * terminal refs and the element that makes it.
  */
+/**
+ * The supply a wire is on (v0.5 A23): a block or rail it lands on is
+ * assigned one with a tag. Every wire on it carries that number.
+ */
+export function supplyOf(project: Project, c: Conductor): Distribution | undefined {
+  for (const [id] of c.terminals) {
+    for (const page of project.pages) {
+      const el = page.elements.find((e) => e.id === id);
+      if (!el) continue;
+      if (!isBar(el) || typeof el.params.dist !== "string") break;
+      const d = project.distributions.find((x) => x.id === el.params.dist);
+      if (d && d.tag !== undefined) return d;
+      break;
+    }
+  }
+  return undefined;
+}
+
 export function netJoins(project: Project): { a: TerminalRef; b: TerminalRef; el: string }[] {
   const out: { a: TerminalRef; b: TerminalRef; el: string }[] = [];
   const firstOn = new Map<string, TerminalRef>(); // distribution id → a terminal on it
@@ -179,8 +197,6 @@ export function netJoins(project: Project): { a: TerminalRef; b: TerminalRef; el
         );
         for (let i = 1; i < taps.length; i++) out.push({ a: [el.id, taps[0]!], b: [el.id, taps[i]!], el: el.id });
         if (taps.length) onDist(el.params.dist, [el.id, taps[0]!], el.id);
-      } else if (el.symbol === "offpage") {
-        onDist(el.params.dist, [el.id, "1"], el.id);
       } else if (el.symbol === "supply") {
         for (const [k, v] of Object.entries(el.params)) if (k.startsWith("dist_")) onDist(v, [el.id, k.slice(5)], el.id);
       }

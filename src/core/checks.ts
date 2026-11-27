@@ -11,6 +11,7 @@ import { contactPins, isAnalogueForm, isInputForm, missingRefs, describeExpectat
 import type { Element, Page, Project } from "./model";
 import { benchOf, contactKind, getSymbol, isBar, labelBlockRect, localGeometry, terminalNames } from "./symbols";
 import { numberingTerminal } from "./renumber";
+import { supplyOf } from "./conductors";
 import { displayTag, elementTexts } from "./tags";
 import { isMaster, isSlave, masterOf, partnerOf, slavesOf } from "./xref";
 import { drawnOn, fieldPlant, needsChannel, onNetworkOnly } from "./design";
@@ -161,7 +162,7 @@ export function checkProject(project: Project, opts: { proofs?: Proofs | null } 
   }
 
   if (unnumbered) out.push({ level: "info", message: `${unnumbered} items not numbered yet: press Renumber`, ids: [] });
-  out.push(...terminalNumberChecks(project));
+  out.push(...terminalNumberChecks(project), ...supplyTagChecks(project));
   // Detail sheets (design-v0.3 §6): a detail is shown in a frame; a frame shows a detail that's still there.
   for (const d of allDetails(project))
     if (!frameOf(project, d.it.id)) out.push({ level: "warning", message: `Sheet ${d.page.number}: detail ${d.it.letter ?? "?"} isn't shown on a detail sheet (Place detail…)`, pageId: d.page.id, ids: [d.it.id] });
@@ -441,6 +442,31 @@ export function controllerChecks(project: Project): Finding[] {
 }
 
 /**
+ * Supplies and their tags (v0.5 A23, design-wire-numbering §2, §4a): two
+ * supplies with one tag, and a block or rail on no supply, which gives out
+ * no number.
+ */
+export function supplyTagChecks(project: Project): Finding[] {
+  const out: Finding[] = [];
+  const byTag = new Map<number, string[]>();
+  for (const d of project.distributions) if (d.tag !== undefined) byTag.set(d.tag, [...(byTag.get(d.tag) ?? []), d.name]);
+  for (const [tag, names] of byTag)
+    if (names.length > 1) out.push({ level: "error", message: `Supplies ${names.join(" and ")} have the same tag, ${tag}: every wire on either would be numbered ${tag}`, ids: [] });
+  for (const page of project.pages) {
+    if (page.ga) continue;
+    for (const el of page.elements) {
+      if (!isBar(el)) continue;
+      const d = typeof el.params.dist === "string" ? project.distributions.find((x) => x.id === el.params.dist) : undefined;
+      if (d) continue;
+      const what = el.symbol === "busbar" ? `distribution block ${displayTag(el, project) || ""}`.trim() : "a power rail";
+      // Info, not a warning: a local rail after a switch carries switched power, numbered by position as it should be.
+      out.push({ level: "info", message: `Sheet ${page.number}: ${what} is on no supply, so its wires are numbered by position, not by a supply`, pageId: page.id, ids: [el.id] });
+    }
+  }
+  return out;
+}
+
+/**
  * Wires and terminals agree (v0.3 §2): a locked wire number that isn't its
  * terminal's, and one number on two wires (terminals of different strips in
  * the same place).
@@ -449,6 +475,8 @@ export function terminalNumberChecks(project: Project): Finding[] {
   const out: Finding[] = [];
   const seen = new Map<string, string[]>();
   for (const c of project.conductors) {
+    // A wire on a supply carries the supply's number, terminal or not (v0.5 A23): one number on many wires.
+    if (supplyOf(project, c)) continue;
     const t = numberingTerminal(project, c);
     if (!t) continue;
     const name = `${t.el.params.strip ?? "X1"}:${t.el.tag}`;

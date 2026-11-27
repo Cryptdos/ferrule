@@ -2142,7 +2142,8 @@ export function setGaItemDevice(project: Project, pageId: string, itemId: string
 
 /** The params on an element that name a distribution: a busbar's or arrow's `dist`, an incoming supply's `dist_<terminal>`. */
 export function distParamKeys(el: Element): string[] {
-  if (isBar(el) || el.symbol === "offpage") return ["dist"];
+  // A link arrow can't be set to a supply (design-wire-numbering §3): only blocks and rails.
+  if (isBar(el)) return ["dist"];
   if (el.symbol === "supply") return Object.keys(el.params).filter((k) => k.startsWith("dist_"));
   return [];
 }
@@ -2159,6 +2160,8 @@ export function addDistribution(project: Project, d: Partial<Omit<Distribution, 
   if (!name) throw new OpError("A distribution needs a name");
   if (project.distributions.some((x) => x.name === name)) throw new OpError(`There's already a distribution called ${name}`);
   const out: Distribution = { id: newId("d"), name, kind: d.kind ?? "line", voltage: (d.voltage ?? "").trim() };
+  // The next free tag from 1 (design-wire-numbering §2); changeable, and 0 is allowed.
+  out.tag = d.tag !== undefined ? supplyTag(d.tag) : nextSupplyTag(project);
   if (d.colour?.trim()) out.colour = colourCode(d.colour);
   if (d.function?.trim()) out.function = d.function.trim();
   project.distributions.push(out);
@@ -2175,6 +2178,7 @@ export function updateDistribution(project: Project, id: string, patch: Partial<
     d.name = name;
   }
   if (patch.kind) d.kind = patch.kind;
+  if (patch.tag !== undefined) d.tag = supplyTag(patch.tag);
   if (patch.voltage !== undefined) d.voltage = patch.voltage.trim();
   if (patch.colour !== undefined) {
     if (patch.colour.trim()) d.colour = colourCode(patch.colour);
@@ -2187,7 +2191,22 @@ export function updateDistribution(project: Project, id: string, patch: Partial<
   return d;
 }
 
-/** Delete a distribution: busbars and arrows on it become local, supply terminals stop feeding it. */
+/** A supply's tag: a whole number, 0 or more. */
+function supplyTag(v: unknown): number {
+  const n = typeof v === "string" ? Number(v.trim()) : v;
+  if (typeof n !== "number" || !Number.isInteger(n) || n < 0 || n > 999) throw new OpError("A supply's tag is a whole number, 0 or more");
+  return n;
+}
+
+/** The lowest tag from 1 that no supply has. */
+export function nextSupplyTag(project: Project): number {
+  const used = new Set(project.distributions.map((d) => d.tag));
+  let n = 1;
+  while (used.has(n)) n++;
+  return n;
+}
+
+/** Delete a distribution: busbars on it become local, supply terminals stop feeding it. */
 export function deleteDistribution(project: Project, id: string): void {
   project.distributions = project.distributions.filter((d) => d.id !== id);
   for (const pg of project.pages) for (const el of pg.elements) for (const k of distParamKeys(el)) if (el.params[k] === id) delete el.params[k];

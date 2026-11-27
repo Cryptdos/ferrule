@@ -238,8 +238,9 @@ describe("link arrows: wire number and bracketed reference (v0.3 §2)", () => {
     const prim = localGeometry(out, t).prims.find((x) => x.t === "text" && x.text === n);
     expect(prim && prim.t === "text" && !prim.vertical).toBe(true);
     // A typed reference is bracketed too, never twice.
-    const lone = addElement(p, pg, "offpage", [60, 40], { params: { ref: "(8-34)" } });
-    expect(elementTexts(lone, p).xref).toBe("(8-34)");
+    // An unlinked arrow carries no typed reference (v0.5 A23): there's nothing to set by hand.
+    const lone = addElement(p, pg, "offpage", [60, 40]);
+    expect(elementTexts(lone, p).xref).toBe("");
   });
 
   test("an arrow dropped straight onto a pin is on that pin's conductor and shows its number (32)", async () => {
