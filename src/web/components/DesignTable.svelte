@@ -1,8 +1,9 @@
 <script lang="ts">
   /**
-   * Design's table (design-v0.4 §2): system → plant → point, one row per
-   * point, systems folding. Picking a row shows it in Properties; Ctrl or
-   * Shift adds plant to what's picked.
+   * Design's Plant view (design-v0.4 §2, v0.5 A69): system → plant →
+   * point, one row per point, systems folding. A plant shares a line with its
+   * first point: its tag or description picks the plant, from the point's
+   * name across picks the point. Ctrl or Shift adds plant to what's picked.
    */
   import { goesTo, pointType, systemGroups } from "../../core/design";
   import { POINT_FORMS, type PlantItem } from "../../core/model";
@@ -83,20 +84,18 @@
               {@const picked = editor.designPick.plant.includes(p.id)}
               {#each pts.length ? pts : [null] as pt, i (pt?.name ?? "-")}
                 {@const t = pt ? pointType(pt.form) : undefined}
-                <tr
-                  class="row"
-                  class:picked={picked && (!editor.designPick.point || editor.designPick.point === pt?.name || editor.designPick.plant.length > 1)}
-                  class:first={i === 0}
-                  onclick={(e) => pickPlant(e, p.id, pt?.name)}
-                >
-                  <td class="tag">{i === 0 ? plantLabel(p) : ""}</td>
-                  <td>{i === 0 ? p.description : ""}</td>
-                  <td class="dim">{i === 0 ? by(p) : ""}</td>
-                  <td>{pt?.name ?? ""}{#if pt && !pt.pins.length}<span class="nopins" title="No pins yet: they come when the plant is specified or drawn">○</span>{/if}</td>
-                  <td class="dim">{pt ? formLabel(pt.form) : ""}</td>
-                  <td class="dim">{pt?.signal ?? ""}</td>
-                  <td>{#if t}<TypeBadge type={t} />{/if}</td>
-                  <td>
+                {@const plantPicked = picked && (!editor.designPick.point || editor.designPick.plant.length > 1)}
+                {@const pointPicked = picked && !!pt && editor.designPick.point === pt.name && editor.designPick.plant.length === 1}
+                <tr class="row" class:first={i === 0} onclick={(e) => pickPlant(e, p.id, pt?.name)}>
+                  <!-- The tag and description pick the plant itself (A69). -->
+                  <td class="tag" class:picked={plantPicked && i === 0} onclick={(e) => (e.stopPropagation(), pickPlant(e, p.id))}>{i === 0 ? plantLabel(p) : ""}</td>
+                  <td class:picked={plantPicked && i === 0} onclick={(e) => (e.stopPropagation(), pickPlant(e, p.id))}>{i === 0 ? p.description : ""}</td>
+                  <td class="dim" class:picked={plantPicked && i === 0}>{i === 0 ? by(p) : ""}</td>
+                  <td class:ptpick={pointPicked}>{#if pt?.form === "none"}<span class="new" title="No form yet: pick one in Properties">●</span>{/if}{pt?.name ?? ""}{#if pt && !pt.pins.length && pt.form !== "none"}<span class="nopins" title="No terminals yet: they come when the plant is specified or drawn">○</span>{/if}</td>
+                  <td class="dim" class:ptpick={pointPicked}>{pt ? (pt.form === "none" ? "–" : formLabel(pt.form)) : ""}</td>
+                  <td class="dim" class:ptpick={pointPicked}>{pt?.signal ?? ""}</td>
+                  <td class:ptpick={pointPicked}>{#if t}<TypeBadge type={t} />{/if}</td>
+                  <td class:ptpick={pointPicked}>
                     {#if pt && t}
                       {#if goesTo(pt) === "panel"}<span class="dim">panel only</span>
                       {:else}<ChannelSelect {editor} plant={p} point={pt} compact />{#if goesTo(pt) === "relay"}<span class="dim"> via relay</span>{/if}{/if}
@@ -174,8 +173,17 @@
   tr.row:hover {
     background: #f6f8fb;
   }
-  tr.row.picked {
+  tr.row td.picked,
+  tr.row td.ptpick {
     background: #e8f0fd;
+  }
+  tr.row td.ptpick:nth-child(4) {
+    box-shadow: inset 3px 0 0 #1e6ee6;
+  }
+  .new {
+    color: #c00;
+    margin-right: 4px;
+    font-size: 10px;
   }
   tr.system td {
     background: #f1f3f6;

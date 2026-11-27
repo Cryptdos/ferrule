@@ -219,7 +219,7 @@ export function things(project: Project): Thing[] {
   for (const item of project.plant) {
     const views = viewsOf(project, item.id);
     for (const p of item.points ?? []) {
-      if (isAnalogueForm(p.form) || p.form === "comms") continue;
+      if (isAnalogueForm(p.form) || p.form === "comms" || p.form === "none") continue;
       const shown = views.find((v) => String(v.el.params.show ?? "").split(",").includes(p.pins[0] ?? "")) ?? views[0];
       out.push({
         ref: pointRef(item.id, p.name),

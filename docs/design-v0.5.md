@@ -311,6 +311,14 @@ Judgement calls made while building, by step, with the reason.
 - **README pictures:** the drafting, simulating, notes, terminal block and printed sheet pictures are retaken here, having fallen behind the interface since v0.4.x. Design, Controller, Network and Layout's are retaken in steps 8 to 11, which rework those views.
 - **Link ends moved the file format to 13.** Claude's `connect` takes `{x, y}` for a bare end (with a label, and `link` to carry a source on); `link` pairs two link ends; `add_element` refuses one.
 
+### Step 8
+
+- **8a: a point with no form yet has the form *none*** (shown *–*, marked ● in the table). It needs no channel, can't take an interlock and doesn't simulate, so nothing has to guess what it is. Choosing a form clears it.
+- **8a: a point's Properties keeps *Gives*, *Takes*, *Draw VA*, *Rating VA* and *Efficiency %* until 8d,** which moves them to the device (A38). The plant's *Pins, from the datasheet* line stays until 8b's Terminals window takes it.
+- **8a: the form list is the browser's own list,** each form with its plain words and the channel it needs in brackets; under the box, the words again with the channel's badge.
+- **8a: *Terminals…* opens today's *Pins and points…* window** until 8b replaces it.
+- **8a: dropping *Enabled by* and *Source* moved the file format to 14.**
+
 ### Title block (ruled 27 Nov 2026, before step 7)
 
 - **A1 laid out again:** *Sheet*, *Job no.* and *Checked* in three equal cells (24 mm); *Drawing ref.* and *Drawn* in two (36 mm); *Client* across the row (72 mm). A long *Checked* name and date is squeezed to fit its cell, as every cell's value is.

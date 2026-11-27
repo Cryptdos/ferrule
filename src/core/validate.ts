@@ -246,7 +246,7 @@ const text = (v: unknown) => (typeof v === "string" ? v.trim() : "");
 /** A plant item's Design fields (design-v0.4 §2), each only when set. */
 function parsePlantDesign(pl: Record<string, unknown>): Partial<PlantItem> {
   const out: Partial<PlantItem> = {};
-  for (const k of ["system", "protocol", "network", "enabledBy", "source"] as const) {
+  for (const k of ["system", "protocol", "network"] as const) {
     const v = text(pl[k]);
     if (v) out[k] = v;
   }
@@ -327,7 +327,7 @@ function parseControllers(v: unknown, plant: PlantItem[]): Controller[] | undefi
 
 const isSupplyType = (v: unknown): v is { v: number; ac: boolean } => isObj(v) && typeof v.v === "number" && v.v > 0 && typeof v.ac === "boolean";
 
-const FORMS = new Set(POINT_FORMS.map((f) => f.value));
+const FORMS = new Set<PointForm>([...POINT_FORMS.map((f) => f.value), "none"]);
 
 function parseConditions(v: unknown, max = 2): Condition[] {
   return arr(v)

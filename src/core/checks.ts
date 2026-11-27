@@ -336,7 +336,7 @@ export function pointChecks(project: Project): Finding[] {
         out.push({ level: "error", message: `${lead}: dry input ${pt.name} is wired to a live conductor (a voltage onto a volt-free input)`, ids: viewIds(item.id) });
       }
       // Signal pins only: commons are often shared (an analogue 0 V with a DI common) and that's fine.
-      if (pt.form === "comms" || pt.form === "supply-in" || pt.form === "supply-out") continue;
+      if (pt.form === "comms" || pt.form === "supply-in" || pt.form === "supply-out" || pt.form === "none") continue;
       const signals = pt.form === "contact" ? [contactPins(pt, item.pins).no, contactPins(pt, item.pins).nc].filter((x): x is string => !!x) : pt.pins.slice(0, 1);
       for (const t of signals) {
         if (!pinWired(item.id, t)) continue;
@@ -514,7 +514,7 @@ function gaItemName(project: Project, it: { refs?: string[]; module?: string; ta
 /** A project worked on in Design: it has systems, a controller, or plant with Design's fields. */
 export function usesDesign(project: Project): boolean {
   if (project.systems?.length || project.controllers?.length || project.networks?.length) return true;
-  return project.plant.some((p) => p.system || p.connects || p.source || p.enabledBy || p.interlocks?.length || (p.points ?? []).some((q) => q.signal || q.goesTo || q.channel));
+  return project.plant.some((p) => p.system || p.connects || p.interlocks?.length || (p.points ?? []).some((q) => q.signal || q.goesTo || q.channel));
 }
 
 /** Parts that are wiring or drawing furniture, not equipment: never "field plant not in the table". */

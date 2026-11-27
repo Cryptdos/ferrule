@@ -71,8 +71,6 @@ describe("the Design fields round-trip (§2, §4, §6, §7)", () => {
       connects: "both",
       protocol: "BACnet IP",
       network: "n1",
-      enabledBy: "ventilation time zone",
-      source: "Section 4.2",
       interlocks: [{ id: "il1", point: "Enable", when: [{ ref: `plant:${ef.id}:Fault`, on: true }] }],
     });
     p.expectations.push({ id: "x1", kind: "never", when: [{ ref: `plant:${ef.id}:Enable`, on: true }, { ref: `plant:${ef.id}:Fault`, on: true }], join: "and", interlock: "il1" });
@@ -82,8 +80,6 @@ describe("the Design fields round-trip (§2, §4, §6, §7)", () => {
     expect(b.connects).toBe("both");
     expect(b.protocol).toBe("BACnet IP");
     expect(b.network).toBe("n1");
-    expect(b.enabledBy).toBe("ventilation time zone");
-    expect(b.source).toBe("Section 4.2");
     expect(b.interlocks).toEqual(ef.interlocks);
     expect(b.points!.map((q) => [q.name, q.pins, q.signal, q.goesTo])).toEqual([
       ["Enable", [], "volt-free", "relay"],
@@ -292,11 +288,11 @@ describe("the Design table (§2, §3)", () => {
   test("plant fields set and cleared; a network must exist", () => {
     const p = newProject("t");
     const it = addDesignPlant(p);
-    setPlantDesign(p, it.id, { connects: "comms", protocol: "Modbus RTU", enabledBy: "time zone", source: "4.2" });
-    expect([it.connects, it.protocol, it.enabledBy, it.source]).toEqual(["comms", "Modbus RTU", "time zone", "4.2"]);
-    setPlantDesign(p, it.id, { connects: "hardwired", source: "" });
+    setPlantDesign(p, it.id, { connects: "comms", protocol: "Modbus RTU" });
+    expect([it.connects, it.protocol]).toEqual(["comms", "Modbus RTU"]);
+    setPlantDesign(p, it.id, { connects: "hardwired", protocol: "" });
     expect(it.connects).toBeUndefined();
-    expect(it.source).toBeUndefined();
+    expect(it.protocol).toBeUndefined();
     expect(() => setPlantDesign(p, it.id, { network: "n9" })).toThrow(/network/);
   });
 });

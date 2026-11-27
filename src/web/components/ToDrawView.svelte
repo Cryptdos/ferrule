@@ -165,7 +165,7 @@
             {:else if x.st?.kind === "unknown"}not proved: too many sequences to try them all
             {:else}not proved yet: Prove all, or Check logic in Simulate{/if}
           </span>
-          <button onclick={() => (editor.designView = "table", editor.designPick = { plant: [x.plant.id] })}>Show</button>
+          <button onclick={() => (editor.designView = "plant", editor.designPick = { plant: [x.plant.id] })}>Show</button>
         </div>
       {/each}
     {/if}
