@@ -153,7 +153,7 @@ Decided in discussion. The aim: Ferrule runs the same way on a desk or on one ce
 
 Decided while going through the specification's window and sheet sections.
 
-- [ ] **A32. Windows and prompts.** *Tweak. WN-18. Build 0.4.5.* Everything that opens is a window, a prompt or a panel, and the kind decides whether it docks. Today eight windows dock, picked by name, and nothing says why those eight.
+- [x] **A32. Windows and prompts.** *Built: PR 121.* *Tweak. WN-18. Build 0.4.5.* Everything that opens is a window, a prompt or a panel, and the kind decides whether it docks. Today eight windows dock, picked by name, and nothing says why those eight.
   - **A window** is kept open and worked beside. It shows or edits the project, and the only way out of it is to close it. **Every window docks into a tile.**
   - **A prompt** is one step of an action. It asks, and a button finishes it: *Apply*, *Accept*, *OK*, *Cancel*, yes or no. **A prompt always floats, and never docks.**
   - **A panel** isn't opened: it comes up by itself with what you're doing. There are two: Properties, which follows the selection, and the Simulation panel, which comes up on entering Simulate. **A panel floats, and never docks** (both ruled 26 Nov 2026).
@@ -302,7 +302,7 @@ From the notes written into the QA copy of the specification (`v0.4.0-pre Notes\
 
 - ~~**A63. *Add pin* numbers the pin itself.**~~ *Folded into A67, 27 Nov 2026.* *Add terminal* numbers the row itself, and numbers never change by themselves. In `design-design-workbench.md` §7. To check before building: that deleting a pin on build 0.4.5 already leaves the others' numbers alone.
 
-- [ ] **A64. A window docks only at an edge.** *Tweak. WN-18. Build 0.4.5.* Found on the build: dragging a window across the middle of the screen lights the whole tile up, as it's ready to be dropped there, when all that was wanted was to move it. Docking becomes splitting only: a window docks when it's dragged close to an edge of a tile, and anywhere else it just moves.
+- [x] **A64. A window docks only at an edge.** *Built: PR 121.* *Tweak. WN-18. Build 0.4.5.* Found on the build: dragging a window across the middle of the screen lights the whole tile up, as it's ready to be dropped there, when all that was wanted was to move it. Docking becomes splitting only: a window docks when it's dragged close to an edge of a tile, and anywhere else it just moves.
   - Dropping in the middle to replace what's in a tile is given up. On this build it splits the tile anyway, which isn't what WN-18 says.
 
 - [ ] **A65. A new network asks what kind it is.** *Tweak. DE-59, DE-66. Build 0.4.5.* Found on the build: *+ Network* makes a LAN with a switch straight away, when a bus off the controller was wanted, and it had to be deleted and made again. Proposed: it asks the kind first, or the kind is plainly the first thing to set. Also noted: *Place as sheet* adds a sheet at one click, easily pressed by mistake.
@@ -342,7 +342,7 @@ From the notes written into the QA copy of the specification (`v0.4.0-pre Notes\
 
 Checks whose intended behaviour was already ruled, where the code shows the build does something else.
 
-- [ ] **A73. Where a window was put isn't remembered.** *Tweak. WN-7, WN-11, WN-19. Build 0.4.5. Ruled 26 Nov 2026.* Settings are remembered and layout isn't. Today each window's place, and whether it's folded, is kept for the browser, as are Properties' and help's, so they come back after a reload. They stop being kept: a project opens with its windows closed, and a window opened starts in its usual place. Within a session a window still stays where it's put.
+- [x] **A73. Where a window was put isn't remembered.** *Built: PR 121.* *Tweak. WN-7, WN-11, WN-19. Build 0.4.5. Ruled 26 Nov 2026.* Settings are remembered and layout isn't. Today each window's place, and whether it's folded, is kept for the browser, as are Properties' and help's, so they come back after a reload. They stop being kept: a project opens with its windows closed, and a window opened starts in its usual place. Within a session a window still stays where it's put.
   - Still remembered, as settings: theme, button style, *Keep placing until Esc*, whether the browser panel and its sections are shown, whether the overview is shown, and the last folder browsed.
 
 - [x] **A74. Copies from *Duplicate ×n* start with no description.** *Built: PR 119.* *Tweak. DE-30. Build 0.4.5. Ruled 26 Nov 2026.* Copies keep the description as it is, so three copies of *Supply fan 1* are all *Supply fan 1*. A copy's description comes out empty, ready to type, since it's always different. Everything else about a copy is as now.
