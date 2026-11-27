@@ -42,7 +42,7 @@ try {
   check(resolve(status.projects) === resolve(dir), "it works on the projects folder it was given");
   const page = await fetch(`${base}/`).then((r) => r.text());
   check(/<script/.test(page), "the page and its scripts are served from inside the binary");
-  const made = await json("/api/projects", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ title: "Smoke test" }) });
+  const made = await json("/api/projects", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: "Smoke test" }) });
   check(made.status === 201 || made.status === 200, "a project is created");
   const loaded = await json(`/api/projects/${made.body.id}`);
   check(loaded.status === 200 && loaded.body.pages.length === 1, "it opens with one sheet");
