@@ -60,7 +60,7 @@ A3, A18, A19 and A20 are all corrections to documents and can go in one PR.
 
 Decided in discussion. The aim: Ferrule runs the same way on a desk or on one central machine, so the drawings live in one place and are reached from any browser on the home network or over the VPN.
 
-- [ ] **A5. One Ferrule at a time.** *Fix. ST-1, ST-3. Build 0.4.5.* Started while a Ferrule is already running, the exe starts a second copy on the next port (4811…) working on the same projects folder. Instead, if a Ferrule answers on the port, the new one opens the browser at it, says so in its console and exits. This is also how a lost page is reopened: run the exe again.
+- [x] **A5. One Ferrule at a time.** *Built: PR 144.* *Fix. ST-1, ST-3. Build 0.4.5.* Started while a Ferrule is already running, the exe starts a second copy on the next port (4811…) working on the same projects folder. Instead, if a Ferrule answers on the port, the new one opens the browser at it, says so in its console and exits. This is also how a lost page is reopened: run the exe again.
   - The console says which version it found, so a newer exe run against an older Ferrule still running is plain to see.
   - A port taken by something that isn't Ferrule still moves on to the next free one, as now.
 
@@ -75,7 +75,7 @@ Decided in discussion. The aim: Ferrule runs the same way on a desk or on one ce
 
 - [x] **A9. Upload.** *Built: PR 142.* *Missing. ST-8.* *Open file…* browses the machine Ferrule runs on. On a central Ferrule that isn't the machine you're sitting at, so the project list also gets *Upload*: pick a `.ferrule` file on your own machine and it's added to the projects folder. It's checked as a Ferrule project, as opening one is, and refused if a file by that name is there (A8). With *Download*, this is how files move on and off a central Ferrule.
 
-- [ ] **A10. Claude on a central Ferrule.** *Missing. MC-1, MC-2.* Claude works the same whether Ferrule is on this machine or another. `ferrule.exe --mcp` already relays Claude Desktop to a running Ferrule, but only on the same machine: let it be given the address of the Ferrule to relay to. Every tool stays, PDF export included.
+- [x] **A10. Claude on a central Ferrule.** *Built: PR 144.* *Missing. MC-1, MC-2.* Claude works the same whether Ferrule is on this machine or another. `ferrule.exe --mcp` already relays Claude Desktop to a running Ferrule, but only on the same machine: let it be given the address of the Ferrule to relay to. Every tool stays, PDF export included.
   - Known limits on a central machine: Claude's view of a sheet needs Chrome or Chromium installed there, and its PDF export writes into that machine's `exports` folder.
   - The endpoint is as open as the page: whoever can reach the server can edit drawings through it. Accepted for a server on the home network or VPN.
 

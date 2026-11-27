@@ -56,6 +56,12 @@ try {
   check(print.ok, "its first sheet prints");
   const list = (await json("/api/projects")).body as { id: string; error?: string }[];
   check(list.length === 2 && list.every((p) => !p.error), "the project list shows both, neither refused");
+  // Run again while it's running: it points at this one and stops (v0.5 A5).
+  const again = Bun.spawn([resolve(bin), "--projects", dir, "--no-open", "--host", "127.0.0.1", "--port", String(port)], { stdout: "pipe", stderr: "pipe" });
+  const said = await Promise.race([new Response(again.stdout).text(), Bun.sleep(15_000).then(() => "")]);
+  const code = await Promise.race([again.exited, Bun.sleep(2_000).then(() => null)]);
+  if (code === null) again.kill();
+  check(code === 0 && said.includes("is already running"), "run again, it points at the running one and stops");
   console.log("Smoke test passed.");
 } catch (e) {
   console.error(`FAILED: ${(e as Error).message}`);

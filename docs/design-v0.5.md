@@ -383,6 +383,14 @@ Judgement calls made while building, by step, with the reason.
 - **10c: file format 19.** A project holds its backup settings.
 - **10c: in passing,** *Use the shared device library* under *Project…* has its tick beside its words again, as the backup settings do.
 
+### Step 11
+
+- **A5: Ferrule is found by asking the port,** with the `/api/health` the `--mcp` relay already used, which also gives its version. The check is made when a port turns out taken, so a Ferrule that moved on to 4811 earlier (with 4810 taken by something else) is found too.
+- **A5: the console stays up four seconds** after opening the browser, long enough to read before the window closes. With `--no-open` it stops at once.
+- **A5: the smoke test runs the build twice** and checks that the second one points at the first and stops, so CI checks this on the Windows exe as well.
+- **A10: the address follows `--mcp` as its own argument** (`--mcp server`), as the plan has it. Without a scheme it's `http://`, and without a port it's 4810, or `--port`'s. Given an address, Ferrule starts no server of its own. One that isn't answering is still relayed to, so Claude sees *Ferrule isn't reachable* on each request rather than a server that won't start, and carries on once the Ferrule is up.
+- **A10: Settings → Status opened from another computer shows that computer's Claude Desktop settings,** `--mcp` with the address the page was opened at, and a path to fill in. Claude Code's command uses the same address.
+
 ### Title block (ruled 27 Nov 2026, before step 7)
 
 - **A1 laid out again:** *Sheet*, *Job no.* and *Checked* in three equal cells (24 mm); *Drawing ref.* and *Drawn* in two (36 mm); *Client* across the row (72 mm). A long *Checked* name and date is squeezed to fit its cell, as every cell's value is.

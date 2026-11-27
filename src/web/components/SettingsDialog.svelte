@@ -35,12 +35,16 @@
     const s = Math.round((Date.now() - ms) / 1000);
     return s < 60 ? `${s} s ago` : s < 3600 ? `${Math.round(s / 60)} min ago` : new Date(ms).toLocaleString();
   };
+  /** This page reached from another computer: Claude there relays to this Ferrule by its address (A10). */
+  const remote = !["localhost", "127.0.0.1", "[::1]", "::1"].includes(location.hostname);
   const desktopConfig = $derived(
-    status?.command
-      ? JSON.stringify({ mcpServers: { ferrule: { command: status.command.command, args: status.command.args } } }, null, 2)
-      : "",
+    remote
+      ? JSON.stringify({ mcpServers: { ferrule: { command: "C:\\path\\to\\ferrule.exe", args: ["--mcp", location.origin] } } }, null, 2)
+      : status?.command
+        ? JSON.stringify({ mcpServers: { ferrule: { command: status.command.command, args: status.command.args } } }, null, 2)
+        : "",
   );
-  const codeCommand = $derived(status ? `claude mcp add --transport http ferrule ${status.mcpUrl}` : "");
+  const codeCommand = $derived(status ? `claude mcp add --transport http ferrule ${remote ? `${location.origin}/mcp` : status.mcpUrl}` : "");
 
   async function copy(what: string, text: string) {
     try {
@@ -94,7 +98,7 @@
       <dt>Projects folder</dt>
       <dd class="path">{status.projects}</dd>
       <dt>Address</dt>
-      <dd class="path">{status.address}</dd>
+      <dd class="path">{remote ? location.origin : status.address}</dd>
       <dt>Claude</dt>
       <dd>
         {#if status.mcp?.connectedAt}
@@ -109,7 +113,13 @@
     <h3>Connecting Claude</h3>
     <p class="hint">
       <strong>Claude Desktop:</strong> add this to <code>claude_desktop_config.json</code> (Settings → Developer → Edit config), then restart
-      Claude Desktop. It uses this Ferrule if it's running, or starts one.
+      Claude Desktop.
+      {#if remote}
+        This Ferrule runs on another computer: put where <code>ferrule.exe</code> is on this one in place of the path. It relays Claude to this
+        Ferrule by its address. Claude's views of a sheet and its PDF exports are made on that computer, and the PDFs are saved there.
+      {:else}
+        It uses this Ferrule if it's running, or starts one. From another computer, <code>ferrule.exe --mcp</code> takes this Ferrule's address.
+      {/if}
     </p>
     <div class="code">
       <pre>{desktopConfig}</pre>
@@ -121,7 +131,7 @@
       <button onclick={() => copy("code", codeCommand)}>{copied === "code" ? "Copied" : "Copy"}</button>
     </div>
 
-    {#if status.canQuit}
+    {#if status.canQuit && !remote}
       <div class="quit">
         <button class="danger" onclick={quit}>Quit Ferrule</button>
         <span class="hint">Stops the server cleanly. Closing its console window does the same.</span>
