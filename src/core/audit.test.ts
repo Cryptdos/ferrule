@@ -30,12 +30,12 @@ describe("contacts follow their timer (6, 32, 76)", () => {
   test("a contact on a TON timer closes after the delay, shows the delay mark and prints 17-18; Instantaneous doesn't", () => {
     const { p, add, w, top, bottom } = ladder();
     const sw = add("selector", 20, 30);
-    const t = add("timer-coil", 20, 70, { time: "5s", mode: "on" });
+    const t = add("coil", 20, 70, { type: "timer", time: "5s", mode: "on" });
     w(top(20), [sw.id, "13"]);
     w([sw.id, "14"], [t.id, "A1"]);
     w([t.id, "A2"], bottom(20));
-    const timed = add("contact-no", 40, 30);
-    const inst = add("contact-no", 60, 30, { instant: true });
+    const timed = add("contact", 40, 30);
+    const inst = add("contact", 60, 30, { instant: true });
     const h1 = add("lamp", 40, 60);
     const h2 = add("lamp", 60, 60);
     for (const [k, h, x] of [[timed, h1, 40], [inst, h2, 60]] as const) {
@@ -121,7 +121,7 @@ describe("selector (33, 35, 75)", () => {
 describe("flip (31, 39)", () => {
   test("F flips a part top to bottom: its terminals swap ends; twice puts it back", () => {
     const { p, pg, add } = ladder();
-    const k = add("contact-no", 20, 30);
+    const k = add("contact", 20, 30);
     expect(terminalPoint(k, "13")).toEqual([20, 27]);
     flipElements(p, pg, [k.id]);
     expect(terminalPoint(k, "13")).toEqual([20, 33]);

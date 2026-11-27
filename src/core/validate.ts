@@ -14,7 +14,7 @@ import { tidyDesign } from "./design";
 import { RELEASES_URL, VERSION } from "./version";
 import { MAX_CONDITIONS } from "./interlocks";
 import { PLANT_MARKS, TEXT_PLACES, type TextPlace, DISTRIBUTION_KINDS, type DistributionKind, POINT_FORMS, type Condition, type Controller, type ControllerSlot, type DesignTemplate, type ModuleInfo, type ModuleType, type PlantItem, type Expectation, type IoPoint, type Interlock, type Network, type PinInfo, type PointForm, FORMAT, FORMAT_VERSION, type GaDim, type GaDimPoint, type GaItem, type Page, type Project, emptyInfo } from "./model";
-import { defaultParams, getSymbol } from "./symbols";
+import { canRotate, defaultParams, getSymbol } from "./symbols";
 import { gaToSheet } from "./ga";
 import { MODULE_TYPES } from "./modules";
 import { colourCode, lampColour } from "./wirecolours";
@@ -420,7 +420,8 @@ function parsePage(pg: Record<string, unknown>, i: number): Project["pages"][num
       if (e.params.style === "control") e.symbol = "rail";
       delete e.params.style;
     }
-    const rot = [0, 90, 180, 270].includes(e.rot as number) ? (e.rot as 0 | 90 | 180 | 270) : 0;
+    // A part that doesn't turn is always upright (A39).
+    const rot = [0, 90, 180, 270].includes(e.rot as number) && canRotate({ symbol: String(e.symbol) }) ? (e.rot as 0 | 90 | 180 | 270) : 0;
     return {
       id: e.id,
       symbol: e.symbol as string,

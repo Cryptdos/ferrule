@@ -76,7 +76,7 @@ describe("renumber preview", () => {
   test("lists only what would change, and changes nothing", () => {
     const { p, pg } = project();
     const k = addElement(p, pg, "coil", [20, 60]);
-    const s = addElement(p, pg, "contact-no", [40, 30]);
+    const s = addElement(p, pg, "contact", [40, 30]);
     linkContact(p, s.id, k.id);
     renumber(p);
     expect(renumberPreview(p).changes).toEqual([]);
@@ -206,7 +206,7 @@ describe("simulation: plant points", () => {
 
   test("an output can follow an input after a delay, or the other way round", () => {
     const { p, pg, cct, ov, item, v } = plantRig("ENABLE: 1 2 | RUNNING: 3 4 | FAULT: 5 6");
-    const sw = addElement(p, pg, "contact-no", [10, 30]);
+    const sw = addElement(p, pg, "contact", [10, 30]);
     connect(p, pg, [cct.id, "10"], [sw.id, "13"]);
     connect(p, pg, [sw.id, "14"], [v.id, "1"]);
     connect(p, pg, [v.id, "2"], [ov.id, "12"]);

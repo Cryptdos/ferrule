@@ -10,10 +10,10 @@
 import { columnOf, lineUnits, textUnits, type Rect, type Vec } from "./geometry";
 import type { Element, Page, Project } from "./model";
 import type { RelayPins } from "./devices";
-import { isolatorAux, type Prim } from "./symbols";
+import { contactKind, isolatorAux, isTimerCoil, type Prim } from "./symbols";
 
-export const MASTER_SYMBOLS = new Set(["coil", "timer-coil"]);
-const SLAVE_SYMBOLS = new Set(["contact-no", "contact-nc", "contact-co"]);
+export const MASTER_SYMBOLS = new Set(["coil"]);
+const SLAVE_SYMBOLS = new Set(["contact"]);
 
 export function isMaster(el: Element): boolean {
   return MASTER_SYMBOLS.has(el.symbol);
@@ -84,12 +84,8 @@ export function partnerOf(project: Project, el: Element): Located | null {
 /** How a contact is described in a coil's contact table. */
 export function contactType(el: Element): string {
   switch (el.symbol) {
-    case "contact-no":
-      return "NO";
-    case "contact-nc":
-      return "NC";
-    case "contact-co":
-      return "CO";
+    case "contact":
+      return contactKind(el).toUpperCase();
     case "isolator":
       return "Main";
     default:
@@ -103,7 +99,8 @@ export function contactType(el: Element): string {
  */
 export function isTimed(project: Project, el: Element): boolean {
   if (!SLAVE_SYMBOLS.has(el.symbol) || el.params.instant === true) return false;
-  return masterOf(project, el)?.el.symbol === "timer-coil";
+  const m = masterOf(project, el)?.el;
+  return !!m && isTimerCoil(m);
 }
 
 /**
@@ -125,22 +122,24 @@ export function relayPinMarks(project: Project, el: Element): Record<string, str
   if (el === coil) return { A1: map.coil[0], A2: map.coil[1] };
   const pole = typeof el.params.pole === "number" ? map.poles[el.params.pole - 1] : undefined;
   if (!pole) return undefined;
-  if (el.symbol === "contact-no") return pole.no ? { "13": pole.c, "14": pole.no } : undefined;
-  if (el.symbol === "contact-nc") return pole.nc ? { "21": pole.c, "22": pole.nc } : undefined;
-  if (el.symbol === "contact-co") return { "11": pole.c, "12": pole.nc || "-", "14": pole.no || "-" };
-  return undefined;
+  if (el.symbol !== "contact") return undefined;
+  const k = contactKind(el);
+  if (k === "no") return pole.no ? { "13": pole.c, "14": pole.no } : undefined;
+  if (k === "nc") return pole.nc ? { "21": pole.c, "22": pole.nc } : undefined;
+  return { "11": pole.c, "12": pole.nc || "-", "14": pole.no || "-" };
 }
 
 /** Printed terminal marks of a contact, e.g. "23-24"; a timed one "17-18"; a relay base's own (v0.4.x M4). */
 export function contactMarks(el: Element, timed = false, pins?: Record<string, string>): string {
   if (pins) {
-    if (el.symbol === "contact-no" && pins["13"]) return `${pins["13"]}-${pins["14"]}`;
-    if (el.symbol === "contact-nc" && pins["21"]) return `${pins["21"]}-${pins["22"]}`;
-    if (el.symbol === "contact-co" && pins["11"]) return `${pins["11"]}-${pins["12"]}/${pins["14"]}`;
+    const k = el.symbol === "contact" ? contactKind(el) : null;
+    if (k === "no" && pins["13"]) return `${pins["13"]}-${pins["14"]}`;
+    if (k === "nc" && pins["21"]) return `${pins["21"]}-${pins["22"]}`;
+    if (k === "co" && pins["11"]) return `${pins["11"]}-${pins["12"]}/${pins["14"]}`;
   }
   const pole = typeof el.params.pole === "number" && el.params.pole > 0 ? String(el.params.pole) : "";
   const pair = (a: string, b: string) => (pole ? `${pole}${a[1]}-${pole}${b[1]}` : `${a}-${b}`);
-  switch (el.symbol) {
+  switch (el.symbol === "contact" ? `contact-${contactKind(el)}` : el.symbol) {
     case "contact-no":
       return timed ? pair("17", "18") : pair("13", "14");
     case "contact-nc":

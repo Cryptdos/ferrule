@@ -135,11 +135,11 @@ describe("controllers and modules", () => {
     const di = addModule(p, c.id, { type: "di", channels: 2 });
     const v = placePlantView(p, pg, di.id, [60, 30]);
     const k = addElement(p, pg, "coil", [20, 70]);
-    const sw = addElement(p, pg, "contact-no", [20, 62]);
+    const sw = addElement(p, pg, "contact", [20, 62]);
     connect(p, pg, [cct.id, "20"], [sw.id, "13"]);
     connect(p, pg, [sw.id, "14"], [k.id, "A1"]);
     connect(p, pg, [k.id, "A2"], [ov.id, "20"]);
-    const kc = addElement(p, pg, "contact-no", [60, 45]);
+    const kc = addElement(p, pg, "contact", [60, 45]);
     linkContact(p, kc.id, k.id);
     const [sig, com] = di.points![0]!.pins;
     connect(p, pg, [v.id, sig!], [kc.id, "13"]);

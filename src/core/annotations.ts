@@ -4,7 +4,7 @@
  */
 import { lineUnits, type Vec } from "./geometry";
 import type { Element, Project } from "./model";
-import { getSymbol, isBar, listSymbols, localGeometry, type Prim } from "./symbols";
+import { COIL_NAMES, CONTACT_NAMES, coilType, contactKind, getSymbol, isBar, listSymbols, localGeometry, timerFunction, type Prim } from "./symbols";
 import { CAP_HEIGHT, textWidth } from "./textwidth";
 
 const THIN = lineUnits("thin");
@@ -375,6 +375,9 @@ function variantName(el: Element): string {
     const opt = p.options?.find((o) => o.value === v);
     if (!opt || /^(none|default|plain)$/i.test(String(opt.value))) continue;
     const variant = opt.label.split(/[(,]/)[0]!.trim();
+    if (el.symbol === "contact") return CONTACT_NAMES[contactKind(el)];
+    // A timer's function changes its mark: one entry for each in use, as the timer coil part had.
+    if (el.symbol === "coil" && coilType(el) === "timer") return `${COIL_NAMES.timer}: ${timerFunction(el).label}`;
     // "Isolator / MCB / contactor: Circuit breaker" reads better as just "Circuit breaker".
     if (["isolator", "coil", "earth"].includes(el.symbol)) {
       const n = /coil/i.test(def.name) && !/coil/i.test(variant) ? `${variant} coil` : variant;
@@ -410,7 +413,9 @@ export function legendEntries(project: Project): LegendEntry[] {
     }
   }
   // In the palette's order (contacts, operators, coils, protection…), as an engineer reads them.
-  return [...seen.values()].sort((a, b) => (order.get(a.el.symbol) ?? 999) - (order.get(b.el.symbol) ?? 999) || a.name.localeCompare(b.name));
+  // One part's kinds in their own order: a contact NO, NC, changeover; a coil relay, contactor, timer.
+  const rank = (el: Element) => (el.symbol === "contact" ? ["no", "nc", "co"].indexOf(contactKind(el)) : el.symbol === "coil" ? ["relay", "contactor", "timer"].indexOf(coilType(el)) : 0);
+  return [...seen.values()].sort((a, b) => (order.get(a.el.symbol) ?? 999) - (order.get(b.el.symbol) ?? 999) || rank(a.el) - rank(b.el) || a.name.localeCompare(b.name));
 }
 
 /** The legend: name on the left, the symbol on the right, in `cols` columns. */

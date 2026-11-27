@@ -8,7 +8,7 @@
 <Modal title="Help" store="help" width={340} {onclose}>
   <div class="help">
     <p>Pick a part in the browser and click to place it; then it's back to Select. Hold <kbd>Ctrl</kbd> as you click to keep the part for the next click (or tick <em>Keep placing until Esc</em> in Settings). Drag to move, <kbd>Del</kbd> delete, <kbd>Ctrl</kbd>+<kbd>D</kbd> duplicate, arrows nudge.</p>
-    <p>Scroll to zoom, middle-drag or <kbd>Space</kbd>+drag to pan; tap <kbd>Space</kbd> to fit the sheet. <kbd>R</kbd> rotates, <kbd>F</kbd> flips top to bottom. Drag the outline in the overview (top right of the tile you're in) to move about.</p>
+    <p>Scroll to zoom, middle-drag or <kbd>Space</kbd>+drag to pan; tap <kbd>Space</kbd> to fit the sheet. <kbd>R</kbd> rotates (not contacts, coils, switches and the like: they're drawn the way the sheet runs), <kbd>F</kbd> flips top to bottom. Drag the outline in the overview (top right of the tile you're in) to move about.</p>
     <p><kbd>W</kbd> wire tool: click a terminal, then another; click on a wire to tee into it. <kbd>Esc</kbd> cancels, <kbd>S</kbd> back to select.</p>
     <p><kbd>PgUp</kbd>/<kbd>PgDn</kbd> change sheet. Double-click a contact, coil or link arrow to jump to its partner.</p>
     <p>Split the drawing into tiles from a tile's bar (split right, split down); click a tile to work in it. Drag a window's title bar close to a tile's edge to dock it there, and its tile's bar out to float it again.</p>

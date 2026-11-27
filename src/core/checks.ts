@@ -9,7 +9,7 @@ import { compile, pinNode } from "./sim";
 import { controllerName, modulesOf, moduleTypeName, slotAddress, viewsOf } from "./modules";
 import { contactPins, isAnalogueForm, isInputForm, missingRefs, describeExpectation, things } from "./points";
 import type { Element, Page, Project } from "./model";
-import { benchOf, getSymbol, isBar, labelBlockRect, localGeometry, terminalNames } from "./symbols";
+import { benchOf, contactKind, getSymbol, isBar, labelBlockRect, localGeometry, terminalNames } from "./symbols";
 import { numberingTerminal } from "./renumber";
 import { displayTag, elementTexts } from "./tags";
 import { isMaster, isSlave, masterOf, partnerOf, slavesOf } from "./xref";
@@ -105,7 +105,7 @@ export function checkProject(project: Project, opts: { proofs?: Proofs | null } 
         const w = wired.get(el.id) ?? new Set<string>();
         if (w.size === 0) {
           out.push({ level: "warning", message: `Sheet ${page.number}: ${tag || el.symbol} isn't connected`, pageId: page.id, ids: [el.id] });
-        } else if (el.symbol !== "contact-co" && el.symbol !== "terminal" && names.some((n) => !w.has(n))) {
+        } else if (!(el.symbol === "contact" && contactKind(el) === "co") && el.symbol !== "terminal" && names.some((n) => !w.has(n))) {
           // (A terminal wired on one side only is normal: the other side is a cable by others.)
           const open = names.filter((n) => !w.has(n));
           out.push({

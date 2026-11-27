@@ -11,7 +11,7 @@
  */
 import { AREA_UNITS, UNIT_MM, type Vec } from "./geometry";
 import type { DoorColumn, DoorLeaf, Element, GaDimPoint, GaItem, GaSettings, GaView, Page, PlantItem, Project, TextPlace } from "./model";
-import { getSymbol } from "./symbols";
+import { getSymbol, isTimerCoil } from "./symbols";
 import { controllerName, modulesOf, viewsOf } from "./modules";
 import { isSlave, slavesOf } from "./xref";
 
@@ -377,10 +377,9 @@ export function sizeKey(project: Project, el: Element): { key: string; poles: nu
   const poles = typeof el.params.poles === "number" ? el.params.poles : 1;
   switch (el.symbol) {
     case "coil":
+      if (isTimerCoil(el)) return { key: "timer", poles: 1 };
       // A coil working contactor main contacts is a contactor; otherwise a relay.
       return slavesOf(project, el).some((s) => s.el.symbol === "isolator") ? { key: "contactor", poles: 1 } : { key: "relay", poles: 1 };
-    case "timer-coil":
-      return { key: "timer", poles: 1 };
     case "isolator":
       if (el.params.function === "contactor") return isSlave(el) && el.links.length ? null : { key: "contactor", poles: 1 };
       return { key: el.params.function === "breaker" || el.params.function === "rcd" ? "mcb" : "isolator", poles: poles + (Number(el.params.aux) || 0) * 0.5 };

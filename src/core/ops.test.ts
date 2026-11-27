@@ -34,7 +34,7 @@ describe("element operations", () => {
 
   test("rotate steps 90° and wraps", () => {
     const { p, pg } = setup();
-    const e = addElement(p, pg, "coil", [10, 10]);
+    const e = addElement(p, pg, "earth", [10, 10]);
     for (let i = 0; i < 4; i++) rotateElements(p, pg, [e.id]);
     expect(e.rot).toBe(0);
   });

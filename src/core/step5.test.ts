@@ -25,7 +25,7 @@ describe("wire colour on creation", () => {
   test("a wire from the far side of a fuse or contact takes the colour of the wire into it (T5)", () => {
     const { p, pg } = project();
     const f = addElement(p, pg, "fuse", [20, 20]);
-    const k = addElement(p, pg, "contact-no", [40, 20]);
+    const k = addElement(p, pg, "contact", [40, 20]);
     const h = addElement(p, pg, "lamp", [60, 40]);
     const src = addElement(p, pg, "coil", [20, 5]);
     connect(p, pg, [src.id, "A2"], [f.id, "1"]);

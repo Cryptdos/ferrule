@@ -26,7 +26,7 @@ import {
   textUnits,
   unionRect,
 } from "./geometry";
-import type { Element, ParamValue } from "./model";
+import type { Element, ParamValue, Project } from "./model";
 import type { SymbolKind } from "./designations";
 
 // ---------------------------------------------------------------------------
@@ -85,8 +85,10 @@ export interface ParamDef {
   min?: number;
   max?: number;
   default: ParamValue;
-  /** Only applies when this returns true (otherwise shown greyed out). */
-  when?: (el: Element) => boolean;
+  /** Only applies when this returns true (otherwise shown greyed out, or not at all with `hideOff`). */
+  when?: (el: Element, project?: Project) => boolean;
+  /** Not shown at all when it doesn't apply (v0.5 A36, A37), rather than greyed out. */
+  hideOff?: boolean;
   /** What it reads as when it doesn't apply. */
   fixed?: string;
   /** An example of the format to follow, shown greyed in an empty box. */
@@ -157,6 +159,11 @@ export interface SymbolDef {
   bench?: "draft" | "annotate";
   /** `t` carries what the project says about it, where a symbol needs it (tables, notes with fields). */
   draw(el: Element, t?: GeometryText): { prims: Prim[]; terminals: TerminalDef[]; body: Rect };
+  /**
+   * It doesn't turn (v0.5 A39): a part that sits in a drop (contacts, coils,
+   * switches, protection, lamps…) is drawn the way the sheet runs. Flip still works.
+   */
+  noRotate?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -394,9 +401,27 @@ const instantParam: ParamDef = {
   label: "Instantaneous (not delayed by its timer)",
   type: "bool",
   default: false,
-  when: (el) => el.links.length > 0,
-  fixed: "Only for a contact linked to a timer",
+  // Only on a timer's contact (A36): anywhere else it isn't shown.
+  when: (el, project) => !!project && el.links.some((id) => project.pages.some((pg) => pg.elements.some((m) => m.id === id && isTimerCoil(m)))),
+  hideOff: true,
 };
+
+/** A contact's kind (v0.5 A36): one Contact part, normally open, normally closed or changeover. */
+export type ContactKind = "no" | "nc" | "co";
+export function contactKind(el: Element): ContactKind {
+  const v = el.params.contact;
+  return v === "nc" || v === "co" ? v : "no";
+}
+/** A coil's type (v0.5 A37): one Coil part, a relay, a contactor or a timer. */
+export type CoilType = "relay" | "contactor" | "timer";
+export function coilType(el: Element): CoilType {
+  const v = el.params.type;
+  return v === "contactor" || v === "timer" ? v : "relay";
+}
+export const isTimerCoil = (el: Element): boolean => el.symbol === "coil" && coilType(el) === "timer";
+/** How a contact's kind is named, in the legend and the contact table. */
+export const CONTACT_NAMES: Record<ContactKind, string> = { no: "Contact NO", nc: "Contact NC", co: "Changeover contact" };
+export const COIL_NAMES: Record<CoilType, string> = { relay: "Relay coil", contactor: "Contactor coil", timer: "Timer coil" };
 
 /** A push button's poles, in order: true for NC. Files from before (`contact`: no, nc, both) are read the same way. */
 export function pushPoles(el: Element): boolean[] {
@@ -417,24 +442,6 @@ function keyHead(hx: number): Prim[] {
   return [circle(hx - 0.55, 0, 0.45), line([hx - 0.1, 0], [hx, 0])];
 }
 
-const familyParam: ParamDef = {
-  key: "family",
-  label: "Belongs to",
-  type: "select",
-  options: [
-    { value: "relay", label: "Relay (K)" },
-    { value: "contactor", label: "Contactor (Q)" },
-    { value: "timer", label: "Timer (K)" },
-  ],
-  default: "relay",
-  // Once linked to a coil, the contact takes the coil's tag: this is for one standing alone.
-  when: (el) => el.links.length === 0,
-  fixed: "Follows its coil",
-};
-const familyKind = (el: Element): SymbolKind => {
-  const f = str(el, "family", "relay");
-  return f === "contactor" ? "contactor" : f === "timer" ? "timer" : "relay";
-};
 
 /** What a timer does. `wave` is a small sketch of its output for the coil's function box. */
 export interface TimerFunction {
@@ -515,71 +522,74 @@ export function partPoints(el: Pick<Element, "symbol" | "pos" | "params">): Vec[
 
 const SYMBOLS: SymbolDef[] = [
   {
-    id: "contact-no",
-    name: "Contact NO",
+    id: "contact",
+    name: "Contact",
     group: "Contacts",
     palette: true,
-    params: [familyParam, instantParam],
-    kind: familyKind,
-    draw(el, t) {
-      const timed = t?.timed;
-      const c = contactTerms(timed ? ["17", "18"] : ["13", "14"], el, ["13", "14"], t?.pins);
-      return {
-        // On- and off-delay draws two arcs, reaching 0.9 further out: the tag stands clear of it.
-        prims: [...noContact(0, opOf(el)), ...(timed ? timingMark(NO_MID, -2.1, timed) : []), ...c.prims, ...tagAndLabel(timed ? (timed === "on-off" ? -4.1 : -3.2) : -1.9, el)],
-        terminals: c.terminals,
-        body: { x: timed ? (timed === "on-off" ? -3.6 : -2.7) : -1.3, y: -1.7, w: timed ? (timed === "on-off" ? 3.7 : 2.8) : 1.4, h: 3.2 },
-      };
-    },
-  },
-  {
-    id: "contact-nc",
-    name: "Contact NC",
-    group: "Contacts",
-    palette: true,
-    params: [familyParam, instantParam],
-    kind: familyKind,
-    draw(el, t) {
-      const timed = t?.timed;
-      const c = contactTerms(timed ? ["15", "16"] : ["21", "22"], el, ["21", "22"], t?.pins);
-      return {
-        prims: [...ncContact(0, opOf(el)), ...(timed ? timingMark(NC_MID, -2.1, timed) : []), ...c.prims, ...tagAndLabel(timed ? (timed === "on-off" ? -4.1 : -3.2) : -0.8, el)],
-        terminals: c.terminals,
-        body: { x: timed ? (timed === "on-off" ? -3.6 : -2.7) : -0.1, y: -1.9, w: timed ? (timed === "on-off" ? 5.0 : 4.1) : 1.5, h: 3.4 },
-      };
-    },
-  },
-  {
-    id: "contact-co",
-    name: "Changeover contact",
-    group: "Contacts",
-    palette: true,
-    params: [familyParam, instantParam],
-    kind: familyKind,
-    draw(el, t) {
-      const timed = t?.timed;
-      // Printed marks: 11 common, 12 NC, 14 NO; a timed changeover 15, 16, 18.
-      const [m12, m14, m11] = timed ? ["16", "18", "15"] : ["12", "14", "11"];
-      return {
-        prims: [
-          line([0, -3], [0, -1.5]),
-          line([-2, -3], [-2, -1.5], [-0.9, -1.5]),
-          line([0, 1.5], [0, 3]),
-          opOf(el) ? line([0, 1.5], [-0.25, -1.5]) : line([0, 1.5], [-1.1, -1.7]),
-          // The timing mark goes out past the NC fixed contact.
-          ...(timed ? timingMark([-0.55, 0], -3.2, timed) : []),
-          term(0.45, -2.2, t?.pins?.["14"] ?? poleMarks(el, [m14, m11])[0]),
-          term(-2.45, -2.2, t?.pins?.["12"] ?? poleMarks(el, [m12, m11])[0], "end"),
-          term(0.45, 2.9, t?.pins?.["11"] ?? poleMarks(el, [m14, m11])[1]),
-          ...tagAndLabel(timed ? -4.2 : -2.6, el).map((p) => (p.t === "text" ? { ...p, at: [p.at[0], p.at[1] + 1.2] as Vec } : p)),
+    noRotate: true,
+    params: [
+      {
+        key: "contact",
+        label: "Contact",
+        type: "select",
+        options: [
+          { value: "no", label: "Normally open (13-14)" },
+          { value: "nc", label: "Normally closed (21-22)" },
+          { value: "co", label: "Changeover (11-12/14)" },
         ],
-        terminals: [
-          { name: "12", at: [-2, -3], dir: "up" },
-          { name: "14", at: [0, -3], dir: "up" },
-          { name: "11", at: [0, 3], dir: "down" },
-        ],
-        body: { x: timed ? -3.8 : -2, y: -1.8, w: timed ? 3.9 : 2.1, h: 3.3 },
-      };
+        default: "no",
+      },
+      instantParam,
+    ],
+    // Unlinked, a contact is K; linked, it takes its coil's tag (A36).
+    kind: () => "relay",
+    draw(el, t) {
+      switch (contactKind(el)) {
+        case "nc": {
+          const timed = t?.timed;
+          const c = contactTerms(timed ? ["15", "16"] : ["21", "22"], el, ["21", "22"], t?.pins);
+          return {
+            prims: [...ncContact(0, opOf(el)), ...(timed ? timingMark(NC_MID, -2.1, timed) : []), ...c.prims, ...tagAndLabel(timed ? (timed === "on-off" ? -4.1 : -3.2) : -0.8, el)],
+            terminals: c.terminals,
+            body: { x: timed ? (timed === "on-off" ? -3.6 : -2.7) : -0.1, y: -1.9, w: timed ? (timed === "on-off" ? 5.0 : 4.1) : 1.5, h: 3.4 },
+          };
+        }
+        case "co": {
+          const timed = t?.timed;
+          // Printed marks: 11 common, 12 NC, 14 NO; a timed changeover 15, 16, 18.
+          const [m12, m14, m11] = timed ? ["16", "18", "15"] : ["12", "14", "11"];
+          return {
+            prims: [
+              line([0, -3], [0, -1.5]),
+              line([-2, -3], [-2, -1.5], [-0.9, -1.5]),
+              line([0, 1.5], [0, 3]),
+              opOf(el) ? line([0, 1.5], [-0.25, -1.5]) : line([0, 1.5], [-1.1, -1.7]),
+              // The timing mark goes out past the NC fixed contact.
+              ...(timed ? timingMark([-0.55, 0], -3.2, timed) : []),
+              term(0.45, -2.2, t?.pins?.["14"] ?? poleMarks(el, [m14, m11])[0]),
+              term(-2.45, -2.2, t?.pins?.["12"] ?? poleMarks(el, [m12, m11])[0], "end"),
+              term(0.45, 2.9, t?.pins?.["11"] ?? poleMarks(el, [m14, m11])[1]),
+              ...tagAndLabel(timed ? -4.2 : -2.6, el).map((p) => (p.t === "text" ? { ...p, at: [p.at[0], p.at[1] + 1.2] as Vec } : p)),
+            ],
+            terminals: [
+              { name: "12", at: [-2, -3], dir: "up" },
+              { name: "14", at: [0, -3], dir: "up" },
+              { name: "11", at: [0, 3], dir: "down" },
+            ],
+            body: { x: timed ? -3.8 : -2, y: -1.8, w: timed ? 3.9 : 2.1, h: 3.3 },
+          };
+        }
+        default: {
+          const timed = t?.timed;
+          const c = contactTerms(timed ? ["17", "18"] : ["13", "14"], el, ["13", "14"], t?.pins);
+          return {
+            // On- and off-delay draws two arcs, reaching 0.9 further out: the tag stands clear of it.
+            prims: [...noContact(0, opOf(el)), ...(timed ? timingMark(NO_MID, -2.1, timed) : []), ...c.prims, ...tagAndLabel(timed ? (timed === "on-off" ? -4.1 : -3.2) : -1.9, el)],
+            terminals: c.terminals,
+            body: { x: timed ? (timed === "on-off" ? -3.6 : -2.7) : -1.3, y: -1.7, w: timed ? (timed === "on-off" ? 3.7 : 2.8) : 1.4, h: 3.2 },
+          };
+        }
+      }
     },
   },
   {
@@ -587,6 +597,7 @@ const SYMBOLS: SymbolDef[] = [
     name: "Push button",
     group: "Operators",
     palette: true,
+    noRotate: true,
     params: [
       // Poles worked by the one head, each NO or NC, numbered by pole like a selector's: NO k3/k4, NC k1/k2 (v0.2.1 note 24).
       { key: "poles", label: "Poles", type: "number", min: 1, max: 4, default: 1 },
@@ -634,6 +645,7 @@ const SYMBOLS: SymbolDef[] = [
     name: "Selector / keyswitch",
     group: "Operators",
     palette: true,
+    noRotate: true,
     params: [
       {
         key: "positions",
@@ -781,6 +793,7 @@ const SYMBOLS: SymbolDef[] = [
     name: "Isolator / MCB / contactor",
     group: "Protection",
     palette: true,
+    noRotate: true,
     params: [
       {
         key: "function",
@@ -864,6 +877,7 @@ const SYMBOLS: SymbolDef[] = [
     name: "Fuse / fuse carrier",
     group: "Protection",
     palette: true,
+    noRotate: true,
     params: [
       { key: "poles", label: "Poles", type: "number", min: 1, max: 4, default: 1 },
       { key: "rating", label: "Rating", type: "text", default: "", placeholder: "e.g. 2A" },
@@ -899,9 +913,10 @@ const SYMBOLS: SymbolDef[] = [
   },
   {
     id: "coil",
-    name: "Relay / contactor coil",
+    name: "Coil",
     group: "Coils",
     palette: true,
+    noRotate: true,
     params: [
       {
         key: "type",
@@ -910,14 +925,63 @@ const SYMBOLS: SymbolDef[] = [
         options: [
           { value: "relay", label: "Relay (K)" },
           { value: "contactor", label: "Contactor (Q)" },
+          { value: "timer", label: "Timer (K)" },
         ],
         default: "relay",
       },
+      // A timer's settings show only on a timer (A37).
+      {
+        key: "mode",
+        label: "Function",
+        type: "select",
+        options: TIMER_FUNCTIONS.map((f) => ({ value: f.value, label: f.label })),
+        default: "on",
+        when: isTimerCoil,
+        hideOff: true,
+      },
+      {
+        key: "time",
+        label: "Time",
+        type: "text",
+        default: "",
+        placeholder: "e.g. 5s, 1.5s, 2min",
+        help: "A number and a unit: 500ms, 5s, 1.5s, 2min (or 2m). Decimals are fine; a number on its own is seconds.",
+        when: isTimerCoil,
+        hideOff: true,
+      },
+      { key: "code", label: "Maker's function code", type: "text", default: "", placeholder: "e.g. A", when: isTimerCoil, hideOff: true },
       ACCEPTS_PARAM,
       VA_PARAM,
     ],
-    kind: (el) => (str(el, "type", "relay") === "contactor" ? "contactor" : "relay"),
+    // Tags follow the type: K for a relay or a timer, Q for a contactor (A37).
+    kind: (el) => coilType(el),
     draw(el, t) {
+      if (coilType(el) === "timer") {
+          const mode = timerFunction(el);
+          const time = str(el, "time", "");
+          const code = str(el, "code", "");
+          // Function mark in a box on the left of the coil (IEC 60617 for the two delays).
+          const bx = -2.8;
+          const mark: Prim[] = [rect(bx, -1.1, 1.2, 2.2, mode.value === "off")];
+          if (mode.value === "on") mark.push(line([bx, -1.1], [bx + 1.2, 1.1]), line([bx, 1.1], [bx + 1.2, -1.1]));
+          if (mode.value === "on-off") mark.push(line([bx, -1.1], [bx + 1.2, 1.1]), { t: "poly", pts: [[bx, 1.1], [bx + 1.2, 1.1], [bx + 1.2, -1.1]], fill: true });
+          if (mode.wave) mark.push(line(...mode.wave.map(([x, y]) => [bx + 0.15 + x * 0.9, y * 0.7] as Vec)));
+          // What it does, under the tag: the function (with the maker's code) and the time.
+          const fn = [mode.short, time, code ? `(${code})` : ""].filter(Boolean).join(" ");
+          const tx = -3.3;
+          const prims: Prim[] = [
+            line([0, -3], [0, -1.1]),
+            line([0, 1.1], [0, 3]),
+            rect(-1.6, -1.1, 3.2, 2.2),
+            ...mark,
+            term(0.45, -1.6, t?.pins?.A1 ?? "A1"),
+            term(0.45, 2.9, t?.pins?.A2 ?? "A2"),
+            text(tx, 0.5, "{tag}", TAG, "end", "tag"),
+            text(tx, 1.75, fn, DETAIL, "end", "note"),
+          ];
+          if (el.label) prims.push(text(tx, 3.0, "{label}", TAG, "end", "label"));
+          return { prims, terminals: vterms("A1", "A2"), body: { x: -2.8, y: -1.1, w: 4.4, h: 2.2 } };
+      }
       return {
         prims: [
           line([0, -3], [0, -1.1]),
@@ -933,63 +997,11 @@ const SYMBOLS: SymbolDef[] = [
     },
   },
   {
-    id: "timer-coil",
-    name: "Timer coil",
-    group: "Coils",
-    palette: true,
-    params: [
-      {
-        key: "mode",
-        label: "Function",
-        type: "select",
-        options: TIMER_FUNCTIONS.map((f) => ({ value: f.value, label: f.label })),
-        default: "on",
-      },
-      {
-        key: "time",
-        label: "Time",
-        type: "text",
-        default: "",
-        placeholder: "e.g. 5s, 1.5s, 2min",
-        help: "A number and a unit: 500ms, 5s, 1.5s, 2min (or 2m). Decimals are fine; a number on its own is seconds.",
-      },
-      { key: "code", label: "Maker's function code", type: "text", default: "", placeholder: "e.g. A" },
-      ACCEPTS_PARAM,
-      VA_PARAM,
-    ],
-    kind: () => "timer",
-    draw(el, t) {
-      const mode = timerFunction(el);
-      const time = str(el, "time", "");
-      const code = str(el, "code", "");
-      // Function mark in a box on the left of the coil (IEC 60617 for the two delays).
-      const bx = -2.8;
-      const mark: Prim[] = [rect(bx, -1.1, 1.2, 2.2, mode.value === "off")];
-      if (mode.value === "on") mark.push(line([bx, -1.1], [bx + 1.2, 1.1]), line([bx, 1.1], [bx + 1.2, -1.1]));
-      if (mode.value === "on-off") mark.push(line([bx, -1.1], [bx + 1.2, 1.1]), { t: "poly", pts: [[bx, 1.1], [bx + 1.2, 1.1], [bx + 1.2, -1.1]], fill: true });
-      if (mode.wave) mark.push(line(...mode.wave.map(([x, y]) => [bx + 0.15 + x * 0.9, y * 0.7] as Vec)));
-      // What it does, under the tag: the function (with the maker's code) and the time.
-      const fn = [mode.short, time, code ? `(${code})` : ""].filter(Boolean).join(" ");
-      const tx = -3.3;
-      const prims: Prim[] = [
-        line([0, -3], [0, -1.1]),
-        line([0, 1.1], [0, 3]),
-        rect(-1.6, -1.1, 3.2, 2.2),
-        ...mark,
-        term(0.45, -1.6, t?.pins?.A1 ?? "A1"),
-        term(0.45, 2.9, t?.pins?.A2 ?? "A2"),
-        text(tx, 0.5, "{tag}", TAG, "end", "tag"),
-        text(tx, 1.75, fn, DETAIL, "end", "note"),
-      ];
-      if (el.label) prims.push(text(tx, 3.0, "{label}", TAG, "end", "label"));
-      return { prims, terminals: vterms("A1", "A2"), body: { x: -2.8, y: -1.1, w: 4.4, h: 2.2 } };
-    },
-  },
-  {
     id: "lamp",
     name: "Indicator lamp",
     group: "Loads",
     palette: true,
+    noRotate: true,
     params: [
       {
         key: "colour",
@@ -1188,6 +1200,7 @@ const SYMBOLS: SymbolDef[] = [
     name: "Connector block",
     group: "Connection",
     palette: true,
+    noRotate: true,
     params: [{ key: "terminals", label: "Terminals", type: "number", min: 2, max: 12, default: 2 }],
     // One potential throughout (v0.4.x M9): an earth block, a 0 V or 24 V block, a screen connector.
     kind: () => "terminal",
@@ -1260,6 +1273,7 @@ const SYMBOLS: SymbolDef[] = [
     name: "Transformer",
     group: "Loads",
     palette: true,
+    noRotate: true,
     params: [
       { key: "screen", label: "Earthed screen", type: "bool", default: false },
       { key: "rating", label: "Rating", type: "text", default: "", placeholder: "e.g. 230/24V 100VA" },
@@ -1306,6 +1320,7 @@ const SYMBOLS: SymbolDef[] = [
     name: "Motor",
     group: "Loads",
     palette: true,
+    noRotate: true,
     params: [
       { key: "rating", label: "Rating", type: "text", default: "", placeholder: "e.g. 1.5kW 3.4A FLC" },
       // v0.4.x M8: single phase (L N) as well as three (U V W); the picture only changes the drawing.
@@ -2490,8 +2505,13 @@ export function plantViewLayout(el: Element): {
 }
 
 /** Does a parameter apply to this element as it's set now? */
-export function paramApplies(def: ParamDef, el: Element): boolean {
-  return !def.when || def.when(el);
+export function paramApplies(def: ParamDef, el: Element, project?: Project): boolean {
+  return !def.when || def.when(el, project);
+}
+
+/** Does this part turn with `R` (v0.5 A39)? */
+export function canRotate(el: Pick<Element, "symbol">): boolean {
+  return !getSymbol(el.symbol)?.noRotate;
 }
 
 const BY_ID = new Map(SYMBOLS.map((s) => [s.id, s]));
@@ -2811,15 +2831,12 @@ export function poleMates(el: Element, terminal: string): string[] {
     for (let i = 0; i < n; i++) pairs.push([String(2 * i + 1), String(2 * i + 2)]);
   };
   switch (el.symbol) {
-    case "contact-no":
-      pairs.push(["13", "14"]);
+    case "contact": {
+      const k = contactKind(el);
+      if (k === "co") pairs.push(["11", "14"], ["11", "12"]);
+      else pairs.push(k === "nc" ? ["21", "22"] : ["13", "14"]);
       break;
-    case "contact-nc":
-      pairs.push(["21", "22"]);
-      break;
-    case "contact-co":
-      pairs.push(["11", "14"], ["11", "12"]);
-      break;
+    }
     case "pushbutton":
       // Pole k: k3/k4 when normally open, k1/k2 when closed (A25), every pole.
       pushPoles(el).forEach((nc, i) => pairs.push(nc ? [`${i + 1}1`, `${i + 1}2`] : [`${i + 1}3`, `${i + 1}4`]));

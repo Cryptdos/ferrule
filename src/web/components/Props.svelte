@@ -33,7 +33,7 @@
   import { controllerName, moduleTitle } from "../../core/modules";
   import { readImage } from "../images";
   import { address, contactMarks, relayPinMarks, contactType, isMaster, isSlave, masterOf, partnerOf, slavesOf } from "../../core/xref";
-  import { isBar, paramApplies, parsePlantPins, plantViewLayout, requireSymbol, terminalNames, viewSides, type ViewSide } from "../../core/symbols";
+  import { canRotate, isBar, paramApplies, parsePlantPins, plantViewLayout, requireSymbol, terminalNames, viewSides, type ViewSide } from "../../core/symbols";
   import { WIRE_FUNCTIONS, conductorLooks, functionRows } from "../../core/wirecolours";
   import ColourSelect from "./ColourSelect.svelte";
   import { displayTag, tagPrefix } from "../../core/tags";
@@ -304,9 +304,9 @@
         </label>
       {/each}
     {/if}
-    {#each def.params.filter((x) => !x.hidden) as p (p.key)}
+    {#each def.params.filter((x) => !x.hidden && (!x.hideOff || paramApplies(x, one, editor.project))) as p (p.key)}
       {@const v = one.params[p.key] ?? p.default}
-      {#if !paramApplies(p, one)}
+      {#if !paramApplies(p, one, editor.project)}
         <label class="off" title="Doesn't apply to this {def.name.toLowerCase()} as it's set">
           {p.label}
           <select disabled>
@@ -758,12 +758,14 @@
   {/if}
   {#if sel.length > 0}
     <div class="buttons">
-      <button
-        onclick={() => {
-          const ids = sel.map((e) => e.id);
-          editor.apply((p) => rotateElements(p, editor.pageId, ids));
-        }}>Rotate (R)</button
-      >
+      {#if sel.some((e) => canRotate(e))}
+        <button
+          onclick={() => {
+            const ids = sel.map((e) => e.id);
+            editor.apply((p) => rotateElements(p, editor.pageId, ids));
+          }}>Rotate (R)</button
+        >
+      {/if}
       <button
         onclick={() => {
           const ids = sel.map((e) => e.id);

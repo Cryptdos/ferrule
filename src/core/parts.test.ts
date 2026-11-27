@@ -148,10 +148,10 @@ describe("timer functions", () => {
   test("a flasher drives its contact in the simulator", () => {
     const { p, pg, add } = sheet();
     const { cct: cct, ov: ov } = controlBusbars(p, pg, 10, 80);
-    const kt = add("timer-coil", 10, 60, { mode: "flash-on", time: "1s" });
+    const kt = add("coil", 10, 60, { type: "timer", mode: "flash-on", time: "1s" });
     connect(p, pg, [cct.id, "10"], [kt.id, "A1"]);
     connect(p, pg, [kt.id, "A2"], [ov.id, "10"]);
-    const tc = add("contact-no", 40, 30);
+    const tc = add("contact", 40, 30);
     linkContact(p, tc.id, kt.id);
     const h = add("lamp", 40, 60);
     connect(p, pg, [cct.id, "40"], [tc.id, "13"]);

@@ -17,7 +17,7 @@ import {
   type Project,
 } from "./model";
 import { displayTag } from "./tags";
-import { terminalNames } from "./symbols";
+import { contactKind, terminalNames } from "./symbols";
 import { pointLabel, viewsOf } from "./modules";
 
 /** The simulator's (and expectations') id for a point: shared by every view of its device. */
@@ -195,7 +195,6 @@ export interface Thing {
 
 const ELEMENT_WORDS: Record<string, [string, string]> = {
   coil: ["energised", "de-energised"],
-  "timer-coil": ["energised", "de-energised"],
   lamp: ["lit", "out"],
   "contact-no": ["closed", "open"],
   "contact-nc": ["closed", "open"],
@@ -211,7 +210,7 @@ export function things(project: Project): Thing[] {
   const out: Thing[] = [];
   for (const pg of project.pages) {
     for (const el of pg.elements) {
-      const w = ELEMENT_WORDS[el.symbol];
+      const w = ELEMENT_WORDS[el.symbol === "contact" ? `contact-${contactKind(el)}` : el.symbol];
       if (!w) continue;
       // A contact shares its coil's tag: its terminals tell it apart (K3-12 13-14).
       const tag = displayTag(el, project) || el.label || el.symbol;

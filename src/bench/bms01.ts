@@ -323,9 +323,9 @@ export function buildBms01(avoid: Avoid | null): Bms01 {
   field(tap(c24, 36), [kfOverride, "A1"], fosView, "1", "2", 36);
   for (const k of [kfHealthy, kfStage2, kfOverride]) w([k, "A2"], tap(c0, k.pos[0]));
   // AHU-01 enable: BMS enable relay, then (fire alarm healthy OR firemans override), then the enable relay.
-  const kcBms = add("contact-no", 56, 14);
-  const kfH = add("contact-no", 56, 26);
-  const kfO = add("contact-no", 64, 26);
+  const kcBms = add("contact", 56, 14);
+  const kfH = add("contact", 56, 26);
+  const kfO = add("contact", 64, 26);
   const keAhu = add("coil", 56, 52, { label: "AHU-01\nENABLE RELAY" });
   w(tap(c24, 56), [kcBms, "13"]);
   w([kcBms, "14"], [kfH, "13"]);
@@ -335,7 +335,7 @@ export function buildBms01(avoid: Avoid | null): Bms01 {
   w([keAhu, "A2"], tap(c0, 56));
   linkContact(p, kfH.id, kfHealthy.id);
   linkContact(p, kfO.id, kfOverride.id);
-  const hFire = add("contact-no", 80, 26);
+  const hFire = add("contact", 80, 26);
   const hFireLamp = add("lamp", 80, 52, { label: "FIRE ALARM\nACTIVATED", params: { colour: "Rd" } });
   w(tap(c24, 80), [hFire, "13"]);
   w([hFire, "14"], [hFireLamp, "+V"]);
@@ -355,8 +355,8 @@ export function buildBms01(avoid: Avoid | null): Bms01 {
   const d1 = view(DMP1, 100, 76, ["1", "2"]);
   const d2 = view(DMP2, 120, 76, ["1", "2"]);
   // Dampers open from the AHU enable relay.
-  const keD1 = add("contact-no", 100, 20);
-  const keD2 = add("contact-no", 120, 20);
+  const keD1 = add("contact", 100, 20);
+  const keD2 = add("contact", 120, 20);
   field([keD1, "14"], tap(c0, 104), d1, "1", "2", 100);
   field([keD2, "14"], tap(c0, 124), d2, "1", "2", 120);
   w(tap(c24, 100), [keD1, "13"]);
@@ -364,12 +364,12 @@ export function buildBms01(avoid: Avoid | null): Bms01 {
   linkContact(p, keD1.id, keAhu.id);
   linkContact(p, keD2.id, keAhu.id);
   // Supply drive: AHU enable. Extract drive: AHU enable and its damper proven open (the damper's own end switch, on sheet 4).
-  const keS = add("contact-no", 14, 20);
+  const keS = add("contact", 14, 20);
   w(tap(c24, 14), [keS, "13"]);
   field([keS, "14"], tap(c0, 18), sfd, "DI1", "DCOM", 14);
   linkContact(p, keS.id, keAhu.id);
-  const keE = add("contact-no", 54, 14);
-  const kdOpen = add("contact-no", 54, 28);
+  const keE = add("contact", 54, 14);
+  const kdOpen = add("contact", 54, 28);
   w(tap(c24, 54), [keE, "13"]);
   w([keE, "14"], [kdOpen, "13"]);
   field([kdOpen, "14"], tap(c0, 58), efd, "DI1", "DCOM", 54);

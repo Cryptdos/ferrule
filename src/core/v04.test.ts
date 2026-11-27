@@ -505,7 +505,7 @@ describe("checks: a point wired to its channel (§5)", () => {
   test("confirmed by hand holds while the wiring at both ends is unchanged, and drops back when it changes", () => {
     const { p, fs, mv, fv, pg, wire, point } = rig();
     // Through a link arrow pair would be direct; through a switch it's to review.
-    const sw = addElement(p, pg, "contact-no", [40, 40]);
+    const sw = addElement(p, pg, "contact", [40, 40]);
     wire([fv.id, "NO"], [sw.id, "13"]);
     wire([sw.id, "14"], [mv.id, "1"]);
     expect(wiringOf(p, fs, point()).kind).toBe("review");
@@ -513,7 +513,7 @@ describe("checks: a point wired to its channel (§5)", () => {
     expect(wiringOf(p, fs, point()).kind).toBe("confirmed");
     // Something elsewhere changes: still confirmed.
     const lamp = addElement(p, pg, "lamp", [120, 40]);
-    const other = addElement(p, pg, "contact-no", [130, 40]);
+    const other = addElement(p, pg, "contact", [130, 40]);
     wire([other.id, "14"], [lamp.id, "+V"]);
     expect(wiringOf(p, fs, point()).kind).toBe("confirmed");
     // A wire added at the point's end: back to review.
@@ -571,9 +571,9 @@ describe("one hop, proved on the example project (§5)", () => {
     const sheet = p.pages.find((pg) => pg.elements.some((e) => e.symbol === "plant-view" && e.params.plant === dps.id))!;
     const mv = placePlantView(p, sheet.id, di.id, [60, 4]);
     allocate(p, dps.id, "Airflow proven", { module: di.id, point: "DI1" });
-    const coil = (tag: string) => p.pages.flatMap((pg) => pg.elements).find((e) => e.tag === tag && (e.symbol === "coil" || e.symbol === "timer-coil"))!;
+    const coil = (tag: string) => p.pages.flatMap((pg) => pg.elements).find((e) => e.tag === tag && (e.symbol === "coil"))!;
     const contactOf = (tag: string, at: [number, number]) => {
-      const k = addElement(p, sheet.id, "contact-no", at);
+      const k = addElement(p, sheet.id, "contact", at);
       linkContact(p, k.id, coil(tag).id);
       return k;
     };
@@ -604,14 +604,14 @@ describe("one hop, proved on the example project (§5)", () => {
     kx.tag = "KX1";
     const a = contactOf("K8-37", [80, 40]);
     wire([a.id, "14"], [kx.id, "A1"]);
-    const b = addElement(p, sheet.id, "contact-no", [62, 40]);
+    const b = addElement(p, sheet.id, "contact", [62, 40]);
     linkContact(p, b.id, kx.id);
     wire([b.id, "14"], [mv.id, "1"]);
     expect(kind().kind).toBe("review");
   });
   test("a switch or timer between is to review; confirming it by hand still works", () => {
     const { p, dps, mv, sheet, wire, kind } = example();
-    const sw = addElement(p, sheet.id, "contact-no", [62, 40]);
+    const sw = addElement(p, sheet.id, "contact", [62, 40]);
     const views = p.pages.flatMap((pg) => pg.elements.filter((e) => e.symbol === "plant-view" && e.params.plant === dps.id));
     wire([views[0]!.id, "NO"], [sw.id, "13"]);
     wire([sw.id, "14"], [mv.id, "1"]);
@@ -628,7 +628,7 @@ describe("one hop, proved on the example project (§5)", () => {
     allocate(p, ef.id, "enable", { module: dout.id, point: "DO1" });
     const ky = addElement(p, sheet.id, "coil", [110, 50]);
     ky.tag = "KY1";
-    const k = addElement(p, sheet.id, "contact-no", [130, 40]);
+    const k = addElement(p, sheet.id, "contact", [130, 40]);
     linkContact(p, k.id, ky.id);
     connect(p, sheet.id, [dv.id, dout.points![0]!.pins[1]!], [ky.id, "A1"]);
     connect(p, sheet.id, [k.id, "14"], [ev.id, "1"]);
@@ -781,7 +781,7 @@ describe("points schedule (§9)", () => {
     allocate(p, dps.id, "Airflow proven", { module: di.id, point: "DI1" });
     const sheet = p.pages.find((pg) => pg.elements.some((e) => e.symbol === "plant-view" && e.params.plant === dps.id))!;
     const mv = placePlantView(p, sheet.id, di.id, [60, 4]);
-    const k = addElement(p, sheet.id, "contact-no", [62, 40]);
+    const k = addElement(p, sheet.id, "contact", [62, 40]);
     linkContact(p, k.id, p.pages.flatMap((pg) => pg.elements).find((e) => e.tag === "K8-37" && e.symbol === "coil")!.id);
     connect(p, sheet.id, [k.id, "14"], [mv.id, "1"]);
     refreshConductors(p);

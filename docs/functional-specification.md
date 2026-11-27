@@ -335,7 +335,7 @@ The electrical drawing: parts, wires, rails, plant views, numbering and links. I
 
 - **DR-1** Picking a part in the browser and clicking on the sheet places it, snapped to the grid. The tool then returns to Select, unless *Keep placing* is on or the click was made with `Ctrl` held, which keeps the part for the next click (WN-20).
 - **DR-2** Typing in *Find a part…* narrows the list by name or group; `Enter` picks the first match; `Esc` clears it.
-- **DR-3** While placing, ~~`R` turns the part 90° and~~ *(v0.5: A39)* `F` flips it before it's dropped.
+- **DR-3** While placing, `F` flips the part before it's dropped, and `R` turns one that turns (DR-8).
 - **DR-4** Picking the active part again, or `S` or `Esc`, returns to Select.
 - **DR-5** Parts are grouped: Contacts, Operators, Coils, Protection, Loads, Connection.
 
@@ -343,7 +343,7 @@ The electrical drawing: parts, wires, rails, plant views, numbering and links. I
 
 - **DR-6** Click selects. Dragging on empty paper box-selects. `Shift`/`Ctrl`+click adds to the selection. `Ctrl+A` selects everything this workbench edits on the sheet.
 - **DR-7** Dragging moves the selection on the grid, its wires following.
-- **DR-8** ~~`R` rotates 90°.~~ *(v0.5: A39)* `F` flips top to bottom; a flipped contact's numbers still read the right way up. Only the symbol turns over: its tag stays above its label.
+- **DR-8** `R` rotates 90° the parts that turn: the earth, the cable screen, terminals, the socket outlet, the connector, the incoming supply, blocks and rails, the terminal strip line, and plant and module views. Contacts, coils, push buttons, selectors, isolators and breakers, fuses, lamps, the transformer, the motor and the connector block don't: they sit in a drop and are drawn the way the sheet runs, so *Rotate* isn't offered and `R` says so. `F` flips top to bottom; a flipped contact's numbers still read the right way up. Only the symbol turns over: its tag stays above its label.
 - **DR-9** Arrow keys nudge by 1 unit, `Shift`+arrow by 2.
 - **DR-10** `Ctrl+D` duplicates the selection 4 units to the right and selects the copies.
 - **DR-11** `Del` or `Backspace` deletes selected parts, wires, sections and clouds.
@@ -463,17 +463,17 @@ Tag prefixes follow IEC 81346-2 as applied in `docs/designations.md`. Untagged p
 
 | ID | Part | Prefix | Settings | Expected |
 |---|---|---|---|---|
-| **PT-1** | Contact NO / NC / Changeover | K, Q (from its coil) | ~~*Belongs to* (Relay, Contactor, Timer); *Instantaneous*~~ *(v0.5: A36)* | Unlinked: terminals 13-14, 21-22, 11-12-14. Linked: its coil's tag and pole numbers *(v0.5: A36. NO, NC and changeover become one Contact part)* |
+| **PT-1** | Contact | K, Q (from its coil) | *Contact*: normally open, normally closed or changeover; *Instantaneous*, shown only on a contact linked to a timer | One part, its kind picked in its properties. Unlinked, it's a K: terminals 13-14, 21-22 or 11-12/14 by its kind. Linked: its coil's tag and pole numbers, and timed when the coil is a timer |
 | **PT-2** | Push button | S | Poles 1–4; each pole NO or NC | One head. Pole *n* is numbered *n*3/*n*4 when NO and *n*1/*n*2 when NC (13/14 or 11/12, 23/24 or 21/22…) |
 | **PT-3** | Selector / keyswitch | S | 2 position (0–I) or 3 (I–0–II); poles 1–4; each pole NO closed in I, in II, or in both, NC opened in I or II, ~~or changeover~~ *(v0.5: A43)*; *Key operated*; a name per position | Position names print under the head as `SUPPLY 1 – OFF – SUPPLY 2`. A 3-position changeover is numbered common 2, to 3 in I, to 1 in II; the next pole 7, 6, 5 *(v0.5: A41, A43, A46. The pole choices, changeover and the part's name change; a 4 position selector is added)* |
 | **PT-4** | Isolator / MCB / contactor | Q or F | *Function*: Isolator (Q), Contactor main contacts (Q), Circuit breaker / MCB (F), RCD / RCBO (F); main poles 1–4; aux NO 0–3; aux NC 0–3; *Operator* (an isolator only): rotary handle, door handle or key; every isolator has one | Contactor poles are worked by the coil picked under *Driven by coil*. A breaker draws no operator. An RCD carries the residual current mark |
 | **PT-5** | Fuse / fuse carrier | F | Poles 1–4; *Rating* | Rating prints beside it |
-| **PT-6** | Relay / contactor coil | K or Q | *Type*; ~~*Takes (supply)*; *Draw (VA)*~~ *(v0.5: A38)* | Terminals A1, A2; contact table once contacts are linked *(v0.5: A37. One Coil part with PT-7)* |
-| **PT-7** | Timer coil | K | *Function*: TON, TOF, TON+TOF, TP, Flasher ON first, Flasher OFF first; *Time* (`500ms`, `5s`, `1.5s`, `2min`); *Maker's function code*; ~~*Takes*; *Draw*~~ *(v0.5: A38)* | Function, time and code print by the coil; the simulator runs it |
+| **PT-6** | Coil | K for a relay or timer, Q for a contactor | *Type*: Relay, Contactor or Timer; ~~*Takes (supply)*; *Draw (VA)*~~ *(v0.5: A38)* | One part: the symbol changes with the type. Terminals A1, A2; contact table once contacts are linked. Its contacts follow the type: set to Timer, they're timed |
+| **PT-7** | Coil set to Timer | K | Shown only when the type is Timer: *Function*: TON, TOF, TON+TOF, TP, Flasher ON first, Flasher OFF first; *Time* (`500ms`, `5s`, `1.5s`, `2min`); *Maker's function code*; ~~*Takes*; *Draw*~~ *(v0.5: A38)* | Function, time and code print by the coil; the simulator runs it |
 | **PT-8** | Indicator lamp | P | *Colour*: Rd, Ye, Gn, Bu, Wh; *Lamp test terminal (LT)*; ~~*Takes*; *Draw*~~ *(v0.5: A38)* | Terminals +V and −V; with lamp test, a third, LT. Every lamp has a colour (white covers a clear lens) |
 | **PT-9** | Terminal | (number only) | *Terminal strip* (default X1); *Type*; *Show the strip identifier beside it* | See DR-55 to DR-61 |
 | **PT-10** | Socket outlet | X | none | A box with L and N on top, 3 units apart to line up under an MCB, and E beside them |
-| **PT-11** | Connector block | X | *Terminals* 2–12 | A box of terminals all at one potential (an earth, 0 V or screen block); grows with each terminal; ~~rotates~~ *(v0.5: A39)* |
+| **PT-11** | Connector block | X | *Terminals* 2–12 | A box of terminals all at one potential (an earth, 0 V or screen block); grows with each terminal; doesn't turn (DR-8) |
 | **PT-12** | Connector (plug and socket) | X | *Ways* 1–12 | Each way a plug pin and a socket contact, for flying leads |
 | **PT-13** | Transformer | T | *Earthed screen*; *Rating*; *Gives*; *Rating (VA)* | Terminals P1, P2, S1, S2 at switch pole pitch; a supply in Simulate once its primary is energised |
 | **PT-14** | Motor | M | *Rating*; *Phases*: three (U V W) or single (L N); *Picture*: motor, fan, pump | Terminals at pole pitch, so it wires straight down from the contactor above *(v0.5: A56. *Picture* becomes *Type*, and the name follows it)* |
@@ -779,7 +779,7 @@ Design's findings appear only once a project uses Design.
 | `Ctrl+D` | Duplicate | – | – | – |
 | `Ctrl+V` | Paste a picture (Annotate) | – | – | – |
 | `Del` / `Backspace` | Delete | Remove from the GA | – | – |
-| `R` | Rotate (or turn the part being placed) | Rotate | – | – |
+| `R` | Rotate a part that turns (or turn one being placed) | Rotate | – | – |
 | `F` | Flip (or flip the part being placed) | – | – | – |
 | Arrows | Nudge 1 unit (`Shift`: 2) | Nudge 5 mm (`Shift`: 1 mm) | – | – |
 | `W` | Wire tool (Draft) | – | – | – |
