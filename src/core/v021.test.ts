@@ -37,26 +37,18 @@ describe("step 2a: parts and Annotate", () => {
     expect(t.label).toBe("# Notes\n- one");
   });
 
-  test("files: lamps with no colour or clear are white; label plates become boxes; a left drain moves to E2", () => {
+  test("files: lamps with no colour or clear are white", () => {
     const { p, pg } = sheet();
     const l1 = addElement(p, pg, "lamp", [10, 10]);
     const l2 = addElement(p, pg, "lamp", [20, 10]);
     const raw = JSON.parse(JSON.stringify(p));
     raw.pages[0].elements.find((e: { id: string }) => e.id === l1.id).params.colour = "";
     raw.pages[0].elements.find((e: { id: string }) => e.id === l2.id).params.colour = "Cl";
-    raw.pages[0].elements.push({ id: "e_plate", symbol: "plate", tag: "", label: "POWER\nON", pos: [40, 40], rot: 0, zone: "internal", params: { w: 14, h: 5, size: "note" }, links: [] });
-    raw.pages[0].elements.push({ id: "e_scr", symbol: "screen", tag: "W1", label: "", pos: [60, 40], rot: 0, zone: "internal", params: { drain: "left", span: 3 }, links: [] });
-    const k = addElement(p, pg, "coil", [70, 60]);
-    raw.pages[0].elements.push(JSON.parse(JSON.stringify(k)));
-    raw.pages[0].segments.push({ id: "s1", conductor: "", from: ["e_scr", "E"], to: [k.id, "A1"], route: "auto", points: [] });
     expect(raw.format).toBe(FORMAT);
     expect(raw.version).toBe(FORMAT_VERSION);
     const back = parseProject(raw);
     const els = back.pages[0]!.elements;
     expect(els.filter((e) => e.symbol === "lamp").map((e) => e.params.colour)).toEqual(["Wh", "Wh"]);
-    const box = els.find((e) => e.id === "e_plate")!;
-    expect([box.symbol, box.label, box.params.w, box.params.h]).toEqual(["box", "POWER ON", 14, 5]);
-    expect(back.pages[0]!.segments.find((s) => s.id === "s1")!.from).toEqual(["e_scr", "E2"]);
   });
 
   test("a flipped incoming supply keeps its names beyond the arrows' tails and its label clear of them (30)", () => {

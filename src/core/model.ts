@@ -6,7 +6,12 @@ import type { Rotation, Vec } from "./geometry";
 import type { ProjectDevice } from "./devices";
 
 export const FORMAT = "ferrule";
-export const FORMAT_VERSION = 3;
+/**
+ * What a file must hold. Moved on by any build that changes it (v0.5 A30): a
+ * file of any other number isn't opened, and says which Ferrule it needs.
+ * 4: v0.5 step 0, the test-build mapping dropped.
+ */
+export const FORMAT_VERSION = 4;
 
 export type ParamValue = string | number | boolean;
 

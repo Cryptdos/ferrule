@@ -1,11 +1,13 @@
 /**
  * Loading project files. Checks the shape (files can be hand-edited or
  * written over MCP) and rejects anything that isn't a Ferrule project of
- * this format. There's no upgrading before 1.0: an older file is refused
- * with a plain message rather than half-opened.
+ * this format. There's no backwards compatibility before release (v0.5 A30):
+ * a file of any other format is refused, naming the Ferrule it needs, rather
+ * than half-opened. A build that changes what a file must hold moves
+ * FORMAT_VERSION on.
  */
 import { spreadBlock } from "./blocks";
-import { PLANT_VIEW_KEYS, labelWidthFor, legendToPositions } from "./ops";
+import { PLANT_VIEW_KEYS, labelWidthFor } from "./ops";
 import { parseProjectDevices } from "./devices";
 import { AREA_UNITS } from "./geometry";
 import { tidyDesign } from "./design";
@@ -15,7 +17,7 @@ import { PLANT_MARKS, TEXT_PLACES, type TextPlace, DISTRIBUTION_KINDS, type Dist
 import { defaultParams, getSymbol } from "./symbols";
 import { gaToSheet } from "./ga";
 import { MODULE_TYPES } from "./modules";
-import { colourCode, knownColour, lampColour } from "./wirecolours";
+import { colourCode, lampColour } from "./wirecolours";
 
 export class ProjectFormatError extends Error {}
 
@@ -25,24 +27,25 @@ const isVec = (v: unknown): v is [number, number] =>
 const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 const strOr = (v: unknown, d = ""): string => (typeof v === "string" ? v : d);
 
+/**
+ * Why a file of another format isn't opened (v0.5 A30). Since v0.4.x every
+ * save writes the Ferrule that made it (`savedBy`), so the message names the
+ * build to open it in; old builds stay on the releases page for that.
+ */
+export function notOpened(version: number, savedBy: unknown): string {
+  const by = typeof savedBy === "string" ? savedBy.trim() : "";
+  if (by) return `Not opened. This file needs Ferrule ${by}${version > FORMAT_VERSION ? " or later" : ""}. Builds: ${RELEASES_URL}`;
+  return version > FORMAT_VERSION
+    ? "Not opened. This file is from a newer Ferrule."
+    : "Not opened. This file is from an older Ferrule and can't be opened in this one.";
+}
+
 export function parseProject(input: unknown): Project {
   if (!isObj(input)) throw new ProjectFormatError("Not a project: expected a JSON object");
   if (input.format !== FORMAT) throw new ProjectFormatError('Not a Ferrule project (missing format: "ferrule")');
   const version = typeof input.version === "number" ? input.version : 0;
-  if (version > FORMAT_VERSION) {
-    // The version that saved it (v0.4.x T19), when the file says; otherwise only its format.
-    const by = typeof input.savedBy === "string" && input.savedBy.trim() ? input.savedBy.trim() : "";
-    throw new ProjectFormatError(
-      by
-        ? `Saved by Ferrule ${by} (format ${version}). This is ${VERSION} (format ${FORMAT_VERSION}). Open it in ${by} or later: ${RELEASES_URL}`
-        : `Project was saved by a newer Ferrule (format ${version}); this build reads format ${FORMAT_VERSION}`,
-    );
-  }
-  if (version < FORMAT_VERSION) {
-    throw new ProjectFormatError("This project was made with Ferrule 0.1; this version can't open it. Projects from 0.1 need redrawing.");
-  }
+  if (version !== FORMAT_VERSION) throw new ProjectFormatError(notOpened(version, input.savedBy));
   if (typeof input.id !== "string" || !input.id) throw new ProjectFormatError("Project has no id");
-  preRelease(input);
 
   const info = isObj(input.project) ? input.project : {};
   const base = emptyInfo();
@@ -600,125 +603,4 @@ function parseConductors(v: unknown): Project["conductors"] {
         (t): t is [string, string] => Array.isArray(t) && t.length === 2 && t.every((x) => typeof x === "string"),
       ),
     }));
-}
-
-/**
- * Drawings made with the 0.2 test builds (format 3, before the parts audit)
- * open with the parts and terminals renamed in the audit. For the test
- * period only: remove when 0.2.0 is released.
- */
-function preRelease(input: Record<string, unknown>): void {
-  // Annotate label plates became boxes: label plates are a GA item now (v0.2.1 note 3).
-  // A cable screen's drain on the left is its E2 now; it has points both sides (note 13).
-  for (const pg of arr(input.pages).filter(isObj)) {
-    const renamed = new Set<string>();
-    for (const el of arr(pg.elements).filter(isObj)) {
-      const params = isObj(el.params) ? el.params : {};
-      // Text sizes became Markdown headings (note 8): a Title or Heading text gets # or ## on each line.
-      if (el.symbol === "text" && (params.size === "title" || params.size === "heading") && typeof el.label === "string") {
-        const mark = params.size === "title" ? "# " : "## ";
-        el.label = el.label.split("\n").map((l) => (l.trim() && !/^#/.test(l) ? mark + l : l)).join("\n");
-      }
-      if (el.symbol === "text") delete params.size;
-      if (el.symbol === "plate") {
-        el.symbol = "box";
-        el.params = { w: params.w ?? 20, h: params.h ?? 5 };
-      } else if (el.symbol === "screen" && params.drain === "left" && typeof el.id === "string") renamed.add(el.id);
-    }
-    for (const s of arr(pg.segments).filter(isObj))
-      for (const r of [s.from, s.to]) if (Array.isArray(r) && renamed.has(r[0]) && r[1] === "E") r[1] = "E2";
-  }
-  // Plant groups became points, and logic rules expectations (step 8a).
-  for (const pl of arr(input.plant).filter(isObj)) {
-    if (!Array.isArray(pl.groups) || pl.points) continue;
-    const groups = arr(pl.groups).filter(isObj);
-    const formOf = (g: Record<string, unknown>): PointForm => {
-      const names = arr(g.terminals).map((t) => String(t).split(".").pop()!.toUpperCase());
-      const relay = names.some((t) => t === "C" || t === "COM") && names.some((t) => t === "NO" || t === "NC");
-      if (g.role === "input") return "powered-in";
-      if (g.role === "none") return names.includes("L") || names.includes("+V") ? "supply-in" : "analogue-in";
-      if (g.role === "output" || relay) return "contact";
-      return /ENABLE|START|RUN\s*(CMD|COMMAND)|COMMAND|CMD|INPUT|ON\/OFF|DEMAND|CALL|STOP/i.test(String(g.name)) ? "powered-in" : "contact";
-    };
-    pl.points = groups.map((g) => ({
-      name: g.name,
-      form: formOf(g),
-      pins: g.terminals,
-      ...(typeof g.follows === "string" && g.follows
-        ? { follows: [{ ref: `plant:${String(pl.id)}:${g.follows}`, on: g.invert !== true }], ...(typeof g.delay === "number" ? { delay: g.delay } : {}) }
-        : {}),
-    }));
-    delete pl.groups;
-  }
-  if (Array.isArray(input.rules) && !input.expectations) {
-    input.expectations = arr(input.rules)
-      .filter(isObj)
-      .filter((r) => typeof r.a === "string")
-      .map((r) => ({
-        id: r.id,
-        kind: "never",
-        when: [{ ref: r.a, on: true }, ...(r.kind !== "never" && typeof r.b === "string" ? [{ ref: r.b, on: true }] : [])],
-        join: "and",
-      }));
-  }
-  const terms = new Map<string, Record<string, string>>(); // element id → old terminal → new
-  for (const pg of arr(input.pages).filter(isObj)) {
-    for (const e of arr(pg.elements).filter(isObj)) {
-      const params = (isObj(e.params) ? e.params : (e.params = {})) as Record<string, unknown>;
-      const id = String(e.id ?? "");
-      if (e.symbol === "timer-contact") {
-        const nc = params.contact === "nc";
-        e.symbol = nc ? "contact-nc" : "contact-no";
-        delete params.contact;
-        delete params.mode;
-        terms.set(id, nc ? { "15": "21", "16": "22" } : { "17": "13", "18": "14" });
-      } else if (e.symbol === "pb-no" || e.symbol === "pb-nc") {
-        params.contact = e.symbol === "pb-nc" ? "nc" : "no";
-        e.symbol = "pushbutton";
-      } else if (e.symbol === "notes") {
-        e.symbol = "text";
-      } else if (e.symbol === "selector" && params.contact === "co") {
-        params.pole1 = "co";
-        delete params.contact;
-      } else if (e.symbol === "lamp") {
-        terms.set(id, { "V+": "+V", "V-": "-V", T: "LT" });
-      } else if (e.symbol === "supply") {
-        terms.set(id, { "+": "+V", "-": "-V" });
-      }
-      // A selector's legend became its position names; a 3-position changeover is numbered as makers do (v0.2.1 note 23).
-      if (e.symbol === "selector") {
-        const three = params.positions === "3";
-        if (typeof params.legend === "string") Object.assign(params, legendToPositions(params.legend, three));
-        delete params.legend;
-        if (three) {
-          const map: Record<string, string> = { ...(terms.get(id) ?? {}) };
-          for (let k = 1; k <= 4; k++) {
-            if (params[`pole${k}`] !== "co") continue;
-            const b = 4 * (k - 1);
-            Object.assign(map, { [`${k}1`]: String(b + 2), [`${k}2`]: String(b + 3), [`${k}4`]: String(b + 1) });
-          }
-          if (Object.keys(map).length) terms.set(id, map);
-        }
-      }
-      // Push buttons have poles now (v0.2.1 note 24); an NC alone is pole 1 (11/12, was 21/22).
-      if (e.symbol === "pushbutton" && typeof params.contact === "string") {
-        const c = params.contact;
-        delete params.contact;
-        if (c === "both") Object.assign(params, { poles: 2, pole1: "no", pole2: "nc" });
-        else Object.assign(params, { poles: 1, pole1: c === "nc" ? "nc" : "no" });
-        if (c === "nc") terms.set(id, { ...(terms.get(id) ?? {}), "21": "11", "22": "12" });
-      }
-      if (e.symbol === "isolator" && params.operator === "push") params.operator = "turn";
-      // Busbar colours were free text in the test builds; now one of the wire colours (T4).
-      if ((e.symbol === "busbar" || e.symbol === "rail") && typeof params.colour === "string") params.colour = knownColour(params.colour);
-    }
-  }
-  if (!terms.size) return;
-  const fix = (r: unknown) => {
-    if (!Array.isArray(r) || typeof r[0] !== "string") return;
-    const to = terms.get(r[0])?.[String(r[1])];
-    if (to) r[1] = to;
-  };
-  for (const pg of arr(input.pages).filter(isObj)) for (const sg of arr(pg.segments).filter(isObj)) [sg.from, sg.to].forEach(fix);
-  for (const c of arr(input.conductors).filter(isObj)) arr(c.terminals).forEach(fix);
 }

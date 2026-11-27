@@ -151,30 +151,3 @@ describe("terminal names (30, 44)", () => {
     expect(terminalNames(add("supply", 40, 4, { system: "dc" }))).toEqual(["+V", "-V"]);
   });
 });
-
-describe("drawings from the 0.2 test builds", () => {
-  test("open with the audited parts and terminals renamed", () => {
-    const p = parseProject({
-      format: "ferrule",
-      version: 3,
-      id: "x",
-      pages: [
-        {
-          id: "pg",
-          elements: [
-            { id: "a", symbol: "timer-contact", tag: "", label: "", pos: [10, 10], rot: 0, zone: "internal", params: { contact: "no" }, links: [] },
-            { id: "b", symbol: "lamp", tag: "", label: "", pos: [10, 30], rot: 0, zone: "internal", params: {}, links: [] },
-            { id: "c", symbol: "pb-nc", tag: "", label: "", pos: [20, 10], rot: 0, zone: "internal", params: {}, links: [] },
-            { id: "d", symbol: "notes", tag: "", label: "## N", pos: [40, 10], rot: 0, zone: "internal", params: {}, links: [] },
-          ],
-          segments: [{ id: "w", conductor: "c1", from: ["a", "18"], to: ["b", "V+"], route: "auto", points: [] }],
-        },
-      ],
-    });
-    const els = p.pages[0]!.elements;
-    expect(els.map((e) => e.symbol)).toEqual(["contact-no", "lamp", "pushbutton", "text"]);
-    expect([els[2]!.params.poles, els[2]!.params.pole1]).toEqual([1, "nc"]);
-    expect(p.pages[0]!.segments[0]!.from).toEqual(["a", "14"]);
-    expect(p.pages[0]!.segments[0]!.to).toEqual(["b", "+V"]);
-  });
-});

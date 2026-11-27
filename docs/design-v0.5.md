@@ -1,0 +1,224 @@
+# Ferrule v0.5: the sprint plan
+
+The plan for building v0.5 from everything prepared in this folder. Written 27 Nov 2026, against `main` at build 0.4.5.
+
+`advancements-v0.5.md` says **what** is wanted and why: 68 entries, A1 to A75 less the seven withdrawn. Three design notes hold the design of the large ones. This document says **in what order** they're built, what each step has to know, and what has to be true when it's done. Where this plan and the list disagree on what's wanted, the list wins and this plan is corrected. Where an entry and its design note disagree, the design note wins.
+
+## 1. What to read
+
+| File | What it is | Read it for |
+|---|---|---|
+| `advancements-v0.5.md` | The list: every entry, the checks, and what was decided against | Every step |
+| `functional-specification.md` | What build 0.4.5 does, as numbered statements. What v0.5 changes is crossed through with its entry | Every step: it's rewritten as the build goes |
+| `design-wire-numbering.md` | A wire on a supply carries the supply's number; distribution blocks; power rails | Step 6 (A23) |
+| `design-wire-labels-and-links.md` | One label for a wire; link ends in place of the link arrow; markers | Step 7 (A26, A27, A28) |
+| `design-design-workbench.md` | The Design workbench reworked: Properties, the Terminals window, adapter modules, devices | Step 8 (A38, A66 to A70) |
+| `mockups\` | Pictures for the three notes | With the note that names them |
+
+The four changes that reach furthest, so they're known from the start:
+
+1. **Parts merge** (step 4): one Contact, one Coil, a reworked Selector. Symbol names change, and everything that reads them.
+2. **Wires** (steps 6 and 7): numbers by supply, one label, link ends in place of the link arrow part.
+3. **Design** (step 8): what Properties shows, a Terminals window, the Controller… window gone, and devices picked in Design in place of Layout.
+4. **Files and builds** (steps 0, 2, 10, 11): no backwards compatibility, builds published when asked for, the project list's new buttons, a central Ferrule.
+
+## 2. Ground rules
+
+- **No backwards compatibility** (A30, built first). A step that changes what a file must hold moves the file format number on, and that's all it owes old files. The examples (`lsp01`, `bms01`) are rebuilt by their scripts whenever a step needs it.
+- **Build from the design note where the entry says so.** A23, A26, A27, A38 and A66 to A70 are pointers on the list; the note has the design.
+- **A mock-up shows what's where and how it's worded.** It isn't a style guide: use Ferrule's own parts, spacing and look.
+- **One place for each thing.** If building an entry leaves a value that can be set in two places, or a button that does what another already does, that's a fault in the step. Note it under §6 and take the second one out.
+- **Nothing is built in.** New parts are parts like any other; new settings start empty or as today.
+- **The specification moves with the code.** In the PR that builds an entry, each statement it changes is rewritten to say what the build now does, keeping its ID, and the strike-through and its *(v0.5: …)* note come off. A new behaviour gets a new ID at the end of its section. When the sprint ends nothing is left crossed through.
+- **Not to be built from:** the *Checks* section of the list, *Decided: nothing to build*, and the withdrawn entries (A2, A6, A7, A15, A44, A62, A63).
+- **Each step ends with:** tests for its rules; a look at the result on the fixtures (print pictures or the browser); the README and the decisions table in `docs/DESIGN.md` brought up to date; its entries ticked on the list with the PR number; the version moved on by one for each PR; and the documents synced back to this folder.
+- **Builds are made when asked for,** not after each PR (A22). Until step 2 is in, a build that's asked for is made and sent as before.
+- **Judgement calls** go under §6, *Changed during build*. A point in §5 that hasn't been answered when its step starts is built to the recommended answer, and the PR says so.
+
+## 3. Order of work
+
+Groundwork first; then the small and safe; then parts, since the legend, the wires and Design all lean on them; then wires; then Design, the largest; then Layout, files and running.
+
+| Step | Entries | What | Size |
+|---|---|---|---|
+| 0 | A30, A3, A18, A19, A20 | Start: version, documents in, the old-files rule dropped, document corrections | Small |
+| 1 | A4, A13, A14, A25, A40, A45, A47, A49, A53, A54, A59, A61, A74 | Small fixes | Small, one or two PRs |
+| 2 | A22, A11 | Builds published when asked for, Windows and Linux | Medium |
+| 3 | A32, A64, A73, A34, A35, A33 | Windows and prompts, row two, sheets | Medium, two PRs |
+| 4a | A36, A37, A39 | One Contact, one Coil, rotate off parts in a drop | Large |
+| 4b | A41, A42, A43, A46 | The Selector | Medium |
+| 4c | A48, A56, A55, A24 | Connector block, motor, the legend, colour through a relay output | Medium |
+| 5 | A50, A51, A52, A1 | Project settings: numbering, strips, wire colours, the title block | Medium |
+| 6 | A23, A57 | Wire numbers by supply; supplies joined only by wires | Large, three PRs |
+| 7a | A26, A29 | One label for a wire; text that turns | Medium |
+| 7b | A27 | Link ends | Large |
+| 7c | A28 | Markers counted per connection | Small |
+| 8a | A69 | Design: the Plant view and what Properties shows | Large |
+| 8b | A67 | The Terminals window; the Controller… window goes | Large |
+| 8c | A68, A66 | Adapter modules; plant marks | Medium |
+| 8d | A70, A38, A31, A72 | Devices picked in Design; the device holds what a thing takes, gives and draws | Large, two PRs |
+| 8e | A65, A75 | A new network asks its kind; interlocks proved on entering Simulate | Small |
+| 9 | A58, A60, A71 | Layout: backplate sizing, Fit, the bill of materials table | Medium |
+| 10a | A17, A8 | A project is made from a file name; no second by the same name | Medium |
+| 10b | A21, A16, A9 | Rename, deleted projects, Upload | Medium |
+| 10c | A12 | Rolling backups | Medium |
+| 11 | A5, A10 | One Ferrule at a time; Claude on a central Ferrule | Medium |
+| 12 | none | Close: the specification clean, README and pictures, the report | Small |
+
+## 4. The steps
+
+File and line pointers are from `main` at 0.4.5 and are there to save a search. Check them before leaning on them.
+
+### Step 0: start
+
+- **Version.** The first PR under 0.5 is `0.5.1`; every PR after moves the last number on.
+- **Documents in.** Copy from `C:\Temp\eCAD\v0.5.0-pre Notes\` into `docs\` under the same names: this plan, the list, the specification and the three design notes. Copy `mockups\` to `docs\mockups\`, **leaving out the two `numbering-sheet8-` pictures**, which hold a real project's title block and never go in the repo. The notes name pictures as `mockups\…`, so that still reads true.
+- **`CLAUDE.md`** is rewritten for this sprint: the plan and the list it works from; the old-files rule and the test-build file mapping gone; a build made and sent after each PR replaced by builds when asked for; the sync after each PR pointed at this folder.
+- **A30.** `src/core/validate.ts` holds the format number and the messages. An older file isn't opened and says which Ferrule it needs. `preRelease()` goes.
+- **A3, A18, A19, A20** are corrections to the README and `docs/DESIGN.md`.
+
+### Step 1: small fixes
+
+Thirteen entries with nothing between them. Each is as its entry says.
+
+- A45: `remove()` in `src/server/storage.ts` moves the file and leaves its `.bak`.
+- A74: `duplicatePlant()` in `src/core/design.ts` clones the description.
+- A49: *Add revision* already dates itself (`ProjectDialog.svelte`). What's left is the new project's *Drawn date* and revision A.
+- A25: where a colour is carried through a part is in `src/core/wirecolours.ts`.
+- A53: `Esc` during a window drag has to cancel the drag before anything closes.
+- A59 closes *Place parts…* off a GA sheet. Making it dock is step 3.
+
+### Step 2: builds
+
+- **A11** adds a Linux job to CI and tests the result end to end. **A22** publishes builds to the repo's releases page, each marked pre-release, and only when asked for (§5, D5).
+- The README's download link is §5, D4.
+- From here a build is asked for by name and nothing is sent at the end of a chat.
+
+### Step 3: windows, row two, sheets
+
+- **A32.** Windows and most prompts are already one part: `Modal.svelte` with `docking.svelte.ts`, which lets eight dock, picked by name. The change is to which may dock, by the test in the entry. Properties, help and the Simulation panel are `FloatBox` and never dock. *Device table…* and *Pins and points…* go in step 8, so don't make them dock here; the Terminals window docks when it's built.
+- **A64** makes docking edge-only. **A73** stops window places being kept: they're in the browser's storage today, from `Modal.svelte` and `FloatBox.svelte`. Settings stay kept (`settings.svelte.ts`).
+- **A34.** Row two is laid out in `EditorView.svelte`. The order of the groups is in the entry; the order of the shared menus is §5, D8. Design's row changes again in step 8.
+- **A35 and A33** go together: which workbench is greyed out on which sheet, and a GA sheet made from the add menu. Before building A33, reproduce on the build what a GA sheet's settings do when *Detail* is chosen, so the right thing is fixed. §5, D7 settles Layout on a schematic sheet.
+
+### Step 4a: one Contact, one Coil
+
+The widest ripple of the sprint. Three contact parts become one and two coil parts become one, so their symbol names change, and with them everything that asks what a part is: linking a contact to its coil, cross-references and contact tables, the simulator, the checks, the schedules, the legend, Claude's tools, and both example scripts. The file format number moves on.
+
+- A contact's kind is a setting, as a push button's poles are. A coil's *Type* is Relay, Contactor or Timer.
+- *Takes* and *Draw (VA)* are still on the coil after this step. They come off in step 8d (A38).
+- **A39** takes Rotate off the parts named in its entry. The parts it doesn't name are §5, D9.
+
+### Step 4b: the Selector
+
+Four entries on one part, built together: the pole choices fit the positions (A41); each pole is drawn in Simulate from the positions it's set to (A42); changeover is a setting of the whole switch (A43); the part is named Selector and gains 4 positions (A46).
+
+- `selectorPoles` in `src/core/symbols.ts` holds the choices. `src/core/sim.ts`, near line 199, treats the whole switch as operated whenever it's off 0, and the drawing takes every pole from that.
+- A43 has two more parts that outlast the selector fix: the wire tool must not fail on a repeated terminal number (`Canvas.svelte` keys its terminal dots by name), and Check reports any part with two terminals of one number.
+
+### Step 4c: connector block, motor, legend, colour
+
+- A55 comes after 4a and A56, since the legend gets an entry for each kind of contact, coil and motor in use.
+- A24 was logged from reading the code. Confirm the cause on the BMS fixture before fixing it.
+
+### Step 5: project settings
+
+- **A50** removes Sequential numbering and the setting that chose it. **A51** replaces the *Terminal strips* setting with one rule, applied at Renumber. **A52** moves *Wire colours by function* into the Distribution window. **A1** puts Client in the title block as a third equal cell.
+- A52 comes before step 6, which adds to the same window.
+
+### Step 6: wire numbers by supply
+
+Build from `design-wire-numbering.md`. Suggested split:
+
+1. **A supply's tag.** Each distribution gets a number in the Distribution window; every wire on it carries that number; the order of the numbering rules (§2 of the note); Check for a block or rail on no supply.
+2. **Blocks and rails.** The control rail becomes the power rail, drawn by voltage (LV or ELV); a distribution block's ways are counted from its wires; line weights (§3, §4 of the note).
+3. **A57.** The distribution pickers come off the Incoming supply and off a plant's supply out, and Check's bypass warning goes. A point's `dists` is read in `sim.ts`, `conductors.ts` and `checks.ts`, and set in `PointsDialog.svelte`. Mind the note in the entry: with no Incoming supply drawn, a distribution that a supply out reaches by wire is supplied by that plant and isn't stood in for by its blocks.
+
+- The two `numbering-sheet8-` mock-ups are in the PC folder only. Look at them there.
+- Every existing drawing's supply wires renumber at the next Renumber. The examples are rebuilt.
+
+### Step 7: wire labels and link ends
+
+Build from `design-wire-labels-and-links.md`.
+
+- **7a.** A26: number and colour are one label, the function stops printing, *Other end* goes. A29 goes with it, since a turned note is how a wire now gets extra description. A29 was logged from the code (a rotation is stored and nothing draws it): confirm first.
+- **7b.** A27: the link arrow part goes and a wire's free end is a link end. Shapes are in `mockups\link-ends.png`. Claude's tools change to match and nothing is kept for old use.
+- **7c.** A28: `wireMarkers()` in `src/core/schedules.ts` counts a marker at each real end of a connection.
+
+### Step 8: Design
+
+Build from `design-design-workbench.md`. Its §9, *What comes out*, is the list to check off: when step 8 is done, nothing on it is left in the build. Its §10 names the mock-up for each part.
+
+- **8a, A69.** The first view is renamed Plant; the views run Plant, Controller, Devices, Network, To draw (Devices arrives in 8d). Pick a row and Properties shows that thing and nothing else. `+ Point` adds an empty row. Interlocks sit on the point. *Enabled by* and *Source* go. Today's Properties is `DesignProps.svelte`.
+- **8b, A67.** One Terminals window for plant and for modules, in place of *Pins and points…* (`PointsDialog.svelte`): the list, *Add terminal* numbering itself, drag to reorder, the one line at its foot, Generate on IO modules only. Every module is on the rail in the Controller view and is added there, a module's details are in Properties, and the *Controller…* window (`ControllersDialog.svelte`) goes. *Save model* becomes *Save as device* in a module's Properties (`saveModuleDevice()` in `src/core/controllers.ts`). Check before building that deleting a pin on 0.4.5 leaves the others' numbers alone, which the design relies on.
+- **8c, A68 and A66.** Adapter is a module type with no channels. Plant marks are pictures plus *Other* with up to four typed letters (`markPrims()` in `src/core/symbols.ts`; preview in `mockups\plant-marks.png`).
+- **8d, A70, A38, A31, A72.** Suggested as two PRs:
+  1. The Devices view: one row for each drawn part, each terminal strip, each module and each plant item; a device picked per row or for several at once; a row picked shows its device in Properties. The Device table window (`DevicesDialog.svelte`) goes from Layout, and Layout only shows a part's device, with a link to Design (`GaProps.svelte` is where one is picked today).
+  2. The device is the one source of what a thing takes, gives and draws. *Takes* is a value with V AC, V DC or both. Those boxes come off the coil and lamp in Draft, off points and modules in Design, and a part with no device is a warning in Check (A31). *Relay pins* goes (`relayPins`, and `relayPinMarks()` in `src/core/xref.ts`); a device that suits a coil gets *Poles*, read only by a new warning in Check. The Incoming supply keeps *Gives* in the new form and loses *Rating (VA)* (A72).
+- **8e, A65 and A75.** A65 is §5, D10. For A75, time *Prove all* on the BMS fixture first (`proveInterlocks()` in `src/core/interlocks.ts`); §5, D12 says what counts as quick.
+
+### Step 9: Layout
+
+- **A58.** The size typed for a Backplate sheet is the enclosure's; the plate is drawn 25 mm in from each edge and is what positions and dimensions are measured from.
+- **A60.** *Fit* takes the largest scale that fits, to one decimal place, and a detail's frame gets *Fit*.
+- **A71.** A *Bill of materials* table in the Tables list, from the same rows as the Schedules tab (`billOfMaterials()` in `src/core/schedules.ts`). The count itself doesn't change: it's what's placed on the GA sheets.
+- While here, write down what a GA sheet's settings show for each view and correct SH-6 to match.
+
+### Step 10: files and the project list
+
+- **10a.** A17: *Create project* asks for a file name and nothing else. A8: a name already taken is refused, and *Duplicate* asks for the copy's name. Legal names are §5, D2.
+- **10b.** A21 *Rename*, A16 the deleted projects list with *Restore* and *Delete permanently*, A9 *Upload*. All are on the project list, and all refuse a name that's taken.
+- **10c.** A12 rolling backups, with restore into a new project. Its starting values are §5, D1.
+
+### Step 11: running
+
+- **A5.** Started while a Ferrule is running, the exe opens the browser at it and exits.
+- **A10.** `--mcp` is given the address of the Ferrule to relay to.
+
+### Step 12: close
+
+- Read the specification through: nothing crossed through, every entry's statements say what the build does, its heading says 0.5.
+- README screenshots retaken where the interface changed.
+- The report: each step's PRs, what's under *Changed during build*, anything left unticked and why, and the §5 points that were built to the recommended answer.
+
+## 5. Points with a recommended answer
+
+Each is small and has an answer that can be built. If one hasn't been answered when its step starts, the recommended answer is built and the PR says so.
+
+| | Entry | The point | Recommended |
+|---|---|---|---|
+| D1 | A12 | When a backup is taken, and what a new project starts with | A copy only when the project has changed since the last one. A new project starts at every 30 minutes, 10 kept |
+| D2 | A17 | Which file names are legal on Linux | Windows' rules everywhere (none of `\ / : * ? " < > \|`), so a file made on one machine can be moved to another |
+| D3 | A18 | The README's status line | The number comes out of the sentence |
+| D4 | A22 | The README's download link | To the list of builds until a version is called the release, then to the latest release. The latest-release page shows nothing until there is one |
+| D5 | A22 | How a build is asked for | A CI job run by hand: it builds Windows and Linux at that commit and publishes them as `v<version>`, marked pre-release. Nothing is published on a merge |
+| D6 | A32 | Design's *Templates…*, a prompt, and Draft's *Templates*, a window | Both stay as they are until the two Templates lists are looked at in QA |
+| D7 | A35, A33 | Layout on a schematic sheet | Greyed out, as Draft is on a GA sheet, with a tip that says to add a GA sheet from `▾`. Layout's own *New GA sheet* offer goes with it, since it can no longer be reached |
+| D8 | A34 | The order of the menus the workbenches share | Check, Expectations…, Schedules, in that order, first in the workbench's own group. That's where Layout and Design have them already, so only Draft's row moves |
+| D9 | A39 | Rotate on the parts not ruled on (terminal, socket outlet, connector, incoming supply, blocks and rails, terminal strip line, plant and module views) | Stays on all of them |
+| D10 | A65 | How a new network gets its kind | `+ Network ▾` offers the kinds, as `+ Module ▾` does. *Place as sheet* is left as it is |
+| D11 | A73 | What counts as a setting and is still remembered | As listed in the entry |
+| D12 | A75 | What counts as quick enough to prove on entering Simulate | About a second for *Prove all* on the BMS fixture. Slower than that, Simulate says what's stale and proving stays a choice |
+
+## 6. Changed during build
+
+Judgement calls made while building, by step, with the reason.
+
+### Step 0
+
+- **The file format moves to 4 now** (A30). Taking out `preRelease()` changes what a format 3 file must hold: a file from the 0.2 test builds would no longer be mapped, and would half-open with its renamed terminals unwired. Moving the number on refuses it cleanly instead, which is the one duty A30 gives a format change. Files saved by 0.4.5 are refused by 0.5 with *Not opened. This file needs Ferrule 0.4.5*; step 4a would have done the same.
+- **One message for older and newer files.** A30 words the older file's message. A newer file gets the same form (*Not opened. This file needs Ferrule 0.9.1 or later*), replacing the v0.4.x T19 wording, so there's one way of saying it. Both add the address of the builds, since that's where the version named is found. A file that doesn't say which Ferrule saved it says it's from an older, or a newer, Ferrule.
+- **The other old-file code in the parser stays for now.** A few lines in `parseProject` still tidy fields from older files (a socket's earth, busbars split in v0.3, the door front's old name). Format 4 means no real file reaches them, and they also tidy hand-written files, so they're left; each goes when the step that reworks its part comes to it.
+- **The LSP-01 example's sheet count.** The start page, the README and ST-10 called it a 16-sheet panel; it's 14 sheets. Like A18, the number comes out of the sentence so it can't go out of date again.
+
+## 7. After the build
+
+What QA on v0.5 starts from:
+
+- The specification as rewritten, statement by statement.
+- *Carried to QA on v0.5* in the list's Checks section: sixteen things to judge in use.
+- §7 of `design-wire-labels-and-links.md` and §2a of `design-wire-numbering.md`: the places where the new wire design could read worse than the old, to be judged on a printed sheet.
+- The §5 points built to the recommended answer.
+- One real system built start to finish in the reworked Design, which is the test of step 8.
+
+Findings go on the next list in the same way.

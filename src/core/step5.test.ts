@@ -82,16 +82,6 @@ describe("wire numbers", () => {
   });
 });
 
-describe("pre-release files", () => {
-  test("free-text busbar colours from the test builds become colour codes", () => {
-    const { p, pg } = project();
-    const bar = addElement(p, pg, "rail", [10, 10], { params: { length: 40 } });
-    bar.params.colour = "black";
-    const back = parseProject(JSON.parse(JSON.stringify(p)));
-    expect(back.pages[0]!.elements.find((e) => e.id === bar.id)!.params.colour).toBe("Bk");
-  });
-});
-
 describe("terminals", () => {
   test("an earth terminal in the block prints no number; its earth sign is centred in the cell (27, 13; v0.3 §2)", () => {
     const { localGeometry } = require("./symbols") as typeof import("./symbols");
