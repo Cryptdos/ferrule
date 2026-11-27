@@ -261,6 +261,13 @@ Judgement calls made while building, by step, with the reason.
 - **LSP-01's duty selector** is set with *Changeover* ticked in place of its first pole's old changeover choice: it prints as before.
 - **File format 6.**
 
+### Step 4c
+
+- **A48, how columns lay out.** Two columns are the block as it was. One column puts every terminal on the left. Three or more make a wide block: two rows, the top row's terminals up and the bottom row's down, E1 and E2 at its ends, as the turned block used to be. A wide block can't have a middle row (its terminals would land on the same points as the outer rows'), so it widens to hold them in two: 12 terminals in 4 columns are drawn 6 across. Judge in QA whether a wide block of more than two rows is ever wanted.
+- **A24, which points carry colour:** only a point that switches, the *Contact* form, on a module (a relay output's common and NO) or on plant (a fault contact). A powered point's two pins are different potentials, so nothing carries through them. Confirmed first on the BMS fixture: its DO module's channels are contact points, and nothing carried.
+- **A55, the size limit:** a symbol is drawn smaller in the legend when it's taller than a contact (6 units) or wider than a four-pole isolator (14). The motor and the transformer are; nothing else in the examples is. Text keeps its size, since nothing prints under 1.8 mm. A motor's *M* and *3~* are drawn with it, since they're the symbol.
+- **A56:** the setting's key in the file is `type` now, as the coil's is. **File format 7.**
+
 ## 7. After the build
 
 What QA on v0.5 starts from:

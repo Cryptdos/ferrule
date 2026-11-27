@@ -161,6 +161,8 @@ export interface SymbolDef {
   bench?: "draft" | "annotate";
   /** `t` carries what the project says about it, where a symbol needs it (tables, notes with fields). */
   draw(el: Element, t?: GeometryText): { prims: Prim[]; terminals: TerminalDef[]; body: Rect };
+  /** Its name as set, where a setting changes what it is (v0.5 A56: a motor set to Pump is a Pump). */
+  nameFor?(el: Element): string;
   /**
    * It doesn't turn (v0.5 A39): a part that sits in a drop (contacts, coils,
    * switches, protection, lamps…) is drawn the way the sheet runs. Flip still works.
@@ -1267,41 +1269,50 @@ const SYMBOLS: SymbolDef[] = [
     group: "Connection",
     palette: true,
     noRotate: true,
-    params: [{ key: "terminals", label: "Terminals", type: "number", min: 2, max: 12, default: 2 }],
+    params: [
+      { key: "terminals", label: "Terminals", type: "number", min: 2, max: 12, default: 2 },
+      // v0.5 A48: how many across; the rows follow. Two (the default) is a column of in-and-out pairs.
+      { key: "columns", label: "Columns", type: "number", min: 1, max: 12, default: 2 },
+    ],
     // One potential throughout (v0.4.x M9): an earth block, a 0 V or 24 V block, a screen connector.
     kind: () => "terminal",
     bridged: (el) => [[...connectorNames(el), "E1", "E2"]],
     draw(el) {
-      // Upright it's a column, a row for each pair: the odd terminal of a row in on the
-      // left, the even one out on the right, in line, so a conductor passes straight
-      // through. The border's middle top and bottom are E1 and E2, for an earth sign
-      // or a link on to another block. Turned a quarter, it's a wide block with its
-      // terminals along the top and bottom and E1, E2 at its ends. Text stays upright.
+      // Terminals laid out in `columns` across, row after row (A48), 2 units a cell.
+      // Two columns: a pair to a row, the odd one in on the left and the even one out
+      // on the right, in line, so a conductor passes straight through; E1 and E2 at
+      // the middle top and bottom. One column: every terminal on the left. Three or
+      // more: a wide block of two rows, the top row's terminals up and the bottom's
+      // down, with E1 and E2 at its ends.
       const names = connectorNames(el);
-      const rows = Math.ceil(names.length / 2);
-      const W = 2;
+      const cols = connectorColumns(el);
+      const rows = Math.ceil(names.length / cols);
+      const W = cols === 1 ? 2 : cols;
       const H = rows * 2;
-      const rot = el.rot;
-      const up = (at: Vec, s: string, size: number, anchor: Anchor, role: TextRole): Prim => {
-        const p = rotate(at, rot);
-        return { t: "text", at: [p[0], p[1] + (rot % 180 ? size * CAP_HEIGHT * 0.5 : 0)], text: s, size, anchor, role, placed: true };
-      };
+      const wide = cols >= 3;
       const prims: Prim[] = [rect(-W, -1, 2 * W, H)];
       const terminals: TerminalDef[] = [];
+      const label = (at: Vec, s: string, anchor: Anchor): Prim => ({ t: "text", at, text: s, size: DETAIL, anchor, role: "term", placed: true });
       names.forEach((n, i) => {
-        const row = Math.floor(i / 2);
-        const left = i % 2 === 0;
+        const row = Math.floor(i / cols);
+        const col = i % cols;
         const y = row * 2;
-        terminals.push({ name: n, at: [left ? -W : W, y], dir: left ? "left" : "right" });
-        prims.push(up([left ? -W + 0.4 : W - 0.4, y + (rot % 180 ? 0 : DETAIL * CAP_HEIGHT * 0.5)], n, DETAIL, rot % 180 ? "middle" : left ? "start" : "end", "term"));
+        const lift = DETAIL * CAP_HEIGHT * 0.5;
+        if (!wide) {
+          const left = cols === 1 || col === 0;
+          terminals.push({ name: n, at: [left ? -W : W, y], dir: left ? "left" : "right" });
+          prims.push(label([left ? -W + 0.4 : W - 0.4, y + lift], n, left ? "start" : "end"));
+          return;
+        }
+        const x = -W + 1 + col * 2;
+        const up = row === 0;
+        terminals.push({ name: n, at: [x, up ? -1 : H - 1], dir: up ? "up" : "down" });
+        prims.push(label([x, up ? -1 + 0.4 + DETAIL * CAP_HEIGHT : H - 1 - 0.4], n, "middle"));
       });
-      terminals.push({ name: "E1", at: [0, -1], dir: "up" }, { name: "E2", at: [0, H - 1], dir: "down" });
-      const tagP: Prim = { t: "text", at: rot % 180 ? [rotate([0, -1], rot)[0] - 1.2, -W - 1.0] : [-W - 0.5, 0.5], text: "{tag}", size: TAG, anchor: "end", role: "tag", placed: true };
-      prims.push(tagP);
-      if (el.label) {
-        const at: Vec = rot % 180 ? [(rotate([0, H - 1], rot)[0] + rotate([0, -1], rot)[0]) / 2, W + 2.6] : [-W - 0.5, 1.75];
-        prims.push({ t: "text", at, text: "{label}", size: TAG, anchor: rot % 180 ? "middle" : "end", role: "label", placed: true });
-      }
+      if (wide) terminals.push({ name: "E1", at: [-W, H / 2 - 1], dir: "left" }, { name: "E2", at: [W, H / 2 - 1], dir: "right" });
+      else terminals.push({ name: "E1", at: [0, -1], dir: "up" }, { name: "E2", at: [0, H - 1], dir: "down" });
+      prims.push({ t: "text", at: [-W - 0.5, 0.5], text: "{tag}", size: TAG, anchor: "end", role: "tag", placed: true });
+      if (el.label) prims.push({ t: "text", at: [-W - 0.5, 1.75], text: "{label}", size: TAG, anchor: "end", role: "label", placed: true });
       return { prims, terminals, body: { x: -W, y: -1, w: 2 * W, h: H } };
     },
   },
@@ -1389,7 +1400,7 @@ const SYMBOLS: SymbolDef[] = [
     noRotate: true,
     params: [
       { key: "rating", label: "Rating", type: "text", default: "", placeholder: "e.g. 1.5kW 3.4A FLC" },
-      // v0.4.x M8: single phase (L N) as well as three (U V W); the picture only changes the drawing.
+      // v0.4.x M8: single phase (L N) as well as three (U V W); the type only changes the drawing and the name.
       {
         key: "phases",
         label: "Phases",
@@ -1401,8 +1412,8 @@ const SYMBOLS: SymbolDef[] = [
         ],
       },
       {
-        key: "picture",
-        label: "Picture",
+        key: "type",
+        label: "Type",
         type: "select",
         default: "motor",
         options: [
@@ -1412,6 +1423,7 @@ const SYMBOLS: SymbolDef[] = [
         ],
       },
     ],
+    nameFor: (el) => ({ fan: "Fan", pump: "Pump" })[str(el, "type", "motor")] ?? "Motor",
     kind: () => "motor",
     draw(el) {
       // U V W 3 units apart, in line with the poles of the contactor above; single phase L N 3 apart.
@@ -1419,7 +1431,7 @@ const SYMBOLS: SymbolDef[] = [
       const e = Math.sqrt(r * r - 9);
       const rating = str(el, "rating", "");
       const one = str(el, "phases", "3") === "1";
-      const pic = str(el, "picture", "motor");
+      const pic = str(el, "type", "motor");
       const prims: Prim[] = [circle(0, 0, r)];
       const names = one ? ["L", "N"] : ["U", "V", "W"];
       const xs = one ? [-1.5, 1.5] : [-3, 0, 3];
@@ -2571,6 +2583,12 @@ export function plantViewLayout(el: Element): {
 }
 
 /** Does a parameter apply to this element as it's set now? */
+/** A part's name, as its settings make it (a motor set to Pump is a Pump, A56). */
+export function partName(el: Element): string {
+  const def = requireSymbol(el.symbol);
+  return def.nameFor?.(el) ?? def.name;
+}
+
 export function paramApplies(def: ParamDef, el: Element, project?: Project): boolean {
   return !def.when || def.when(el, project);
 }
@@ -2869,6 +2887,17 @@ export function terminalNames(el: Element): string[] {
   return requireSymbol(el.symbol).draw(el).terminals.map((t) => t.name);
 }
 
+/**
+ * A connector block's columns (A48), as drawn: one or two, or three or more
+ * for a wide block. A wide block has two rows, its terminals along the top
+ * and the bottom, so it's at least half its terminals across.
+ */
+export function connectorColumns(el: Element): number {
+  const n = connectorNames(el).length;
+  const c = Math.max(1, Math.min(n, num(el, "columns", 2, 1, 12)));
+  return c >= 3 ? Math.max(c, Math.ceil(n / 2)) : c;
+}
+
 /** World position of a terminal, or null if the element has no such terminal. */
 export function terminalPoint(el: Element, name: string): Vec | null {
   const t = requireSymbol(el.symbol)
@@ -2890,8 +2919,16 @@ export function terminalDir(el: Element, name: string): Dir {
  * The terminals on the other side of the same pole of an in-line part
  * (fuse, contact, isolator pole, terminal, push button, selector), for a
  * wire drawn from one side to take the colour of the wire on the other (T5).
+ * On a plant or module view (v0.5 A24), the other pins of a point that
+ * switches (a relay output's common and NO, a plant's fault contact):
+ * switched power stays the colour it came in.
  */
-export function poleMates(el: Element, terminal: string): string[] {
+export function poleMates(el: Element, terminal: string, project?: Project): string[] {
+  if (el.symbol === "plant-view") {
+    const item = project?.plant.find((p) => p.id === el.params.plant);
+    const pt = item?.points?.find((q) => q.form === "contact" && q.pins.includes(terminal));
+    return pt ? pt.pins.filter((x) => x !== terminal) : [];
+  }
   const pairs: [string, string][] = [];
   const poles = (n: number) => {
     for (let i = 0; i < n; i++) pairs.push([String(2 * i + 1), String(2 * i + 2)]);

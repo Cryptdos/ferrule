@@ -12,8 +12,9 @@ export const FORMAT = "ferrule";
  * 4: v0.5 step 0, the test-build mapping dropped.
  * 5: v0.5 step 4a, one Contact and one Coil (contact-no, -nc, -co and timer-coil gone).
  * 6: v0.5 step 4b, a selector's changeover on the whole switch, 4 positions.
+ * 7: v0.5 step 4c, a motor's picture is its type.
  */
-export const FORMAT_VERSION = 6;
+export const FORMAT_VERSION = 7;
 
 export type ParamValue = string | number | boolean;
 
