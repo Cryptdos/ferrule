@@ -2067,6 +2067,8 @@ export function addProjectDevice(project: Project, d: Omit<ProjectDevice, "id" |
   if (!d.name.trim()) throw new OpError("A device needs a name");
   if (!(d.w > 0) || !(d.h > 0)) throw new OpError("A device needs a width and height");
   const dev: ProjectDevice = { ...d, name: d.name.trim(), id: newId("dev"), library: false };
+  if (dev.ways !== undefined && dev.ways >= 1) dev.ways = Math.floor(dev.ways);
+  else delete dev.ways;
   devicesOf(project).push(dev);
   return dev;
 }
@@ -2092,6 +2094,10 @@ export function updateProjectDevice(project: Project, id: string, patch: Partial
   if ("relayPins" in patch) {
     if (patch.relayPins) dev.relayPins = patch.relayPins;
     else delete dev.relayPins;
+  }
+  if (patch.ways !== undefined) {
+    if (patch.ways >= 1) dev.ways = Math.floor(patch.ways);
+    else delete dev.ways;
   }
   if (old.w !== dev.w || old.h !== dev.h) resizeDeviceItems(project, id, old, dev);
 }

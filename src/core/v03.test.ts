@@ -15,13 +15,13 @@ function project() {
 }
 
 describe("busbars split in two (v0.3 §1)", () => {
-  test("a distribution block is tagged W and named so; a control rail has no tag", () => {
+  test("a distribution block is tagged W and named so; a power rail has no tag", () => {
     const { p, pg } = project();
     const block = addElement(p, pg, "busbar", [10, 10], { params: { name: "L1", length: 30 } });
     const rail = addElement(p, pg, "rail", [10, 30], { params: { name: "CCT", length: 30 } });
     renumber(p);
     expect(getSymbol("busbar")!.name).toBe("Distribution block");
-    expect(getSymbol("rail")!.name).toBe("Control rail");
+    expect(getSymbol("rail")!.name).toBe("Power rail");
     expect(displayTag(block, p)).toMatch(/^W1-/);
     expect(displayTag(rail, p)).toBe("");
     expect(isBar(block) && isBar(rail)).toBe(true);
@@ -34,7 +34,7 @@ describe("busbars split in two (v0.3 §1)", () => {
     expect(getSymbol("busbar")!.params.some((x) => x.key === "style")).toBe(false);
   });
 
-  test("only distribution blocks are GA parts: a control rail isn't offered in Place parts", () => {
+  test("only distribution blocks are GA parts: a power rail isn't offered in Place parts", () => {
     const { p, pg } = project();
     const block = addElement(p, pg, "busbar", [10, 10], { params: { length: 30 } });
     const rail = addElement(p, pg, "rail", [10, 30], { params: { length: 30 } });

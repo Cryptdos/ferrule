@@ -175,9 +175,14 @@ export interface SymbolDef {
 
 // Sizes come from the named styles in geometry.ts (millimetres on paper).
 const W = lineUnits("thin");
-/** Distribution blocks (thick) and control rails (a touch heavier than a wire). */
-const BAR_W = lineUnits("thick");
-const CONTROL_W = 0.35 / UNIT_MM;
+/**
+ * Distribution blocks at the frame's weight, being short; power rails by their
+ * supply's voltage: extra-low a touch heavier than a wire, low voltage heavier
+ * (v0.5 A23, design-wire-numbering §4b).
+ */
+const BAR_W = lineUnits("frame");
+const RAIL_ELV_W = 0.35 / UNIT_MM;
+const RAIL_LV_W = 0.5 / UNIT_MM;
 /** Part tags, labels and names. */
 const TAG = textUnits("tag");
 /** Terminal numbers, ratings, functions, colours, cross-references. */
@@ -1469,13 +1474,15 @@ const SYMBOLS: SymbolDef[] = [
   },
   {
     id: "rail",
-    name: "Control rail",
+    name: "Power rail",
     group: "Connection",
     palette: true,
     params: barParams(),
-    // A drawing convention (CCT, 0V), not a part: no tag, not on the GA.
+    // The common of a drawing (CCT, 0V), not a part: no tag, not on the GA, no ways.
     kind: () => null,
-    draw: (el, t) => drawBar(el, t, CONTROL_W, false),
+    // Its weight is read from its supply: no setting on the rail. On no supply, or one
+    // whose voltage says no number, it's drawn as extra-low voltage.
+    draw: (el, t) => drawBar(el, t, t?.band === "lv" ? RAIL_LV_W : RAIL_ELV_W, false),
   },
   {
     id: "earth",
@@ -2146,7 +2153,7 @@ const SYMBOLS: SymbolDef[] = [
   },
 ];
 
-/** Distribution blocks and control rails: whole-unit taps, a name, a distribution. */
+/** Distribution blocks and power rails: whole-unit taps, a name, a distribution. */
 function barParams(): ParamDef[] {
   return [
     { key: "length", label: "Length (units)", type: "number", min: 2, max: 150, default: 20 },
@@ -2179,7 +2186,7 @@ function drawBar(el: Element, t: GeometryText | undefined, weight: number, tagge
   };
 }
 
-/** A distribution block or a control rail: both join everything on them (v0.3 §1). */
+/** A distribution block or a power rail: both join everything on them (v0.3 §1). */
 export function isBar(el: { symbol: string } | undefined): boolean {
   return el?.symbol === "busbar" || el?.symbol === "rail";
 }
@@ -2729,6 +2736,8 @@ export interface GeometryText {
   wire?: string;
   /** A busbar's name: its distribution's, or its own when it's local. */
   name?: string;
+  /** A power rail's supply's voltage band, which sets how heavy it's drawn (v0.5 A23). */
+  band?: "elv" | "lv";
   /** A contact timed by its timer coil: the coil's function (on, off, on-off…), so the delay mark is drawn. */
   timed?: string;
   /** A controller map's boxes. */

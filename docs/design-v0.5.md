@@ -284,6 +284,13 @@ Judgement calls made while building, by step, with the reason.
 - **A tag is a whole number from 0 to 999**, typed in the Distribution window. An empty box isn't allowed: every supply has a tag, given from 1 when it's added.
 - **Markers follow the number** (note §5): a panel wire on a supply says the supply's tag at both ends, terminal or not; a field core still says its terminal at the panel end.
 - **The terminal checks leave supply wires alone:** a supply wire landing on a terminal isn't *a wire whose number doesn't match its terminal*, and one tag on many wires isn't *one number on several wires*.
+- **A rail's band is read from the first number in its supply's voltage**, DC when the voltage says DC or the supply is a DC kind. A rail on no supply, or on one whose voltage is empty or has no number in it, is drawn as extra-low voltage (today's weight), and its Properties say why. The examples' rails are all extra-low (24 V AC, 24 V DC, 0 V).
+- **A block's ways count every wire drawn onto it on its sheet**, a wire to a tee counted once at the block. Properties shows the count under the distribution.
+- **Each drawn block is its own line on the bill of materials** (note §3), even when two have the same device and need the same ways: the line says *needs at least n ways*. Other devices still share a line when they're the same.
+- **A block's *Ways* go in the device table** beside the other columns, shown only for a device that suits a distribution block. *Suits*' *Busbar (distribution block)* is now *Distribution block*, the part's own name.
+- **Blocks and rails on different supplies joined by a wire is a warning, not an error**, and it follows the wire through terminals (a terminal doesn't end a wire; a part does). A drawing may bond the controls' 0 V to an earth bar on purpose, which this reports; it can't be told from a mistake.
+- **A device's ways moved the file format to 10.**
+- Placeholders and test data in the device table that named a real maker and part number are now generic.
 
 ## 7. After the build
 

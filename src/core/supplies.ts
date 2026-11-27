@@ -9,7 +9,8 @@
  * `accepts`), a plant point of form supply in or powered in (`accepts`), a
  * controller's power supply module through its supply-in point. On parts
  * they're text, "24 V DC" or "24 V AC, 24 V DC"; unset means not stated.
- * A distribution's voltage stays its printed label and isn't parsed.
+ * A distribution's voltage is its printed label: only its band is read from it
+ * (voltageBand, model.ts), for how heavy a power rail is drawn.
  */
 import type { Element, Project, SupplyType } from "./model";
 import { compile, type Circuit } from "./sim";
@@ -102,7 +103,7 @@ function reach(project: Project, c = compile(project)): Reach {
     }
     return {
       el: s.el,
-      name: s.el === "rails" ? "the control rails" : (c.names.get(s.el) ?? s.el),
+      name: s.el === "rails" ? "the power rails" : (c.names.get(s.el) ?? s.el),
       ...(gives ? { gives } : {}),
       phases: new Set(s.phases.map((n) => uf.find(n))),
       rets: new Set(s.ret.map((n) => uf.find(n))),

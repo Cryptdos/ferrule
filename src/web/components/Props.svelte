@@ -2,7 +2,7 @@
   import { channelLabel, pointOnChannel } from "../../core/design";
   import { resolveFields } from "../../core/fields";
   import { columnOf } from "../../core/geometry";
-  import { earthConductors, isFieldWire, numberedSegments, routeOf } from "../../core/wires";
+  import { blockWays, earthConductors, isFieldWire, numberedSegments, routeOf } from "../../core/wires";
   import {
     deleteElements,
     deleteSegments,
@@ -37,7 +37,7 @@
   import { WIRE_FUNCTIONS, conductorLooks, functionRows } from "../../core/wirecolours";
   import ColourSelect from "./ColourSelect.svelte";
   import { displayTag, tagPrefix } from "../../core/tags";
-  import type { ParamValue } from "../../core/model";
+  import { voltageBand, type ParamValue } from "../../core/model";
   import { describeExpectation, formLabel, isInputForm, pointOfPin, pointRef, printedPin } from "../../core/points";
   import type { Editor } from "../editor.svelte";
   import FieldInput from "./FieldInput.svelte";
@@ -285,6 +285,24 @@
       </label>
       {#if !editor.project.distributions.length}
         <p class="hint">The project's distributions are set up under Distribution… in the top bar.</p>
+      {/if}
+      {#if one.symbol === "busbar"}
+        {@const n = blockWays(editor.project, one)}
+        <p class="hint">{n} wire{n === 1 ? "" : "s"}: needs at least {n} way{n === 1 ? "" : "s"}</p>
+      {:else}
+        {@const d = editor.project.distributions.find((x) => x.id === one.params.dist)}
+        {@const band = d ? voltageBand(d) : undefined}
+        <p class="hint">
+          {band === "lv"
+            ? `Drawn heavier: its supply is low voltage (${d?.voltage})`
+            : band === "elv"
+              ? `Drawn lighter: its supply is extra-low voltage (${d?.voltage})`
+              : d?.voltage
+                ? `Drawn as extra-low voltage: its supply's voltage (${d.voltage}) has no number in it`
+                : d
+                  ? "Drawn as extra-low voltage: its supply's voltage isn't set"
+                  : "Drawn as extra-low voltage until it's on a supply"}.
+        </p>
       {/if}
     {:else if one.symbol === "supply"}
       <div class="sub">Distribution each conductor feeds</div>

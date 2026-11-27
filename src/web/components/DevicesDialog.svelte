@@ -35,15 +35,15 @@
   const used = $derived(new Set(editor.project.pages.flatMap((pg) => (pg.gaItems ?? []).map((i) => i.device).filter(Boolean))));
 
   // New / edit form.
-  type Form = { id: string | null; where: "library" | "project"; name: string; maker: string; part: string; kind: string; w: number; h: number; d: number; va: number; pins: string; notes: string };
-  const blank = (): Form => ({ id: null, where: useLib ? "library" : "project", name: "", maker: "", part: "", kind: "", w: 18, h: 90, d: 0, va: 0, pins: "", notes: "" });
+  type Form = { id: string | null; where: "library" | "project"; name: string; maker: string; part: string; kind: string; w: number; h: number; d: number; va: number; ways: number; pins: string; notes: string };
+  const blank = (): Form => ({ id: null, where: useLib ? "library" : "project", name: "", maker: "", part: "", kind: "", w: 18, h: 90, d: 0, va: 0, ways: 0, pins: "", notes: "" });
   let form: Form | null = $state(null);
 
   function editLibrary(d: DeviceEntry) {
-    form = { id: d.id, where: "library", name: d.name, maker: d.maker, part: d.part, kind: d.kind, w: d.w, h: d.h, d: d.d, va: d.va ?? 0, pins: formatRelayPins(d.relayPins), notes: d.notes };
+    form = { id: d.id, where: "library", name: d.name, maker: d.maker, part: d.part, kind: d.kind, w: d.w, h: d.h, d: d.d, va: d.va ?? 0, ways: d.ways ?? 0, pins: formatRelayPins(d.relayPins), notes: d.notes };
   }
   function editMine(d: ProjectDevice) {
-    form = { id: d.id, where: "project", name: d.name, maker: d.maker, part: d.part, kind: d.kind, w: d.w, h: d.h, d: d.d, va: d.va ?? 0, pins: formatRelayPins(d.relayPins), notes: "" };
+    form = { id: d.id, where: "project", name: d.name, maker: d.maker, part: d.part, kind: d.kind, w: d.w, h: d.h, d: d.d, va: d.va ?? 0, ways: d.ways ?? 0, pins: formatRelayPins(d.relayPins), notes: "" };
   }
 
   async function run(what: string, fn: () => Promise<void>) {
@@ -72,7 +72,7 @@
       error = (e as Error).message;
       return;
     }
-    const fields = { name: f.name, maker: f.maker, part: f.part, kind: f.kind, w: Number(f.w), h: Number(f.h), d: Number(f.d) || 0, va: Number(f.va) || 0, relayPins };
+    const fields = { name: f.name, maker: f.maker, part: f.part, kind: f.kind, w: Number(f.w), h: Number(f.h), d: Number(f.d) || 0, va: Number(f.va) || 0, ways: f.kind === "block" ? Math.floor(Number(f.ways) || 0) : 0, relayPins };
     await run("save", async () => {
       if (f.where === "library") {
         // null clears a pin map the entry had (undefined wouldn't be sent).
@@ -115,7 +115,7 @@
 
   async function toLibrary(d: ProjectDevice) {
     await run(`up:${d.id}`, async () => {
-      const e = await api.devices.add({ name: d.name, maker: d.maker, part: d.part, kind: d.kind, w: d.w, h: d.h, d: d.d, ...(d.module ? { module: d.module } : {}) });
+      const e = await api.devices.add({ name: d.name, maker: d.maker, part: d.part, kind: d.kind, w: d.w, h: d.h, d: d.d, ...(d.module ? { module: d.module } : {}), ...(d.ways ? { ways: d.ways } : {}) });
       deviceLibrary.put(e);
       // The project now uses the library entry in place of its own.
       editor.apply((p) => {
@@ -151,7 +151,7 @@
           <tr>
             <td>{d.name} {#if d.library}<span class="badge" title="A copy of a library device">library</span>{/if}</td>
             <td>{[d.maker, d.part].filter(Boolean).join(" ")}</td>
-            <td>{kindLabel(d.kind)}</td>
+            <td>{kindLabel(d.kind)}{d.ways ? `, ${d.ways} ways` : ""}</td>
             <td class="num">{d.w} × {d.h}{d.d ? ` × ${d.d}` : ""}</td>
             <td class="acts">
               {#if n}
@@ -203,7 +203,7 @@
             <div class="info">
               <strong>{d.name}</strong>
               <span>{[d.maker, d.part].filter(Boolean).join(" ") || "–"}</span>
-              <span>{d.w} × {d.h}{d.d ? ` × ${d.d}` : ""} mm · {kindLabel(d.kind)}</span>
+              <span>{d.w} × {d.h}{d.d ? ` × ${d.d}` : ""} mm · {kindLabel(d.kind)}{d.ways ? `, ${d.ways} ways` : ""}</span>
               {#if d.notes}<span class="muted">{d.notes}</span>{/if}
               <span class="files">
                 {#each d.files as f (f.name)}
@@ -252,8 +252,8 @@
       <h3>{form.id ? "Edit device" : "New device"}</h3>
       <div class="grid">
         <label class="wide">Name <input bind:value={form.name} placeholder="e.g. Relay 4CO 24V DC with base" /></label>
-        <label>Maker <input bind:value={form.maker} placeholder="e.g. Weidmüller" /></label>
-        <label>Part no. <input bind:value={form.part} placeholder="e.g. 7760056085" /></label>
+        <label>Maker <input bind:value={form.maker} placeholder="the maker's name" /></label>
+        <label>Part no. <input bind:value={form.part} placeholder="from the datasheet" /></label>
         <label>
           Suits
           <select bind:value={form.kind}>
@@ -266,6 +266,9 @@
         <label>Depth (mm) <input type="number" min="0" step="0.1" bind:value={form.d} /></label>
         <label class="wide" title="A relay base's own terminal numbers, printed on its coil, contacts and contact table in place of A1/A2 and 11/12/14: the coil's two, then | and each pole's common, NC and NO (a dash for one it hasn't)">Relay pins <input bind:value={form.pins} placeholder="e.g. A1 A2 | 11 12 14 | 21 22 24" /></label>
         <label title="Its expected draw from its data sheet: the default for parts that use it, which Simulate adds up on the supply that feeds them">Draw (VA) <input type="number" min="0" step="0.1" bind:value={form.va} /></label>
+        {#if form.kind === "block"}
+          <label title="How many wires it takes. Each wire drawn onto a distribution block needs a way, and Check warns when the block's device has fewer">Ways <input type="number" min="0" step="1" bind:value={form.ways} /></label>
+        {/if}
         {#if form.where === "library"}
           <label class="wide">Notes <input bind:value={form.notes} placeholder="e.g. coil 24V DC, 4 changeover" /></label>
         {/if}

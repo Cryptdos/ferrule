@@ -162,24 +162,24 @@ describe("device library", () => {
     const { DeviceLibrary } = await import("./devices");
     const devices = new DeviceLibrary(join(dir, "library", "devices"));
     const a = createApp({ storage: new Storage(dir), devices });
-    const res = await a.request("/api/devices", json({ name: "Relay 4CO", maker: "Weidmüller", part: "7760056085", kind: "relay", w: 30.6, h: 101.8, d: 82.3 }));
+    const res = await a.request("/api/devices", json({ name: "Relay 4CO", maker: "Maker", part: "1234567", kind: "relay", w: 30.6, h: 101.8, d: 82.3 }));
     expect(res.status).toBe(201);
     const dev = await res.json();
-    expect(dev.id).toBe("relay-4co-7760056085");
+    expect(dev.id).toBe("relay-4co-1234567");
     expect((await a.request("/api/devices", json({ name: "" }))).status).toBe(400);
 
     const put = await a.request(`/api/devices/${dev.id}`, { method: "PUT", body: JSON.stringify({ h: 100 }), headers: { "content-type": "application/json" } });
     expect((await put.json()).h).toBe(100);
 
     const pdf = new TextEncoder().encode("%PDF-1.4 fake");
-    const up = await a.request(`/api/devices/${dev.id}/files?name=${encodeURIComponent("DRM datasheet.pdf")}`, { method: "POST", body: pdf });
+    const up = await a.request(`/api/devices/${dev.id}/files?name=${encodeURIComponent("Relay datasheet.pdf")}`, { method: "POST", body: pdf });
     expect(up.status).toBe(201);
     const pic = await a.request(`/api/devices/${dev.id}/files?name=photo.png`, { method: "POST", body: new Uint8Array([137, 80, 78, 71]) });
     const withFiles = await pic.json();
-    expect(withFiles.files.map((f: { name: string; type: string }) => `${f.type}:${f.name}`)).toEqual(["datasheet:DRM datasheet.pdf", "picture:photo.png"]);
+    expect(withFiles.files.map((f: { name: string; type: string }) => `${f.type}:${f.name}`)).toEqual(["datasheet:Relay datasheet.pdf", "picture:photo.png"]);
     expect((await a.request(`/api/devices/${dev.id}/files?name=evil.exe`, { method: "POST", body: pdf })).status).toBe(400);
 
-    const got = await a.request(`/api/devices/${dev.id}/files/${encodeURIComponent("DRM datasheet.pdf")}`);
+    const got = await a.request(`/api/devices/${dev.id}/files/${encodeURIComponent("Relay datasheet.pdf")}`);
     expect(got.headers.get("content-type")).toBe("application/pdf");
     expect(await got.text()).toBe("%PDF-1.4 fake");
 

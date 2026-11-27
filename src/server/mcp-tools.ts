@@ -554,7 +554,7 @@ export const TOOLS: Tool[] = [
   {
     name: "connect",
     description:
-      "Wire two ends together on a sheet. Each end is {element, terminal} (distribution blocks and control rails: terminal is the tap offset along the bar, e.g. '30') or {wire, x, y} to tee into an existing wire at that grid point. Routing is automatic.",
+      "Wire two ends together on a sheet. Each end is {element, terminal} (distribution blocks and power rails: terminal is the tap offset along the bar, e.g. '30') or {wire, x, y} to tee into an existing wire at that grid point. Routing is automatic.",
     inputSchema: obj(
       {
         project,
@@ -1113,7 +1113,7 @@ export const TOOLS: Tool[] = [
   {
     name: "add_distribution",
     description:
-      "Add a distribution (a supply the project distributes: L1, N, CCT, 0V…), or update one (give its name or id as 'distribution'). Each has a numerical tag, given from 1 if not set (0 is fine for the controls' 0 V): every wire on the supply carries it as its number. Distribution blocks and control rails pick one with params.dist, and the incoming supply with params.dist_<terminal>, e.g. dist_L1; everything on the same distribution is joined on every sheet. A block or rail with no distribution is local and gives no number. Returns the list.",
+      "Add a distribution (a supply the project distributes: L1, N, CCT, 0V…), or update one (give its name or id as 'distribution'). Each has a numerical tag, given from 1 if not set (0 is fine for the controls' 0 V): every wire on the supply carries it as its number. Distribution blocks and power rails pick one with params.dist, and the incoming supply with params.dist_<terminal>, e.g. dist_L1; everything on the same distribution is joined on every sheet. A block or rail with no distribution is local and gives no number. Returns the list.",
     inputSchema: obj(
       {
         project,
@@ -1146,9 +1146,9 @@ export const TOOLS: Tool[] = [
 
 export const INSTRUCTIONS = `Ferrule drafts control panel schematics on A4 landscape sheets.
 
-Coordinates are grid units: x 0–${AREA_UNITS.w} across (${AREA_UNITS.w / 2} columns, 2 units each), y 0–${AREA_UNITS.h} down. Every terminal sits on a whole unit. Symbols are vertical by default (current flows top to bottom), so a ladder rung is a column of symbols between a CCT control rail (symbol 'rail') at the top and a 0V rail at the bottom, each on its distribution: wire terminal to terminal down the column. Power busbars are distribution blocks (symbol 'busbar', tagged W, placed on the GA); control rails are a drawing convention with no tag.
+Coordinates are grid units: x 0–${AREA_UNITS.w} across (${AREA_UNITS.w / 2} columns, 2 units each), y 0–${AREA_UNITS.h} down. Every terminal sits on a whole unit. Symbols are vertical by default (current flows top to bottom), so a ladder rung is a column of symbols between a CCT power rail (symbol 'rail') at the top and a 0V rail at the bottom, each on its distribution: wire terminal to terminal down the column. Power busbars are distribution blocks (symbol 'busbar', tagged W, placed on the GA, needing a way for each wire drawn onto them); power rails are the common of a drawing, with no tag, drawn heavier on a low-voltage supply than an extra-low one.
 
-Typical flow: create_project or pick one from list_projects → add_distribution (CCT, 0V…) → add_element (distribution blocks and control rails with params.dist, contacts, coils, lamps, terminals) → connect → link contacts to their coils → add_plant / place_plant_view for field equipment below a panel boundary (update_page boundaryY), with terminals on the boundary → controller / add_module for an outstation or PLC, its module views placed at the top of a sheet and every one of a module's connections wired there (outputs that switch panel circuits go out through link arrows) → renumber → check → view_page to look at the result → export_pdf.
+Typical flow: create_project or pick one from list_projects → add_distribution (CCT, 0V…) → add_element (distribution blocks and power rails with params.dist, contacts, coils, lamps, terminals) → connect → link contacts to their coils → add_plant / place_plant_view for field equipment below a panel boundary (update_page boundaryY), with terminals on the boundary → controller / add_module for an outstation or PLC, its module views placed at the top of a sheet and every one of a module's connections wired there (outputs that switch panel circuits go out through link arrows) → renumber → check → view_page to look at the result → export_pdf.
 
 Never type tags or wire numbers: renumber generates them from position (e.g. K3-16 = sheet 3, column 16). Labels can use fields such as {plant:SF-01.tag} so they follow the plant. Use templates (save_template / apply_template) for repeated sheets such as one starter per fan.`;
 

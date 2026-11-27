@@ -58,7 +58,7 @@ const suitsFrom = (k: unknown) => {
 };
 
 export interface DeviceFile {
-  /** File name as stored, e.g. "drm-datasheet.pdf". */
+  /** File name as stored, e.g. "relay-datasheet.pdf". */
   name: string;
   type: "datasheet" | "picture";
   bytes: number;
@@ -85,6 +85,8 @@ export interface DeviceEntry {
   va?: number;
   /** A relay's own terminal numbers (v0.4.x M4): its coil's two, and each pole's common, NC and NO. */
   relayPins?: RelayPins;
+  /** A distribution block's ways (v0.5 A23): Check warns when a block needs more. */
+  ways?: number;
 }
 
 /** A device a project uses: a copy of the library entry's details (or the project's own). */
@@ -105,6 +107,8 @@ export interface ProjectDevice {
   va?: number;
   /** A relay's own terminal numbers (v0.4.x M4). */
   relayPins?: RelayPins;
+  /** A distribution block's ways (v0.5 A23). */
+  ways?: number;
 }
 
 /** A relay base's terminal numbers (v0.4.x M4). A pole may have no NC or no NO (""). */
@@ -175,10 +179,12 @@ export function parseDeviceEntry(v: unknown, id?: string): DeviceEntry {
     ...withModule(o.module),
     ...withVa(o.va),
     ...relayPinsFrom(o.relayPins),
+    ...withWays(o.ways),
   };
 }
 
 const withVa = (v: unknown): { va?: number } => (typeof v === "number" && Number.isFinite(v) && v > 0 ? { va: v } : {});
+const withWays = (v: unknown): { ways?: number } => (typeof v === "number" && Number.isFinite(v) && v >= 1 ? { ways: Math.min(999, Math.floor(v)) } : {});
 
 const withModule = (v: unknown): { module?: ModuleTemplate } => {
   const m = parseModuleTemplate(v);
@@ -207,6 +213,7 @@ export function parseProjectDevices(v: unknown): ProjectDevice[] {
       ...withModule(o.module),
       ...withVa(o.va),
       ...relayPinsFrom(o.relayPins),
+      ...withWays(o.ways),
     });
   }
   return out;
@@ -214,10 +221,10 @@ export function parseProjectDevices(v: unknown): ProjectDevice[] {
 
 /** The project's copy of a library entry. */
 export function projectCopy(e: DeviceEntry): ProjectDevice {
-  return { id: e.id, name: e.name, maker: e.maker, part: e.part, kind: e.kind, w: e.w, h: e.h, d: e.d, library: true, ...(e.module ? { module: structuredClone(e.module) } : {}), ...(e.va ? { va: e.va } : {}), ...(e.relayPins ? { relayPins: structuredClone(e.relayPins) } : {}) };
+  return { id: e.id, name: e.name, maker: e.maker, part: e.part, kind: e.kind, w: e.w, h: e.h, d: e.d, library: true, ...(e.module ? { module: structuredClone(e.module) } : {}), ...(e.va ? { va: e.va } : {}), ...(e.relayPins ? { relayPins: structuredClone(e.relayPins) } : {}), ...(e.ways ? { ways: e.ways } : {}) };
 }
 
-/** "Relay 4CO (Weidmüller DRM 7760…) 30.6 × 101.8" for lists. */
+/** "Relay 4CO (Maker 1234…) 30.6 × 101.8" for lists. */
 export function deviceLabel(d: Pick<ProjectDevice, "name" | "maker" | "part" | "w" | "h">): string {
   const who = [d.maker, d.part].filter(Boolean).join(" ");
   return `${d.name}${who ? ` (${who})` : ""} · ${d.w} × ${d.h}`;
