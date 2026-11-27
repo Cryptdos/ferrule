@@ -151,12 +151,13 @@
 
   // A GA sheet is laid out in the Layout workbench, a schematic sheet drafted:
   // moving between them takes you to the right one (Annotate and Simulate stay).
-  // A spare sheet holds annotations only.
+  // A spare sheet holds annotations only. Each is greyed out where it can't work (A35).
   $effect(() => {
     const isGa = !!editor.page.ga;
     if (editor.mode === "design") return;
     if (isGa && editor.mode === "draft") setMode("ga");
-    else if (editor.page.spare && editor.mode === "draft") setMode("annotate");
+    else if (editor.page.spare && (editor.mode === "draft" || editor.mode === "ga")) setMode("annotate");
+    else if (!isGa && editor.mode === "ga") setMode("draft");
   });
 
   /** Split the active tile: the new half, to its right, shows the same sheet. */
@@ -480,12 +481,12 @@
       <div class="workbench" role="group" aria-label="Workbench">
         <LabelButton icon="design" label="Design" active={editor.mode === "design"} onclick={() => setMode("design")}
           title="What the panel has: systems, plant and points, the controller. Nothing is drawn here" />
-        <LabelButton icon="draft" label="Draft" active={editor.mode === "draft"} onclick={() => setMode("draft")} disabled={!!editor.page.spare}
-          title={editor.page.spare ? "This is a spare sheet: annotations only" : "The electrical drawing: parts, wires, rails, plant"} />
+        <LabelButton icon="draft" label="Draft" active={editor.mode === "draft"} onclick={() => setMode("draft")} disabled={!!editor.page.spare || !!editor.page.ga}
+          title={editor.page.spare ? "This is a spare sheet: annotations only" : editor.page.ga ? "This is a GA sheet: it's laid out in Layout" : "The electrical drawing: parts, wires, rails, plant"} />
         <LabelButton icon="annotate" label="Annotate" active={editor.mode === "annotate"} onclick={() => setMode("annotate")}
           title="Text, boxes, label plates, sections, revision clouds and pictures" />
-        <LabelButton icon="ga" label="Layout" active={editor.mode === "ga"} onclick={() => setMode("ga")}
-          title="General arrangement: the panel laid out at true scale" />
+        <LabelButton icon="ga" label="Layout" active={editor.mode === "ga"} onclick={() => setMode("ga")} disabled={!editor.page.ga}
+          title={editor.page.spare ? "This is a spare sheet: annotations only" : !editor.page.ga ? "Layout works on GA sheets: add one from ▾ beside + in Sheets" : "General arrangement: the panel laid out at true scale"} />
         <LabelButton icon="simulate" label="Simulate" active={editor.mode === "simulate"} onclick={() => setMode("simulate")}
           title="Try the logic as drawn" />
       </div>
@@ -502,7 +503,7 @@
       <span class="status" class:error={editor.saveState === "error"}>{saveText}</span>
     </div>
     <div class="row two">
-      <!-- The same order on every workbench (v0.2.1 note 15): undo and redo, view, tools, menus. -->
+      <!-- The same order on every workbench (v0.5 A34): undo and redo | Fit and Split | align and distribute | Select | the workbench's own. -->
       {#if editor.mode !== "simulate"}
         <button class="icon" disabled={!editor.canUndo} onclick={() => editor.undo()} title="Undo (Ctrl+Z)"><Icon name="undo" /></button>
         <button class="icon" disabled={!editor.canRedo} onclick={() => editor.redo()} title="Redo (Ctrl+Y)"><Icon name="redo" /></button>
@@ -545,6 +546,15 @@
       {/if}
       {/if}
       {#if editor.mode !== "simulate" && editor.mode !== "design"}
+        <!-- Align and distribute (design-v0.3 §5): always icons, the name on hover. -->
+        <span class="sep"></span>
+        {#each ALIGN as a (a.how)}
+          <button class="icon" disabled={!alignable.length} onclick={() => align(a.how)} title="{a.name}: {alignHint}"><Icon name={a.icon} /></button>
+        {/each}
+        <button class="icon" disabled={alignable.length < 3} onclick={() => distribute("across")} title="Distribute across: equal gaps between them, the outer two staying put (three or more)"><Icon name="distributeAcross" /></button>
+        <button class="icon" disabled={alignable.length < 3} onclick={() => distribute("down")} title="Distribute down: equal gaps between them, the outer two staying put (three or more)"><Icon name="distributeDown" /></button>
+      {/if}
+      {#if editor.mode !== "simulate" && editor.mode !== "design"}
         <span class="sep"></span>
         <button class="icon" class:active={editor.tool === "select"} onclick={() => ((editor.tool = "select"), (editor.placeSymbol = null), (editor.gaPlace = null))} title="Select (S)">
           <Icon name="select" />
@@ -555,29 +565,21 @@
           </button>
         {/if}
       {/if}
-      {#if editor.mode !== "simulate" && editor.mode !== "design"}
-        <!-- Align and distribute (design-v0.3 §5): always icons, the name on hover. -->
-        <span class="sep"></span>
-        {#each ALIGN as a (a.how)}
-          <button class="icon" disabled={!alignable.length} onclick={() => align(a.how)} title="{a.name}: {alignHint}"><Icon name={a.icon} /></button>
-        {/each}
-        <button class="icon" disabled={alignable.length < 3} onclick={() => distribute("across")} title="Distribute across: equal gaps between them, the outer two staying put (three or more)"><Icon name="distributeAcross" /></button>
-        <button class="icon" disabled={alignable.length < 3} onclick={() => distribute("down")} title="Distribute down: equal gaps between them, the outer two staying put (three or more)"><Icon name="distributeDown" /></button>
-      {/if}
       {#if editor.mode === "simulate"}
         <span class="sep"></span>
         <span class="simnote">Simulating: click switches, buttons and plant outputs on the drawing; double-click to follow a link. Editing is off.</span>
         <LabelButton icon="expectations" label="Expectations…" active={!!open.expectations} onclick={() => toggle("expectations")} title="What the drawing should do: checked live, and by Check logic" />
       {:else if editor.mode === "draft"}
         <span class="sep"></span>
+        <!-- The menus the workbenches share come first in their own group (D8): Check, Expectations…, Schedules. -->
+        <LabelButton icon="check" label="Check" active={!!open.checks} onclick={() => toggle("checks")} title="Check the drawing for problems" />
+        <LabelButton icon="expectations" label="Expectations…" active={!!open.expectations} onclick={() => toggle("expectations")} title="What the drawing should do: checked live in Simulate, and by Check logic" />
+        <LabelButton icon="schedules" label="Schedules" active={!!open.schedules} onclick={() => toggle("schedules")} title="Terminal, cable and IO schedules" />
         <LabelButton icon="renumber" label="Renumber" active={!!open.renumber} onclick={() => toggle("renumber")} title="See what Renumber would change to tags, terminal and wire numbers, then apply" />
         <LabelButton icon="templates" label="Templates" active={!!open.templates} onclick={() => toggle("templates")} title="Save and stamp sheet and section templates" />
         <LabelButton icon="plant" label="Plant" active={!!open.plant} onclick={() => toggle("plant")} title="Field equipment: define plant and place views" />
         <LabelButton icon="distribution" label="Distribution" active={!!open.distribution} onclick={() => toggle("distribution")} title="The supplies busbars, link arrows and the incoming supply pick from" />
         <LabelButton icon="table" label="Table" active={!!open.table} onclick={() => toggle("table")} title="Table: every element in the project, to filter, edit and find-and-replace" />
-        <LabelButton icon="check" label="Check" active={!!open.checks} onclick={() => toggle("checks")} title="Check the drawing for problems" />
-        <LabelButton icon="expectations" label="Expectations…" active={!!open.expectations} onclick={() => toggle("expectations")} title="What the drawing should do: checked live in Simulate, and by Check logic" />
-        <LabelButton icon="schedules" label="Schedules" active={!!open.schedules} onclick={() => toggle("schedules")} title="Terminal, cable and IO schedules" />
       {:else if editor.mode === "ga"}
         <span class="sep"></span>
         <LabelButton icon="check" label="Check" active={!!open.checks} onclick={() => toggle("checks")} title="Check the drawing for problems, with how full each DIN rail is" />

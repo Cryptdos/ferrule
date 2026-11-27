@@ -235,6 +235,10 @@ Judgement calls made while building, by step, with the reason.
 - **How close to an edge docks** (A64): within 80 px of a tile's edge, or a quarter of the tile when it's smaller than that. Anywhere else a dragged window just moves.
 - **Places are kept for the session** (A73), in memory, as WN-11's note said: a window reopened comes back where it was left, and a reload starts everything in its usual place. The places older builds kept in the browser are cleared on loading.
 - **Window titles in a tile's bar** follow the window's own (*Project details*, *Place parts*).
+- **A33, checked on the build before building it:** in a GA sheet's settings the *Detail* view was disabled on every sheet that wasn't already one, and every other view disabled on a detail sheet, with nothing saying why; the core refused the change outright (*A detail sheet is added as one, and stays one*). Now an empty sheet changes to and from Detail like any other view, a detail sheet's scale becoming 1, and a refused change flashes its reason and puts the list back.
+- **The New GA sheet prompt is the form Layout's browser had,** moved whole: the same fields and defaults, with *Cancel*. It opens Layout on the new sheet.
+- **D7 and D8 built to the recommended answer:** Layout greyed on a schematic sheet, with a tip to add a GA sheet from `▾`, and its own *New GA sheet* gone; Draft's row puts *Check, Expectations…, Schedules* first in its own group.
+- **Leaving a sheet a workbench can't work on:** in Layout, moving to a schematic sheet goes to Draft and to a spare sheet goes to Annotate, as moving to a GA sheet in Draft already went to Layout.
 
 ## 7. After the build
 

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { addPage, addSparePage, deletePage, duplicatePage, movePage } from "../../core/ops";
+  import NewGaSheetDialog from "./NewGaSheetDialog.svelte";
   import { columnOf } from "../../core/geometry";
   import { resolveFields } from "../../core/fields";
   import { benchOf, isBar, requireSymbol } from "../../core/symbols";
@@ -17,6 +18,8 @@
   let open: Record<string, boolean> = $state({});
   let filter = $state("");
   let addMenu = $state(false);
+  /** The New GA sheet prompt (A33). */
+  let newGa = $state(false);
   let list: HTMLDivElement | undefined = $state();
 
   type Row = { id: string; tag: string; text: string; col: number; y: number };
@@ -140,8 +143,10 @@
         <div class="menu" role="menu">
           <button role="menuitem" onclick={() => add()}>Sheet</button>
           <button role="menuitem" onclick={() => add(true)} title="For spacing and organisation: annotations only, no drafting">Spare sheet</button>
+          <button role="menuitem" onclick={() => ((addMenu = false), (newGa = true))} title="A general arrangement: the backplate, a door, or details, laid out at true scale in Layout">GA sheet…</button>
         </div>
       {/if}
+      {#if newGa}<NewGaSheetDialog {editor} onclose={() => (newGa = false)} />{/if}
     </div>
     <button class="icon" title="Duplicate this sheet" onclick={duplicate}><Icon name="duplicate" size={15} /></button>
     <button class="icon" title="Move this sheet up" disabled={editor.pageIndex === 0} onclick={() => move(-1)}><Icon name="up" size={15} /></button>

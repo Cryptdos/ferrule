@@ -321,11 +321,15 @@
     <div class="grid">
       <label>
         View
-        <select value={page.ga.view} onchange={(e) => editor.apply((p) => setGaSettings(p, editor.pageId, { view: e.currentTarget.value as GaView }))}>
-          {#each Object.entries(VIEW_NAMES) as [v, name] (v)}
-            <!-- A detail sheet is its own kind: it's added as one, and stays one. -->
-            <option value={v} disabled={(v === "door-back" && !page.ga.of && !doorFronts.length) || (v === "detail") !== (page.ga.view === "detail")}>{name}</option>
-          {/each}
+        <select
+          value={page.ga.view}
+          onchange={(e) => {
+            // A view the sheet can't take is refused with the reason (A33), and the list goes back to what it is.
+            const sel = e.currentTarget;
+            if (!editor.apply((p) => setGaSettings(p, editor.pageId, { view: sel.value as GaView }))) sel.value = page.ga!.view;
+          }}
+        >
+          {#each Object.entries(VIEW_NAMES) as [v, name] (v)}<option value={v}>{name}</option>{/each}
         </select>
       </label>
       {#if page.ga.view !== "detail"}
