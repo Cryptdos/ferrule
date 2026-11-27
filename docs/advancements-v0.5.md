@@ -121,7 +121,7 @@ Decided in discussion. The aim: Ferrule runs the same way on a desk or on one ce
   - The design and the shapes are in `design-wire-labels-and-links.md` §3 and `mockups\link-ends.png`. Build from that, not from this line.
   - Goes with A23: a link end can't be set to a supply or carry a typed reference.
 
-- [ ] **A28. Markers counted at link arrows.** *Fix. SC-5. Build 0.4.5.* The Markers schedule is built from the lines as drawn, so it puts a marker at each link arrow, where none goes. A wire across two sheets is one wire with two ends and two markers. Count markers per connection, once at each real end.
+- [x] **A28. Markers counted at link arrows.** *Built: PR 133.* *Fix. SC-5. Build 0.4.5.* The Markers schedule is built from the lines as drawn, so it puts a marker at each link arrow, where none goes. A wire across two sheets is one wire with two ends and two markers. Count markers per connection, once at each real end.
   - Found by running the schedule on the QA project, 26 Nov 2026: 34 rows too many, one for each of its 34 arrows.
 
 - [x] **A29. Text that can be turned.** *Built: PR 131.* *Missing. AN-2, AN-3. Build 0.4.5.* A Text annotation can't be drawn turned, so a note can't run up the sheet beside a vertical wire. With the function no longer printed on wires (A26), a note is how a wire gets extra description, so text needs to turn in 90° steps like a part. Turned text reads bottom up.

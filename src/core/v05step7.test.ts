@@ -128,3 +128,22 @@ describe("step 7b: link ends in place of the link arrow (A27)", () => {
     expect(elementTexts(far, p).wireLabel).toBeUndefined();
   });
 });
+
+describe("step 7c: markers counted per connection (A28)", () => {
+  test("a wire carried across two sheets has two markers, one at each real end; none at a link end or a tee", async () => {
+    const { wireMarkers } = await import("./schedules");
+    const { p, pg } = sheet();
+    const k = addElement(p, pg, "contact", [20, 20]);
+    wire(p, pg, { terminal: [k.id, "14"] }, { free: [20, 40], label: "FAN RUN" });
+    const src = p.pages[0]!.elements.find((e) => e.symbol === "link")!;
+    const pg2 = addPage(p, "two").id;
+    const h = addElement(p, pg2, "lamp", [30, 40]);
+    wire(p, pg2, { free: [30, 20], linkTo: src.id }, { terminal: [h.id, "+V"] });
+    renumber(p);
+    const rows = wireMarkers(p);
+    expect(rows.length).toBe(2);
+    expect(rows.map((r) => r.where).sort()).toEqual(["1-11", "2-16"]);
+    // Both say the wire's one number.
+    expect(new Set(rows.map((r) => r.text)).size).toBe(1);
+  });
+});
