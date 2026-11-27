@@ -735,6 +735,14 @@ export function emptyInfo(title = "Untitled project"): ProjectInfo {
   };
 }
 
+/**
+ * A deep copy of project data. Not `structuredClone`: in the editor the
+ * project is a reactive proxy, which `structuredClone` refuses to copy.
+ */
+export function clone<T>(v: T): T {
+  return JSON.parse(JSON.stringify(v));
+}
+
 let counter = 0;
 /** Short unique id with a type prefix, e.g. `e_k3j9x2a`. */
 export function newId(prefix: string): string {

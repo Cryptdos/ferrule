@@ -6,7 +6,7 @@
  * reference to something that's gone is let go, never guessed.
  */
 import { moduleType } from "./modules";
-import { markLetters, newId, type ChannelRef, type Condition, type DesignTemplate, type Interlock, type IoPoint, type PlantItem, type PlantMark, type PointForm, type Project } from "./model";
+import { clone, markLetters, newId, type ChannelRef, type Condition, type DesignTemplate, type Interlock, type IoPoint, type PlantItem, type PlantMark, type PointForm, type Project } from "./model";
 import { OpError, getPlant, renamePointRefs, syncPlantViews } from "./ops";
 import { MAX_CONDITIONS, newInterlock, syncInterlocks } from "./interlocks";
 
@@ -570,7 +570,7 @@ export function designTemplateOf(project: Project, ids: string[], name: string):
   });
   // Its devices come with it (v0.5 A70).
   const devices = (project.devices ?? []).filter((d) => plant.some((p) => p.device === d.id));
-  return { name: n, plant, ...(devices.length ? { devices: structuredClone(devices) } : {}) };
+  return { name: n, plant, ...(devices.length ? { devices: clone(devices) } : {}) };
 }
 
 /**
@@ -585,7 +585,11 @@ export function insertDesignTemplate(
 ): { plant: PlantItem[]; untagged: number } {
   if (!t.plant.length) throw new OpError("That template has no rows");
   if (opts.system && !(project.systems ?? []).includes(opts.system)) throw new OpError(`No system "${opts.system}"`);
-  for (const d of t.devices ?? []) if (!project.devices?.some((x) => x.id === d.id)) (project.devices ??= []).push(structuredClone(d));
+  for (const d of t.devices ?? []) {
+    if (project.devices?.some((x) => x.id === d.id)) continue;
+    project.devices ??= [];
+    project.devices.push(clone(d));
+  }
   return copyRows(project, t.plant, { copies: opts.copies ?? 1, step: opts.step ?? 1, first: 0, system: opts.system ?? "", after: opts.after });
 }
 

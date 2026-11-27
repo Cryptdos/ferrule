@@ -20,13 +20,12 @@ import {
   type Section,
   type Segment,
   type Template,
+  clone,
   newId,
 } from "./model";
 import type { ProjectDevice } from "./devices";
 import { OpError, addPage, addPlant, distParamKeys, getPage, prefixOf, syncPlantViews, updateZones } from "./ops";
 import { isMaster, isSlave, locate } from "./xref";
-
-const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v));
 
 /** Plant ids an area of drawing refers to: plant views and {plant:…} fields. */
 function plantRefs(elements: Element[], sections: Section[]): Set<string> {
@@ -94,7 +93,11 @@ export function devicesFor(project: Project, ids: (string | undefined)[]): { dev
 
 /** A template's devices the project hasn't got: they come in with it, as a library device does. */
 export function bringDevices(project: Project, devices: ProjectDevice[] | undefined): void {
-  for (const d of devices ?? []) if (!project.devices?.some((x) => x.id === d.id)) (project.devices ??= []).push(clone(d));
+  for (const d of devices ?? []) {
+    if (project.devices?.some((x) => x.id === d.id)) continue;
+    project.devices ??= [];
+    project.devices.push(clone(d));
+  }
 }
 
 /** Save a whole sheet as a template. */

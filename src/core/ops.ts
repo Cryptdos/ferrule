@@ -32,6 +32,7 @@ import {
   type Section,
   type Segment,
   type TerminalRef,
+  clone,
   newId,
 } from "./model";
 import { allowedRotation, benchOf, canRotate, nextRotation, tidySelector, defaultParams, isBar, formatPoints, getSymbol, partPoints, plantViewLayout, poleMates, requireSymbol, terminalPoint, viewSides, type ViewSide } from "./symbols";
@@ -2034,7 +2035,7 @@ export function splitGaStrip(project: Project, pageId: string, id: string, at: s
   const head = refs.slice(0, i);
   const tail = refs.slice(i);
   const size = (r: string[]) => stripSize(project, r).w;
-  const part: GaItem = { ...structuredClone(it), id: newId("g"), refs: tail, seen: [...tail] };
+  const part: GaItem = { ...clone(it), id: newId("g"), refs: tail, seen: [...tail] };
   it.refs = head;
   it.seen = [...head];
   if (upright) {

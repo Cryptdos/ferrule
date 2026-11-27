@@ -230,23 +230,30 @@ export class Editor {
    */
   apply(fn: (p: Project) => void, opts: { merge?: string } = {}): boolean {
     const before = JSON.stringify($state.snapshot(this.project));
+    // The operation runs on a plain copy, which then becomes the project. The
+    // project held here is a reactive proxy, and an operation run on it can
+    // go wrong where the same one on plain data doesn't: a list given a bare
+    // array that's then pushed to, an object changed after the proxy read it,
+    // `structuredClone`. On a copy, an edit does what it does in the tests.
+    const draft: Project = JSON.parse(before);
     try {
-      fn(this.project);
+      fn(draft);
       // Keep every wire on the current page attached and routed.
-      routePage(getAvoid(), this.page);
-      refreshConductors(this.project);
+      const page = draft.pages.find((p) => p.id === this.pageId) ?? draft.pages[0];
+      if (page) routePage(getAvoid(), page);
+      refreshConductors(draft);
       // Placed terminal strips follow the schematic (note 45); detail frames follow their details.
-      syncGaStrips(this.project);
-      syncDetailFrames(this.project);
+      syncGaStrips(draft);
+      syncDetailFrames(draft);
     } catch (e) {
-      // Roll back anything the operation changed before it failed.
-      this.project = JSON.parse(before);
+      // Refused or failed: the copy is dropped and the project is as it was.
       if (e instanceof OpError) {
         this.flash(e.message);
         return false;
       }
       throw e;
     }
+    this.project = draft;
     const merging = !!opts.merge && opts.merge === this.lastMerge && this.undoStack.length > 0;
     if (!merging) this.undoStack.push(before);
     this.lastMerge = opts.merge ?? null;

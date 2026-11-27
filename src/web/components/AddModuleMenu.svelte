@@ -7,6 +7,7 @@
   import { addModule, addModuleFromDevice, addSpareSlot } from "../../core/controllers";
   import { MODULE_TYPES } from "../../core/modules";
   import type { ModuleType } from "../../core/model";
+  import { fixedAt } from "../fixedat";
   import type { Editor } from "../editor.svelte";
   import { deviceLibrary } from "../devices.svelte";
 
@@ -66,7 +67,7 @@
 <div class="wrap">
   <button bind:this={btn} class:active={open} disabled={!ctrl} onclick={toggle} title={ctrl ? "Add a module at the end of the rail" : "Add the controller first"}>+ Module ▾</button>
   {#if open && ctrl}
-    <div class="menu" role="menu" style:left="{at.x}px" style:top="{at.y}px">
+    <div class="menu" role="menu" use:fixedAt={at}>
       <div class="sub">A type</div>
       <label class="count">Channels <input type="number" min="1" max="64" bind:value={channels} /></label>
       {#each MODULE_TYPES as t (t.value)}
