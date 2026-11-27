@@ -1,7 +1,7 @@
 /** v0.5 step 6: wire numbers by supply (design-wire-numbering.md). */
 import { describe, expect, test } from "bun:test";
 import { newProject, voltageBand } from "./model";
-import { addDistribution, addElement, addGaItem, addGaPage, addPlant, addProjectDevice, connect, placePlantView, setGaItemDevice, updateDistribution, updatePoint, updateProjectDevice } from "./ops";
+import { addDistribution, addElement, addGaItem, addGaPage, addPlant, addProjectDevice, connect, placePlantView, setDevices, updateDistribution, updatePoint, updateProjectDevice } from "./ops";
 import { compile, initialState, toggle } from "./sim";
 import { pointRef } from "./points";
 import { renumber } from "./renumber";
@@ -132,17 +132,17 @@ describe("step 6b: blocks and rails", () => {
     const tag = displayTag(blk, p);
     expect(billOfMaterials(p).find((r) => r.tags === tag)?.item).toBe("Distribution block (no device picked), needs at least 3 ways");
     const dev = addProjectDevice(p, { name: "2-way block", maker: "", part: "", kind: "block", w: 40, h: 40, d: 0, ways: 2 });
-    setGaItemDevice(p, ga.id, it.id, dev.id);
+    setDevices(p, [`el:${blk.id}`], dev.id);
     expect(billOfMaterials(p).find((r) => r.tags === tag)?.item).toBe("2-way block, needs at least 3 ways");
     expect(checkProject(p).filter((f) => /ways$/.test(f.message)).map((f) => [f.level, f.message])).toEqual([
-      ["warning", `Sheet ${ga.number}: distribution block ${tag} has 3 wires and its device, 2-way block, has 2 ways`],
+      ["warning", `Sheet ${p.pages.find((x) => x.id === pg)!.number}: distribution block ${tag} has 3 wires and its device, 2-way block, has 2 ways`],
     ]);
     updateProjectDevice(p, dev.id, { ways: 6 });
     expect(checkProject(p).some((f) => /ways$/.test(f.message))).toBe(false);
     // Each drawn block is its own line, even with the same device.
     const blk2 = addElement(p, pg, "busbar", [10, 50], { params: { dist: l.id, length: 20 } });
-    const it2 = addGaItem(p, ga.id, { kind: "device", x: 200, y: 100, w: 60, h: 50, refs: [blk2.id] });
-    setGaItemDevice(p, ga.id, it2.id, dev.id);
+    addGaItem(p, ga.id, { kind: "device", x: 200, y: 100, w: 60, h: 50, refs: [blk2.id] });
+    setDevices(p, [`el:${blk2.id}`], dev.id);
     renumber(p);
     expect(billOfMaterials(p).filter((r) => r.item.startsWith("2-way block")).map((r) => [r.item, r.quantity])).toEqual([
       ["2-way block, needs at least 0 ways", 1],

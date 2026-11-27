@@ -4,6 +4,7 @@
  * named by sheet number; elements and wires by id (get_page lists them).
  */
 import { syncGaStrips } from "../core/ga";
+import { deviceRows } from "../core/devicerows";
 import type { Avoid } from "libavoid-js";
 import { checkProject } from "../core/checks";
 import { proveInterlocks } from "../core/interlocks";
@@ -755,7 +756,7 @@ export const TOOLS: Tool[] = [
           });
           if (a.pattern !== undefined) generateModule(p, item.id, patternArg(item.module.type, item.module.channels, a.pattern));
           if (n("move") !== undefined) moveSlot(p, c.id, c.slots.findIndex((x) => x.module === item.id), n("move")!);
-          if (a.saveModel === true && !item.module.device) saveModuleDevice(p, item.id);
+          if (a.saveModel === true && !item.device) saveModuleDevice(p, item.id);
         } else {
           const c = controllerByRef(p, str(a, "controller"));
           if (a.spare === true) {
@@ -805,6 +806,47 @@ export const TOOLS: Tool[] = [
         const ids = modulesOf(p, c).filter((m) => !placed.has(m.id)).map((m) => m.id);
         if (!ids.length) throw new ArgError("All its modules are on a GA already");
         return placeModulesOnGa(p, page.id, ids, [num(a, "x"), num(a, "y")]).map((it) => ({ id: it.id, module: p.plant.find((x) => x.id === it.module)?.tag, x: it.x, y: it.y, w: it.w, h: it.h }));
+      }),
+  },
+  {
+    name: "devices",
+    description:
+      "Design's Devices view (v0.5): everything that needs a real device (each drawn part, each terminal strip, each module and plant item) with the device it has, and the project's device table. set gives things a device: things are part tags (K3-16), strip names (X1) or plant tags; device is a device's name or id, or '' for none. A device that doesn't suit one of them is refused. add makes a device in this project first {name, maker, part, suits, w, h, d, va} (suits: relay, contactor, timer, mcb, isolator, fuse, terminal, lamp, pushbutton, selector, block, transformer, socket, connBlock, plugSocket, module, plant, or '' for anything; w × h as seen on the backplate, mm). What's placed on a GA takes its device's size.",
+    inputSchema: obj(
+      {
+        project,
+        add: { type: "object", description: "A device to make in this project: {name, maker?, part?, suits?, w, h, d?, va?}" },
+        set: { type: "object", description: "{things: [tags or strip names], device: name or id, '' for none}" },
+      },
+      ["project"],
+    ),
+    run: async (a, ctx) =>
+      edit(ctx, str(a, "project"), (p) => {
+        if (a.add !== undefined) {
+          const o = (a.add ?? {}) as Record<string, unknown>;
+          const t = (k: string) => (typeof o[k] === "string" ? (o[k] as string) : "");
+          const n = (k: string) => (typeof o[k] === "number" ? (o[k] as number) : 0);
+          op.addProjectDevice(p, { name: t("name"), maker: t("maker"), part: t("part"), kind: t("suits"), w: n("w"), h: n("h"), d: n("d"), ...(n("va") > 0 ? { va: n("va") } : {}) });
+        }
+        if (a.set !== undefined) {
+          const o = (a.set ?? {}) as Record<string, unknown>;
+          const names = Array.isArray(o.things) ? o.things.filter((x): x is string => typeof x === "string") : [];
+          if (!names.length) throw new ArgError("set.things: name what's to have the device");
+          const rows = deviceRows(p);
+          const keys = names.map((nm) => {
+            const r = rows.find((x) => x.key === nm || x.tag.toLowerCase() === nm.trim().toLowerCase());
+            if (!r) throw new ArgError(`Nothing that needs a device is called ${nm}`);
+            return r.key;
+          });
+          const want = typeof o.device === "string" ? o.device.trim() : "";
+          const dev = want ? p.devices?.find((d) => d.id === want || d.name.toLowerCase() === want.toLowerCase()) : undefined;
+          if (want && !dev) throw new ArgError(`No device "${want}" in this project's device table`);
+          op.setDevices(p, keys, dev?.id ?? null);
+        }
+        return {
+          things: deviceRows(p).map((r) => ({ thing: r.tag, what: r.what, group: r.group, device: r.device?.name ?? null })),
+          devices: (p.devices ?? []).map((d) => ({ id: d.id, name: d.name, maker: d.maker, part: d.part, suits: d.kind, w: d.w, h: d.h, d: d.d, ...(d.va ? { va: d.va } : {}), library: d.library })),
+        };
       }),
   },
   {

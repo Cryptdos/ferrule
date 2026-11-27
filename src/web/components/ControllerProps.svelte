@@ -23,7 +23,7 @@
   const slotIndex = $derived(module && ctrl ? ctrl.slots.findIndex((s) => s.module === module.id) : pick.slot ?? -1);
   const point = $derived(module && pick.point ? module.points?.find((q) => q.name === pick.point) : undefined);
   const list = $derived(things(editor.project));
-  const device = $derived(module?.module?.device ? editor.project.devices?.find((d) => d.id === module.module!.device) : undefined);
+  const device = $derived(module?.device ? editor.project.devices?.find((d) => d.id === module.device) : undefined);
 
   const move = (by: number) => {
     if (!ctrl || slotIndex < 0) return;
@@ -132,7 +132,7 @@
       <span class="hint">{m.address ? "set by hand: clear it for rail order" : "rail order"}</span>
     </span>
   </label>
-  <div class="field"><span>Device</span><span>{device ? device.name : "None yet"}</span></div>
+  <div class="field"><span>Device</span><span>{device ? device.name : "None yet"} <button class="link" onclick={() => editor.showDevice(`plant:${module.id}`)} title="Its row in the Devices view, where its device is picked">Devices →</button></span></div>
   {#if sharedPins(module).length > 1}
     <label class="tick" title="Its commons (C, RET, 0 V) are joined inside the module, as its datasheet has it: one return carries them all, in Simulate and the wiring check, and its view shows the link">
       <input type="checkbox" checked={!!m.commons?.length} onchange={(e) => editor.apply((p) => setModuleCommons(p, module.id, e.currentTarget.checked))} /> Commons linked inside
@@ -149,7 +149,7 @@
   </div>
   <div class="actions">
     <button onclick={() => editor.openTerminals(module.id)}>Terminals…</button>
-    {#if !m.device}
+    {#if !module.device}
       <button title="Keep it as a device, its type, channels, terminals and points, so the next one is added whole from + Module" onclick={() => editor.apply((p) => void saveModuleDevice(p, module.id))}>Save as device</button>
     {/if}
     <button disabled={slotIndex <= 0} onclick={() => move(-1)}>← Move</button>

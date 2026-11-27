@@ -300,6 +300,8 @@
       </label>
       <label class="tick" title="A power supply, UPS or battery: listed under Panel, drawn above the boundary with solid, numbered wiring, placed on the GA"><input type="checkbox" checked={plant.inPanel === true} onchange={(e) => setPlant({ inPanel: e.currentTarget.checked })} /> In the panel (a power supply, UPS or battery: not field plant)</label>
       <label class="tick"><input type="checkbox" checked={plant.powerByOthers === true} onchange={(e) => editor.apply((p) => updatePlant(p, plant.id, { powerByOthers: e.currentTarget.checked }))} /> Power by others (its power isn't on these drawings)</label>
+      {@const dev = plant.device ? editor.project.devices?.find((d) => d.id === plant.device) : undefined}
+      <div class="devline"><span>Device</span><span class:none={!dev}>{dev ? dev.name : "None yet"}</span><button class="link" onclick={() => editor.showDevice(`plant:${plant.id}`)} title="Its row in the Devices view, where its device is picked">Devices →</button></div>
       <div class="actions">
         <button onclick={() => editor.openTerminals(plant.id)} title="Its terminals, and the points they make">Terminals…</button>
         <button onclick={() => (editor.open.designDuplicate = true)}>Duplicate ×n…</button>
@@ -541,5 +543,15 @@
   .actions.end {
     border-top: 1px solid #eef0f2;
     padding-top: 8px;
+  }
+  .devline {
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+    font-size: 12px;
+    color: #556;
+  }
+  .devline .none {
+    color: #b33;
   }
 </style>

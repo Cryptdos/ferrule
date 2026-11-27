@@ -251,7 +251,8 @@ describe("Rail fill and the bill of materials", () => {
     p.devices = [{ id: "dev_r", name: "Relay 2CO 24V DC", maker: "Maker", part: "R-2CO", kind: "relay", w: 16, h: 80, d: 70, library: false }];
     const bp = addGaPage(p, "", { scale: 10, enclosure: { w: 600, h: 800 }, view: "backplate" });
     addGaItem(p, bp.id, { kind: "rail", x: 50, y: 100, w: 500, h: 35 });
-    addGaItem(p, bp.id, { kind: "device", x: 60, y: 77.5, w: 16, h: 80, refs: [k1.id], device: "dev_r" });
+    k1.device = "dev_r";
+    addGaItem(p, bp.id, { kind: "device", x: 60, y: 77.5, w: 16, h: 80, refs: [k1.id] });
     const strip = gaCandidates(p, () => "").find((c) => c.refs.length === 2)!;
     addGaItem(p, bp.id, { kind: "device", x: 200, y: 95, w: strip.w, h: strip.h, refs: strip.refs });
     const front = addGaPage(p, "", { scale: 10, enclosure: { w: 600, h: 800 }, view: "door-front" });

@@ -48,22 +48,14 @@ class UF {
 const positive = (v: unknown): number | undefined => (typeof v === "number" && Number.isFinite(v) && v > 0 ? v : undefined);
 const POINT = /^plant:([^:]+):(.+)$/;
 
-/** A placed part's draw: its own, or its device's from the device table. */
+/** A part's draw: its own, or its device's from the device table. */
 function elementVa(project: Project, el: Element): number | undefined {
-  const own = positive(el.params.va);
-  if (own) return own;
-  for (const pg of project.pages)
-    for (const it of pg.gaItems ?? []) {
-      if (!it.device || !it.refs?.includes(el.id) || it.part) continue;
-      const d = project.devices?.find((x) => x.id === it.device);
-      if (positive(d?.va)) return d!.va;
-    }
-  return undefined;
+  return positive(el.params.va) ?? positive(el.device ? project.devices?.find((x) => x.id === el.device)?.va : undefined);
 }
 
-/** A module's draw: its own, or its model's from the device table. */
+/** A module's draw: its own, or its device's from the device table. */
 function moduleVa(project: Project, m: PlantItem): number | undefined {
-  return positive(m.module?.va) ?? positive(project.devices?.find((d) => d.id === m.module?.device)?.va);
+  return positive(m.module?.va) ?? positive(m.device ? project.devices?.find((d) => d.id === m.device)?.va : undefined);
 }
 
 /**

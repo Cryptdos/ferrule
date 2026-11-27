@@ -18,10 +18,11 @@
   import Icon from "./Icon.svelte";
   import LabelButton from "./LabelButton.svelte";
   import SheetProps from "./SheetProps.svelte";
-  import DevicesDialog from "./DevicesDialog.svelte";
+  import LibraryDialog from "./LibraryDialog.svelte";
   import GaProps from "./GaProps.svelte";
   import PlacePartsDialog from "./PlacePartsDialog.svelte";
-  import { deleteGaItems, moveGaItems, rotateGaItems } from "../../core/ops";
+  import { addProjectDevice, deleteGaItems, moveGaItems, rotateGaItems, setDevices } from "../../core/ops";
+  import { deviceRows, deviceSuits, newDeviceFor } from "../../core/devicerows";
   import { alignElements, alignGaItems, distributeElements, distributeGaItems, type AlignHow, type DistributeHow } from "../../core/align";
   import { isTyping } from "../typing";
   import type { Editor } from "../editor.svelte";
@@ -102,7 +103,7 @@
     });
   });
   /** Open windows: they don't block the drawing, and several can be open at once. */
-  type DialogName = "expectations" | "plant" | "terminals" | "table" | "distribution" | "checks" | "schedules" | "templates" | "renumber" | "devices" | "settings" | "place" | "project" | "help";
+  type DialogName = "expectations" | "plant" | "terminals" | "table" | "distribution" | "checks" | "schedules" | "templates" | "renumber" | "library" | "settings" | "place" | "project" | "help";
   const open: Partial<Record<DialogName, boolean>> = editor.open;
   /** Windows in tiles (design-v0.3 §7), and where a dragged window would go. */
   const inTile = $derived(new Set(leaves(editor.tiles).flatMap((l) => (l.content.type === "window" ? [l.content.name] : []))));
@@ -222,6 +223,32 @@
     if (!id) return;
     let name = "";
     if (editor.apply((p) => (name = addDesignPoint(p, id).name))) editor.designPick = { plant: [id], point: name };
+  }
+
+  /**
+   * + Device (A70): a device made in this project, suiting the picked row and
+   * sized as it is now; a picked row with no device is given it.
+   */
+  function newDevice() {
+    const key = editor.designPick.row;
+    let id = "";
+    const ok = editor.apply((p) => {
+      const was = key ? deviceRows(p).find((r) => r.key === key) : undefined;
+      const d = addProjectDevice(p, { name: "New device", maker: "", part: "", d: 0, ...newDeviceFor(p, key) });
+      id = d.id;
+      if (key && was && !was.device) setDevices(p, [key], d.id);
+    });
+    if (!ok) return;
+    const row = key && editor.project.devices?.some((d) => d.id === id) && deviceRows(editor.project).find((r) => r.key === key)?.device?.id === id;
+    editor.designPick = row ? { plant: [], row: key } : { plant: [], device: id };
+  }
+  /** The devices that suit every ticked row, for Set picked to…. */
+  const tickedRows = $derived(editor.mode === "design" && editor.designView === "devices" ? deviceRows(editor.project).filter((r) => editor.deviceTicks.includes(r.key)) : []);
+  const forTicked = $derived((editor.project.devices ?? []).filter((d) => tickedRows.length && tickedRows.every((r) => deviceSuits(d, r))).sort((a, b) => a.name.localeCompare(b.name)));
+  function setTicked(value: string) {
+    if (!value) return;
+    const keys = tickedRows.map((r) => r.key);
+    editor.apply((p) => setDevices(p, keys, value === "-" ? null : value));
   }
 
   /** The point picked in Design, when it's on a channel. */
@@ -521,6 +548,7 @@
         <div class="workbench" role="group" aria-label="Design view">
           <button class:active={editor.designView === "plant"} onclick={() => (editor.designView = "plant")} title="Systems, plant and points">Plant</button>
           <button class:active={editor.designView === "controller"} onclick={() => (editor.designView = "controller")} title="The panel's controller: its modules, their channels, and the points on them">Controller</button>
+          <button class:active={editor.designView === "devices"} onclick={() => (editor.designView = "devices")} title="Every drawn part, terminal strip, module and plant item, each with the real device it is">Devices</button>
           <button class:active={editor.designView === "network"} onclick={() => (editor.designView = "network")} title="Comms plant by network: a LAN off a switch, or a bus off the controller">Network</button>
           <button class:active={editor.designView === "todraw"} onclick={() => (editor.designView = "todraw")} title="What Design has that isn't on a sheet yet: place it from here">To draw</button>
         </div>
@@ -532,6 +560,18 @@
           <button onclick={() => editor.apply((p) => void addNetwork(p, "lan"))} title="A network comms plant can be on: a LAN off a switch, or a bus off the controller">+ Network</button>
         {:else if editor.designView === "todraw"}
           <span class="hint">Pick a line and place it: Draft opens with it ready to drop on the sheet.</span>
+        {:else if editor.designView === "devices"}
+          <button onclick={newDevice} title={editor.designPick.row ? "A device for the picked row, made in this project: edit it in Properties" : "A device made in this project: edit it in Properties"}>+ Device</button>
+          <button class:active={!!open.library} onclick={() => toggle("library")} title="Bring a device in from the shared library, with its datasheets and pictures">From the library…</button>
+          <span class="sep"></span>
+          <select class="setpicked" value="" disabled={!tickedRows.length} onchange={(e) => {
+            setTicked(e.currentTarget.value);
+            e.currentTarget.value = "";
+          }} title={tickedRows.length ? "Give every ticked row the same device" : "Tick rows, or a whole group, first"}>
+            <option value="">{tickedRows.length ? `Set ${tickedRows.length} picked to…` : "Set picked to…"}</option>
+            {#each forTicked as d (d.id)}<option value={d.id}>{d.name}</option>{/each}
+            <option value="-">No device</option>
+          </select>
         {:else if editor.designView === "controller"}
           <AddModuleMenu {editor} />
           <button disabled={!pickedAllocated} onclick={unallocate} title={pickedAllocated ? "Take the picked point off its channel" : "Pick an allocated point first"}>Unallocate</button>
@@ -593,7 +633,6 @@
         <LabelButton icon="check" label="Check" active={!!open.checks} onclick={() => toggle("checks")} title="Check the drawing for problems, with how full each DIN rail is" />
         <LabelButton icon="schedules" label="Schedules" active={!!open.schedules} onclick={() => toggle("schedules")} title="Terminal and cable schedules, and the bill of materials" />
         <LabelButton icon="place" label={editor.page.ga?.view === "detail" ? "Place detail…" : "Place parts…"} active={!!open.place} onclick={() => toggle("place")} title="Parts from the schematic not on a GA yet: pick one, then click on the sheet" />
-        <LabelButton icon="devices" label="Device table…" active={!!open.devices} onclick={() => toggle("devices")} title="Real devices with their sizes, datasheets and pictures" />
       {/if}
     </div>
   </header>
@@ -612,7 +651,7 @@
       {#if gaSelected || editor.sheetSettings}
         <FloatBox title={gaSelected ? "Properties" : "Sheet"} store="props" onclose={closeProps}>
           {#if editor.sheetSettings && !gaSelected}<SheetProps {editor} />{/if}
-          <GaProps {editor} ondevices={() => (open.devices = true)} />
+          <GaProps {editor} />
         </FloatBox>
       {/if}
     {:else if editor.selection.length || editor.sheetSettings}
@@ -699,8 +738,8 @@
 {#if open.renumber}
   <RenumberDialog {editor} onclose={() => (open.renumber = false)} />
 {/if}
-{#if open.devices}
-  <DevicesDialog {editor} onclose={() => (open.devices = false)} />
+{#if open.library}
+  <LibraryDialog {editor} onclose={() => (open.library = false)} />
 {/if}
 {#if pdfError}
   <Modal title="Export PDF" store="pdf-error" width={520} onclose={() => (pdfError = "")}>

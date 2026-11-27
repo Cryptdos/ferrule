@@ -332,6 +332,16 @@ Judgement calls made while building, by step, with the reason.
 - **8c: a module whose type has no channels never has any** (`channelTypes`), whatever its points' forms: an adapter's *Bus* typed in as a contact isn't counted as a DO. On 0.4.5 a host's or power supply's point with an IO form was counted as a channel.
 - **8c: a module with no channels lists each point's form and terminals** in its column (*supply in · 1 2*), as in mock-up 3.
 
+- **8d1: a device is kept on what it's for:** on a drawn part's element (a relay's coil, not its contacts), on each terminal strip by its name (`Project.stripDevices`), and on the plant item, modules included. A GA item's own device and a module's are gone: what's placed is what was picked. File format 16.
+- **8d1: a strip's device is one terminal,** so the strip is as long as its terminals times the device's width. A strip with fused and plain terminals takes one device for all of them; the generic sizes still tell them apart when it has none.
+- **8d1: a part's device counts wherever it's drawn,** placed on a GA or not: its draw in Simulate, its relay pins and a block's ways (CK-54 now points at the block on its schematic sheet, not at the GA).
+- **8d1: `+ Device` gives the new device to the picked row when it had none,** suited to it and at the size it has now, so one button makes and assigns it. With no row picked it makes a device suited to anything.
+- **8d1: devices no row has are listed last, under *Devices not used yet*,** so one made and not yet given, or one left over, can still be picked, edited or deleted. Not in the mock-up.
+- **8d1: plant devices suit *Plant*** (a new entry in the list of what a device suits), modules *Controller module*.
+- **8d1: a library device is edited in its Properties and the change goes to the library,** this project's copy following; new library devices are made with `+ Device` and *To library*. *From the library…* lists the library to bring one in, or delete one from it.
+- **8d1: the group names** are Coils; Breakers, isolators and fuses; Lamps, push buttons and selectors; Blocks, transformers and sockets; Terminal strips; Controller; Plant. A contactor drawn without a coil is with the breakers.
+- **8d1: the MCP server has a `devices` tool,** the Devices view's rows and the device table, to make a device and give things one.
+
 ### Title block (ruled 27 Nov 2026, before step 7)
 
 - **A1 laid out again:** *Sheet*, *Job no.* and *Checked* in three equal cells (24 mm); *Drawing ref.* and *Drawn* in two (36 mm); *Client* across the row (72 mm). A long *Checked* name and date is squeezed to fit its cell, as every cell's value is.

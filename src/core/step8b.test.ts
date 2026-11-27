@@ -3,7 +3,7 @@
  */
 import { describe, expect, test } from "bun:test";
 import { checkProject } from "./checks";
-import { addController, addModule, addModuleFromDevice, addSpareSlot, deleteController, generateModule, moveSlot, placeModulesOnGa, removeSlot, saveModuleDevice, setModuleDevice, updateController, updateModule } from "./controllers";
+import { addController, addModule, addModuleFromDevice, addSpareSlot, deleteController, generateModule, moveSlot, placeModulesOnGa, removeSlot, saveModuleDevice, updateController, updateModule } from "./controllers";
 import { gaCandidates } from "./ga";
 import { billOfMaterials, ioSchedule, plantPointsSchedule } from "./schedules";
 import { newProject, type Project } from "./model";
@@ -299,7 +299,6 @@ describe("8b2: controller map, schedules, GA, library models, checks", () => {
     expect(bom.find((r) => r.item.startsWith("Controller module DI-4"))!.tags).toBe("A1-23");
     // Saved as a model: the GA takes its size, the BOM its name.
     const dev = saveModuleDevice(p, di.id, { w: 45, h: 110 });
-    setModuleDevice(p, di.id, dev.id);
     expect(items[1]!.w).toBe(45);
     expect(billOfMaterials(p).find((r) => r.item === "Maker DI4")!.tags).toBe("A1-23");
     // A model makes the next module in seconds.
@@ -307,7 +306,7 @@ describe("8b2: controller map, schedules, GA, library models, checks", () => {
     expect(again.terminals).toEqual(di.terminals);
     expect(again.points!.map((x) => x.name)).toEqual(di.points!.map((x) => x.name));
     expect(again.points![0]!.label).toBeUndefined();
-    expect(again.module!.device).toBe(dev.id);
+    expect(again.device).toBe(dev.id);
     expect(again.module!.model).toBe("DI4");
     void host;
     void dout;

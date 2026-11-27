@@ -1,11 +1,12 @@
 <script lang="ts">
-  import { setModuleDevice } from "../../core/controllers";
   import { moduleTypeName } from "../../core/modules";
-  import { addPlatesForDoors, deleteGaItems, joinDoorBelow, setPlateBehind, sizePlateFromDoor, rotateGaItems, setGaItemDevice, setGaSettings, setGaSize, splitDoor, splitGaStrip, updateDoor, updateGaItem, useLibraryDevice } from "../../core/ops";
+  import { addPlatesForDoors, deleteGaItems, joinDoorBelow, setPlateBehind, sizePlateFromDoor, rotateGaItems, setDevices, setGaSettings, setGaSize, splitDoor, splitGaStrip, updateDoor, updateGaItem } from "../../core/ops";
   import {
     GA_SCALES,
     VIEW_NAMES,
     deviceSize,
+    gaItemDevice,
+    itemStrip,
     doorColumns,
     doorLeaves,
     doorPanes,
@@ -39,7 +40,7 @@
   import type { Editor } from "../editor.svelte";
 
   /** Layout workbench (GA sheets), right side: the selected item, or the sheet's enclosure and the size library. */
-  let { editor, ondevices }: { editor: Editor; ondevices?: () => void } = $props();
+  let { editor }: { editor: Editor } = $props();
 
   const page = $derived(editor.page);
   /** The sheet the picked items are on: this one, or one a frame shows (design-v0.3 §6). */
@@ -50,55 +51,33 @@
   const sizes = $derived(gaSizes(editor.project));
   let showSizes = $state(false);
 
-  // The device table: the project's devices, then the library's (if it's used).
+  // Its device is picked in Design (v0.5 A70): here it's only shown, with a way there.
   const useLib = $derived(editor.project.useDeviceLibrary !== false);
   $effect(() => {
     if (useLib) void deviceLibrary.load();
   });
   const first = $derived(one?.refs?.[0] ? byId.get(one.refs[0])?.e : undefined);
-  /** A controller's module on the GA. */
+  /** A controller's module (or plant in the panel) on the GA. */
   const mod = $derived(one?.module ? editor.project.plant.find((x) => x.id === one.module) : undefined);
-  const kind = $derived(mod ? "module" : first ? suitsKey(editor.project, first) : "");
-  /** The size the part would have without a device from the table. */
-  const generic = $derived.by(() => {
-    if (mod?.module) return moduleGaSize(editor.project, { ...mod, module: { ...mod.module, device: undefined } });
-    if (!first || !one) return null;
-    if (first.symbol === "terminal") return stripSize(editor.project, one.refs ?? []);
-    return deviceSize(editor.project, first);
+  /** Its row in Design's Devices view. */
+  const rowKey = $derived.by(() => {
+    if (!one || one.kind !== "device" || one.part) return "";
+    if (mod) return `plant:${mod.id}`;
+    const strip = itemStrip(editor.project, one);
+    if (strip) return `strip:${strip}`;
+    return first && suitsKey(editor.project, first) ? `el:${first.id}` : "";
   });
-  const suits = (k: string) => !k || k === kind;
-  const mine = $derived([...(editor.project.devices ?? [])].sort((a, b) => Number(suits(b.kind)) - Number(suits(a.kind)) || a.name.localeCompare(b.name)));
-  const libOnly = $derived(
-    useLib
-      ? deviceLibrary.list.filter((d) => !mine.some((m) => m.id === d.id)).sort((a, b) => Number(suits(b.kind)) - Number(suits(a.kind)) || a.name.localeCompare(b.name))
-      : [],
-  );
-  const dev = $derived(one?.device ? editor.project.devices?.find((d) => d.id === one.device) : undefined);
+  const dev = $derived(one ? gaItemDevice(editor.project, one) : undefined);
   const libEntry = $derived(dev?.library ? deviceLibrary.get(dev.id) : undefined);
+  /** The size it has from its device (a strip: each terminal its device). */
+  const devSize = $derived.by(() => {
+    if (!dev || !one) return null;
+    if (itemStrip(editor.project, one)) return stripSize(editor.project, one.refs ?? []);
+    if (mod) return moduleGaSize(editor.project, mod);
+    return first ? deviceSize(editor.project, first) : null;
+  });
   /** Sized by hand since the device was picked (either way round). */
-  const handSized = $derived(!!dev && !!one && !((one.w === dev.w && one.h === dev.h) || (one.w === dev.h && one.h === dev.w)));
-
-  function pickDevice(value: string) {
-    if (!one) return;
-    const id = one.id;
-    // A module is its model everywhere it's placed.
-    if (mod) {
-      const lib = value.startsWith("lib:") ? deviceLibrary.get(value.slice(4)) : undefined;
-      const mid = mod.id;
-      editor.apply((p) => setModuleDevice(p, mid, value ? (lib ? useLibraryDevice(p, lib).id : value) : null));
-      return;
-    }
-    if (!value) {
-      const g = generic;
-      if (g) editor.apply((p) => setGaItemDevice(p, ip.id, id, null, g));
-      return;
-    }
-    const lib = value.startsWith("lib:") ? deviceLibrary.get(value.slice(4)) : undefined;
-    editor.apply((p) => {
-      const devId = lib ? useLibraryDevice(p, lib).id : value;
-      setGaItemDevice(p, ip.id, id, devId);
-    });
-  }
+  const handSized = $derived(!!devSize && !!one && !((one.w === devSize.w && one.h === devSize.h) || (one.w === devSize.h && one.h === devSize.w)));
   const num = (v: string) => Number(v);
 
   // The sheet: its view, its door (one or two leaves, or another sheet's door) and what it shows.
@@ -227,29 +206,19 @@
       </label>
     {/if}
     {#if mod?.module}
-      <p class="hint">{mod.tag || `${mod.prefix || "A"}?`} · {moduleTypeName(mod.module)}{mod.module.maker || mod.module.model ? ` · ${[mod.module.maker, mod.module.model].filter(Boolean).join(" ")}` : ""}, a controller's module (Controllers… in Draft).</p>
+      <p class="hint">{mod.tag || `${mod.prefix || "A"}?`} · {moduleTypeName(mod.module)}, a controller's module (Design's Controller view).</p>
     {/if}
-    {#if one.kind === "device" && (one.refs?.length || mod)}
-      <label>
-        Device
-        <select value={one.device ?? ""} onchange={(e) => pickDevice(e.currentTarget.value)}>
-          <option value="">Generic size{generic ? ` (${generic.w} × ${generic.h})` : ""}</option>
-          {#if mine.length}
-            <optgroup label="This project's devices">
-              {#each mine as d (d.id)}<option value={d.id}>{suits(d.kind) ? "" : "· "}{deviceLabel(d)}</option>{/each}
-            </optgroup>
-          {/if}
-          {#if libOnly.length}
-            <optgroup label="From the shared library">
-              {#each libOnly as d (d.id)}<option value={"lib:" + d.id}>{suits(d.kind) ? "" : "· "}{deviceLabel(d)}</option>{/each}
-            </optgroup>
-          {/if}
-        </select>
-      </label>
-      {#if dev && handSized}
+    {#if rowKey}
+      <!-- Shown, not set (v0.5 A70): a device is picked in Design. -->
+      <div class="devline">
+        <span>Device</span>
+        <span class:none={!dev}>{dev ? deviceLabel(dev) : "none yet: its generic size"}</span>
+        <button class="link-btn" onclick={() => editor.showDevice(rowKey)} title="Its row in Design's Devices view, where its device is picked">In Design →</button>
+      </div>
+      {#if dev && devSize && handSized}
         <p class="hint">
-          Sized by hand: {one.w} × {one.h} mm (the table says {dev.w} × {dev.h}).
-          <button class="link-btn" onclick={() => pickDevice(dev.id)}>Back to the table size</button>
+          Sized by hand: {one.w} × {one.h} mm (its device says {devSize.w} × {devSize.h}).
+          <button class="link-btn" onclick={() => editor.apply((p) => setDevices(p, [rowKey], dev.id))}>Back to its device's size</button>
         </p>
       {/if}
       {#if libEntry?.files.length}
@@ -259,7 +228,6 @@
           {/each}
         </div>
       {/if}
-      <button class="link-btn" onclick={() => ondevices?.()}>Device table…</button>
     {/if}
     {#if one.kind === "device" && !one.refs?.length && !one.module}
       <!-- A device with no schematic part (v0.4.x M5): its name, tag and cut-out. -->
@@ -515,7 +483,6 @@
       Positions are measured from the enclosure's top-left corner, as this sheet sees it.
     </p>
     <div class="buttons">
-      <button onclick={() => ondevices?.()} title="Real devices with sizes, datasheets and pictures">Device table…</button>
       <button onclick={() => (showSizes = !showSizes)} title="The size each kind of part has when no device is picked">{showSizes ? "Hide generic sizes" : "Generic sizes…"}</button>
     </div>
     {#if showSizes}
@@ -683,5 +650,15 @@
   }
   .places .on .dot {
     background: #246;
+  }
+  .devline {
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+    flex-wrap: wrap;
+    font-size: 12px;
+  }
+  .devline .none {
+    color: #b33;
   }
 </style>
