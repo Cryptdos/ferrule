@@ -6,7 +6,6 @@
  * reference to something that's gone is let go, never guessed.
  */
 import { moduleType } from "./modules";
-import { parseSupplies, parseSupply } from "./supplies";
 import { markLetters, newId, type ChannelRef, type Condition, type DesignTemplate, type Interlock, type IoPoint, type PlantItem, type PlantMark, type PointForm, type Project } from "./model";
 import { OpError, getPlant, renamePointRefs, syncPlantViews } from "./ops";
 import { MAX_CONDITIONS, newInterlock, syncInterlocks } from "./interlocks";
@@ -369,14 +368,6 @@ export interface PointDesign {
   form?: PointForm;
   signal?: string;
   goesTo?: "channel" | "relay" | "panel";
-  /** What it gives, typed (v0.4.x M11): "24 V DC"; empty clears it. */
-  gives?: string;
-  /** What it takes, typed: "24 V AC, 24 V DC"; empty clears it. */
-  accepts?: string;
-  /** Its draw, rating (VA) and efficiency (0–1) (v0.4.x M12); null or 0 clears one. */
-  va?: number | null;
-  ratingVa?: number | null;
-  efficiency?: number | null;
 }
 
 /** Add a point with no pins (design-v0.4 §2, `+ Point`): a form, a name and a signal. */
@@ -422,25 +413,6 @@ export function updateDesignPoint(project: Project, plantId: string, name: strin
   if (patch.goesTo !== undefined) {
     if (patch.goesTo === "channel") delete p.goesTo;
     else p.goesTo = patch.goesTo;
-  }
-  if (patch.gives !== undefined) {
-    const g = parseSupply(patch.gives);
-    if (patch.gives.trim() && !g) throw new OpError(`Write what it gives as a voltage and AC or DC: 24 V DC`);
-    if (g) p.gives = g;
-    else delete p.gives;
-  }
-  if (patch.accepts !== undefined) {
-    const a = parseSupplies(patch.accepts);
-    if (patch.accepts.trim() && !a.length) throw new OpError(`Write what it takes as a voltage and AC or DC: 24 V DC, or 24 V AC, 24 V DC`);
-    if (a.length) p.accepts = a;
-    else delete p.accepts;
-  }
-  for (const k of ["va", "ratingVa", "efficiency"] as const) {
-    const v = patch[k];
-    if (v === undefined) continue;
-    if (v !== null && (!Number.isFinite(v) || v < 0 || (k === "efficiency" && v > 1))) throw new OpError(k === "efficiency" ? "An efficiency is between 0 and 1 (0.85 for 85%)" : "A draw or rating is a number of VA");
-    if (v) p[k] = v;
-    else delete p[k];
   }
   // What it now is: a channel that can't take it lets it go.
   if (p.channel) {
@@ -596,7 +568,9 @@ export function designTemplateOf(project: Project, ids: string[], name: string):
     for (const pt of rest.points ?? []) delete pt.channel;
     return rest as PlantItem;
   });
-  return { name: n, plant };
+  // Its devices come with it (v0.5 A70).
+  const devices = (project.devices ?? []).filter((d) => plant.some((p) => p.device === d.id));
+  return { name: n, plant, ...(devices.length ? { devices: structuredClone(devices) } : {}) };
 }
 
 /**
@@ -611,6 +585,7 @@ export function insertDesignTemplate(
 ): { plant: PlantItem[]; untagged: number } {
   if (!t.plant.length) throw new OpError("That template has no rows");
   if (opts.system && !(project.systems ?? []).includes(opts.system)) throw new OpError(`No system "${opts.system}"`);
+  for (const d of t.devices ?? []) if (!project.devices?.some((x) => x.id === d.id)) (project.devices ??= []).push(structuredClone(d));
   return copyRows(project, t.plant, { copies: opts.copies ?? 1, step: opts.step ?? 1, first: 0, system: opts.system ?? "", after: opts.after });
 }
 

@@ -232,7 +232,7 @@ Design lists what the panel has before anything is drawn: systems, plant and poi
   | Comms | RS485, Modbus… | none |
 
 - **DE-21** *Goes to*: **Channel** (wired straight to a controller channel), **Channel, via relay** (the plant switches a relay whose contact switches the channel, or the reverse for an output), or **Panel only** (used in the panel's own circuits; never needs a channel).
-- **DE-22** ~~A supply out point takes *Gives*, *Rating VA* and *Efficiency %*; a supply in point takes *Takes* and *Draw VA* (see SM-20 to SM-23).~~ *(v0.5: A38)*
+- **DE-22** A supply or powered point's Properties set no voltage or load: they say that what it takes and draws, or gives with its rating, is its plant's device's, with *Devices →* (DE-89).
 - **DE-23** An allocated point shows how it's wired to its channel: *✓ Wired straight to its channel*; *✓ Wired to its channel via K…*; *✓ Wired: confirmed by hand* (with *Undo*); *Not wired straight to its channel: check the drawing* (with *Confirm by hand*); or *Not drawn yet*.
 
 ### The Needs line
@@ -277,7 +277,7 @@ Design lists what the panel has before anything is drawn: systems, plant and poi
 - **DE-49** *Generate* fills an IO module's terminals from a pattern, at the top of its Terminals window (on IO modules only, not plant, a host, a power supply or an adapter): channels; one channel's terminal ids (`VO RET CO`, `IO C`, `Y ⊥`), a dash using up a number without making a terminal; the first terminal number; the form; names with `#` for the channel (`AO#` → AO1, AO2…); counting from; a shared terminal and how many channels it serves. It says what it will make first (*Makes 16 channels and 4 shared terminals, numbered 1 to 36*), replaces the list, and asks first if any of its terminals are wired.
 - **DE-50** A module picked shows in Properties: *Type*, *Channels*, *Address*, its device (shown, not set, with *Devices →* to its row), *Commons linked inside*, where it's drawn, and *Terminals…*, *Save as device*, *← Move*, *Move →* and *Delete module*. A channel picked shows the point on it with *Unallocate*, or, spare, its label typed by hand; a module's other point (a supply in, a serial port) its name, form and how it simulates. Both show their terminals with *Terminals…*.
 - **DE-51** *Commons linked* joins the module's commons (C, RET, 0 V) inside it: one return serves them all in Simulate and in the wiring check, and the view shows the link.
-- **DE-52** ~~*Draw (VA)* on a module is counted on the controller's power supply module in Simulate.~~ *(v0.5: A38)*
+- **DE-52** A module's draw is its device's, and is counted on the controller's power supply module in Simulate; its maker and model are its device's too. There's no *Draw (VA)*, *Maker* or *Model* on a module.
 - **DE-53** *Save as device* in a module's Properties keeps it, its type, channels, terminals and points, in the device table (and from there the shared library), so the next one is added whole from `+ Module`.
 - **DE-54** A module is moved by dragging it along the rail, or with *← Move* and *Move →*; *Delete module* removes it and every view of it. A spare slot is picked on the rail too, to move or remove.
 - **DE-55** A module is tagged by where its first view is drawn, prefix **A**: at sheet 3, column 23 it's `A3-23`, and its points are `A3-23:DI2`. With a controller map in the set, modules take their tags from their place on the map.
@@ -293,7 +293,7 @@ Design lists what the panel has before anything is drawn: systems, plant and poi
 - **DE-86** The Devices view lists everything in the job that needs a real device, one row each: each drawn part once it's added in Draft (a relay's coil, not its contacts), each terminal strip (not each terminal), each controller module, and each plant item, in the field or the panel, drawn or not. A row shows its tag, what it is (*Coil, relay · Supply fan run*; *48 terminals*; *DI-16*; *Supply air temperature sensor · field*) and its device.
 - **DE-87** Rows are grouped: Coils; Breakers, isolators and fuses; Lamps, push buttons and selectors; Blocks, transformers and sockets; Terminal strips; Controller (in rail order); Plant. Groups fold. The heading counts what's left (*3 left of 25*), and each group its own. Devices no row has are listed last, under *Devices not used yet*, to be picked and edited.
 - **DE-88** A row's device is picked from its drop-down: the project's devices that suit it (made for that kind of part, or for anything), or *none yet*. Ticking rows, or a group's box for all of it, and choosing from *Set n picked to…* on Design's row gives them all one device (or *No device*); it offers only the devices that suit every ticked row. A device that doesn't suit a thing is refused.
-- **DE-89** A row picked shows its device in Properties, which is where a device is edited: name, maker, part number, what it suits, width × height × depth, *Draw (VA)*, *Ways* for a distribution block, *Relay pins* for a coil, and for a device from the shared library its notes and its datasheets and pictures (*Add files…*). With none, Properties says so. *To library* puts one of the project's own devices in the shared library; *Delete device* takes a device out of the project, and what had it has none.
+- **DE-89** A row picked shows its device in Properties, which is where a device is edited: name, maker, part number, what it suits, width × height × depth, and what it says by what it suits: *Takes* (a value with *V AC*, *V DC* or *V AC or DC* beside it) and *Draw (VA)* for a load, *Gives* (a value with *V AC* or *V DC*) for a supply with its *Rating (VA)* and *Efficiency %*, *Poles* for a relay, timer or contactor, *Ways* for a distribution block; and for a device from the shared library its notes and its datasheets and pictures (*Add files…*). With none, Properties says so. *To library* puts one of the project's own devices in the shared library; *Delete device* takes a device out of the project, and what had it has none.
 - **DE-90** `+ Device` makes a device in this project, suited to the picked row and the size it has now, and gives it to that row if it had none; *From the library…* lists the shared library to bring one in (*Use in this project*) or delete one from the library.
 - **DE-91** What's placed on a GA is what's been picked: a part placed takes its device's size, a strip its device's width for each terminal, and a device picked or resized later resizes what's placed (LA-34).
 
@@ -390,7 +390,7 @@ The electrical drawing: parts, wires, rails, plant views, numbering and links. I
 - **DR-36** Double-clicking a contact jumps to its coil; a coil, to its first contact; a link end, to its partner. Where you land is highlighted until something else is selected.
 - **DR-37** References are always in full (`11-06`), on the same sheet too.
 - **DR-38** A contact linked to a timer coil is timed by it: it draws the delay mark for the timer's function and takes 17-18 (NO), 15-16 (NC) or 15-16/18 (changeover). *Instantaneous* keeps it a plain contact switching with the coil. Unlinking returns it to a plain contact.
-- **DR-39** ~~A coil placed as a device with *Relay pins* (LA-33) prints that base's terminal numbers on the coil, its contacts and its contact table, in place of A1/A2 and 11/12/14.~~ *(v0.5: A70)*
+- **DR-39** Draft numbers a relay's terminals, A1 and A2 on its coil and 11, 12, 14 and so on by pole on its contacts, and a device doesn't change them. There are no *Relay pins*: a device's *Poles* is read only by Check (CK-55).
 
 ### Link ends
 
@@ -477,14 +477,14 @@ Tag prefixes follow IEC 81346-2 as applied in `docs/designations.md`. Untagged p
 | **PT-3** | Selector | S | *Positions*: 2 (0–I), 3 (I–0–II) or 4 (1–2–3–4, no off); poles 1–4; *Changeover* (2 or 3 position): every pole a changeover; otherwise each pole picks from the choices its positions have: on 2, NO closed in I or NC opened in I; on 3, NO closed in I, in II or in both, NC opened in I or II; on 4, closed in one position, 1 to 4; *Key operated*; a name per position | Position names print under the head as `SUPPLY 1 – OFF – SUPPLY 2`. A pole is numbered *n*3/*n*4 when NO and *n*1/*n*2 when NC; a changeover *n*1 common, *n*2, *n*4 on a 2-position switch, and as makers do on a 3 (common 2, to 3 in I, to 1 in II; the next pole 7, 6, 5). Changing the positions puts a pole on a choice they don't have back to its default |
 | **PT-4** | Isolator / MCB / contactor | Q or F | *Function*: Isolator (Q), Contactor main contacts (Q), Circuit breaker / MCB (F), RCD / RCBO (F); main poles 1–4; aux NO 0–3; aux NC 0–3; *Operator* (an isolator only): rotary handle, door handle or key; every isolator has one | Contactor poles are worked by the coil picked under *Driven by coil*. A breaker draws no operator. An RCD carries the residual current mark |
 | **PT-5** | Fuse / fuse carrier | F | Poles 1–4; *Rating* | Rating prints beside it |
-| **PT-6** | Coil | K for a relay or timer, Q for a contactor | *Type*: Relay, Contactor or Timer; ~~*Takes (supply)*; *Draw (VA)*~~ *(v0.5: A38)* | One part: the symbol changes with the type. Terminals A1, A2; contact table once contacts are linked. Its contacts follow the type: set to Timer, they're timed |
-| **PT-7** | Coil set to Timer | K | Shown only when the type is Timer: *Function*: TON, TOF, TON+TOF, TP, Flasher ON first, Flasher OFF first; *Time* (`500ms`, `5s`, `1.5s`, `2min`); *Maker's function code*; ~~*Takes*; *Draw*~~ *(v0.5: A38)* | Function, time and code print by the coil; the simulator runs it |
-| **PT-8** | Indicator lamp | P | *Colour*: Rd, Ye, Gn, Bu, Wh; *Lamp test terminal (LT)*; ~~*Takes*; *Draw*~~ *(v0.5: A38)* | Terminals +V and −V; with lamp test, a third, LT. Every lamp has a colour (white covers a clear lens) |
+| **PT-6** | Coil | K for a relay or timer, Q for a contactor | *Type*: Relay, Contactor or Timer. What it takes and draws is its device's (DE-89) | One part: the symbol changes with the type. Terminals A1, A2; contact table once contacts are linked. Its contacts follow the type: set to Timer, they're timed |
+| **PT-7** | Coil set to Timer | K | Shown only when the type is Timer: *Function*: TON, TOF, TON+TOF, TP, Flasher ON first, Flasher OFF first; *Time* (`500ms`, `5s`, `1.5s`, `2min`); *Maker's function code*. What it takes and draws is its device's | Function, time and code print by the coil; the simulator runs it |
+| **PT-8** | Indicator lamp | P | *Colour*: Rd, Ye, Gn, Bu, Wh; *Lamp test terminal (LT)*. What it takes and draws is its device's | Terminals +V and −V; with lamp test, a third, LT. Every lamp has a colour (white covers a clear lens) |
 | **PT-9** | Terminal | (number only) | *Terminal strip* (default X1); *Type*; *Show the strip identifier beside it* | See DR-55 to DR-61 |
 | **PT-10** | Socket outlet | X | none | A box with L and N on top, 3 units apart to line up under an MCB, and E beside them |
 | **PT-11** | Connector block | X | *Terminals* 2–12 (the total); *Columns* 1–12, default 2 | A box of terminals all at one potential (an earth, 0 V or screen block), sized from the two: two columns are a pair to a row, in on the left and out on the right; one column has every terminal on the left; three or more make a wide block of two rows, its terminals along the top and bottom (widening to fit, so 12 in 4 columns is drawn 6 across). Doesn't turn (DR-8) |
 | **PT-12** | Connector (plug and socket) | X | *Ways* 1–12 | Each way a plug pin and a socket contact, for flying leads |
-| **PT-13** | Transformer | T | *Earthed screen*; *Rating*; *Gives*; *Rating (VA)* | Terminals P1, P2, S1, S2 at switch pole pitch; a supply in Simulate once its primary is energised |
+| **PT-13** | Transformer | T | *Earthed screen*; *Rating* (printed text). What it gives and its rating (VA) are its device's | Terminals P1, P2, S1, S2 at switch pole pitch; a supply in Simulate once its primary is energised |
 | **PT-14** | Motor | M | *Rating*; *Phases*: three (U V W) or single (L N); *Type*: motor, fan or pump | Terminals at pole pitch, so it wires straight down from the contactor above. The type changes the picture and the name: a pump reads *Pump* in its properties and in the legend |
 | **PT-15** | Distribution block | W | See DR-48 to DR-53 | |
 | **PT-16** | Power rail | none | As the block | Drawn by its supply's voltage (DR-49) |
@@ -492,7 +492,7 @@ Tag prefixes follow IEC 81346-2 as applied in `docs/designations.md`. Untagged p
 | **PT-18** | Link end | none | Not a part: the end of a wire on bare paper. See DR-40 to DR-47 | |
 | **PT-19** | Terminal strip line | none | *Terminal strip*; length | See DR-62 |
 | **PT-20** | Cable screen | none | *Width across the cores* 1–60 units; *Dashed* | No tag; its drain wire attaches at either end |
-| **PT-21** | Incoming supply | none | *System*: 3-phase + N, 3-phase, single phase, DC; *Gives*; ~~*Rating (VA)*~~ *(v0.5: A72)* | Where the simulator's power comes from. It picks no distribution: it's wired to its blocks (DR-50) |
+| **PT-21** | Incoming supply | none | *System*: 3-phase + N, 3-phase, single phase, DC; *Gives*, a value with *V AC* or *V DC* beside it. It's the site's supply, not a device: it has no rating, and counts as unlimited | Where the simulator's power comes from. It picks no distribution: it's wired to its blocks (DR-50) |
 
 - **PT-22** Multi-terminal parts keep the switch pole pitch (3 units) between terminals.
 - **PT-23** Text fields such as *Rating* show an example as greyed placeholder text.
@@ -590,7 +590,7 @@ General arrangement (GA) sheets drawn to scale. Positions and sizes are in milli
 
 ### Device table
 
-- **LA-33** The device table is the project's devices, kept in the project and edited in Design's Devices view (DE-89): name, maker, part number, the part each suits, width × height × depth, ~~*Relay pins* (`A1 A2 | 11 12 14 | 21 22 24`),~~ *Draw (VA)*, *Ways* for a distribution block, and notes. There's no *Device table…* window in Layout. *(v0.5: A70. A device gains what it takes and gives, and a count of poles in place of Relay pins)*
+- **LA-33** The device table is the project's devices, kept in the project and edited in Design's Devices view (DE-89): name, maker, part number, the part each suits, width × height × depth, what it takes and draws, what it gives with its rating and efficiency, its poles, *Ways* for a distribution block, and notes. It's the one place a thing's voltages and loads are set. There's no *Device table…* window in Layout.
 - **LA-34** Sizes are generic per kind of part until a device is picked for it in Design (DE-88): then a part placed, or placed later, takes its device's size, a strip its device's width for each terminal; with its device taken off, it's back to its generic size. *Generic sizes…* in the sheet's settings sets the generic ones for the project; parts already placed keep their size.
 - **LA-35** Devices in the **shared library** can be used by any project and hold datasheets (PDF) and pictures, added with *Add files…* in the device's Properties in Design.
 - **LA-36** A project keeps a copy of each library device it uses, so it opens anywhere. A library device edited in its Properties changes the library's entry, and the copy follows; when the library's entry says something else, *Take the library's* brings the copy up to date.
@@ -638,11 +638,11 @@ The same sheets, live. Editing is off. Entering Simulate starts from everything 
 
 ### Supply load
 
-- **SM-20** Loads say what they draw: *Draw (VA)* ~~on coils, timer coils and lamps,~~ *(v0.5: A38)* on a device in the device table, on a plant's supply in, and on a controller's modules. A part with no draw of its own takes its device's. *(v0.5: A38. The device is the only place a draw is set)*
-- **SM-21** Supplies say what they can give: *Rating (VA)* on ~~an Incoming supply,~~ *(v0.5: A72)* a transformer, or a plant's supply out (with its efficiency). *(v0.5: A38. A transformer's and a plant supply's are on their device)*
+- **SM-20** A thing draws what its device does (*Draw (VA)*, DE-89): a coil, timer coil or lamp; a plant item, through its first supply in or powered in; a controller's modules, through its power supply module. The device is the only place a draw is set.
+- **SM-21** A transformer's and a plant supply out's rating and efficiency are their device's. An Incoming supply has none: it's the site's supply, its load shown beside it but never over.
 - **SM-22** Each supply shows its load beside it on the sheet and in the panel: **live** (what's energised now) and **worst case** (everything it can reach), in amps at its own voltage. A figure over the rating is red.
 - **SM-23** A power supply's load is passed up to what feeds it, divided by its efficiency.
-- **SM-24** Parts with no draw set count as nothing, and the panel says how many.
+- **SM-24** Things with no device, or whose device says no draw, count as nothing, and the panel says how many.
 
 ### Expectations and Check logic
 
@@ -689,10 +689,10 @@ The same sheets, live. Editing is off. Entering Simulate starts from everything 
 | ID | Level | Finding |
 |---|---|---|
 | **CK-15** | warning | A load takes one supply and is fed from another (*… takes 24 V DC; it's fed from …, 230 V AC*), traced through relays and terminals |
-| **CK-16** | info | *n* loads don't say what supply they take, so can't be compared |
+| **CK-16** | info | *n* loads don't say what supply they take (no device, or a device that doesn't say), so can't be compared |
 | **CK-17** | warning | A distribution feeds parts and nothing supplies it |
-| **CK-18** | warning | A supply's worst-case load is over its rating *(v0.5: A72. Never an Incoming supply)* |
-| **CK-19** | ~~info~~ *(v0.5: A31)* | *n* parts have no draw set, so count as nothing |
+| **CK-18** | warning | A supply's worst-case load is over its rating. Never an Incoming supply, which has none |
+| **CK-19** | warning | Once the project has a device, *n of m things have no device yet*: what they take and draw isn't known, so a supply's load leaves them out. *Show* goes to the first in Design's Devices view |
 | **CK-20** | none | No check for a supply bypassing its isolator: an incoming supply picks no distribution, so there's nothing to bypass one (DR-50) |
 
 ### Plant, controller and Design
@@ -739,6 +739,7 @@ Design's findings appear only once a project uses Design.
 | **CK-48** | info | A backplate is larger than its door's opening, or its door has gone |
 | **CK-49** | warning | A device or module on the GA is no longer on the schematic |
 | **CK-54** | warning | A distribution block has more wires than the device picked for it has ways |
+| **CK-55** | warning | A relay's, timer's or contactor's contacts use more poles than its device has (*K3-16 uses 5 poles and its device, Relay 4CO, has 4*) |
 
 ---
 

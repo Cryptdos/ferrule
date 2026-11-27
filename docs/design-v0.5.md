@@ -342,6 +342,15 @@ Judgement calls made while building, by step, with the reason.
 - **8d1: the group names** are Coils; Breakers, isolators and fuses; Lamps, push buttons and selectors; Blocks, transformers and sockets; Terminal strips; Controller; Plant. A contactor drawn without a coil is with the breakers.
 - **8d1: the MCP server has a `devices` tool,** the Devices view's rows and the device table, to make a device and give things one.
 
+- **8d2: *Takes* is a value with *V AC*, *V DC* or *V AC or DC*; *Gives* the same less *either*.** A device shows what it says by what it suits: a load *Takes* and *Draw*, a supply *Gives* with *Rating* and *Efficiency %* (shown once it gives something), a relay, timer or contactor *Poles*, a block *Ways*; a device for anything shows all of them.
+- **8d2: a plant item draws through its first supply in or powered in,** and its device's *Gives* is what each of its supply outs gives. A plant with two different outputs needs two plant items. A controller's power supply module carries every module's draw, its own included.
+- **8d2: the Incoming supply's *Gives* is two boxes,** a number and *V AC* / *V DC*, kept as the part's own (it isn't a device). File format 17.
+- **8d2: a contactor's poles counted by Check** are its main contacts' poles and auxiliaries and each linked contact; a relay's, each linked contact.
+- **8d2: A31's warning is one line for the project,** once it has a device at all: *n of m things have no device yet*, naming the first few, with *Show* to the first in the Devices view. A project that never uses devices isn't told about every part.
+- **8d2: a module's maker and model are its device's,** shown in its title row and the controller map from the device's maker and part number; *Save as device* names the device by type (*DI-16 module*).
+- **8d2: sheet, section and Design templates carry the devices their parts and plant are,** and bring them into a project that hasn't got them, as a distribution comes with a template.
+- **8d2: the BMS fixture gives its modules, power supply and actuators devices** (their makers and models moved there), so its drawings print as before.
+
 ### Title block (ruled 27 Nov 2026, before step 7)
 
 - **A1 laid out again:** *Sheet*, *Job no.* and *Checked* in three equal cells (24 mm); *Drawing ref.* and *Drawn* in two (36 mm); *Client* across the row (72 mm). A long *Checked* name and date is squeezed to fit its cell, as every cell's value is.

@@ -30,7 +30,15 @@
           {@const c = f.confirm}
           <button title="You've checked the drawing: it's wired. Kept until the wiring at either end changes" onclick={() => editor.apply((p) => confirmWiring(p, c.plant, c.point))}>Confirm by hand</button>
         {/if}
-        {#if f.design && !f.ids.length}
+        {#if f.devices}
+          {@const key = f.devices}
+          <button
+            onclick={() => {
+              editor.showDevice(key);
+              onclose();
+            }}>Show</button
+          >
+        {:else if f.design && !f.ids.length}
           {@const d = f.design}
           <button
             onclick={() => {

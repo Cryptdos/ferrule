@@ -6,7 +6,7 @@
    * here; its terminals are in the Terminals window.
    */
   import { allocate, channelLabel, channelTypes, pointOnChannel } from "../../core/design";
-  import { deleteController, moveSlot, removeSlot, saveModuleDevice, setModuleCommons, setModuleVa, setSlotAddress, sharedPins, updateController, updateModule } from "../../core/controllers";
+  import { deleteController, moveSlot, removeSlot, saveModuleDevice, setModuleCommons, setSlotAddress, sharedPins, updateController, updateModule } from "../../core/controllers";
   import { isOutputForm, pointRef, printedPin, things } from "../../core/points";
   import { MODULE_TYPES, controllerTag, moduleType, moduleTypeName, slotAddress, viewsOf } from "../../core/modules";
   import { POINT_FORMS, type ModuleType, type PointForm } from "../../core/model";
@@ -138,9 +138,6 @@
       <input type="checkbox" checked={!!m.commons?.length} onchange={(e) => editor.apply((p) => setModuleCommons(p, module.id, e.currentTarget.checked))} /> Commons linked inside
     </label>
   {/if}
-  <label title="Its expected draw from its data sheet, in VA; Simulate counts the controller's modules on its power supply module">Draw (VA)
-    <input type="number" min="0" step="0.1" value={m.va ?? ""} placeholder="—" onchange={(e) => editor.apply((p) => setModuleVa(p, module.id, Number(e.currentTarget.value) || null))} />
-  </label>
   <div class="field">
     <span>Drawn at</span>
     <span>

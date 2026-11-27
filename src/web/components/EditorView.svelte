@@ -232,15 +232,18 @@
   function newDevice() {
     const key = editor.designPick.row;
     let id = "";
+    let given = false;
     const ok = editor.apply((p) => {
       const was = key ? deviceRows(p).find((r) => r.key === key) : undefined;
       const d = addProjectDevice(p, { name: "New device", maker: "", part: "", d: 0, ...newDeviceFor(p, key) });
       id = d.id;
-      if (key && was && !was.device) setDevices(p, [key], d.id);
+      if (key && was && !was.device) {
+        setDevices(p, [key], d.id);
+        given = true;
+      }
     });
     if (!ok) return;
-    const row = key && editor.project.devices?.some((d) => d.id === id) && deviceRows(editor.project).find((r) => r.key === key)?.device?.id === id;
-    editor.designPick = row ? { plant: [], row: key } : { plant: [], device: id };
+    editor.designPick = given && key ? { plant: [], row: key } : { plant: [], device: id };
   }
   /** The devices that suit every ticked row, for Set picked to…. */
   const tickedRows = $derived(editor.mode === "design" && editor.designView === "devices" ? deviceRows(editor.project).filter((r) => editor.deviceTicks.includes(r.key)) : []);

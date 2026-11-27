@@ -1,9 +1,11 @@
 /**
- * Supply load (v0.4.x M12), built on M11's supplies. Each part has one
- * expected draw in VA: `va` on a coil, timer coil or lamp (or its device's,
- * from the device table, when the part has none), `va` on a plant supply-in
- * or powered-in point, and `ModuleInfo.va` on a controller's modules, drawn
- * through the module with a supply-in point (the controller's power supply).
+ * Supply load (v0.4.x M12), built on M11's supplies. What a thing draws, and
+ * what a supply is rated for, is its device's (v0.5 A38): a coil's, timer
+ * coil's or lamp's; a plant item's, drawn through its first supply in or
+ * powered in; a controller's modules', drawn through the module with a
+ * supply-in point (the controller's power supply). A transformer's and a
+ * plant supply out's rating and efficiency are their device's; an Incoming
+ * supply is the site's, with no rating (v0.5 A72).
  *
  * Each supply gets two figures: *live*, what's energised in the simulated
  * state, and *worst case*, everything it can reach with every switch
@@ -15,7 +17,7 @@
  */
 import type { Element, IoPoint, PlantItem, Project, SupplyType } from "./model";
 import { type Circuit, type SimState } from "./sim";
-import { elementGives } from "./supplies";
+import { elementGives, plantGives } from "./supplies";
 
 /** A power supply's efficiency when none is set. */
 export const DEFAULT_EFFICIENCY = 0.85;
@@ -48,14 +50,16 @@ class UF {
 const positive = (v: unknown): number | undefined => (typeof v === "number" && Number.isFinite(v) && v > 0 ? v : undefined);
 const POINT = /^plant:([^:]+):(.+)$/;
 
-/** A part's draw: its own, or its device's from the device table. */
+const deviceOf = (project: Project, id: string | undefined) => (id ? project.devices?.find((d) => d.id === id) : undefined);
+
+/** A part's draw: its device's. */
 function elementVa(project: Project, el: Element): number | undefined {
-  return positive(el.params.va) ?? positive(el.device ? project.devices?.find((x) => x.id === el.device)?.va : undefined);
+  return positive(deviceOf(project, el.device)?.va);
 }
 
-/** A module's draw: its own, or its device's from the device table. */
-function moduleVa(project: Project, m: PlantItem): number | undefined {
-  return positive(m.module?.va) ?? positive(m.device ? project.devices?.find((d) => d.id === m.device)?.va : undefined);
+/** A plant item's or module's draw: its device's. */
+function plantVa(project: Project, m: PlantItem): number | undefined {
+  return positive(deviceOf(project, m.device)?.va);
 }
 
 /**
@@ -77,15 +81,17 @@ export function supplyLoads(project: Project, c: Circuit, state?: SimState): { s
     if (el) return elementVa(project, el);
     const p = pointOf(loadId);
     if (!p) return undefined;
-    let va = positive(p.pt.va);
-    // A controller's power supply module carries the whole controller's draw.
-    if (p.item.module && p.pt.form === "supply-in") {
+    // A controller's power supply module carries the whole controller's draw, its own with it.
+    if (p.item.module) {
+      if (p.pt.form !== "supply-in") return undefined;
       const ctrl = (project.controllers ?? []).find((x) => x.slots.some((s) => s.module === p.item.id));
       const mods = ctrl ? project.plant.filter((x) => x.module && ctrl.slots.some((s) => s.module === x.id)) : [p.item];
-      const sum = mods.reduce((a, m) => a + (moduleVa(project, m) ?? 0), 0);
-      if (sum) va = (va ?? 0) + sum;
+      const sum = mods.reduce((a, m) => a + (plantVa(project, m) ?? 0), 0);
+      return sum || undefined;
     }
-    return va;
+    // A plant item draws through its first supply in or powered in.
+    const first = (p.item.points ?? []).find((q) => q.form === "supply-in" || q.form === "powered-in");
+    return first?.name === p.pt.name ? plantVa(project, p.item) : undefined;
   };
 
   // The supplies each load feeds, and how efficiently.
@@ -100,7 +106,7 @@ export function supplyLoads(project: Project, c: Circuit, state?: SimState): { s
   const effOf = (supplyId: string): number => {
     const p = pointOf(supplyId);
     if (!p) return 1;
-    const e = positive(p.pt.efficiency);
+    const e = positive(deviceOf(project, p.item.device)?.efficiency);
     return e && e <= 1 ? e : p.pt.form === "supply-out" ? DEFAULT_EFFICIENCY : 1;
   };
   for (const s of c.supplies) {
@@ -154,8 +160,9 @@ export function supplyLoads(project: Project, c: Circuit, state?: SimState): { s
     seen.add(s.el);
     const el = els.get(s.el);
     const p = pointOf(s.el);
-    const gives = el ? elementGives(el) : p?.pt.gives;
-    const ratingVa = el ? positive(el.params.ratingVa) : positive(p?.pt.ratingVa);
+    const gives = el ? elementGives(project, el) : plantGives(project, p?.item);
+    // An Incoming supply is the site's: it has no rating (v0.5 A72).
+    const ratingVa = el ? (el.symbol === "transformer" ? positive(deviceOf(project, el.device)?.ratingVa) : undefined) : positive(deviceOf(project, p?.item.device)?.ratingVa);
     out.push({
       id: s.el,
       name: s.el === "rails" ? "the power rails" : (c.names.get(s.el) ?? s.el),
@@ -177,6 +184,5 @@ export function loadText(va: number, gives?: SupplyType): string {
 
 /** Does the project say any draws or ratings at all? */
 export function usesLoads(project: Project): boolean {
-  if (project.pages.some((pg) => pg.elements.some((e) => positive(e.params.va) || positive(e.params.ratingVa)))) return true;
-  return project.plant.some((p) => positive(p.module?.va) || (p.points ?? []).some((q) => positive(q.va) || positive(q.ratingVa))) || !!project.devices?.some((d) => positive(d.va));
+  return !!project.devices?.some((d) => positive(d.va) || positive(d.ratingVa));
 }

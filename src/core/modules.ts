@@ -274,7 +274,7 @@ export function moduleTitle(project: Project, el: Element): string {
   const slot = ctrlOf ? ctrlOf.slots.findIndex((s) => s.module === item.id) : -1;
   if (ctrlOf && slot >= 0) parts.push(`Module ${slotAddress(project, ctrlOf, slot)}`);
   parts.push(moduleTypeName(item.module));
-  const who = [item.module.maker, item.module.model].filter(Boolean).join(" ");
+  const who = makerModel(project, item);
   if (who) parts.push(who);
   const views = viewsOf(project, item.id);
   const first = views[0];
@@ -290,6 +290,15 @@ export function moduleTitle(project: Project, el: Element): string {
     }
   }
   return parts.join(" · ");
+}
+
+/** A plant item's or module's device (v0.5 A70). */
+const deviceOf = (project: Project, item: PlantItem) => (item.device ? project.devices?.find((d) => d.id === item.device) : undefined);
+
+/** A module's maker and model, from its device (v0.5 A38): "Generic UIO-16X". */
+export function makerModel(project: Project, item: PlantItem): string {
+  const d = deviceOf(project, item);
+  return d ? [d.maker, d.part].filter(Boolean).join(" ") : "";
 }
 
 /** Controllers with their modules, in the order they're listed. */
@@ -308,8 +317,8 @@ export function controllerMapEntries(project: Project, ctrlId: string): import("
     return {
       tag: it.tag || `${it.prefix || "A"}?`,
       address,
-      maker: it.module.maker ?? "",
-      model: it.module.model ?? "",
+      maker: deviceOf(project, it)?.maker ?? "",
+      model: deviceOf(project, it)?.part ?? "",
       type: moduleTypeName(it.module),
       where: viewsOf(project, it.id).map((v) => v.address).join(", "),
     };

@@ -29,6 +29,8 @@ import { addNetwork, placeNetworkSheet, putOnNetwork } from "../core/network";
 import {
   addDistribution,
   addElement,
+  addProjectDevice,
+  setDevices,
   addGaDim,
   addGaItem,
   addGaPage,
@@ -43,6 +45,8 @@ import {
   updateRevision,
 } from "../core/ops";
 import { pointRef } from "../core/points";
+import { newDeviceFor } from "../core/devicerows";
+import type { ProjectDevice } from "../core/devices";
 import { renumber } from "../core/renumber";
 import { routePage } from "../core/routing";
 
@@ -184,13 +188,22 @@ export function buildBms01(avoid: Avoid | null): Bms01 {
   // --- The controller ------------------------------------------------------------
   const ctrl = addController(p, "Building controller", "A");
   const modules = {
-    host: addModule(p, ctrl.id, { type: "host", maker: "Generic", model: "HC-100" }),
-    psu: addModule(p, ctrl.id, { type: "psu", maker: "Generic", model: "PS-24" }),
-    di: addModule(p, ctrl.id, { type: "di", channels: 16, maker: "Generic", model: "DI-16X" }),
-    uio: addModule(p, ctrl.id, { type: "uio", channels: 16, maker: "Generic", model: "UIO-16X" }),
-    ao: addModule(p, ctrl.id, { type: "ao", channels: 8, maker: "Generic", model: "AO-8X" }),
-    do: addModule(p, ctrl.id, { type: "do", channels: 8, maker: "Generic", model: "DO-8X" }),
+    host: addModule(p, ctrl.id, { type: "host" }),
+    psu: addModule(p, ctrl.id, { type: "psu" }),
+    di: addModule(p, ctrl.id, { type: "di", channels: 16 }),
+    uio: addModule(p, ctrl.id, { type: "uio", channels: 16 }),
+    ao: addModule(p, ctrl.id, { type: "ao", channels: 8 }),
+    do: addModule(p, ctrl.id, { type: "do", channels: 8 }),
   };
+  // Each module is a device (v0.5 A38, A70): its maker and model are the device's.
+  const device = (it: PlantItem, part: string, extra: Partial<ProjectDevice> = {}) =>
+    setDevices(p, [`plant:${it.id}`], addProjectDevice(p, { name: `Generic ${part}`, maker: "Generic", part, d: 0, ...newDeviceFor(p, `plant:${it.id}`), ...extra }).id);
+  device(modules.host, "HC-100");
+  device(modules.psu, "PS-24", { takes: { v: 24, kind: "dc" } });
+  device(modules.di, "DI-16X");
+  device(modules.uio, "UIO-16X");
+  device(modules.ao, "AO-8X");
+  device(modules.do, "DO-8X");
   // The host's two serial ports: terminals with nothing to simulate.
   modules.host.terminals = ["1", "2", "3", "4", "5", "6"];
   modules.host.pins = {
@@ -246,11 +259,12 @@ export function buildBms01(avoid: Avoid | null): Bms01 {
   };
   PSU.points![1]!.follows = [{ ref: pointRef(PSU.id, "Mains"), on: true }];
   PSU.points![2]!.follows = [{ ref: pointRef(PSU.id, "Mains"), on: true }];
-  // What the supplies give and the loads take (M11).
-  PSU.points![0]!.accepts = [{ v: 230, ac: true }];
-  PSU.points![1]!.gives = { v: 24, ac: false };
-  for (const it of [DMP1, DMP2, VLV]) it.points![0]!.accepts = [{ v: 24, ac: true }, { v: 24, ac: false }];
-  modules.psu.points![0]!.accepts = [{ v: 24, ac: false }];
+  // What the supplies give and the loads take (M11): their devices' (v0.5 A38).
+  const plantDevice = (items: PlantItem[], name: string, extra: Partial<ProjectDevice>) =>
+    setDevices(p, items.map((it) => `plant:${it.id}`), addProjectDevice(p, { name, maker: "", part: "", d: 0, ...newDeviceFor(p, `plant:${items[0]!.id}`), ...extra }).id);
+  plantDevice([PSU], "Power supply 24 V DC", { takes: { v: 230, kind: "ac" }, gives: { v: 24, ac: false } });
+  plantDevice([DMP1, DMP2], "Damper actuator 24 V", { takes: { v: 24, kind: "both" } });
+  plantDevice([VLV], "Valve actuator 24 V", { takes: { v: 24, kind: "both" } });
 
   // --- Drawing helpers -------------------------------------------------------------
   let page: Page = p.pages[0]!;
@@ -280,7 +294,7 @@ export function buildBms01(avoid: Avoid | null): Bms01 {
   // battery are inside the panel.
   page.title = "Incoming supply and 24 V DC";
   addSection(p, page.id, "INCOMING SUPPLY AND 24 V DC", [2, 2, 146, 84]);
-  const inc = add("supply", 14, 8, { label: "230V 1PH+N 50Hz SUPPLY", params: { system: "1ph-n", gives: "230 V AC" } });
+  const inc = add("supply", 14, 8, { label: "230V 1PH+N 50Hz SUPPLY", params: { system: "1ph-n", gives: 230, givesKind: "ac" } });
   const qMain = add("isolator", 14, 18, { label: "32A MAIN ISOLATOR", params: { poles: 2, aux: 0, operator: "door" } });
   w([inc, "L"], [qMain, "1"]);
   w([inc, "N"], [qMain, "3"]);

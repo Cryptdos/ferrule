@@ -31,7 +31,7 @@
   } from "../../core/ops";
   import { controllerName, moduleTitle } from "../../core/modules";
   import { readImage } from "../images";
-  import { address, contactMarks, relayPinMarks, contactType, isMaster, isSlave, masterOf, partnerOf, slavesOf } from "../../core/xref";
+  import { address, contactMarks, contactType, isMaster, isSlave, masterOf, partnerOf, slavesOf } from "../../core/xref";
   import { canRotate, isBar, paramApplies, partName, parsePlantPins, plantViewLayout, requireSymbol, viewSides, type ViewSide } from "../../core/symbols";
   import { WIRE_FUNCTIONS, conductorLooks, functionRows } from "../../core/wirecolours";
   import ColourSelect from "./ColourSelect.svelte";
@@ -140,7 +140,7 @@
       {/if}
       {#each slaves as s (s.el.id)}
         <button class="link-btn" onclick={() => editor.goTo(s.el.id)}>
-          {contactType(s.el)} {contactMarks(s.el, false, relayPinMarks(editor.project, s.el))} at {address(s.page, s.el.pos)} →
+          {contactType(s.el)} {contactMarks(s.el, false)} at {address(s.page, s.el.pos)} →
         </button>
       {/each}
     {/if}

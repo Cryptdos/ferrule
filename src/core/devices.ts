@@ -4,7 +4,7 @@
  * uses one, so a project file always has the sizes it needs.
  */
 
-import type { IoPoint, ModuleType, PinInfo } from "./model";
+import type { IoPoint, ModuleType, PinInfo, SupplyType } from "./model";
 import { MODULE_TYPES as TYPES } from "./modules";
 
 /**
@@ -82,12 +82,30 @@ export interface DeviceEntry {
   files: DeviceFile[];
   /** A controller module's model: its pins as entered from the datasheet. */
   module?: ModuleTemplate;
-  /** Its expected draw, VA (v0.4.x M12): the default for parts that use it. */
+  /** Its expected draw, VA (v0.4.x M12). */
   va?: number;
-  /** A relay's own terminal numbers (v0.4.x M4): its coil's two, and each pole's common, NC and NO. */
-  relayPins?: RelayPins;
+  /** What it takes (v0.5 A38): a voltage, and AC, DC or either. */
+  takes?: Takes;
+  /** A supply's: what it gives, its rating (VA) and its efficiency (0 to 1). */
+  gives?: SupplyType;
+  ratingVa?: number;
+  efficiency?: number;
+  /** A relay's or contactor's poles (v0.5 A70): Check warns when its contacts use more. */
+  poles?: number;
   /** A distribution block's ways (v0.5 A23): Check warns when a block needs more. */
   ways?: number;
+}
+
+/** What a device takes (v0.5 A38): *24 V AC*, *24 V DC*, or *24 V AC or DC* (both). */
+export interface Takes {
+  v: number;
+  kind: "ac" | "dc" | "both";
+}
+
+/** The supplies a device can take, as supply types: both is two. */
+export function takesList(t: Takes | undefined): SupplyType[] {
+  if (!t) return [];
+  return t.kind === "both" ? [{ v: t.v, ac: true }, { v: t.v, ac: false }] : [{ v: t.v, ac: t.kind === "ac" }];
 }
 
 /** A device a project uses: a copy of the library entry's details (or the project's own). */
@@ -106,49 +124,30 @@ export interface ProjectDevice {
   module?: ModuleTemplate;
   /** Its expected draw, VA (v0.4.x M12). */
   va?: number;
-  /** A relay's own terminal numbers (v0.4.x M4). */
-  relayPins?: RelayPins;
+  /** What it takes, gives, its rating and efficiency, its poles (v0.5 A38, A70). */
+  takes?: Takes;
+  gives?: SupplyType;
+  ratingVa?: number;
+  efficiency?: number;
+  poles?: number;
   /** A distribution block's ways (v0.5 A23). */
   ways?: number;
 }
 
-/** A relay base's terminal numbers (v0.4.x M4). A pole may have no NC or no NO (""). */
-export interface RelayPins {
-  coil: [string, string];
-  poles: { c: string; nc: string; no: string }[];
-}
-
-/**
- * A pin map as typed: the coil's two, then each pole's common, NC and NO,
- * groups split by "|": "A1 A2 | 11 12 14 | 21 22 24". A dash for a pole's
- * missing NC or NO. Empty: none.
- */
-export function parseRelayPins(text: string): RelayPins | undefined {
-  const groups = text.split("|").map((g) => g.trim().split(/\s+/).filter(Boolean));
-  if (!groups[0]?.length) return undefined;
-  if (groups[0].length !== 2) throw new Error("Start with the coil's two terminals, then | and each pole's common, NC and NO");
-  const poles = groups.slice(1).map((g) => {
-    if (g.length !== 3) throw new Error("Each pole is its common, NC and NO (a dash for one it hasn't)");
-    const v = (x: string) => (x === "-" ? "" : x);
-    return { c: g[0]!, nc: v(g[1]!), no: v(g[2]!) };
-  });
-  return { coil: [groups[0][0]!, groups[0][1]!], poles };
-}
-
-export function formatRelayPins(p: RelayPins | undefined): string {
-  if (!p) return "";
-  return [p.coil.join(" "), ...p.poles.map((x) => [x.c, x.nc || "-", x.no || "-"].join(" "))].join(" | ");
-}
-
-function relayPinsFrom(v: unknown): { relayPins?: RelayPins } {
-  if (typeof v !== "object" || v === null) return {};
-  const o = v as Record<string, unknown>;
-  const coil = Array.isArray(o.coil) && o.coil.length === 2 && o.coil.every((x) => typeof x === "string" && x) ? (o.coil as [string, string]) : null;
-  if (!coil) return {};
-  const poles = (Array.isArray(o.poles) ? o.poles : [])
-    .filter((p): p is Record<string, unknown> => typeof p === "object" && p !== null && typeof (p as Record<string, unknown>).c === "string")
-    .map((p) => ({ c: String(p.c), nc: typeof p.nc === "string" ? p.nc : "", no: typeof p.no === "string" ? p.no : "" }));
-  return { relayPins: { coil: [coil[0], coil[1]], poles } };
+/** What a device says about its supply and load, as read from a file or the library (v0.5 A38). */
+function electrics(o: Record<string, unknown>): Pick<ProjectDevice, "va" | "takes" | "gives" | "ratingVa" | "efficiency" | "poles" | "ways"> {
+  const pos = (v: unknown) => typeof v === "number" && Number.isFinite(v) && v > 0;
+  const t = o.takes as Record<string, unknown> | undefined;
+  const g = o.gives as Record<string, unknown> | undefined;
+  return {
+    ...(pos(o.va) ? { va: o.va as number } : {}),
+    ...(t && typeof t === "object" && pos(t.v) && (t.kind === "ac" || t.kind === "dc" || t.kind === "both") ? { takes: { v: t.v as number, kind: t.kind } } : {}),
+    ...(g && typeof g === "object" && pos(g.v) && typeof g.ac === "boolean" ? { gives: { v: g.v as number, ac: g.ac } } : {}),
+    ...(pos(o.ratingVa) ? { ratingVa: o.ratingVa as number } : {}),
+    ...(pos(o.efficiency) && (o.efficiency as number) <= 1 ? { efficiency: o.efficiency as number } : {}),
+    ...(pos(o.poles) ? { poles: Math.min(24, Math.floor(o.poles as number)) } : {}),
+    ...(typeof o.ways === "number" && Number.isFinite(o.ways) && o.ways >= 1 ? { ways: Math.min(999, Math.floor(o.ways)) } : {}),
+  };
 }
 
 const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
@@ -178,14 +177,9 @@ export function parseDeviceEntry(v: unknown, id?: string): DeviceEntry {
     notes: typeof o.notes === "string" ? o.notes : "",
     files: Array.isArray(o.files) ? o.files.map(parseDeviceFile).filter((f): f is DeviceFile => !!f) : [],
     ...withModule(o.module),
-    ...withVa(o.va),
-    ...relayPinsFrom(o.relayPins),
-    ...withWays(o.ways),
+    ...electrics(o),
   };
 }
-
-const withVa = (v: unknown): { va?: number } => (typeof v === "number" && Number.isFinite(v) && v > 0 ? { va: v } : {});
-const withWays = (v: unknown): { ways?: number } => (typeof v === "number" && Number.isFinite(v) && v >= 1 ? { ways: Math.min(999, Math.floor(v)) } : {});
 
 const withModule = (v: unknown): { module?: ModuleTemplate } => {
   const m = parseModuleTemplate(v);
@@ -212,9 +206,7 @@ export function parseProjectDevices(v: unknown): ProjectDevice[] {
       d: typeof o.d === "number" && o.d > 0 ? mm(o.d, 0) : 0,
       library: o.library === true,
       ...withModule(o.module),
-      ...withVa(o.va),
-      ...relayPinsFrom(o.relayPins),
-      ...withWays(o.ways),
+      ...electrics(o),
     });
   }
   return out;
@@ -222,7 +214,7 @@ export function parseProjectDevices(v: unknown): ProjectDevice[] {
 
 /** The project's copy of a library entry. */
 export function projectCopy(e: DeviceEntry): ProjectDevice {
-  return { id: e.id, name: e.name, maker: e.maker, part: e.part, kind: e.kind, w: e.w, h: e.h, d: e.d, library: true, ...(e.module ? { module: structuredClone(e.module) } : {}), ...(e.va ? { va: e.va } : {}), ...(e.relayPins ? { relayPins: structuredClone(e.relayPins) } : {}), ...(e.ways ? { ways: e.ways } : {}) };
+  return { id: e.id, name: e.name, maker: e.maker, part: e.part, kind: e.kind, w: e.w, h: e.h, d: e.d, library: true, ...(e.module ? { module: structuredClone(e.module) } : {}), ...electrics(e as unknown as Record<string, unknown>) };
 }
 
 /** "Relay 4CO (Maker 1234…) 30.6 × 101.8" for lists. */
@@ -230,3 +222,21 @@ export function deviceLabel(d: Pick<ProjectDevice, "name" | "maker" | "part" | "
   const who = [d.maker, d.part].filter(Boolean).join(" ");
   return `${d.name}${who ? ` (${who})` : ""} · ${d.w} × ${d.h}`;
 }
+
+/**
+ * What a device says, by what it suits (v0.5 A38, A70): a load what it takes
+ * and draws, a supply what it gives with its rating and efficiency, a relay
+ * its poles, a block its ways. A device for anything says all of it.
+ */
+export function deviceSays(kind: string): { takes: boolean; gives: boolean; poles: boolean; ways: boolean } {
+  const any = !kind;
+  return {
+    takes: any || ["relay", "contactor", "timer", "lamp", "transformer", "module", "plant"].includes(kind),
+    gives: any || ["transformer", "module", "plant"].includes(kind),
+    poles: any || ["relay", "contactor", "timer"].includes(kind),
+    ways: any || kind === "block",
+  };
+}
+
+/** "24 V AC", "24 V DC", "24 V AC or DC". */
+export const formatTakes = (t: Takes) => `${t.v} V ${t.kind === "both" ? "AC or DC" : t.kind.toUpperCase()}`;

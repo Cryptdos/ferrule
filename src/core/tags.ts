@@ -2,7 +2,7 @@ import { STANDARDS } from "./designations";
 import { networkData } from "./network";
 import { voltageBand, type Element, type Project } from "./model";
 import { isBar, requireSymbol, type GeometryText } from "./symbols";
-import { isTimed, masterOf, relayPinMarks, xrefText } from "./xref";
+import { isTimed, masterOf, xrefText } from "./xref";
 import { resolveFields } from "./fields";
 import { labelOnLinkEnd, routeOf, wireLabelOf } from "./wires";
 import { controllerMapEntries, moduleTitle } from "./modules";
@@ -39,9 +39,6 @@ export function elementTexts(el: Element, project: Project): GeometryText {
   const m = masterOf(project, el);
   const masterTag = m ? displayTag(m.el, project) : "";
   const t: GeometryText = { tag: displayTag(el, project), xref: xrefText(project, el, masterTag), label: resolveFields(el.label, project) };
-  // A relay base's own terminal numbers (v0.4.x M4).
-  const pins = relayPinMarks(project, el);
-  if (pins) t.pins = pins;
   if (isTimed(project, el)) {
     const coil = masterOf(project, el)!.el;
     t.timed = typeof coil.params.mode === "string" ? coil.params.mode : "on";

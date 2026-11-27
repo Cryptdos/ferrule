@@ -36,10 +36,8 @@ import { importTemplate, saveSheetTemplate, stampTemplate } from "./templates";
 import { duplicatePlant, stepTag } from "./design";
 import { masterOf } from "./xref";
 import { loadText, supplyLoads } from "./supplyload";
-import { setModuleVa } from "./controllers";
 import { conductorLooks, distributionFunction, functionRows } from "./wirecolours";
-import { formatRelayPins, parseRelayPins } from "./devices";
-import { contactTable, relayPinMarks, slavesOf } from "./xref";
+import { contactTable, slavesOf } from "./xref";
 import { setFunctionColour } from "./ops";
 import { stampSaved } from "../server/storage";
 import { parseProject } from "./validate";
@@ -251,20 +249,20 @@ describe("step 2: supplies (M11, F2, F1)", () => {
     const before = checkProject(p);
     expect(before.filter((f) => /takes .*; it's fed from/.test(f.message))).toEqual([]);
     expect(before.some((f) => /\d+ loads don't say what supply they take/.test(f.message))).toBe(true);
-    // A coil that takes 24 V AC, on the 24 V DC rails: the warning names both.
+    // A coil whose device takes 24 V AC, on the 24 V DC rails: the warning names both (v0.5 A38).
     const k = p.pages[1]!.elements.find((e) => e.symbol === "coil")!;
-    updateElement(p, p.pages[1]!.id, k.id, { params: { accepts: "24 V AC" } });
+    (p.devices ??= []).push({ id: "rly-ac", name: "Relay 24 V AC", maker: "", part: "", kind: "", w: 16, h: 80, d: 0, library: false, takes: { v: 24, kind: "ac" } });
+    k.device = "rly-ac";
     const w = checkProject(p).filter((f) => /takes 24 V AC; it's fed from PSU-01 24V out, 24 V DC/.test(f.message));
     expect(w.map((f) => f.ids)).toEqual([[k.id]]);
   });
 
-  test("M11: a point's gives and accepts are set in Design and round-trip", () => {
+  test("M11: what plant takes and gives is its device's (v0.5 A38), and round-trips", () => {
     const { project: p, plant } = fresh();
-    updateDesignPoint(p, plant.BAT!.id, "Charge", { accepts: "24 V DC" });
-    expect(plant.BAT!.points![0]!.accepts).toEqual([{ v: 24, ac: false }]);
-    expect(() => updateDesignPoint(p, plant.BAT!.id, "Charge", { accepts: "lots" })).toThrow();
+    const dev = p.devices!.find((d) => d.id === plant.PSU!.device)!;
+    expect([dev.takes, dev.gives]).toEqual([{ v: 230, kind: "ac" }, { v: 24, ac: false }]);
     const back = parseProject(JSON.parse(JSON.stringify(p)));
-    expect(back.plant.find((x) => x.id === plant.PSU!.id)!.points![1]!.gives).toEqual({ v: 24, ac: false });
+    expect(back.devices!.find((d) => d.id === dev.id)!.gives).toEqual({ v: 24, ac: false });
   });
 
   test("F2 and F1: with its power supply deleted, 24DC feeds parts and nothing supplies it; every interlock is never on", () => {
@@ -757,7 +755,8 @@ describe("step 9b: RCD, connector, plant marks (M1); door devices with no schema
     const pg = p.pages[0]!.id;
     const [psu] = insertDesignTemplate(p, t).plant;
     expect(psu!.inPanel).toBe(true);
-    expect(psu!.points!.find((q) => q.form === "supply-out")!.gives).toEqual({ v: 24, ac: false });
+    // Its device comes with it (v0.5 A70).
+    expect(p.devices!.find((d) => d.id === psu!.device)!.gives).toEqual({ v: 24, ac: false });
     // Its 24 V follows its own mains in the copy, not the original's.
     expect(psu!.points!.find((q) => q.form === "supply-out")!.follows![0]!.ref).toBe(`plant:${psu!.id}:Mains`);
     const inc = addElement(p, pg, "supply", [10, 5], { params: { system: "1ph-n" } });
@@ -1148,13 +1147,16 @@ describe("step 13: stamp links, Duplicate's step, label plate text (T6, T8, T12)
 });
 
 describe("step 14: supply load in Simulate (M12)", () => {
+  // What a part draws is its device's (v0.5 A38): every coil and lamp is a 1.5 VA device.
   const setup = () => {
     const f = fresh();
     const { project: p } = f;
     const loads = p.pages.flatMap((pg) => pg.elements.filter((e) => e.symbol === "coil" || e.symbol === "lamp"));
-    for (const e of loads) e.params.va = 1.5;
+    (p.devices ??= []).push({ id: "load", name: "Load 1.5 VA", maker: "", part: "", kind: "", w: 16, h: 80, d: 0, library: false, va: 1.5 });
+    for (const e of loads) e.device = "load";
     return { ...f, loads };
   };
+  const deviceOf = (p: Project, id: string | undefined) => p.devices!.find((d) => d.id === id)!;
   const fig = (p: Project, state?: ReturnType<typeof initialState>) => {
     const c = compile(p);
     const r = supplyLoads(p, c, state ?? initialState(c));
@@ -1171,11 +1173,11 @@ describe("step 14: supply load in Simulate (M12)", () => {
     expect(mains.worstVa).toBeCloseTo(psu.worstVa / 0.85, 6);
     expect(psu.liveVa!).toBeLessThan(psu.worstVa);
     // The modules are carried by the controller's power supply module.
-    for (const m of Object.values(modules)) setModuleVa(p, m.id, 3);
+    for (const m of Object.values(modules)) deviceOf(p, m.device).va = 3;
     expect(fig(p).by(/24V out/).worstVa).toBeCloseTo(loads.length * 1.5 + 6 * 3, 6);
-    // A set efficiency.
-    const out = p.plant.flatMap((x) => x.points ?? []).find((q) => q.name === "24V out")!;
-    out.efficiency = 0.9;
+    // A set efficiency, on the power supply's device.
+    const unit = p.plant.find((x) => (x.points ?? []).some((q) => q.name === "24V out"))!;
+    deviceOf(p, unit.device).efficiency = 0.9;
     const r2 = fig(p);
     expect(r2.by(/SUPPLY/).worstVa).toBeCloseTo(r2.by(/24V out/).worstVa / 0.9, 6);
     // Amps at the supply's own voltage.
@@ -1183,7 +1185,7 @@ describe("step 14: supply load in Simulate (M12)", () => {
     expect(loadText(12)).toBe("12 VA");
   });
 
-  test("live follows the simulation; a device's draw is the default for parts that use it", () => {
+  test("live follows the simulation; a part draws what its device does", () => {
     const { project: p, loads } = setup();
     const c = compile(p);
     const s = initialState(c);
@@ -1192,33 +1194,34 @@ describe("step 14: supply load in Simulate (M12)", () => {
     const changes = c.inputs.filter((i) => i.kind !== "press").map((i) => supplyLoads(p, c, toggle(c, s, i.el)).supplies.find((x) => /24V out/.test(x.name))!);
     expect(changes.some((x) => x.liveVa !== before)).toBe(true);
     for (const x of changes) expect(x.liveVa!).toBeLessThanOrEqual(x.worstVa + 1e-9);
-    // A coil with no draw of its own takes its device's.
+    // A coil given a 0.6 VA device draws that.
     const coil = loads.find((e) => e.symbol === "coil")!;
-    p.devices = [{ id: "dev1", name: "Relay", maker: "", part: "", kind: "", w: 16, h: 80, d: 0, library: false, va: 0.6 }];
-    coil.device = "dev1";
     const w0 = fig(p).by(/24V out/).worstVa;
-    coil.params.va = 0;
+    p.devices!.push({ id: "dev1", name: "Relay", maker: "", part: "", kind: "", w: 16, h: 80, d: 0, library: false, va: 0.6 });
+    coil.device = "dev1";
     expect(fig(p).by(/24V out/).worstVa).toBeCloseTo(w0 - 1.5 + 0.6, 6);
   });
 
-  test("a rating, red when over; parts with no draw counted in one line; old files have none of it", () => {
+  test("a rating on a supply's device, red when over; the Incoming supply has none; what has no device is a warning (v0.5 A31, A72)", () => {
     const { project: p } = setup();
-    const supply = p.pages.flatMap((pg) => pg.elements).find((e) => e.symbol === "supply")!;
     const msgs = () => checkProject(p).map((f) => f.message);
-    expect(msgs()).toContain("7 parts have no draw set (coils, lamps, plant supply in, modules), so count as nothing in a supply's load");
-    supply.params.ratingVa = 10;
-    expect(fig(p).by(/SUPPLY/).ratingVa).toBe(10);
-    expect(msgs().some((m) => /SUPPLY: worst case .* is over its rating/.test(m))).toBe(true);
-    supply.params.ratingVa = 1000;
+    // Things with no device: one warning, counted.
+    expect(msgs().some((m) => /^\d+ of \d+ things have no device yet .*: what they take and draw isn't known/.test(m))).toBe(true);
+    // The Incoming supply is the site's: never a rating.
+    expect(fig(p).by(/SUPPLY/).ratingVa).toBeUndefined();
+    const psu = deviceOf(p, p.plant.find((x) => (x.points ?? []).some((q) => q.name === "24V out"))!.device);
+    psu.ratingVa = 10;
+    expect(fig(p).by(/24V out/).ratingVa).toBe(10);
+    expect(msgs().some((m) => /24V out: worst case .* is over its rating/.test(m))).toBe(true);
+    psu.ratingVa = 1000;
     expect(msgs().some((m) => /over its rating/.test(m))).toBe(false);
-    // Point draws, ratings and efficiency, and a module's draw, are saved and read back.
-    const out = p.plant.flatMap((x) => x.points ?? []).find((q) => q.name === "24V out")!;
-    Object.assign(out, { ratingVa: 120, efficiency: 0.88 });
+    // A device's rating and efficiency are saved and read back.
+    psu.efficiency = 0.88;
     const back = parseProject(JSON.parse(JSON.stringify(p)));
-    expect(back.plant.flatMap((x) => x.points ?? []).find((q) => q.name === "24V out")).toMatchObject({ ratingVa: 120, efficiency: 0.88 });
-    // A fresh fixture says no draws: no lines at all.
+    expect(back.devices!.find((d) => d.id === psu.id)).toMatchObject({ ratingVa: 1000, efficiency: 0.88 });
+    // A fresh fixture says no draws or ratings: no over-rating lines.
     const { project: q } = fresh();
-    expect(checkProject(q).some((f) => /no draw set|over its rating/.test(f.message))).toBe(false);
+    expect(checkProject(q).some((f) => /over its rating/.test(f.message))).toBe(false);
   });
 });
 
@@ -1255,31 +1258,19 @@ describe("step 15: wire colour by function, relay pins from the part (M3, M4)", 
     expect(p.wireColours).toBeUndefined();
   });
 
-  test("a relay whose device has a pin map prints its own numbers on its coil, its contacts and its contact table", () => {
+  test("Draft numbers a relay's terminals; its device's poles are read only by Check (v0.5 A70)", () => {
     const { project: p } = fresh();
     const coil = p.pages.flatMap((pg) => pg.elements).find((e) => e.symbol === "coil" && slavesOf(p, e).length === 4)!;
     const iec = contactTable(p, coil).map((r) => r[1]);
     expect(iec).toEqual(["13-14", "23-24", "33-34", "43-44"]);
-    expect(relayPinMarks(p, coil)).toBeUndefined();
-    const pins = parseRelayPins("13 14 | 9 1 5 | 10 2 6 | 11 3 7 | 12 4 8")!;
-    expect(formatRelayPins(pins)).toBe("13 14 | 9 1 5 | 10 2 6 | 11 3 7 | 12 4 8");
-    expect(() => parseRelayPins("A1 | 11 12 14")).toThrow(/coil/);
-    p.devices = [{ id: "rly", name: "Relay 4CO", maker: "", part: "", kind: "relay", w: 27, h: 80, d: 0, library: false, relayPins: pins }];
+    p.devices!.push({ id: "rly", name: "Relay 2CO", maker: "", part: "", kind: "relay", w: 27, h: 80, d: 0, library: false, poles: 2 });
     coil.device = "rly";
-    expect(elementTexts(coil, p).pins).toEqual({ A1: "13", A2: "14" });
-    expect(contactTable(p, coil).map((r) => r[1])).toEqual(["9-5", "10-6", "11-7", "12-8"]);
-    // Drawn on the coil and the contact in place of A1/A2 and 13/14; terminal names unchanged.
-    const texts = (e: Element) => localGeometry(e, elementTexts(e, p)).prims.flatMap((x) => (x.t === "text" ? [x.text] : []));
-    expect(texts(coil)).toEqual(expect.arrayContaining(["13", "14"]));
-    expect(texts(coil)).not.toContain("A1");
-    const contact = slavesOf(p, coil).find((s) => s.el.params.pole === 2)!.el;
-    expect(texts(contact)).toEqual(expect.arrayContaining(["10", "6"]));
-    expect(terminalNames(contact)).toEqual(["13", "14"]);
-    // Saved and read back.
-    expect(parseProject(JSON.parse(JSON.stringify(p))).devices![0]!.relayPins).toEqual(pins);
-    // No map: IEC as before.
-    coil.device = undefined;
+    // Its numbers don't change with a device.
     expect(contactTable(p, coil).map((r) => r[1])).toEqual(iec);
+    const poles = () => checkProject(p).filter((f) => /uses \d+ poles and its device/.test(f.message));
+    expect(poles().map((f) => f.message)).toEqual([expect.stringMatching(/uses 4 poles and its device, Relay 2CO, has 2$/)]);
+    p.devices!.find((d) => d.id === "rly")!.poles = 4;
+    expect(poles()).toEqual([]);
   });
 });
 

@@ -10,7 +10,7 @@ import { OpError, addGaItem, addPlant, addProjectDevice, deletePlant, getPlant, 
 import type { DeviceEntry, ModuleTemplate, ProjectDevice } from "./devices";
 import { moduleGaSize, snapToRail } from "./ga";
 import type { GaItem } from "./model";
-import { defaultPattern, generatePins, moduleType, type ModulePattern } from "./modules";
+import { moduleTypeName, defaultPattern, generatePins, moduleType, type ModulePattern } from "./modules";
 import { cleanPoints } from "./points";
 import { tidyDesign } from "./design";
 
@@ -53,8 +53,6 @@ export function deleteController(project: Project, id: string): void {
 export interface NewModule {
   type: ModuleType;
   channels?: number;
-  maker?: string;
-  model?: string;
   /** Pins from a pattern (default: the type's usual one). Pass `null` for a module with no pins yet. */
   pattern?: Partial<ModulePattern> | null;
   /** Where on the rail (slot index); default: the end. */
@@ -70,8 +68,6 @@ export function addModule(project: Project, controllerId: string, m: NewModule):
   const item = addPlant(project, "", moduleType(m.type).label, [], { prefix: c.prefix });
   const info: ModuleInfo = { controller: c.id, type: m.type };
   if (channels) info.channels = channels;
-  if (m.maker?.trim()) info.maker = m.maker.trim();
-  if (m.model?.trim()) info.model = m.model.trim();
   item.module = info;
   const slot = { module: item.id };
   const at = m.at === undefined ? c.slots.length : Math.max(0, Math.min(c.slots.length, Math.floor(m.at)));
@@ -105,20 +101,11 @@ export function setModuleCommons(project: Project, plantId: string, on: boolean)
   syncPlantViews(project);
 }
 
-/** A module's expected draw, VA (v0.4.x M12); 0 or null clears it. */
-export function setModuleVa(project: Project, plantId: string, va: number | null): void {
-  const item = getPlant(project, plantId);
-  if (!item.module) throw new OpError(`${item.tag || "That"} isn't a controller's module`);
-  if (va !== null && (!Number.isFinite(va) || va < 0)) throw new OpError("A draw is a number of VA");
-  if (va) item.module.va = va;
-  else delete item.module.va;
-}
-
-/** Change a module's type, channel count, maker, model or bus address. */
+/** Change a module's type, channel count or bus address. Its maker and model are its device's (v0.5 A38). */
 export function updateModule(
   project: Project,
   plantId: string,
-  patch: { type?: ModuleType; channels?: number; maker?: string; model?: string; address?: number | null; description?: string },
+  patch: { type?: ModuleType; channels?: number; address?: number | null; description?: string },
 ): void {
   const item = getPlant(project, plantId);
   const m = item.module;
@@ -128,12 +115,6 @@ export function updateModule(
     const n = channelsOf(m.type, patch.channels ?? m.channels);
     if (n) m.channels = n;
     else delete m.channels;
-  }
-  for (const k of ["maker", "model"] as const) {
-    const v = patch[k];
-    if (v === undefined) continue;
-    if (v.trim()) m[k] = v.trim();
-    else delete m[k];
   }
   if (patch.address !== undefined) {
     if (patch.address && patch.address >= 1) m.address = Math.min(255, Math.floor(patch.address));
@@ -236,16 +217,15 @@ export function moduleTemplate(item: PlantItem): ModuleTemplate {
 
 /**
  * Save a module as a model in the project's device table (from there it can
- * go to the shared library with its datasheet), named by its maker and
- * model. The module is then that device: its size on the GA comes from it.
+ * go to the shared library with its datasheet), named by its type: *DI-16
+ * module*. The module is then that device: its size on the GA comes from it.
  */
 export function saveModuleDevice(project: Project, plantId: string, size?: { w: number; h: number }): ProjectDevice {
   const item = getPlant(project, plantId);
   const m = item.module;
   if (!m) throw new OpError(`${item.tag || "That"} isn't a controller's module`);
   const s = size ?? moduleGaSize(project, item);
-  const name = [m.maker, m.model].filter(Boolean).join(" ") || `${moduleType(m.type).label} module`;
-  const dev = addProjectDevice(project, { name, maker: m.maker ?? "", part: m.model ?? "", kind: "module", w: s.w, h: s.h, d: 0, module: moduleTemplate(item) });
+  const dev = addProjectDevice(project, { name: `${moduleTypeName(m)} module`, maker: "", part: "", kind: "module", w: s.w, h: s.h, d: 0, module: moduleTemplate(item) });
   setDevices(project, [`plant:${item.id}`], dev.id);
   return dev;
 }
@@ -259,7 +239,7 @@ export function addModuleFromDevice(project: Project, controllerId: string, devi
   if (!device.module) throw new OpError(`${device.name} isn't a controller module`);
   const dev = "library" in device ? device : useLibraryDevice(project, device);
   const t = dev.module!;
-  const item = addModule(project, controllerId, { type: t.type, channels: t.channels, maker: dev.maker, model: dev.part, at, pattern: null });
+  const item = addModule(project, controllerId, { type: t.type, channels: t.channels, at, pattern: null });
   item.terminals = [...t.terminals];
   if (t.pins) item.pins = structuredClone(t.pins);
   if (t.points?.length) item.points = cleanPoints(structuredClone(t.points), item.terminals);

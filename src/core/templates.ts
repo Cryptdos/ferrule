@@ -22,6 +22,7 @@ import {
   type Template,
   newId,
 } from "./model";
+import type { ProjectDevice } from "./devices";
 import { OpError, addPage, addPlant, distParamKeys, getPage, prefixOf, syncPlantViews, updateZones } from "./ops";
 import { isMaster, isSlave, locate } from "./xref";
 
@@ -80,7 +81,20 @@ function capture(
     segments: segs,
     size,
     ...(distributions.length ? { distributions: clone(distributions) } : {}),
+    ...devicesFor(project, [...els.map((e) => e.device), ...plant.map((p) => p.device)]),
   };
+}
+
+/** The devices a template's parts and plant are, to bring with it (v0.5 A70). */
+export function devicesFor(project: Project, ids: (string | undefined)[]): { devices?: ProjectDevice[] } {
+  const want = new Set(ids.filter((x): x is string => !!x));
+  const devices = (project.devices ?? []).filter((d) => want.has(d.id));
+  return devices.length ? { devices: clone(devices) } : {};
+}
+
+/** A template's devices the project hasn't got: they come in with it, as a library device does. */
+export function bringDevices(project: Project, devices: ProjectDevice[] | undefined): void {
+  for (const d of devices ?? []) if (!project.devices?.some((x) => x.id === d.id)) (project.devices ??= []).push(clone(d));
 }
 
 /** Save a whole sheet as a template. */
@@ -195,6 +209,7 @@ export function stampTemplate(project: Project, templateId: string, opts: StampO
     plantMap.set(item.tag, target.id);
   }
 
+  bringDevices(project, t.devices);
   // Resolve distributions: the same one if it's in this project, else one of the same name, else a copy.
   const distMap = new Map<string, string>();
   for (const d of t.distributions ?? []) {

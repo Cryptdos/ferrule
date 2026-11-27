@@ -101,45 +101,20 @@ export interface ParamDef {
   hidden?: boolean;
 }
 
-/** What a load takes (v0.4.x M11): typed, "24 V DC" or "24 V AC, 24 V DC"; empty is not stated. */
-const ACCEPTS_PARAM: ParamDef = {
-  key: "accepts",
-  label: "Takes (supply)",
-  type: "text",
-  default: "",
-  placeholder: "e.g. 24 V DC",
-  help: "What supply it takes: 24 V AC, 24 V DC, 230 V AC, 400 V AC, 12 V DC, or any other typed the same way. Two, comma between, for a part that takes either (24 V AC, 24 V DC). Check warns when it's fed from a supply that gives something else.",
-};
-/** What a supply gives (v0.4.x M11). */
-const GIVES_PARAM: ParamDef = {
-  key: "gives",
-  label: "Gives (supply)",
-  type: "text",
-  default: "",
-  placeholder: "e.g. 230 V AC",
-  help: "What it supplies: 24 V AC, 24 V DC, 230 V AC, 400 V AC, 12 V DC, or any other typed the same way. Check compares it with what the loads it feeds take.",
-};
-
-/** A load's expected draw (v0.4.x M12): VA, from its data sheet. 0: not set (its device's, or none). */
-const VA_PARAM: ParamDef = {
-  key: "va",
-  label: "Draw (VA)",
-  type: "number",
-  min: 0,
-  max: 100000,
-  default: 0,
-  help: "Its expected draw from its data sheet, in VA. Simulate adds it up on the supply that feeds it. 0: not set (the device's from the device table, if it has one).",
-};
-/** A supply's rating (v0.4.x M12). */
-const RATING_PARAM: ParamDef = {
-  key: "ratingVa",
-  label: "Rating (VA)",
-  type: "number",
-  min: 0,
-  max: 1000000,
-  default: 0,
-  help: "What it can supply, in VA. In Simulate its load turns red when over. 0: not set.",
-};
+/** What an Incoming supply gives (v0.4.x M11, v0.5 A72): a voltage, and AC or DC beside it. It's the site's supply, not a device. */
+const GIVES_PARAMS: ParamDef[] = [
+  { key: "gives", label: "Gives (V)", type: "number", min: 0, max: 100000, default: 0, help: "What the site supplies, a voltage with AC or DC beside it. Check compares it with what the devices it feeds take. 0: not stated." },
+  {
+    key: "givesKind",
+    label: "AC or DC",
+    type: "select",
+    default: "ac",
+    options: [
+      { value: "ac", label: "V AC" },
+      { value: "dc", label: "V DC" },
+    ],
+  },
+];
 
 export interface SymbolDef {
   id: string;
@@ -312,10 +287,8 @@ const NC_MID: Vec = [0.65, -0.15];
  * the pole number. `names`: the terminal names when the marks differ (a
  * timed contact prints 17/18 on terminals 13/14).
  */
-function contactTerms(labels: [string, string], el?: Element, names: [string, string] = labels, pins?: Record<string, string>): { prims: Prim[]; terminals: TerminalDef[] } {
-  const iec = el ? poleMarks(el, labels) : labels;
-  // A relay base's own numbers, when its device has a pin map (v0.4.x M4).
-  const marks: [string, string] = [pins?.[names[0]] ?? iec[0], pins?.[names[1]] ?? iec[1]];
+function contactTerms(labels: [string, string], el?: Element, names: [string, string] = labels): { prims: Prim[]; terminals: TerminalDef[] } {
+  const marks = el ? poleMarks(el, labels) : labels;
   return {
     prims: [term(0.45, -2.2, marks[0]), term(0.45, 2.9, marks[1])],
     terminals: vterms(names[0], names[1]),
@@ -615,7 +588,7 @@ const SYMBOLS: SymbolDef[] = [
       switch (contactKind(el)) {
         case "nc": {
           const timed = t?.timed;
-          const c = contactTerms(timed ? ["15", "16"] : ["21", "22"], el, ["21", "22"], t?.pins);
+          const c = contactTerms(timed ? ["15", "16"] : ["21", "22"], el, ["21", "22"]);
           return {
             prims: [...ncContact(0, opOf(el)), ...(timed ? timingMark(NC_MID, -2.1, timed) : []), ...c.prims, ...tagAndLabel(timed ? (timed === "on-off" ? -4.1 : -3.2) : -0.8, el)],
             terminals: c.terminals,
@@ -634,9 +607,9 @@ const SYMBOLS: SymbolDef[] = [
               opOf(el) ? line([0, 1.5], [-0.25, -1.5]) : line([0, 1.5], [-1.1, -1.7]),
               // The timing mark goes out past the NC fixed contact.
               ...(timed ? timingMark([-0.55, 0], -3.2, timed) : []),
-              term(0.45, -2.2, t?.pins?.["14"] ?? poleMarks(el, [m14, m11])[0]),
-              term(-2.45, -2.2, t?.pins?.["12"] ?? poleMarks(el, [m12, m11])[0], "end"),
-              term(0.45, 2.9, t?.pins?.["11"] ?? poleMarks(el, [m14, m11])[1]),
+              term(0.45, -2.2, poleMarks(el, [m14, m11])[0]),
+              term(-2.45, -2.2, poleMarks(el, [m12, m11])[0], "end"),
+              term(0.45, 2.9, poleMarks(el, [m14, m11])[1]),
               ...tagAndLabel(timed ? -4.2 : -2.6, el).map((p) => (p.t === "text" ? { ...p, at: [p.at[0], p.at[1] + 1.2] as Vec } : p)),
             ],
             terminals: [
@@ -649,7 +622,7 @@ const SYMBOLS: SymbolDef[] = [
         }
         default: {
           const timed = t?.timed;
-          const c = contactTerms(timed ? ["17", "18"] : ["13", "14"], el, ["13", "14"], t?.pins);
+          const c = contactTerms(timed ? ["17", "18"] : ["13", "14"], el, ["13", "14"]);
           return {
             // On- and off-delay draws two arcs, reaching 0.9 further out: the tag stands clear of it.
             prims: [...noContact(0, opOf(el)), ...(timed ? timingMark(NO_MID, -2.1, timed) : []), ...c.prims, ...tagAndLabel(timed ? (timed === "on-off" ? -4.1 : -3.2) : -1.9, el)],
@@ -1028,8 +1001,6 @@ const SYMBOLS: SymbolDef[] = [
         hideOff: true,
       },
       { key: "code", label: "Maker's function code", type: "text", default: "", placeholder: "e.g. A", when: isTimerCoil, hideOff: true },
-      ACCEPTS_PARAM,
-      VA_PARAM,
     ],
     // Tags follow the type: K for a relay or a timer, Q for a contactor (A37).
     kind: (el) => coilType(el),
@@ -1052,8 +1023,8 @@ const SYMBOLS: SymbolDef[] = [
             line([0, 1.1], [0, 3]),
             rect(-1.6, -1.1, 3.2, 2.2),
             ...mark,
-            term(0.45, -1.6, t?.pins?.A1 ?? "A1"),
-            term(0.45, 2.9, t?.pins?.A2 ?? "A2"),
+            term(0.45, -1.6, "A1"),
+            term(0.45, 2.9, "A2"),
             text(tx, 0.5, "{tag}", TAG, "end", "tag"),
             text(tx, 1.75, fn, DETAIL, "end", "note"),
           ];
@@ -1065,8 +1036,8 @@ const SYMBOLS: SymbolDef[] = [
           line([0, -3], [0, -1.1]),
           line([0, 1.1], [0, 3]),
           rect(-1.6, -1.1, 3.2, 2.2),
-          term(0.45, -1.6, t?.pins?.A1 ?? "A1"),
-          term(0.45, 2.9, t?.pins?.A2 ?? "A2"),
+          term(0.45, -1.6, "A1"),
+          term(0.45, 2.9, "A2"),
           ...tagAndLabel(-2.1, el),
         ],
         terminals: vterms("A1", "A2"),
@@ -1090,8 +1061,6 @@ const SYMBOLS: SymbolDef[] = [
         default: "Wh",
       },
       { key: "testPin", label: "Lamp test terminal (LT)", type: "bool", default: false },
-      ACCEPTS_PARAM,
-      VA_PARAM,
     ],
     kind: () => "lamp",
     draw(el) {
@@ -1364,8 +1333,6 @@ const SYMBOLS: SymbolDef[] = [
     params: [
       { key: "screen", label: "Earthed screen", type: "bool", default: false },
       { key: "rating", label: "Rating", type: "text", default: "", placeholder: "e.g. 230/24V 100VA" },
-      GIVES_PARAM,
-      RATING_PARAM,
     ],
     kind: () => "transformer",
     draw(el) {
@@ -2088,8 +2055,7 @@ const SYMBOLS: SymbolDef[] = [
           { value: "dc", label: "DC (+ -)" },
         ],
       },
-      GIVES_PARAM,
-      RATING_PARAM,
+      ...GIVES_PARAMS,
     ],
     kind: () => null,
     draw(el) {
@@ -2775,8 +2741,6 @@ export interface GeometryText {
   rows?: string[][];
   /** One of each part used (symbol legend). */
   legend?: LegendEntry[];
-  /** A relay's own terminal numbers from its device (v0.4.x M4), by terminal name: A1 → "13", 13 → "9"… */
-  pins?: Record<string, string>;
 }
 
 /**
