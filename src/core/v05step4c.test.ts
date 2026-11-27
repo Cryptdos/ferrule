@@ -76,3 +76,18 @@ describe("v0.5 step 4c", () => {
     expect(p.conductors.find((c) => c.id === b.conductor)?.colour).toBe("Og");
   });
 });
+
+describe("v0.5 step 5: project settings", () => {
+  test("A50: no numbering scheme in the project; A1: Client is the third of three equal cells on the title block's top row", async () => {
+    const { titleBlock } = await import("./titleblock");
+    const p = newProject("t");
+    expect("numbering" in p).toBe(false);
+    p.project.client = "Example Client";
+    const tb = titleBlock(p, p.pages[0]!);
+    const cell = (l: string) => tb.cells.find((c) => c.label === l)!;
+    expect([cell("Sheet").w, cell("Job no.").w, cell("Client").w]).toEqual([24, 24, 24]);
+    expect([cell("Sheet").y, cell("Job no.").y, cell("Client").y]).toEqual([0, 0, 0]);
+    expect(cell("Client").x).toBe(cell("Job no.").x + 24);
+    expect(cell("Client").value).toBe("Example Client");
+  });
+});

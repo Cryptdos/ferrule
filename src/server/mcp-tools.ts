@@ -199,7 +199,6 @@ function projectInfo(p: Project) {
   return {
     id: p.id,
     details: p.project,
-    numbering: p.numbering.scheme,
     sheets: p.pages.map((pg) => ({
       sheet: pg.number,
       title: resolveFields(pg.title, p),
@@ -328,26 +327,24 @@ export const TOOLS: Tool[] = [
   {
     name: "update_project_info",
     description:
-      "Set title block fields: title, panelName, client, jobNo, drawingNo, drawnBy, drawnDate, checkedBy, checkedDate. Also numbering ('position' or 'sequential').",
+      "Set title block fields: title, panelName, client, jobNo, drawingNo, drawnBy, drawnDate, checkedBy, checkedDate.",
     inputSchema: obj(
       {
         project,
         fields: { type: "object", additionalProperties: { type: "string" } },
-        numbering: { type: "string", enum: ["position", "sequential"] },
       },
       ["project"],
     ),
     run: async (a, ctx) =>
       edit(ctx, str(a, "project"), (p) => {
         if (a.fields && typeof a.fields === "object") op.updateProjectInfo(p, a.fields as Record<string, string>);
-        if (a.numbering === "position" || a.numbering === "sequential") op.setNumberingScheme(p, a.numbering);
         return projectInfo(p).details;
       }),
   },
   {
     name: "list_symbols",
     description:
-      "The symbol library: ids, settings (params) and terminal names. Symbols are drawn vertical by default (current flows top to bottom); rot 90/180/270 turns them clockwise.",
+      "The symbol library: ids, settings (params) and terminal names. Symbols are drawn vertical by default (current flows top to bottom); rot 90/180/270 turns them clockwise, except parts that sit in a drop (contacts, coils, switches, protection, lamps, transformer, motor, connector block), which don't turn.",
     inputSchema: obj({}),
     run: async () =>
       listSymbols()

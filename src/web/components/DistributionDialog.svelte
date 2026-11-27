@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { addDistribution, deleteDistribution, distParamKeys, updateDistribution } from "../../core/ops";
+  import { addDistribution, deleteDistribution, distParamKeys, setFunctionColour, updateDistribution } from "../../core/ops";
   import { DISTRIBUTION_KINDS, type DistributionKind } from "../../core/model";
-  import { WIRE_FUNCTIONS } from "../../core/wirecolours";
+  import { WIRE_COLOURS, WIRE_FUNCTIONS, functionColour, functionRows } from "../../core/wirecolours";
   import ColourSelect from "./ColourSelect.svelte";
   import type { Editor } from "../editor.svelte";
   import Modal from "./Modal.svelte";
@@ -13,6 +13,8 @@
   let voltage = $state("");
   let colour = $state("");
   let func = $state("");
+  let newFunction = $state("");
+  let newFunctionColour = $state("");
 
   function add(e: SubmitEvent) {
     e.preventDefault();
@@ -87,9 +89,46 @@
   <datalist id="dist-functions">
     {#each WIRE_FUNCTIONS as f (f)}<option value={f}></option>{/each}
   </datalist>
+  <h3>Wire colours by function</h3>
+  <!-- v0.4.x M3: a wire with no colour of its own takes its function's (from its distribution, or set on the wire). In Distribution since v0.5 (A52), with all wire colour. -->
+  <table class="wirecolours">
+    <tbody>
+      {#each functionRows(editor.project) as f (f)}
+        <tr>
+          <td>{f}</td>
+          <td>
+            <input value={functionColour(editor.project, f) ?? ""} list="ferrule-core-colours" placeholder="—" onchange={(e) => { const v = e.currentTarget.value; editor.apply((p) => setFunctionColour(p, f, v)); }} />
+          </td>
+        </tr>
+      {/each}
+    </tbody>
+  </table>
+  <form class="inline" onsubmit={(e) => { e.preventDefault(); const f = newFunction.trim(); const c = newFunctionColour.trim(); if (f && c) editor.apply((p) => setFunctionColour(p, f, c)); newFunction = ""; newFunctionColour = ""; }}>
+    <input bind:value={newFunction} placeholder="Another function" />
+    <input bind:value={newFunctionColour} list="ferrule-core-colours" placeholder="Colour, e.g. Og" />
+    <button type="submit">Add</button>
+  </form>
+  <datalist id="ferrule-core-colours">{#each WIRE_COLOURS as c (c.code)}<option value={c.code}>{c.name}</option>{/each}</datalist>
+  <p class="hint">A wire's function comes from its distribution when it's on one, else from the function set on the wire. Its own colour, if set, wins.</p>
 </Modal>
 
 <style>
+  table.wirecolours {
+    width: auto;
+  }
+  form.inline {
+    display: flex;
+    gap: 6px;
+    max-width: 520px;
+    margin: 6px 0;
+  }
+  .wirecolours td {
+    padding: 1px 8px 1px 0;
+    font-size: 13px;
+  }
+  .wirecolours input {
+    width: 6em;
+  }
   table {
     width: 100%;
     border-collapse: collapse;

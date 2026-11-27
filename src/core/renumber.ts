@@ -3,7 +3,7 @@
  * drawing doesn't change under you while you work. Locked tags and wire
  * numbers are kept.
  *
- * Position scheme (default):
+ * Position numbering:
  *  - component tags: prefix + sheet-column of the component, e.g. K10-16;
  *  - terminals: sheet-column, e.g. 10-12 (the strip groups them);
  *  - wire numbers: a wire on a terminal takes the terminal's number (the
@@ -12,8 +12,8 @@
  *    (its highest point), e.g. 11-22 (v0.3 §2);
  *  - in each case the highest item in a column keeps the plain address and
  *    the rest, working down, get A, B, C…
- * Sequential scheme: K1, K2… and wires 100, 101…, in sheet, column, height
- * order.
+ * Position numbering is the only scheme (v0.5 A50): it's part of the
+ * design, and where it falls short it's fixed.
  *
  * Wires on a named rail or busbar take its name (CCT, 0V, L1…). Contacts
  * linked to a coil take its tag and get pole numbers 1, 2, 3… (13/14,
@@ -71,11 +71,9 @@ function order(a: Item, b: Item) {
   return a.page - b.page || a.column - b.column || a.y - b.y || a.x - b.x || a.id.localeCompare(b.id);
 }
 
-/** Addresses (or sequence numbers) for items grouped by prefix/strip, avoiding `taken` values. */
+/** Addresses for items grouped by prefix/strip, avoiding `taken` values. */
 function assign(
   items: Item[],
-  scheme: Project["numbering"]["scheme"],
-  first: number,
   taken: Set<string>,
   label: (it: Item, n: string) => string,
 ): Map<string, string> {
@@ -83,100 +81,49 @@ function assign(
   const groups = new Map<string, Item[]>();
   for (const it of items) groups.set(it.group, [...(groups.get(it.group) ?? []), it]);
   for (const group of groups.values()) {
-    if (scheme === "sequential") {
-      let n = first;
-      for (const it of group.sort(order)) {
-        let v = label(it, String(n++));
-        while (taken.has(v)) v = label(it, String(n++));
-        taken.add(v);
-        out.set(it.id, v);
-      }
-    } else {
-      const addr = assignAddresses(group.map((it): Placed => ({ id: it.id, page: it.page, column: it.column, y: it.y })));
-      for (const it of group.sort(order)) {
-        let v = label(it, addr.get(it.id)!);
-        // Skip past anything locked (or already given out) that holds this address.
-        for (let k = 1; taken.has(v); k++) v = label(it, `${it.page}-${it.column}${collisionSuffix(k)}`);
-        taken.add(v);
-        out.set(it.id, v);
-      }
+    const addr = assignAddresses(group.map((it): Placed => ({ id: it.id, page: it.page, column: it.column, y: it.y })));
+    for (const it of group.sort(order)) {
+      let v = label(it, addr.get(it.id)!);
+      // Skip past anything locked (or already given out) that holds this address.
+      for (let k = 1; taken.has(v); k++) v = label(it, `${it.page}-${it.column}${collisionSuffix(k)}`);
+      taken.add(v);
+      out.set(it.id, v);
     }
   }
   return out;
 }
 
 /**
- * Terminal strips by section (v0.4.x T4). Each section with terminals in it
- * takes a strip of its own, X1, X2… in order across the sheets (by sheet,
- * then left to right, then top down); sections with the same name share one,
- * so a section carried on over two sheets is one strip. A terminal below the
- * sections, in the panel boundary's block, is in the nearest one above it.
- * Terminals outside any section are on X1, and when there are some the
- * sections start at X2.
- * A strip set by hand (Properties, or a strip line) to anything but X1 (the
- * default) wins, and its name isn't given to a section; a locked terminal keeps its strip. With strips back to
- * one, the strips given by section are taken off again.
+ * Terminal strips follow on (v0.5 A51). A terminal is on the same strip as
+ * the terminal before it, by sheet then left to right (then top down), until
+ * a strip is typed on one; every terminal after that follows the new strip,
+ * until the next one typed. With nothing typed, everything is X1.
+ * A terminal Renumber gives its strip carries `stripAuto`; one typed (in
+ * Properties, or by a strip line) doesn't, and starts a run. A locked
+ * terminal keeps its strip.
  */
-export function stripsBySection(project: Project): void {
-  const terms: { el: Element; page: Page }[] = [];
+export function stripsFollowOn(project: Project): void {
+  const terms: { el: Element; page: number }[] = [];
   for (const page of project.pages) {
     if (page.ga) continue;
-    for (const el of page.elements) if (el.symbol === "terminal") terms.push({ el, page });
+    for (const el of page.elements) if (el.symbol === "terminal") terms.push({ el, page: page.number });
   }
-  // X1 is the default, so a terminal on X1 hasn't had its strip set.
-  const auto = (el: Element) => el.params.stripAuto === true || String(el.params.strip ?? "X1").trim() === "X1";
-  if (project.numbering.strips !== "section") {
-    for (const { el } of terms) {
-      if (el.params.stripAuto !== true) continue;
-      el.params.strip = "X1";
-      delete el.params.stripAuto;
+  terms.sort((a, b) => a.page - b.page || a.el.pos[0] - b.el.pos[0] || a.el.pos[1] - b.el.pos[1]);
+  let strip = "X1";
+  for (const { el } of terms) {
+    const typed = el.params.stripAuto !== true;
+    if (typed) {
+      strip = String(el.params.strip ?? "X1").trim() || "X1";
+      continue;
     }
-    return;
-  }
-  const handNames = new Set(terms.filter(({ el }) => !auto(el)).map(({ el }) => String(el.params.strip).trim()));
-  // Inside a section; or, for a terminal below the sections (in the boundary's
-  // terminal block), the nearest section above it, across its width.
-  const sectionOf = (el: Element, page: Page) => {
-    const [x, y] = el.pos;
-    const across = page.sections.filter((s) => x >= s.rect[0] && x <= s.rect[0] + s.rect[2]);
-    const inside = across.find((s) => y >= s.rect[1] && y <= s.rect[1] + s.rect[3]);
-    if (inside) return inside;
-    const above = across.filter((s) => s.rect[1] + s.rect[3] < y).sort((a, b) => b.rect[1] + b.rect[3] - (a.rect[1] + a.rect[3]));
-    return above[0];
-  };
-  // Which section key each terminal Renumber decides for is in.
-  const decided = terms.filter(({ el }) => auto(el) && !isLocked(el)).map((t) => {
-    const s = sectionOf(t.el, t.page);
-    return { ...t, key: s ? s.label.trim() || `\u0000${s.id}` : null };
-  });
-  const order: { key: string; page: number; x: number; y: number }[] = [];
-  for (const page of project.pages)
-    for (const s of page.sections) order.push({ key: s.label.trim() || `\u0000${s.id}`, page: page.number, x: s.rect[0], y: s.rect[1] });
-  order.sort((a, b) => a.page - b.page || a.x - b.x || a.y - b.y);
-  const used = new Set(decided.map((d) => d.key));
-  const names = new Map<string, string>();
-  let n = decided.some((d) => d.key === null) ? 2 : 1;
-  for (const o of order) {
-    if (!used.has(o.key) || names.has(o.key)) continue;
-    while (handNames.has(`X${n}`)) n++;
-    names.set(o.key, `X${n++}`);
-  }
-  for (const d of decided) {
-    const name = d.key === null ? "X1" : names.get(d.key)!;
-    if (name === "X1") {
-      d.el.params.strip = "X1";
-      delete d.el.params.stripAuto;
-    } else {
-      d.el.params.strip = name;
-      d.el.params.stripAuto = true;
-    }
+    if (isLocked(el)) continue;
+    el.params.strip = strip;
   }
 }
 
 export function renumber(project: Project): RenumberResult {
-  const scheme = project.numbering.scheme;
   const result: RenumberResult = { tags: 0, terminals: 0, wires: 0, plant: 0 };
-  stripsBySection(project);
+  stripsFollowOn(project);
 
   // --- Component tags and terminals --------------------------------------
   const tagItems: Item[] = [];
@@ -208,11 +155,11 @@ export function renumber(project: Project): RenumberResult {
       }
     }
   }
-  for (const [id, tag] of assign(tagItems, scheme, 1, takenTags, (it, n) => it.group + n)) {
+  for (const [id, tag] of assign(tagItems, takenTags, (it, n) => it.group + n)) {
     byId.get(id)!.tag = tag;
     result.tags++;
   }
-  for (const [id, tag] of assign(termItems, scheme, 1, takenTerms, (it, n) => `${it.group}:${n}`)) {
+  for (const [id, tag] of assign(termItems, takenTerms, (it, n) => `${it.group}:${n}`)) {
     byId.get(id)!.tag = tag.slice(tag.indexOf(":") + 1);
     result.terminals++;
   }
@@ -260,7 +207,7 @@ export function renumber(project: Project): RenumberResult {
     if (first) plantItems.push(first);
   }
   // Addresses are only taken within a prefix: SF-1-23 and A1-23 can share a column.
-  for (const [id, keyed] of assign(plantItems, scheme, 1, new Set(), (it, n) => `${it.group}:${n}`)) {
+  for (const [id, keyed] of assign(plantItems, new Set(), (it, n) => `${it.group}:${n}`)) {
     const address = keyed.slice(keyed.indexOf(":") + 1);
     const item = project.plant.find((p) => p.id === id)!;
     let tag = plantTag(item.prefix || "U", address);
@@ -316,7 +263,7 @@ export function renumber(project: Project): RenumberResult {
     if (!start) continue;
     condItems.push({ id: c.id, page: start.page, column: columnOf(start.at[0]), y: start.at[1], x: start.at[0], group: "" });
   }
-  const numbers = assign(condItems, scheme, 100, takenWires, (_it, n) => n);
+  const numbers = assign(condItems, takenWires, (_it, n) => n);
   for (const c of project.conductors) {
     const n = numbers.get(c.id);
     if (n !== undefined) {

@@ -268,6 +268,15 @@ Judgement calls made while building, by step, with the reason.
 - **A55, the size limit:** a symbol is drawn smaller in the legend when it's taller than a contact (6 units) or wider than a four-pole isolator (14). The motor and the transformer are; nothing else in the examples is. Text keeps its size, since nothing prints under 1.8 mm. A motor's *M* and *3~* are drawn with it, since they're the symbol.
 - **A56:** the setting's key in the file is `type` now, as the coil's is. **File format 7.**
 
+### Step 5
+
+- **A51, what counts as typed.** A terminal placed with no strip given is marked as following; typing a strip in its properties, or drawing a strip line through it, makes it typed, and it starts a run. Typing X1 on a terminal counts: the terminals after it go back to X1. The order is by sheet, then left to right, then top down for terminals in one column.
+- **A51, the examples.** LSP-01 types X0 on its four incoming terminals, so its first fan terminal now has X1 typed, or every terminal after X0 would follow it. Its strips are as they were. BMS-01 types none and is all X1, as before.
+- **A50:** Claude's `update_project_info` loses its `numbering` field, and the project's details no longer report a scheme.
+- **A52:** the table moved as it was, below the list of distributions.
+- **A1:** a client name longer than its 24 mm cell is squeezed to fit, as every title block cell already is.
+- **File format 8** (the numbering settings are gone from the file).
+
 ## 7. After the build
 
 What QA on v0.5 starts from:

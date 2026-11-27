@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { addAsset, addRevision, deleteRevision, setLogo, setFunctionColour, setNumberingScheme, setTerminalStrips, updateProjectInfo, updateRevision } from "../../core/ops";
+  import { addAsset, addRevision, deleteRevision, setLogo, updateProjectInfo, updateRevision } from "../../core/ops";
   import { readImage } from "../images";
   import { dateText, type ProjectInfo, type Revision } from "../../core/model";
   import type { Editor } from "../editor.svelte";
@@ -36,9 +36,6 @@
     { key: "drawnBy", label: "Drawn", w: "5em" },
     { key: "description", label: "Description", w: "auto" },
   ];
-  import { WIRE_COLOURS, functionColour, functionRows } from "../../core/wirecolours";
-  let newFunction = $state("");
-  let newFunctionColour = $state("");
 </script>
 
 <svelte:window
@@ -100,56 +97,6 @@
         {#if logo}<button onclick={() => editor.apply((p) => setLogo(p, null))}>Remove</button>{/if}
       </div>
     </div>
-    <h3>Numbering</h3>
-    <label class="inline">
-      Scheme
-      <select
-        value={editor.project.numbering.scheme}
-        onchange={(e) => {
-          const v = e.currentTarget.value as "position" | "sequential";
-          editor.apply((p) => setNumberingScheme(p, v));
-        }}
-      >
-        <option value="position">Position: K10-16, wire 11-22 (sheet-column)</option>
-        <option value="sequential">Sequential: K1, K2…, wire 100, 101…</option>
-      </select>
-    </label>
-    <label class="inline">
-      Terminal strips
-      <select
-        value={editor.project.numbering.strips ?? "one"}
-        onchange={(e) => {
-          const v = e.currentTarget.value as "one" | "section";
-          editor.apply((p) => setTerminalStrips(p, v));
-        }}
-        title="By section: each section's terminals take a strip of their own (X1, X2… across the sheets); a strip set by hand on a terminal wins"
-      >
-        <option value="one">One (X1)</option>
-        <option value="section">By section (X1, X2…)</option>
-      </select>
-    </label>
-    <p class="hint">Takes effect next time you press Renumber.</p>
-    <h3>Wire colours by function</h3>
-    <!-- v0.4.x M3: a wire with no colour of its own takes its function's (from its distribution, or set on the wire). -->
-    <table class="wirecolours">
-      <tbody>
-        {#each functionRows(editor.project) as f (f)}
-          <tr>
-            <td>{f}</td>
-            <td>
-              <input value={functionColour(editor.project, f) ?? ""} list="ferrule-core-colours" placeholder="—" onchange={(e) => { const v = e.currentTarget.value; editor.apply((p) => setFunctionColour(p, f, v)); }} />
-            </td>
-          </tr>
-        {/each}
-      </tbody>
-    </table>
-    <form class="inline" onsubmit={(e) => { e.preventDefault(); const f = newFunction.trim(); const c = newFunctionColour.trim(); if (f && c) editor.apply((p) => setFunctionColour(p, f, c)); newFunction = ""; newFunctionColour = ""; }}>
-      <input bind:value={newFunction} placeholder="Another function" />
-      <input bind:value={newFunctionColour} list="ferrule-core-colours" placeholder="Colour, e.g. Og" />
-      <button type="submit">Add</button>
-    </form>
-    <datalist id="ferrule-core-colours">{#each WIRE_COLOURS as c (c.code)}<option value={c.code}>{c.name}</option>{/each}</datalist>
-    <p class="hint">A wire's function comes from its distribution when it's on one, else from the function set on the wire. Its own colour, if set, wins.</p>
     <h3>GA devices</h3>
     <label class="inline">
       <input
@@ -268,12 +215,5 @@
     font-size: 12px;
     color: #667;
     margin: 0;
-  }
-  .wirecolours td {
-    padding: 1px 8px 1px 0;
-    font-size: 13px;
-  }
-  .wirecolours input {
-    width: 6em;
   }
 </style>

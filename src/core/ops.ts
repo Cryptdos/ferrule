@@ -108,6 +108,8 @@ export function addElement(
   if (symbol !== "plant-view") for (const k of PLANT_VIEW_KEYS) delete el.params[k];
   // A label written on lines wraps at its widest line instead (v0.2.1 note 18).
   if (symbol !== "text" && opts.label?.includes("\n") && opts.params?.labelWidth === undefined) el.params.labelWidth = labelWidthFor(opts.label, project);
+  // A terminal placed with no strip typed follows the one before it (A51), at the next Renumber.
+  if (symbol === "terminal" && opts.params?.strip === undefined) el.params.stripAuto = true;
   // Call-outs are numbered 1, 2, 3… on each sheet, the next one after the highest there.
   if (symbol === "callout" && opts.params?.n === undefined) {
     el.params.n = 1 + Math.max(0, ...page.elements.filter((e) => e.symbol === "callout").map((e) => Number(e.params.n) || 0));
@@ -850,18 +852,6 @@ export function setFunctionColour(project: Project, func: string, colour: string
   else delete project.wireColours;
 }
 
-export function setNumberingScheme(project: Project, scheme: Project["numbering"]["scheme"]): void {
-  project.numbering = { ...project.numbering, scheme };
-}
-
-/** Terminal strips: one (X1), or one per section (v0.4.x T4). Takes effect at the next Renumber. */
-export function setTerminalStrips(project: Project, by: "one" | "section"): void {
-  if (by === "section") project.numbering = { ...project.numbering, strips: "section" };
-  else {
-    const { strips: _, ...rest } = project.numbering;
-    project.numbering = rest;
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Plant (DESIGN.md §6)
