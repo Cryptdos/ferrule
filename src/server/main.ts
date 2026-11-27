@@ -267,7 +267,7 @@ async function exportPdf(storage: Storage, pdf: PdfRenderer, base: string, id: s
   const bytes = await pdf.render(`${base}/print/${encodeURIComponent(id)}`);
   const dir = resolve(join(storage.dir, "..", "exports"));
   await mkdir(dir, { recursive: true });
-  const file = join(dir, `${slugify(project.project.drawingNo || project.project.title || id)}.pdf`);
+  const file = join(dir, `${slugify(project.project.drawingNo || project.project.title || storage.fileName(id))}.pdf`);
   await writeFile(file, bytes);
   return file;
 }

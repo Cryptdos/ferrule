@@ -391,6 +391,19 @@ Judgement calls made while building, by step, with the reason.
 - **A10: the address follows `--mcp` as its own argument** (`--mcp server`), as the plan has it. Without a scheme it's `http://`, and without a port it's 4810, or `--port`'s. Given an address, Ferrule starts no server of its own. One that isn't answering is still relayed to, so Claude sees *Ferrule isn't reachable* on each request rather than a server that won't start, and carries on once the Ferrule is up.
 - **A10: Settings → Status opened from another computer shows that computer's Claude Desktop settings,** `--mcp` with the address the page was opened at, and a path to fill in. Claude Code's command uses the same address.
 
+### Step 12
+
+- **The specification read through:** its heading says 0.5.28 and nothing is crossed through. A few statements didn't yet say what the build does, and are corrected:
+  - DE-10 and DE-37 spoke of files from before v0.4, which no longer open.
+  - DE-50: *Save as device* shows only while a module has no device.
+  - DE-81 and SC-2: a CSV is named after the file when there's no drawing ref.
+  - WN-1: the top bar shows the file name.
+  - MC-8 now lists the `devices` tool, and ST-18's example names a 0.5 build.
+- **In passing:**
+  - The points schedule and Schedules CSVs, and Claude's PDF export, fall back to the file's name rather than the project's id, as the PDF download already did.
+  - The Network view's *Kind* is no longer cut off at the side, and its note no longer says *in v0.4*.
+- **Screenshots:** design, controllers, network, ga, editor-draft, simulate and annotate are retaken on the BMS-01 and LSP-01 fixtures. drawing-sheet and terminal-block are left as they are, since their sheets print the same.
+
 ### Title block (ruled 27 Nov 2026, before step 7)
 
 - **A1 laid out again:** *Sheet*, *Job no.* and *Checked* in three equal cells (24 mm); *Drawing ref.* and *Drawn* in two (36 mm); *Client* across the row (72 mm). A long *Checked* name and date is squeezed to fit its cell, as every cell's value is.

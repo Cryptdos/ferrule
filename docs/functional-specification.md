@@ -1,6 +1,6 @@
 # Ferrule functional specification
 
-**Operations reference for QA. Build 0.4.5** (repo `main` at `88e8375`, 25 Nov 2026). Revision 13, 27 Nov 2026: what v0.5 changes is crossed through, with the entry that changes it, up to A75. WN-23, SH-2, SH-3 and SH-9 are filled out from the code.
+**Operations reference for QA. Build 0.5.28** (repo `main`, 27 Nov 2026, the end of the v0.5 sprint). Revision 14: every entry on `advancements-v0.5.md` is built, each statement it changed is rewritten to say what this build does, and nothing is crossed through.
 
 Kept in `v0.5.0-pre Notes` beside `advancements-v0.5.md`, the list that findings and changes go on.
 
@@ -25,7 +25,7 @@ A finding falls into one of three kinds, and it helps to say which:
 
 ### What's crossed through
 
-~~Crossed through~~ with an entry's number after it, *(v0.5: A26)*, means that entry in `advancements-v0.5.md` changes it in v0.5. **Don't test it on this build.**
+Nothing is crossed through in this revision: v0.5 is built, and every statement says what 0.5.28 does. While a sprint is under way, ~~crossed through~~ with an entry's number after it, *(v0.5: A26)*, means that entry in the advancements list changes it. **Don't test such a statement on the build.**
 
 - A whole statement crossed through is replaced. Where only a clause is, the rest stands and is tested as written.
 - A note in the same brackets with nothing crossed through names the one case not to test.
@@ -33,7 +33,7 @@ A finding falls into one of three kinds, and it helps to say which:
 - A statement with a check waiting isn't crossed through. The checks are in the advancements list, under *Checks waiting*, and are done with this document open.
 - When the entry is built, the statement is rewritten in the same PR and the crossing-through goes.
 
-Suggested note format: `DR-31, 0.4.5: wire kept its old number after Renumber` (ID, build, what happened instead).
+Suggested note format: `DR-31, 0.5.28: wire kept its old number after Renumber` (ID, build, what happened instead).
 
 ### IDs
 
@@ -47,7 +47,7 @@ Suggested note format: `DR-31, 0.4.5: wire kept its old number after Renumber` (
 | PT | Parts (Draft) | PR | Project settings |
 | NU | Numbering and references | MC | Claude (MCP) |
 
-IDs are kept when the document is revised: a withdrawn statement is struck through and marked *withdrawn*, not renumbered. None is withdrawn at present; everything crossed through here is waiting on v0.5.
+IDs are kept when the document is revised: a withdrawn statement is struck through and marked *withdrawn*, not renumbered. None is withdrawn at present.
 
 ### Terms
 
@@ -98,7 +98,7 @@ IDs are kept when the document is revised: a withdrawn statement is struck throu
 - **ST-15** Closing or leaving the tab with unsaved changes saves them; the browser may ask to confirm leaving.
 - **ST-16** *Save as…* (top bar) writes the project to a new file anywhere and carries on in that file. Saving over an existing file asks first, and the file that was there is kept as `.bak`.
 - **ST-17** One `.ferrule` file holds everything, pictures included: copying the file copies the whole project.
-- **ST-18** A file of any other format than this build's isn't opened, older or newer: there's no backwards compatibility before release. It's listed with the reason, *Not opened. This file needs Ferrule 0.4.5*, naming the Ferrule that last saved it (*0.9.1 or later* for a newer file), with the address of the builds. A file too old to say which Ferrule saved it reads *Not opened. This file is from an older Ferrule and can't be opened in this one*. A build that changes what a file must hold moves the format number on.
+- **ST-18** A file of any other format than this build's isn't opened, older or newer: there's no backwards compatibility before release. It's listed with the reason, *Not opened. This file needs Ferrule 0.5.20*, naming the Ferrule that last saved it (*0.9.1 or later* for a newer file), with the address of the builds. A file too old to say which Ferrule saved it reads *Not opened. This file is from an older Ferrule and can't be opened in this one*. A build that changes what a file must hold moves the format number on.
 - **ST-19** Undo and redo cover the last 200 changes in the open session. An align or distribute, a Renumber *Apply* and a Suggest *Accept ticked* are each one step.
 - **ST-20** Builds are on the repository's releases page, one entry for each, named `v<version>` and marked pre-release, holding `ferrule-windows-v<version>.zip` and `ferrule-linux-v<version>`. A build is made only when asked for, by running *Publish a build* by hand; nothing is published on a merge, and a version already published is refused. Old builds stay there.
 - **ST-21** `ferrule-linux` is the same program for Linux. Started with `--host 0.0.0.0 --no-open`, it serves Ferrule to any browser that can reach the machine, with no browser of its own.
@@ -113,7 +113,7 @@ IDs are kept when the document is revised: a withdrawn statement is struck throu
 
 ### Top bar
 
-- **WN-1** Row one, left to right: back to the project list, the project title, the workbenches (**Design, Draft, Annotate, Layout, Simulate**), then *Project…*, *Save as…*, *Export PDF*, *Print*, help, *Settings*, and the save status.
+- **WN-1** Row one, left to right: back to the project list, the project's file name with its title beside it (ST-22), the workbenches (**Design, Draft, Annotate, Layout, Simulate**), then *Project…*, *Save as…*, *Export PDF*, *Print*, help, *Settings*, and the save status.
 - **WN-2** Row two is in the same order on every workbench: undo and redo; the view (*Fit*, *Split*, and in Draft *Colour check*); the eight align and distribute icons; the tools (*Select*, and in Draft *Wire*); then the workbench's own buttons, starting with the menus the workbenches share in the order *Check*, *Expectations…*, *Schedules*.
 
   | Workbench | Row two after undo/redo |
@@ -213,7 +213,7 @@ Design lists what the panel has before anything is drawn: systems, plant and poi
 - **DE-7** Systems fold (▸) and show a count when folded.
 - **DE-8** `Ctrl`+click and `Shift`+click pick several plant rows. With several picked, Properties offers *Move to system*, *Duplicate ×n…*, *Save as template…* and *Delete*.
 - **DE-9** Plant marked *In the panel* is listed in a group of its own, **Panel**, not under a system.
-- **DE-10** Plant from projects older than v0.4 is listed under *No system*.
+- **DE-10** Plant in no system (left there when its system is deleted, or moved or added to *No system*) is listed under *No system*.
 - **DE-11** `Esc` lets go of what's picked. `Ctrl+Z`/`Ctrl+Y` undo and redo.
 - **DE-85** A plant shares a line with its first point. Clicking its tag or description picks the plant; clicking from a point's name across picks that point. Properties shows the one thing picked and nothing else.
 
@@ -269,7 +269,7 @@ Design lists what the panel has before anything is drawn: systems, plant and poi
 
 ### Controller view
 
-- **DE-37** With no controller the view says so and offers *Add the controller*. A panel has one controller; a file from before v0.4 with more than one shows them all.
+- **DE-37** With no controller the view says so and offers *Add the controller*. A panel has one controller.
 - **DE-38** The view shows the points still to allocate on the left (*Unallocated (n)*), and every module on the rail along the top, in rail order with its address: the host, power supply and adapters as well as IO modules, and spare slots dashed. Below, each module has a column: an IO module's channels, each with the point on it or spare and *n of m used*; a module with no channels, its points. Clicking a module on the rail, or its column's heading, picks it; dragging it along the rail moves it. Properties is on the right.
 - **DE-39** **Allocation is by hand.** Dragging a point onto a channel allocates it. While dragging, only channels that can take the point light up. A universal (UIO) channel takes any type.
 - **DE-40** The channel can also be picked in the table's *Channel* column or in Properties; both offer only free channels of the right type.
@@ -285,7 +285,7 @@ Design lists what the panel has before anything is drawn: systems, plant and poi
 - **DE-47** `+ Module ▾` on Design's row adds one at the end of the rail: a type with a channel count, an adapter, a module saved before as a device, or a spare slot, left for later. A host and an adapter are added with no terminals; a power supply with its supply in.
 - **DE-48** A slot's bus address follows rail order unless set by hand in the module's Properties (to match DIP switches). Clearing a hand-set address returns it to rail order.
 - **DE-49** *Generate* fills an IO module's terminals from a pattern, at the top of its Terminals window (on IO modules only, not plant, a host, a power supply or an adapter): channels; one channel's terminal ids (`VO RET CO`, `IO C`, `Y ⊥`), a dash using up a number without making a terminal; the first terminal number; the form; names with `#` for the channel (`AO#` → AO1, AO2…); counting from; a shared terminal and how many channels it serves. It says what it will make first (*Makes 16 channels and 4 shared terminals, numbered 1 to 36*), replaces the list, and asks first if any of its terminals are wired.
-- **DE-50** A module picked shows in Properties: *Type*, *Channels*, *Address*, its device (shown, not set, with *Devices →* to its row), *Commons linked inside*, where it's drawn, and *Terminals…*, *Save as device*, *← Move*, *Move →* and *Delete module*. A channel picked shows the point on it with *Unallocate*, or, spare, its label typed by hand; a module's other point (a supply in, a serial port) its name, form and how it simulates. Both show their terminals with *Terminals…*.
+- **DE-50** A module picked shows in Properties: *Type*, *Channels*, *Address*, its device (shown, not set, with *Devices →* to its row), *Commons linked inside*, where it's drawn, and *Terminals…*, *Save as device* (while it has no device), *← Move*, *Move →* and *Delete module*. A channel picked shows the point on it with *Unallocate*, or, spare, its label typed by hand; a module's other point (a supply in, a serial port) its name, form and how it simulates. Both show their terminals with *Terminals…*.
 - **DE-51** *Commons linked* joins the module's commons (C, RET, 0 V) inside it: one return serves them all in Simulate and in the wiring check, and the view shows the link.
 - **DE-52** A module's draw is its device's, and is counted on the controller's power supply module in Simulate; its maker and model are its device's too. There's no *Draw (VA)*, *Maker* or *Model* on a module.
 - **DE-53** *Save as device* in a module's Properties keeps it, its type, channels, terminals and points, in the device table (and from there the shared library), so the next one is added whole from `+ Module`.
@@ -340,7 +340,7 @@ Design lists what the panel has before anything is drawn: systems, plant and poi
 
 ### Export points schedule
 
-- **DE-81** *Export points schedule* downloads `<drawing ref. or project id> points schedule.csv` and confirms the row count.
+- **DE-81** *Export points schedule* downloads `<drawing ref., or the file name> points schedule.csv` and confirms the row count.
 - **DE-82** Columns: System, Tag, Description, Point, Form, Signal, Type, Goes to, Controller, Module, Channel, Via, Wired. Rows are by system, in table order.
 - **DE-83** Unallocated points are listed with the channel empty. Plant with no points is a row of its own.
 - **DE-84** *Via* names the relay when the check traced one. *Wired* is one of: direct, via, confirmed, to review, not drawn; it agrees with Properties.
@@ -757,7 +757,7 @@ Design's findings appear only once a project uses Design.
 ## 13. Schedules and output (SC)
 
 - **SC-1** *Schedules* has tabs, each with its row count and *Download CSV*: Terminals, Field cables, Markers, IO points, Plant points, Bill of materials.
-- **SC-2** CSV files are named `<drawing ref., or the project id> <schedule>.csv`.
+- **SC-2** CSV files are named `<drawing ref., or the file name> <schedule>.csv`.
 - **SC-3** **Terminals:** Strip, Terminal, Sheet-col, Wire, Internal, External. A terminal is listed as `X1:3-13`.
 - **SC-4** **Field cables:** Plant, Description, Plant terminal, Wire, Panel terminal, Sheet-col; and below, **cores per device** (how many cores each field device needs and on which terminals), with its own CSV.
 - **SC-5** **Markers:** one at each real end of a wire, where it lands on a terminal or a part; not at a tee or a link end, so a wire carried across two sheets has two. A panel wire on a supply says the supply's number; any other panel wire says the terminal it lands on, or its own number when it reaches none. A field core's say the terminal at the panel end and the device's tag at the field end. *Group duplicates* gives each marker once with a count. Renumber first.
@@ -793,7 +793,7 @@ Design's findings appear only once a project uses Design.
 - **MC-5** An open editor tab follows Claude's changes: it reloads the project and says so. Undo history is cleared on that reload.
 - **MC-6** If you were mid-edit when Claude saved, your unsaved change is refused, not written over Claude's, and the tab reloads with a message.
 - **MC-7** The endpoint listens on 127.0.0.1 only unless started with `--host`, and refuses requests from web pages served by other sites.
-- **MC-8** Tools: `list_projects`, `create_project`, `project_info`, `update_project_info`, `list_symbols`, `get_page`, `view_page`, `add_page`, `update_page`, `delete_page`, `add_element`, `update_element`, `move_element`, `delete_element`, `connect`, `disconnect`, `label_wire`, `link`, `add_distribution`, `add_plant`, `place_plant_view`, `add_section`, `controller`, `add_module`, `place_controller`, `save_template`, `apply_template`, `renumber`, `check`, `schedules`, `simulate`, `set_expectation`, `check_logic`, `export_pdf`. What each does is in `docs/mcp.md`.
+- **MC-8** Tools: `list_projects`, `create_project`, `project_info`, `update_project_info`, `list_symbols`, `get_page`, `view_page`, `add_page`, `update_page`, `delete_page`, `add_element`, `update_element`, `move_element`, `delete_element`, `connect`, `disconnect`, `label_wire`, `link`, `add_distribution`, `add_plant`, `place_plant_view`, `add_section`, `controller`, `add_module`, `place_controller`, `save_template`, `apply_template`, `renumber`, `check`, `schedules`, `simulate`, `set_expectation`, `check_logic`, `devices`, `export_pdf`. What each does is in `docs/mcp.md`.
 - **MC-9** Settings → Status opened from another computer shows the address it was opened at, no *Quit Ferrule* (only the machine it runs on can stop it), and Claude Desktop's settings for that computer: `ferrule.exe --mcp` with this Ferrule's address, the path to the exe left to fill in, and Claude Code's command with the same address.
 
 ---
