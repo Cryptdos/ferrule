@@ -28,8 +28,8 @@
   import Props from "./Props.svelte";
   import ProjectDialog from "./ProjectDialog.svelte";
   import PlantDialog from "./PlantDialog.svelte";
-  import PointsDialog from "./PointsDialog.svelte";
-  import ControllersDialog from "./ControllersDialog.svelte";
+  import TerminalsDialog from "./TerminalsDialog.svelte";
+  import AddModuleMenu from "./AddModuleMenu.svelte";
   import DistributionDialog from "./DistributionDialog.svelte";
   import ExpectationsDialog from "./ExpectationsDialog.svelte";
   import ChecksDialog from "./ChecksDialog.svelte";
@@ -102,7 +102,7 @@
     });
   });
   /** Open windows: they don't block the drawing, and several can be open at once. */
-  type DialogName = "expectations" | "plant" | "controllers" | "table" | "distribution" | "checks" | "schedules" | "templates" | "renumber" | "devices" | "settings" | "place" | "project" | "help";
+  type DialogName = "expectations" | "plant" | "terminals" | "table" | "distribution" | "checks" | "schedules" | "templates" | "renumber" | "devices" | "settings" | "place" | "project" | "help";
   const open: Partial<Record<DialogName, boolean>> = editor.open;
   /** Windows in tiles (design-v0.3 §7), and where a dragged window would go. */
   const inTile = $derived(new Set(leaves(editor.tiles).flatMap((l) => (l.content.type === "window" ? [l.content.name] : []))));
@@ -533,7 +533,7 @@
         {:else if editor.designView === "todraw"}
           <span class="hint">Pick a line and place it: Draft opens with it ready to drop on the sheet.</span>
         {:else if editor.designView === "controller"}
-          <LabelButton icon="controllers" label="Controller…" active={!!open.controllers} onclick={() => toggle("controllers")} title="Describe the controller; add modules in rail order, spares and addresses; their pins" />
+          <AddModuleMenu {editor} />
           <button disabled={!pickedAllocated} onclick={unallocate} title={pickedAllocated ? "Take the picked point off its channel" : "Pick an allocated point first"}>Unallocate</button>
           <span class="sep"></span>
           <button class:active={!!editor.open.designSuggest} disabled={!editor.project.controllers?.length} onclick={() => (editor.open.designSuggest = !editor.open.designSuggest)} title="Propose channels for the points still to allocate: accept, change or throw away. Nothing is allocated until you accept">Suggest…</button>
@@ -639,9 +639,6 @@
     {/if}
     {#if editor.message}<div class="toast">{editor.message}</div>{/if}
     {#if editor.stampLinks}<StampLinks {editor} />{/if}
-    {#if editor.terminalsOf}
-      <PointsDialog {editor} plantId={editor.terminalsOf} onclose={() => (editor.terminalsOf = null)} onexpectations={() => (open.expectations = true)} />
-    {/if}
   </main>
 </div>
 {#if savingAs}
@@ -656,9 +653,9 @@
   {#if name === "distribution"}
     <DistributionDialog {editor} onclose={() => toggle("distribution")} />
   {:else if name === "plant"}
-    <PlantDialog {editor} onclose={() => toggle("plant")} onexpectations={() => (open.expectations = true)} />
-  {:else if name === "controllers"}
-    <ControllersDialog {editor} onclose={() => toggle("controllers")} onexpectations={() => (open.expectations = true)} />
+    <PlantDialog {editor} onclose={() => toggle("plant")} />
+  {:else if name === "terminals"}
+    <TerminalsDialog {editor} onclose={() => toggle("terminals")} />
   {:else if name === "expectations"}
     <ExpectationsDialog {editor} onclose={() => toggle("expectations")} />
   {:else if name === "table"}

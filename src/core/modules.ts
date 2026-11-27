@@ -49,7 +49,7 @@ export function moduleTypeName(m: Pick<ModuleInfo, "type" | "channels">): string
  */
 export interface ModulePattern {
   channels: number;
-  /** Pin ids per channel, in order: "VO RET CO", "IO C", "Y ⊥". */
+  /** Pin ids per channel, in order: "VO RET CO", "IO C", "Y ⊥". A dash uses up a terminal number without making a terminal (A67). */
   ids: string;
   /** The first pin number. */
   first: number;
@@ -102,6 +102,10 @@ export function generatePins(p: ModulePattern): { terminals: string[]; pins: Rec
     const group = p.group.includes("#") ? p.group.replace("#", String(ch)) : `${p.group}${ch}`;
     const mine: string[] = [];
     for (const id of ids) {
+      if (id === "-") {
+        next++;
+        continue;
+      }
       if (shared.has(id) && i % by !== 0 && sharedPin.has(id)) {
         mine.push(sharedPin.get(id)!);
         continue;
@@ -116,15 +120,30 @@ export function generatePins(p: ModulePattern): { terminals: string[]; pins: Rec
   }
   // No channels (a power supply or host): one point of the ids, if any.
   if (!n && ids.length) {
-    const mine = ids.map((id) => {
+    const mine = ids.flatMap((id) => {
       const num = String(next++);
+      if (id === "-") return [];
       terminals.push(num);
       pins[num] = { id };
-      return num;
+      return [num];
     });
     points.push({ name: p.group || POINT_FORMS.find((f) => f.value === p.form)?.label || "Pins", form: p.form, pins: mine });
   }
   return { terminals, pins, points };
+}
+
+/** What a pattern will make, said before anything changes (A67): "Makes 16 channels and 4 shared terminals, numbered 1 to 36". */
+export function patternSummary(p: ModulePattern): string {
+  const g = generatePins(p);
+  if (!g.terminals.length) return "Makes nothing: give it terminal ids";
+  const count = new Map<string, number>();
+  for (const pt of g.points) for (const t of pt.pins) count.set(t, (count.get(t) ?? 0) + 1);
+  const shared = [...count.values()].filter((n) => n > 1).length;
+  const nums = g.terminals.map(Number).filter(Number.isFinite);
+  const span = nums.length === g.terminals.length ? `, numbered ${Math.min(...nums)} to ${Math.max(...nums)}` : "";
+  const ch = Math.max(0, Math.floor(p.channels));
+  const what = ch ? `${ch} channel${ch === 1 ? "" : "s"}` : `${g.terminals.length} terminal${g.terminals.length === 1 ? "" : "s"}`;
+  return `Makes ${what}${shared ? ` and ${shared} shared terminal${shared === 1 ? "" : "s"}` : ""}${span}`;
 }
 
 // ---------------------------------------------------------------------------

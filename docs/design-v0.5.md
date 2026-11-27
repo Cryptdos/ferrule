@@ -318,6 +318,13 @@ Judgement calls made while building, by step, with the reason.
 - **8a: the form list is the browser's own list,** each form with its plain words and the channel it needs in brackets; under the box, the words again with the channel's badge.
 - **8a: *Terminals…* opens today's *Pins and points…* window** until 8b replaces it.
 - **8a: dropping *Enabled by* and *Source* moved the file format to 14.**
+- **8b: a module's *Draw VA* stays in its Properties until 8d** moves it to the device (A38). *Maker* and *Model* aren't edited on the module any more: the device it was made from is shown, and *Save as device* makes one from it.
+- **8b: a module point that isn't a channel (a supply in, a bus) is picked from its module's column** and named and given its form in Properties; a channel's Properties shows its type and the point allocated to it, or its label when it has none.
+- **8b: the Terminals window docks** as the windows it replaces did (A32), under the name *Terminals*.
+- **8b: a dash in a Generate pattern uses up a number** without making a terminal (`I - C` makes 1, 3 for the first channel), so a module's gaps are typed rather than mended by hand after.
+- **8b: a group that is a channel's isn't offered as a serial port** in the Terminals window; only the other groups are (a comms group, a host's ports).
+- **8b, left as it was: the one line shows a terminal shared by two points under the first only,** since a number repeated across points there means two terminals (`Run: 11 14 | Fault: 11 14`). Typing a module's line back loses the sharing, so on a module with shared commons the table and Generate are the way to change it. For QA.
+- **8b: the Controller view keeps three columns:** the plant points on the left to allocate from, the rail and module columns in the middle, Properties on the right. A module is moved along the rail by dragging it or with *← Move* and *Move →* in its Properties.
 
 ### Title block (ruled 27 Nov 2026, before step 7)
 

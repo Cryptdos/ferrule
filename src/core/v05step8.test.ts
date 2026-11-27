@@ -32,3 +32,29 @@ describe("step 8a: pick a thing, and Properties shows that thing (A69)", () => {
     void it;
   });
 });
+
+describe("step 8b: the Terminals window (A67)", () => {
+  test("Add terminal numbers one on from the highest; delete and reorder leave every number alone", async () => {
+    const { addPlant, addPin, deletePin, movePin, nextPinNumber, updatePin } = await import("./ops");
+    const p = newProject("t");
+    const it = addPlant(p, "", "Fan", ["1", "2", "11", "14"]);
+    expect(nextPinNumber(it)).toBe("15");
+    addPin(p, it.id, nextPinNumber(it));
+    deletePin(p, it.id, "2");
+    expect(it.terminals).toEqual(["1", "11", "14", "15"]);
+    movePin(p, it.id, "15", 0);
+    expect(it.terminals).toEqual(["15", "1", "11", "14"]);
+    // A point name not used yet makes a point with no form yet.
+    updatePin(p, it.id, "11", { point: "Run" });
+    expect(it.points!.find((q) => q.name === "Run")!.form).toBe("none");
+  });
+
+  test("Generate says what it makes first, and a dash uses up a number without making a terminal", async () => {
+    const { generatePins, patternSummary } = await import("./modules");
+    const di = { channels: 16, ids: "I C", first: 1, group: "DI#", form: "dry-in" as const, shared: "C", shareBy: 4 };
+    expect(patternSummary(di)).toBe("Makes 16 channels and 4 shared terminals, numbered 1 to 20");
+    const gap = generatePins({ channels: 2, ids: "I - C", first: 1, group: "DI#", form: "dry-in" });
+    expect(gap.terminals).toEqual(["1", "3", "4", "6"]);
+    expect(gap.points.map((q) => q.pins)).toEqual([["1", "3"], ["4", "6"]]);
+  });
+});
