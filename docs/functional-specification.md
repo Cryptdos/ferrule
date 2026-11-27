@@ -180,7 +180,7 @@ IDs are kept when the document is revised: a withdrawn statement is struck throu
 - **SH-12** The drawing area is 150 × 90 units. Parts snap to the grid.
 - **SH-13** All drawing text is osifont. Sizes on paper: title 5 mm, heading 3.5 mm, tags, labels and terminal, pin and wire numbers 2.5 mm, notes 2.5 mm, detail (cross-references, pin ids, colours, ratings, contact tables) 1.8 mm. Nothing prints smaller than 1.8 mm.
 - **SH-14** Line weights on paper: symbols and wires 0.25 mm; ~~distribution blocks,~~ *(v0.5: A23)* the terminal block and plant outlines 0.5 mm; the frame 0.7 mm.
-- **SH-15** The title block along the bottom shows the logo, *Project*, *Panel name*, the sheet's title, *Sheet x of y*, job no., drawing ref., drawn by and date, checked by and date, and the latest four revisions with the newest at the bottom. *Client* isn't shown in this build (A1).
+- **SH-15** The title block along the bottom shows the logo, *Project*, *Panel name*, the sheet's title, *Sheet x of y*, job no. and client (three equal cells side by side), drawing ref., drawn by and date, checked by and date, and the latest four revisions with the newest at the bottom.
 
 ### Moving about
 
@@ -366,7 +366,7 @@ The electrical drawing: parts, wires, rails, plant views, numbering and links. I
 - **DR-25** A wire's number prints once per sheet, on its longest run. Earth and field wires don't print theirs unless *Show number* is ticked.
 - **DR-26** ~~The number and colour can be dragged along their own wire. *Number and colour back to their place* undoes it.~~ *(v0.5: A26)*
 - **DR-27** A new wire takes its colour from the block or rail it leaves, or from the wire on the other side of the fuse, contact or terminal it's drawn from. A push button carries it between the two terminals of each pole, normally open or closed; a plant or module view between the pins of a point that switches (a relay output's common and NO, a plant's fault contact).
-- **DR-28** A wire with no colour of its own takes its function's colour from *Wire colours by function* (PR-5); its function comes from its distribution when it's on one, else from the function set on the wire. Properties says where the colour came from.
+- **DR-28** A wire with no colour of its own takes its function's colour from *Wire colours by function* in the Distribution window (DR-48); its function comes from its distribution when it's on one, else from the function set on the wire. Properties says where the colour came from.
 - **DR-29** A wire goes straight onto a terminal and keeps its number through it.
 - **DR-30** *Kind*: **Automatic** (by the panel boundary), **Panel wiring**, or **Field wire** (dashed).
 - **DR-31** A wire is field wiring automatically only when it's below the panel boundary. Plant drawn above the boundary, or on a sheet with no boundary, has solid, numbered panel wiring.
@@ -397,7 +397,7 @@ The electrical drawing: parts, wires, rails, plant views, numbering and links. I
 
 ### Distribution blocks, rails and distributions
 
-- **DR-48** *Distribution* (top bar) lists the project's supplies: name, kind (AC line, AC neutral, DC +, DC 0 V, Earth), voltage, colour, function, and the sheets each is used on. New projects start with none.
+- **DR-48** *Distribution* (top bar) lists the project's supplies: name, kind (AC line, AC neutral, DC +, DC 0 V, Earth), voltage, colour, function, and the sheets each is used on. New projects start with none. Below the list, **Wire colours by function**: a table of functions (phase, neutral, earth, 24 V +, 0 V, DC signal, AC signal, external supply, and any added) and their colours, empty to start. Colours are IEC codes: Bk, Bn, Rd, Og, Ye, Gn, Bu, Vt, Gy, Wh, Pk, Tq, GnYe.
 - **DR-49** A **Distribution block** is the physical busbar or block: drawn heavy, tagged W, placed on the GA, counted in the bill of materials. ~~A **Control rail** is the common rail of a control drawing: drawn lighter, no tag, not a GA part.~~ *(v0.5: A23)*
 - **DR-50** A block, rail, ~~link arrow~~ *(v0.5: A23, A27)* ~~or incoming supply terminal~~ *(v0.5: A57)* picks a distribution. Everything on the same distribution is joined on every sheet.
 - **DR-51** A block or rail on no distribution is *local* and joins nothing else. Deleting a distribution makes its blocks and rails local.
@@ -502,9 +502,9 @@ Tag prefixes follow IEC 81346-2 as applied in `docs/designations.md`. Untagged p
 - **NU-8** A contact linked to a coil takes the coil's tag; it isn't numbered separately.
 - **NU-9** *Tag fixed* on a part, or *Lock number* on a wire, keeps it through Renumber.
 - **NU-10** Plant is tagged prefix plus the sheet-column of its first view (`SEF-3-13`; `U3-13` with the default prefix) unless its tag was typed in Design.
-- **NU-11** ~~**Sequential scheme** (Project…): K1, K2… and wires 100, 101…, in sheet, column, then height order.~~ *(v0.5: A50)*
-- **NU-12** ~~*Terminal strips: By section* gives each section's terminals a strip of their own on Renumber (X1, X2… across the sheets). A terminal in the boundary block below a section belongs to it. A strip set by hand wins.~~ *(v0.5: A51)*
-- **NU-13** ~~A change of scheme or strip setting takes effect at the next Renumber.~~ *(v0.5: A50, A51)*
+- **NU-11** Numbering is by position only (NU-3): there's no other scheme, and no setting for one.
+- **NU-12** Terminal strips follow on: a terminal is on the same strip as the terminal before it, by sheet then left to right, until a strip is typed on one (in its properties, or by a strip line); every terminal after that follows the new strip, until the next one typed. With nothing typed, everything is X1. A locked terminal keeps its strip.
+- **NU-13** The terminals after a strip typed follow it at the next Renumber, as tags and wire numbers do, not the moment it's typed.
 - **NU-14** Call-outs number 1, 2, 3… on their sheet in the order placed while *Auto* is ticked; unticked, the number is set by hand.
 
 ---
@@ -747,11 +747,11 @@ Design's findings appear only once a project uses Design.
 
 ## 14. Project settings (PR)
 
-- **PR-1** *Project…* sets the project's details: Project, Panel name, Client, Job no., Drawing ref., Drawn by, Drawn date (a new project's is the day it's made), Checked by, Checked date. They fill every sheet's title block (Client excepted in this build: A1); sheet titles are set per sheet.
+- **PR-1** *Project…* sets the project's details: Project, Panel name, Client, Job no., Drawing ref., Drawn by, Drawn date (a new project's is the day it's made), Checked by, Checked date. They fill every sheet's title block; sheet titles are set per sheet.
 - **PR-2** **Logo:** chosen, dropped in, or pasted (`Ctrl+V`) while the window is open; *Remove* clears it. It prints in every title block.
-- **PR-3** ~~**Numbering scheme:** Position or Sequential (NU-3, NU-11).~~ *(v0.5: A50)*
-- **PR-4** ~~**Terminal strips:** One (X1) or By section (NU-12).~~ *(v0.5: A51)*
-- **PR-5** **Wire colours by function:** a table of functions (phase, neutral, earth, 24 V +, 0 V, DC signal, AC signal, external supply, and any added) and their colours, empty to start. Colours are IEC codes: Bk, Bn, Rd, Og, Ye, Gn, Bu, Vt, Gy, Wh, Pk, Tq, GnYe. *(v0.5: A52. Moves into the Distribution window)*
+- **PR-3** There's no numbering setting: numbering is by position (NU-11).
+- **PR-4** There's no terminal strips setting: strips follow on (NU-12).
+- **PR-5** *Wire colours by function* isn't under *Project…*: it's in the Distribution window, with all wire colour (DR-48).
 - **PR-6** **GA devices:** *Use the shared device library* (LA-39).
 - **PR-7** **Revisions:** Issue, Date, Drawn, Description; *Add revision*; remove. The latest four show in the title block, newest at the bottom.
 

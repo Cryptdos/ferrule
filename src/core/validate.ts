@@ -56,10 +56,6 @@ export function parseProject(input: unknown): Project {
     project: Object.fromEntries(
       Object.keys(base).map((k) => [k, strOr(info[k], base[k as keyof typeof base])]),
     ) as unknown as Project["project"],
-    numbering: {
-      scheme: isObj(input.numbering) && input.numbering.scheme === "sequential" ? "sequential" : "position",
-      ...(isObj(input.numbering) && input.numbering.strips === "section" ? { strips: "section" as const } : {}),
-    },
     designation: {
       standard: isObj(input.designation) ? strOr(input.designation.standard, "iec-81346-2-2019") : "iec-81346-2-2019",
       overrides:

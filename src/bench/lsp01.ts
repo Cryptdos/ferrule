@@ -187,7 +187,8 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
   const qFan = add("isolator", 18, 25, { label: "40A DOOR\nINTERLOCKED", params: { poles: 3, aux: 2, operator: "turn" } });
   const fuses = add("fuse", 18, 35, { params: { poles: 3, rating: "10A" } });
   const km = add("isolator", 18, 45, { params: { function: "contactor", poles: 3 } });
-  const xFan = [18, 21, 24].map((x) => add("terminal", x, 64));
+  // The fan terminals start strip X1, after the incoming supply's X0 (strips follow on, v0.5 A51).
+  const xFan = [18, 21, 24].map((x, i) => add("terminal", x, 64, i === 0 ? { params: { strip: "X1" } } : {}));
   const qLocal = add("isolator", 18, 70, { label: "LOCAL ISOLATOR", params: { poles: 3, aux: 0, operator: "turn" } });
   const fan = placePlantView(p, page.id, SF1.id, [18, 76]);
   for (let i = 0; i < 3; i++) {

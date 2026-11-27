@@ -31,7 +31,7 @@ A note from testing can go in as roughly as it comes (`DR-31, 0.4.5: wire kept i
 
 Found while writing the specification from the 0.4.5 source, and ruled on the same day. None has been tested by running the build.
 
-- [ ] **A1. Client in the title block.** *Tweak. SH-15, PR-1. Build 0.4.5.* Client is entered under *Project…* but printed nowhere unless a text uses `{project:client}`. The title block's *Sheet* and *Job no.* cells are made narrower, leaving room for a third cell, *Client*, beside them on the same row. It's filled from the project's Client on every sheet.
+- [x] **A1. Client in the title block.** *Built: PR 126.* *Tweak. SH-15, PR-1. Build 0.4.5.* Client is entered under *Project…* but printed nowhere unless a text uses `{project:client}`. The title block's *Sheet* and *Job no.* cells are made narrower, leaving room for a third cell, *Client*, beside them on the same row. It's filled from the project's Client on every sheet.
   - The three cells are equal widths (ruled 26 Nov 2026). Today the row is 72 mm, split into two cells of 36 mm, so three of 24 mm.
 
 - ~~**A2. `Ctrl+S`.**~~ *Withdrawn 25 Nov 2026.* It's already there and does no harm, so it's left as it is: it saves at once in Design, Draft and Annotate, and isn't handled in Layout or Simulate.
@@ -258,13 +258,13 @@ From the notes written into the QA copy of the specification (`v0.4.0-pre Notes\
 - [x] **A49. A new project is dated.** *Built: PR 119.* *Missing. ST-5, PR-1, PR-7. Build 0.4.5.* A new project's *Drawn date* and the date of revision A, *First issue*, are empty. Both are filled with the day the project is made.
   - *Add revision* dates a new revision with the current date in the same way (ruled 26 Nov 2026). It does already (from the code, 27 Nov 2026), so there's nothing to build for it.
 
-- [ ] **A50. Position numbering only.** *Tweak. PR-3, NU-11, NU-13. Build 0.4.5.* *Project…* offers a second numbering scheme, Sequential (K1, K2…, wires 100, 101…). Position numbering is part of the design, and a lot of work has gone into it: if it falls short it's fixed, not swapped for a backup. The Sequential scheme and the *Numbering scheme* setting are removed.
+- [x] **A50. Position numbering only.** *Built: PR 126.* *Tweak. PR-3, NU-11, NU-13. Build 0.4.5.* *Project…* offers a second numbering scheme, Sequential (K1, K2…, wires 100, 101…). Position numbering is part of the design, and a lot of work has gone into it: if it falls short it's fixed, not swapped for a backup. The Sequential scheme and the *Numbering scheme* setting are removed.
 
-- [ ] **A51. Terminal strips follow on.** *Tweak. PR-4, NU-12. Build 0.4.5.* The *Terminal strips* setting (One, or By section) is removed. One rule takes its place: a terminal is on the same strip as the terminal before it, by sheet then left to right, until a strip is typed on one; every terminal after that follows the new strip, until the next one typed.
+- [x] **A51. Terminal strips follow on.** *Built: PR 126.* *Tweak. PR-4, NU-12. Build 0.4.5.* The *Terminal strips* setting (One, or By section) is removed. One rule takes its place: a terminal is on the same strip as the terminal before it, by sheet then left to right, until a strip is typed on one; every terminal after that follows the new strip, until the next one typed.
   - So with nothing typed everything is X1. Type X2 on the third terminal, and the third and all after it are X2 until one is made X3.
   - The terminals after it follow at the next Renumber, as tags and wire numbers do, not the moment the strip is typed (ruled 26 Nov 2026).
 
-- [ ] **A52. Wire colours by function moves into Distribution.** *Tweak. PR-5, DR-28, DR-48. Build 0.4.5.* The table is under *Project…*, where nobody drafting would look for it. It becomes a section of the Distribution window, so all wire colour is set in one place.
+- [x] **A52. Wire colours by function moves into Distribution.** *Built: PR 126.* *Tweak. PR-5, DR-28, DR-48. Build 0.4.5.* The table is under *Project…*, where nobody drafting would look for it. It becomes a section of the Distribution window, so all wire colour is set in one place.
   - Whether the rules earn their keep at all is a check below.
 
 - [x] **A53. `Esc` while dragging a window leaves the highlight behind.** *Built: PR 119.* *Fix. WN-12, WN-18. Build 0.4.5.* Found on the build: drag a window that docks until a tile lights up blue, and press `Esc` with the mouse still down. The window closes, and the blue highlight stays on the tile with no way to clear it. `Esc` during a drag should cancel the drag: the highlight goes and the window stays open where it was.

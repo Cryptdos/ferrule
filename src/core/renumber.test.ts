@@ -71,17 +71,6 @@ describe("renumber (position scheme)", () => {
   });
 });
 
-describe("renumber (sequential scheme)", () => {
-  test("K1, K2… and wires from 100", () => {
-    const { p, pg, k1 } = rung();
-    p.numbering.scheme = "sequential";
-    const k2 = addElement(p, pg, "coil", [80, 57]);
-    renumber(p);
-    expect([k1.tag, k2.tag]).toEqual(["K1", "K2"]);
-    expect(p.conductors.map((c) => c.number).filter((n) => /^\d+$/.test(n)).sort()).toEqual(["100", "101", "102"]);
-  });
-});
-
 describe("cross-references", () => {
   test("contacts take the coil's tag, get pole numbers, and show in its contact table", () => {
     const { p, pg, k1 } = rung();
@@ -99,12 +88,8 @@ describe("cross-references", () => {
       ["NO", "13-14", "1-41"], // same sheet: still in full (21)
       ["NC", "21-22", "2-21"],
     ]);
-    // Position tags already say where the coil is, so no extra cross-reference…
+    // Position tags already say where the coil is, so no extra cross-reference.
     expect(elementTexts(a, p).xref).toBe("");
-    // …but with sequential tags there is one.
-    p.numbering.scheme = "sequential";
-    renumber(p);
-    expect(elementTexts(b, p).xref).toBe("/1-16");
   });
 
   test("only contacts link to coils", () => {

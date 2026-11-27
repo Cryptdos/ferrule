@@ -30,7 +30,7 @@ import { designChecks } from "./checks";
 import { networkDiagram } from "./networkdraw";
 import { ENCL, PLATE_MARGIN, gaCandidates, sizeKey, dimLayout, doorPanes, plateDoor, platesOf, drawnGaItems, gaFrame, paneOf, paneRef, sheetPanes } from "./ga";
 import { renumber } from "./renumber";
-import { deleteGaItems, deleteElements, setTerminalStrips, splitGaStrip, updateGaItem, updateSection } from "./ops";
+import { deleteGaItems, deleteElements, splitGaStrip, updateGaItem, updateSection } from "./ops";
 import { itemStrip, plateTextLayout, stripLabel, stripParts, syncGaStrips } from "./ga";
 import { importTemplate, saveSheetTemplate, stampTemplate } from "./templates";
 import { duplicatePlant, stepTag } from "./design";
@@ -944,43 +944,36 @@ describe("step 10b: serial ports (M7, T5)", () => {
   });
 });
 
-describe("step 11: terminal strips by section (T4)", () => {
+describe("step 11: terminal strips (T4; follow on since v0.5 A51)", () => {
   const stripsOf = (p: Project) => p.pages.filter((pg) => !pg.ga).map((pg) => [...new Set(pg.elements.filter((e) => e.symbol === "terminal").map((e) => String(e.params.strip ?? "X1")))].join(","));
 
-  test("by section, each section's terminals take a strip of their own at Renumber; a strip set by hand wins; back to one undoes it", () => {
+  test("a terminal is on the strip of the one before it, by sheet then left to right, until a strip is typed; Renumber follows on", () => {
     const { project: p } = fresh();
-    const one = stripsOf(p);
-    expect(new Set(one.filter(Boolean))).toEqual(new Set(["X1"]));
-    // Old files: no setting, nothing changes.
     renumber(p);
-    expect(stripsOf(p)).toEqual(one);
-    setTerminalStrips(p, "section");
-    renumber(p);
-    // Sheets 2–8 each have a section with terminals, in the boundary's block below it.
-    expect(stripsOf(p).filter(Boolean)).toEqual(["X1", "X2", "X3", "X4", "X5", "X6", "X7"]);
-    // A strip set by hand wins, and isn't given to a section.
+    // Nothing typed: everything is X1.
+    expect(new Set(stripsOf(p).filter(Boolean))).toEqual(new Set(["X1"]));
+    // Type X2 on the first terminal of a sheet: it and every terminal after it are X2.
     const di = p.pages.find((pg) => pg.title === "Controller: digital inputs")!;
-    const t = di.elements.find((e) => e.symbol === "terminal")!;
-    updateElement(p, di.id, t.id, { params: { strip: "X3" } });
+    const terms = di.elements.filter((e) => e.symbol === "terminal").sort((a, b) => a.pos[0] - b.pos[0] || a.pos[1] - b.pos[1]);
+    updateElement(p, di.id, terms[0]!.id, { params: { strip: "X2" } });
+    // Not until Renumber (ruled 26 Nov 2026).
+    expect(terms[1]!.params.strip).toBe("X1");
     renumber(p);
-    expect(t.params.strip).toBe("X3");
-    expect(stripsOf(p).filter(Boolean)).toEqual(["X1", "X2", "X4", "X5", "X3,X6", "X7", "X8"]);
-    // Two sections of the same name are one strip.
-    const ui = p.pages.find((pg) => pg.title === "Controller: universal inputs")!;
-    updateSection(p, ui.id, ui.sections[0]!.id, { label: di.sections[0]!.label });
+    const before = p.pages.filter((pg) => !pg.ga && pg.number < di.number);
+    const after = p.pages.filter((pg) => !pg.ga && pg.number >= di.number);
+    expect(new Set(before.flatMap((pg) => pg.elements.filter((e) => e.symbol === "terminal").map((e) => e.params.strip)))).toEqual(new Set(["X1"]));
+    expect(new Set(after.flatMap((pg) => pg.elements.filter((e) => e.symbol === "terminal").map((e) => e.params.strip)))).toEqual(new Set(["X2"]));
+    // Type X3 on the next sheet's first: X3 from there on.
+    const next = after.find((pg) => pg.number > di.number && pg.elements.some((e) => e.symbol === "terminal"))!;
+    const n0 = next.elements.filter((e) => e.symbol === "terminal").sort((a, b) => a.pos[0] - b.pos[0] || a.pos[1] - b.pos[1])[0]!;
+    updateElement(p, next.id, n0.id, { params: { strip: "X3" } });
     renumber(p);
-    expect(stripsOf(p).filter(Boolean)).toEqual(["X1", "X2", "X4", "X5", "X3,X6", "X6", "X7"]);
-    // A terminal outside every section is on X1, and the sections start at X2.
-    const sheet2 = p.pages.find((pg) => pg.title === "Fire alarm interface and enables")!;
-    sheet2.sections = [];
+    expect(di.elements.filter((e) => e.symbol === "terminal").every((e) => e.params.strip === "X2")).toBe(true);
+    expect(next.elements.filter((e) => e.symbol === "terminal").every((e) => e.params.strip === "X3")).toBe(true);
+    // Renumbering again changes nothing.
+    const once = stripsOf(p);
     renumber(p);
-    expect(stripsOf(p).filter(Boolean)).toEqual(["X1", "X2", "X4", "X5", "X3,X6", "X6", "X7"]);
-    // Back to one: the strips given by section go; the one set by hand stays.
-    setTerminalStrips(p, "one");
-    renumber(p);
-    expect(stripsOf(p).filter(Boolean)).toEqual(["X1", "X1", "X1", "X1", "X3,X1", "X1", "X1"]);
-    expect(parseProject(JSON.parse(JSON.stringify({ ...p, numbering: { scheme: "position", strips: "section" } }))).numbering.strips).toBe("section");
-    expect(parseProject(JSON.parse(JSON.stringify(p))).numbering.strips).toBeUndefined();
+    expect(stripsOf(p)).toEqual(once);
   });
 
   test("a strip on the GA splits at a terminal onto the next rail; each part prints its range and keeps up with the schematic", () => {

@@ -13,8 +13,9 @@ export const FORMAT = "ferrule";
  * 5: v0.5 step 4a, one Contact and one Coil (contact-no, -nc, -co and timer-coil gone).
  * 6: v0.5 step 4b, a selector's changeover on the whole switch, 4 positions.
  * 7: v0.5 step 4c, a motor's picture is its type.
+ * 8: v0.5 step 5, no numbering settings (position only; strips follow on).
  */
-export const FORMAT_VERSION = 7;
+export const FORMAT_VERSION = 8;
 
 export type ParamValue = string | number | boolean;
 
@@ -625,23 +626,11 @@ export const DISTRIBUTION_KINDS: { value: DistributionKind; label: string }[] = 
   { value: "earth", label: "Earth" },
 ];
 
-export type NumberingScheme = "position" | "sequential";
-
 export interface Project {
   format: typeof FORMAT;
   version: number;
   id: string;
   project: ProjectInfo;
-  /** How renumbering assigns tags and wire numbers (DESIGN.md §8). */
-  numbering: {
-    scheme: NumberingScheme;
-    /**
-     * Terminal strips (v0.4.x T4): unset, every terminal is on X1 unless its
-     * strip is set; "section", Renumber gives each section's terminals a
-     * strip of their own.
-     */
-    strips?: "section";
-  };
   designation: { standard: string; overrides: Record<string, string> };
   titleBlock: string;
   plant: PlantItem[];
@@ -725,7 +714,6 @@ export function newProject(id: string, title = "Untitled project"): Project {
     version: FORMAT_VERSION,
     id,
     project: emptyInfo(title),
-    numbering: { scheme: "position" },
     designation: { standard: "iec-81346-2-2019", overrides: {} },
     titleBlock: "default-a4",
     plant: [],
