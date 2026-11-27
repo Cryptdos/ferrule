@@ -78,16 +78,18 @@ describe("v0.5 step 4c", () => {
 });
 
 describe("v0.5 step 5: project settings", () => {
-  test("A50: no numbering scheme in the project; A1: Client is the third of three equal cells on the title block's top row", async () => {
+  test("A50: no numbering scheme in the project; A1: the title block's rows are Sheet, Job no., Checked; Drawing ref., Drawn; Client", async () => {
     const { titleBlock } = await import("./titleblock");
     const p = newProject("t");
     expect("numbering" in p).toBe(false);
     p.project.client = "Example Client";
     const tb = titleBlock(p, p.pages[0]!);
     const cell = (l: string) => tb.cells.find((c) => c.label === l)!;
-    expect([cell("Sheet").w, cell("Job no.").w, cell("Client").w]).toEqual([24, 24, 24]);
-    expect([cell("Sheet").y, cell("Job no.").y, cell("Client").y]).toEqual([0, 0, 0]);
-    expect(cell("Client").x).toBe(cell("Job no.").x + 24);
+    const row = (...ls: string[]) => ls.map((l) => [cell(l).x - cell("Sheet").x, cell(l).y, cell(l).w]);
+    const third = tb.h / 3;
+    expect(row("Sheet", "Job no.", "Checked")).toEqual([[0, 0, 24], [24, 0, 24], [48, 0, 24]]);
+    expect(row("Drawing ref.", "Drawn")).toEqual([[0, third, 36], [36, third, 36]]);
+    expect(row("Client")).toEqual([[0, 2 * third, 72]]);
     expect(cell("Client").value).toBe("Example Client");
   });
 });

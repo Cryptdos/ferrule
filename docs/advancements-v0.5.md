@@ -31,8 +31,9 @@ A note from testing can go in as roughly as it comes (`DR-31, 0.4.5: wire kept i
 
 Found while writing the specification from the 0.4.5 source, and ruled on the same day. None has been tested by running the build.
 
-- [x] **A1. Client in the title block.** *Built: PR 126.* *Tweak. SH-15, PR-1. Build 0.4.5.* Client is entered under *Project…* but printed nowhere unless a text uses `{project:client}`. The title block's *Sheet* and *Job no.* cells are made narrower, leaving room for a third cell, *Client*, beside them on the same row. It's filled from the project's Client on every sheet.
+- [x] **A1. Client in the title block.** *Built: PRs 126 and 130.* *Tweak. SH-15, PR-1. Build 0.4.5.* Client is entered under *Project…* but printed nowhere unless a text uses `{project:client}`. The title block's *Sheet* and *Job no.* cells are made narrower, leaving room for a third cell, *Client*, beside them on the same row. It's filled from the project's Client on every sheet.
   - The three cells are equal widths (ruled 26 Nov 2026). Today the row is 72 mm, split into two cells of 36 mm, so three of 24 mm.
+  - Ruled 27 Nov 2026, after step 6: the cells are laid out again, in three rows of the same 72 mm. *Sheet*, *Job no.* and *Checked* in three equal cells; *Drawing ref.* and *Drawn* in two; *Client* across the whole width.
 
 - ~~**A2. `Ctrl+S`.**~~ *Withdrawn 25 Nov 2026.* It's already there and does no harm, so it's left as it is: it saves at once in Design, Draft and Annotate, and isn't handled in Layout or Simulate.
 

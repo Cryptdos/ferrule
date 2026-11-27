@@ -295,6 +295,10 @@ Judgement calls made while building, by step, with the reason.
 - **A supply out's distribution for the short check is the first one its wiring reaches**, in place of the one it was set to, so a battery and the UPS output it backs, both wired to one bus, still aren't a short.
 - **Removing the pickers moved the file format to 11.** CK-20 keeps its ID, saying there's no such check now.
 
+### Title block (ruled 27 Nov 2026, before step 7)
+
+- **A1 laid out again:** *Sheet*, *Job no.* and *Checked* in three equal cells (24 mm); *Drawing ref.* and *Drawn* in two (36 mm); *Client* across the row (72 mm). A long *Checked* name and date is squeezed to fit its cell, as every cell's value is.
+
 ## 7. After the build
 
 What QA on v0.5 starts from:
