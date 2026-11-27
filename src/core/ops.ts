@@ -1167,7 +1167,8 @@ export function updatePin(
     if (name) {
       const p = points.find((x) => x.name === name);
       if (p) p.pins = item.terminals.filter((t) => t === key || p.pins.includes(t));
-      else points.push({ name, form: "contact", pins: [key] });
+      // A new point is marked until its form is set (A67, A69).
+      else points.push({ name, form: "none", pins: [key] });
     }
     item.points = points;
   }
@@ -1188,7 +1189,25 @@ export function addPin(project: Project, plantId: string, number: string, after?
 
 export function deletePin(project: Project, plantId: string, pin: string): void {
   const item = getPlant(project, plantId);
+  // The others keep their numbers (A67): nothing renumbers by itself.
   updatePlant(project, plantId, { terminals: item.terminals.filter((t) => t !== pin) });
+}
+
+/** The next terminal number (A67): one more than the highest number it has, or 1. */
+export function nextPinNumber(item: PlantItem): string {
+  const nums = item.terminals.map((t) => Number(t)).filter((n) => Number.isInteger(n));
+  return String(nums.length ? Math.max(...nums) + 1 : item.terminals.length + 1);
+}
+
+/** Move a terminal in the list (A67): the order is the order it's drawn along a view. Numbers stay as they are. */
+export function movePin(project: Project, plantId: string, pin: string, to: number): void {
+  const item = getPlant(project, plantId);
+  const from = item.terminals.indexOf(pin);
+  if (from < 0) throw new OpError(`No terminal ${pin}`);
+  const terms = [...item.terminals];
+  terms.splice(from, 1);
+  terms.splice(Math.max(0, Math.min(terms.length, to)), 0, pin);
+  updatePlant(project, plantId, { terminals: terms });
 }
 
 /** A pin renumbered: its points, labels, views and wires follow. */

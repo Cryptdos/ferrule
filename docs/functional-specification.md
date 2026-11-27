@@ -132,7 +132,7 @@ IDs are kept when the document is revised: a withdrawn statement is struck throu
 
 ### Windows
 
-- **WN-10** Plant, Templates, Schedules, Table, Controller…, Distribution, Expectations…, Check, Settings and the rest open as windows: dragged by the title bar, `–` minimises to the title, `×` or `Esc` closes.
+- **WN-10** Plant, Templates, Schedules, Table, Terminals…, Distribution, Expectations…, Check, Settings and the rest open as windows: dragged by the title bar, `–` minimises to the title, `×` or `Esc` closes.
 - **WN-11** Windows don't block the drawing: you can scroll, select and edit behind them, and several can be open at once. Each stays where it was put for the session: reopened, it comes back there. After a reload every window, Properties and help start in their usual place; where they were isn't kept.
 - **WN-12** `Esc` on the drawing cancels what's being drawn or placed first; then closes the window on top; then clears the selection. While a window is being dragged, `Esc` cancels the drag and nothing else: the window goes back where it was, still open, and no tile stays lit.
 - **WN-13** With the keyboard focus in a text box or inside a window, the drawing's shortcuts (R, F, W, Del…) don't act on the drawing.
@@ -143,7 +143,7 @@ IDs are kept when the document is revised: a withdrawn statement is struck throu
 - **WN-15** Dragging a divider shares the space between tiles.
 - **WN-16** Each tile has its own sheet, zoom and pan; the same sheet can be open in two tiles.
 - **WN-17** Clicking a tile makes it active: it's outlined, and the browser, Properties, sheet list, overview, *Fit* and `PgUp`/`PgDn` follow it.
-- **WN-18** Everything that opens is a window, a prompt or a panel, and the kind decides whether it docks. A **window** is opened from a button and kept open to work beside, and closing it is the only way out: Plant, Templates, Schedules, Table, Controller…, Distribution, Expectations…, Check, Place parts…, Project…, Settings and help. A window dragged by its title bar close to the edge of a tile docks there, splitting the tile on that side; dragged anywhere else it just moves. Dragging the tile's bar out floats it again. A **prompt** is one step of an action, finished by a button (Renumber, Suggest…, Duplicate ×n, Open file… and Save as…, New GA sheet, a name to type, a question, a message), and always floats. A **panel** comes up by itself with what you're doing (Properties, the Simulation panel), and always floats.
+- **WN-18** Everything that opens is a window, a prompt or a panel, and the kind decides whether it docks. A **window** is opened from a button and kept open to work beside, and closing it is the only way out: Plant, Templates, Schedules, Table, Terminals…, Distribution, Expectations…, Check, Place parts…, Project…, Settings and help. A window dragged by its title bar close to the edge of a tile docks there, splitting the tile on that side; dragged anywhere else it just moves. Dragging the tile's bar out floats it again. A **prompt** is one step of an action, finished by a button (Renumber, Suggest…, Duplicate ×n, Open file… and Save as…, New GA sheet, a name to type, a question, a message), and always floats. A **panel** comes up by itself with what you're doing (Properties, the Simulation panel), and always floats.
 - **WN-19** Tiles aren't saved: a project opens with one.
 
 ### Settings and help
@@ -209,13 +209,13 @@ Design lists what the panel has before anything is drawn: systems, plant and poi
 
 ### A plant item's Properties
 
-- **DE-12** Fields: *Tag*; *Description*; *Prefix*; *System*; *Connects by* (Hardwired, Comms, Hardwired and comms); *Mark*; *Information* (printed under its box on the drawing); *In the panel*; *Power by others*; ~~*Pins, from the datasheet*~~ *(v0.5: A67)*. Buttons: *Terminals…*, *Duplicate ×n…*, *Save as template…*, *Delete plant*. Its points aren't listed here: each is picked in its own row (DE-19).
+- **DE-12** Fields: *Tag*; *Description*; *Prefix*; *System*; *Connects by* (Hardwired, Comms, Hardwired and comms); *Mark*; *Information* (printed under its box on the drawing); *In the panel*; *Power by others*. Buttons: *Terminals…*, *Duplicate ×n…*, *Save as template…*, *Delete plant*. Its points aren't listed here: each is picked in its own row (DE-19).
 - **DE-13** With the tag left empty, Renumber tags the plant from its prefix and where its first view is drawn (prefix `P` at sheet 3, column 12: `P3-12`; default prefix `U`). A typed tag is kept.
 - **DE-14** Choosing *Comms* or *Hardwired and comms* adds *Protocol* (free text) and *Network*.
 - **DE-15** *In the panel* (a power supply, UPS or battery) lists the plant under Panel, draws it above the boundary with solid, numbered wiring, and lets it be placed on a GA sheet like any panel part.
 - **DE-16** *Mark* puts a small picture in its view: ~~Temperature, Pressure, Humidity, ΔP switch,~~ *(v0.5: A66: typed as letters)* Valve, Damper, Meter, Power supply, Battery, or None.
 - **DE-17** *Power by others* draws a break on the left of its view.
-- **DE-18** *Pins* is one line, each point and its pins with `|` between: `enable: 1 2 | fault: 11 14`. Points not named in the line keep the pins they have. The same pin number can be in two points (a shared common). *(v0.5: A67. The line is in the Terminals window only)*
+- **DE-18** The one line (`Enable: 1 2 | Run: 11 14`) is at the foot of the Terminals window (DR-67): it follows the list, and typing or pasting into it changes the list. Points not named in the line keep the terminals they have. The same number in two points makes two terminals printed alike (`Run: 11 14 | Fault: 11 14`). A terminal two points share is shown under the first only, so a module's shared commons are changed in the list or by Generate, not in the line.
 - **DE-19** A point is edited in one place, its own Properties, by picking its row: its **name**, **form**, **signal** (free text; suggested: volt-free, 24 V, 230 V, 0–10 V, 4–20 mA, thermistor, pulse), **goes to** and **channel**, with how it's wired to its channel (DE-23). Shown, not set there: its terminals, with *Terminals…*. For an output, *In Simulate*: clicked, or follows (what, on or off, after how long). Its interlocks and expectations, with *+ Interlock* and *Expectations…*. *Delete point*.
 - **DE-20** Forms, from the plant's side, and the controller channel type each needs. In the list, and under the box once one is picked, each says in plain words what it is and the channel it needs:
 
@@ -260,7 +260,7 @@ Design lists what the panel has before anything is drawn: systems, plant and poi
 ### Controller view
 
 - **DE-37** With no controller the view says so and offers *Add the controller*. A panel has one controller; a file from before v0.4 with more than one shows them all.
-- **DE-38** The view shows the points still to allocate on the left (*Unallocated (n)*), and the controller's modules in rail order, each channel with the point on it or spare, and *n of m used* per module. *(v0.5: A67. Every module is shown on the rail, and picked there)*
+- **DE-38** The view shows the points still to allocate on the left (*Unallocated (n)*), and every module on the rail along the top, in rail order with its address: the host, power supply and adapters as well as IO modules, and spare slots dashed. Below, each module has a column: an IO module's channels, each with the point on it or spare and *n of m used*; a module with no channels, its points. Clicking a module on the rail, or its column's heading, picks it; dragging it along the rail moves it. Properties is on the right.
 - **DE-39** **Allocation is by hand.** Dragging a point onto a channel allocates it. While dragging, only channels that can take the point light up. A universal (UIO) channel takes any type.
 - **DE-40** The channel can also be picked in the table's *Channel* column or in Properties; both offer only free channels of the right type.
 - **DE-41** Dragging a point back to *Unallocated*, or picking it and pressing *Unallocate*, takes it off its channel.
@@ -268,18 +268,18 @@ Design lists what the panel has before anything is drawn: systems, plant and poi
 - **DE-43** A *via relay* point counts as allocated once it has a channel. A *panel only* point never appears as unallocated.
 - **DE-44** A channel's label follows the point on it (plant tag and point name, *DPS1 flow*) on the drawing and in the IO schedule, and changes when the point or plant is renamed or retagged. Taken off, the channel shows the label typed by hand again.
 
-### Controller… (the window)
+### Modules
 
-- **DE-45** ~~*Controller…* describes the controller (description, prefix) and lists its slots in rail order: address, tag, type, channels, maker, model, where drawn.~~ *(v0.5: A67: the window goes)*
+- **DE-45** There's no *Controller…* window. Clicking the controller's heading picks the controller: Properties shows its description, prefix and *Delete controller*.
 - **DE-46** Module types: Power supply (PSU), Host, Digital inputs (DI), Digital outputs (DO), Universal IO (UIO), Analogue inputs (AI), Analogue outputs (AO). The IO types take a channel count and are written `DI-8`, `UIO-16`. *(v0.5: A68. Adapter is added)*
-- **DE-47** *Add module* adds one of a type; *Add a saved model…* adds one entered before; *Add spare slot* leaves a slot for later. *(v0.5: A67. These are under `+ Module` on Design's row)*
-- **DE-48** A slot's bus address follows rail order unless set by hand (to match DIP switches). Clearing a hand-set address returns it to rail order.
-- **DE-49** *Generate…* fills a module's pins from a pattern: pin ids per channel (`VO RET CO`, `IO C`, `Y ⊥`), first pin number, names with `#` for the channel number (`AO#` → AO1, AO2…), the first channel's number, any shared pin and how many channels share it, and the form. *(v0.5: A67. Generate is in the Terminals window, on IO modules only)*
-- **DE-50** ~~*Pins and points…* edits a module's pins and each point's label by hand.~~ *(v0.5: A67)*
+- **DE-47** `+ Module ▾` on Design's row adds one at the end of the rail: a type with a channel count, a module saved before as a device, or a spare slot, left for later.
+- **DE-48** A slot's bus address follows rail order unless set by hand in the module's Properties (to match DIP switches). Clearing a hand-set address returns it to rail order.
+- **DE-49** *Generate* fills an IO module's terminals from a pattern, at the top of its Terminals window (on IO modules only, not plant, a host, a power supply or an adapter): channels; one channel's terminal ids (`VO RET CO`, `IO C`, `Y ⊥`), a dash using up a number without making a terminal; the first terminal number; the form; names with `#` for the channel (`AO#` → AO1, AO2…); counting from; a shared terminal and how many channels it serves. It says what it will make first (*Makes 16 channels and 4 shared terminals, numbered 1 to 36*), replaces the list, and asks first if any of its terminals are wired.
+- **DE-50** A module picked shows in Properties: *Type*, *Channels*, *Address*, its device (shown, not set), *Commons linked inside*, where it's drawn, and *Terminals…*, *Save as device*, *← Move*, *Move →* and *Delete module*. A channel picked shows the point on it with *Unallocate*, or, spare, its label typed by hand; a module's other point (a supply in, a serial port) its name, form and how it simulates. Both show their terminals with *Terminals…*.
 - **DE-51** *Commons linked* joins the module's commons (C, RET, 0 V) inside it: one return serves them all in Simulate and in the wiring check, and the view shows the link.
 - **DE-52** ~~*Draw (VA)* on a module is counted on the controller's power supply module in Simulate.~~ *(v0.5: A38)*
-- **DE-53** *Save model* keeps a module, pins and all, in the device table (and from there the shared library). *(v0.5: A67. It's Save as device, in the module's Properties)*
-- **DE-54** ~~The arrows move a module left or right along the rail; delete removes the module and every view of it.~~ *(v0.5: A67: dragged along the rail)*
+- **DE-53** *Save as device* in a module's Properties keeps it, its type, channels, terminals and points, in the device table (and from there the shared library), so the next one is added whole from `+ Module`.
+- **DE-54** A module is moved by dragging it along the rail, or with *← Move* and *Move →*; *Delete module* removes it and every view of it. A spare slot is picked on the rail too, to move or remove.
 - **DE-55** A module is tagged by where its first view is drawn, prefix **A**: at sheet 3, column 23 it's `A3-23`, and its points are `A3-23:DI2`. With a controller map in the set, modules take their tags from their place on the map.
 
 ### Suggest…
@@ -295,7 +295,7 @@ Design lists what the panel has before anything is drawn: systems, plant and poi
 - **DE-61** Devices are in table row order, which is the order along a bus. ↑ ↓ moves a device, and its row in the table moves with it.
 - **DE-62** Deleting a network leaves its devices on none.
 - **DE-63** The view draws the controller and a switch along the top (the switch only when there's a LAN), each LAN as a trunk off the switch with its devices, each bus as a chain from the controller. Past sixteen devices on a LAN or eight on a bus the rest are counted (*… FCU-17 to FCU-19 (3 more)*).
-- **DE-64** A bus can name its **Port**: a group of pins marked as a serial port in the controller's (or a device's) *Pins and points*. The sheet prints it at the controller end (*COM A: Drives bus*).
+- **DE-64** A bus can name its **Port**: a group of terminals marked as a serial port in the controller's (or a device's) Terminals window. The sheet prints it at the controller end (*COM A: Drives bus*).
 - **DE-65** Once that port has wires on it, the bus's devices and their order come from the drawing (*from the drawing*, no ↑ ↓), followed from the port to each device's serial port and on.
 - **DE-66** *Place as sheet* adds a spare sheet titled *Network diagram* at the end of the set, with a Network diagram on it that's redrawn whenever the networks change.
 - **DE-67** The switch is drawn only: it has no tag or ports. Addresses aren't held.
@@ -418,11 +418,11 @@ The electrical drawing: parts, wires, rails, plant views, numbering and links. I
 
 ### Plant views
 
-- **DR-63** Draft's *Plant* window lists the plant made in Design, ~~with its pins line,~~ *(v0.5: A67)* the sheets it's on, *Place view* and *Pins and points…*. Plant isn't created or deleted here. *(v0.5: A67. *Pins and points…* becomes *Terminals…*)*
+- **DR-63** Draft's *Plant* window lists the plant made in Design, the sheets it's on and *Place view*. Plant isn't created, deleted or given terminals here: that's Design, and its Terminals window.
 - **DR-64** *Place view* is available once the plant has pins.
 - **DR-65** A view shows the terminals ticked under *Terminals shown on this sheet*. Hidden terminals give the box a break line.
 - **DR-66** Pins sit in boxes along the view's edge with each point's name in capitals under them. The tag, description and information lines print under the box, wrapping to within about 1–2 units of the box's width.
-- **DR-67** ~~*Pins and points…* is the full table: each pin's **number** (what's wired), **id** (C, Y1, VO) and **group** (IO1, AO1), drawn when present; and each point's form, label and how it simulates (*Clicked in Simulate* or *Follows …*). A group can be ticked as a serial port.~~ *(v0.5: A67: the Terminals window)*
+- **DR-67** *Terminals…* (Design, on a plant or a module) opens one window, for plant and for modules, listing its terminals: a grip, **number** (what's wired), **id** (C, Y1, VO), **group** (IO1, AO1), drawn when present, and **point**, with delete. *Add terminal* adds one numbered one more than the highest. Rows are dragged to reorder: the list is the order they're drawn along a view. Numbers never change by themselves, after a delete or a reorder. A point name not used yet makes a point, marked in Design until its form is set. A group that isn't a channel's can be ticked as a serial port. Nothing about a point is edited here.
 - **DR-68** A view takes a **Width**: typed, dragged by its right edge, or *Fit to sheet*. Its groups of terminals then spread with equal gaps.
 - **DR-69** *Terminals on*: the top, bottom, left or right, for the whole view; with more than one group, each group can face its own side.
 - **DR-70** All plant views are at least as tall as a five-character pin name, so they line up.

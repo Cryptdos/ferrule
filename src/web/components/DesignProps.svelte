@@ -24,8 +24,8 @@
     type PointDesign,
   } from "../../core/design";
   import { CONNECTS, GOES_TO, PLANT_MARKS, POINT_FORMS, SIGNAL_SUGGESTIONS, type PointForm } from "../../core/model";
-  import { deletePlant, plantLabel, setQuickEntry, updatePlant } from "../../core/ops";
-  import { describeExpectation, formatQuickEntry, isOutputForm, pointRef, printedPin, things } from "../../core/points";
+  import { deletePlant, plantLabel, updatePlant } from "../../core/ops";
+  import { describeExpectation, isOutputForm, pointRef, printedPin, things } from "../../core/points";
   import { updatePoint } from "../../core/ops";
   import Conditions from "./Conditions.svelte";
   import type { Editor } from "../editor.svelte";
@@ -171,7 +171,7 @@
       <div class="section">Terminals</div>
       <div class="line terms">
         <span>{pt.pins.length ? pt.pins.map((x) => printedPin(x, pt.name)).join("  ") : "None yet"}</span>
-        <button onclick={() => (editor.terminalsOf = plant.id)} title="Where a terminal is given to a point">Terminals…</button>
+        <button onclick={() => editor.openTerminals(plant.id)} title="Where a terminal is given to a point">Terminals…</button>
       </div>
       {#if isOutputForm(pt.form)}
         <div class="section">In Simulate</div>
@@ -295,12 +295,8 @@
       </label>
       <label class="tick" title="A power supply, UPS or battery: listed under Panel, drawn above the boundary with solid, numbered wiring, placed on the GA"><input type="checkbox" checked={plant.inPanel === true} onchange={(e) => setPlant({ inPanel: e.currentTarget.checked })} /> In the panel (a power supply, UPS or battery: not field plant)</label>
       <label class="tick"><input type="checkbox" checked={plant.powerByOthers === true} onchange={(e) => editor.apply((p) => updatePlant(p, plant.id, { powerByOthers: e.currentTarget.checked }))} /> Power by others (its power isn't on these drawings)</label>
-      <label title="Each point and its pins, | between: enable: 1 2 | fault: 11 14. Points not listed keep what they have">Pins, from the datasheet
-        <input class="mono" value={formatQuickEntry(plant)} placeholder={plant.points?.length ? "None yet: given here, or when it's placed" : "e.g. Mains: L N E | Run: 1 2"}
-          onchange={(e) => editor.apply((p) => setQuickEntry(p, plant.id, e.currentTarget.value))} />
-      </label>
       <div class="actions">
-        <button onclick={() => (editor.terminalsOf = plant.id)} title="Its terminals, and the points they make">Terminals…</button>
+        <button onclick={() => editor.openTerminals(plant.id)} title="Its terminals, and the points they make">Terminals…</button>
         <button onclick={() => (editor.open.designDuplicate = true)}>Duplicate ×n…</button>
         <button onclick={() => (editor.open.designTemplates = true)}>Save as template…</button>
       </div>

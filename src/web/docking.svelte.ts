@@ -17,7 +17,7 @@ export const docking = $state<{
  * A prompt (one step of an action, finished by a button) and a panel
  * (Properties, the Simulation panel: they come up by themselves) always float.
  */
-export const DOCKABLE = ["plant", "templates", "schedules", "table", "controllers", "distribution", "expectations", "checks", "place", "project", "settings", "help"] as const;
+export const DOCKABLE = ["plant", "templates", "schedules", "table", "terminals", "distribution", "expectations", "checks", "place", "project", "settings", "help"] as const;
 export type DockableName = (typeof DOCKABLE)[number];
 export const isDockable = (name: string): name is DockableName => (DOCKABLE as readonly string[]).includes(name);
 
@@ -27,7 +27,7 @@ export const WINDOW_TITLES: Record<DockableName, string> = {
   templates: "Templates",
   schedules: "Schedules",
   table: "Table",
-  controllers: "Controllers",
+  terminals: "Terminals",
   distribution: "Distribution",
   expectations: "Expectations",
   checks: "Check",

@@ -42,8 +42,8 @@ export class Editor {
   mode: "design" | "draft" | "annotate" | "ga" | "simulate" = $state("draft");
   /** Which of Design's views is showing. */
   designView: "plant" | "controller" | "network" | "todraw" = $state("plant");
-  /** What's picked in Design: plant (ids, in the order picked), a point of the first, or a system by name. */
-  designPick: { plant: string[]; point?: string; system?: string } = $state({ plant: [] });
+  /** What's picked in Design: plant (ids, in the order picked), a point of the first, a system by name; in the Controller view, the controller itself or a spare slot. */
+  designPick: { plant: string[]; point?: string; system?: string; controller?: string; slot?: number } = $state({ plant: [] });
   /** Systems folded in Design's table (by name; "" is the unnamed group). Not saved. */
   designFolded: string[] = $state([]);
   /** Interlocks proved (design-v0.4 §6), by Check logic or Prove, for the drawing as it was then. Not saved. */
@@ -77,8 +77,13 @@ export class Editor {
   cancelProving(): void {
     this.stopProving = true;
   }
-  /** The plant or module whose Terminals window is open (A67). */
+  /** The plant or module the Terminals window shows (A67). */
   terminalsOf: string | null = $state(null);
+  /** Open the Terminals window on a plant item or module (A67). */
+  openTerminals(id: string): void {
+    this.terminalsOf = id;
+    this.open.terminals = true;
+  }
   placeSymbol: string | null = $state(null);
   /** A section template waiting to be stamped where you click. */
   stamp: { templateId: string; plant: import("../core/templates").PlantMapping; size: [number, number]; name: string } | null =
