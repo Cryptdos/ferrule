@@ -168,7 +168,12 @@ IDs are kept when the document is revised: a withdrawn statement is struck throu
 - **SH-3** `PgUp`/`PgDn` go to the previous and next sheet in every workbench except Design. It's always the very next sheet, whatever its kind, and the workbench doesn't change.
 - **SH-4** `▸` on a sheet lists what's on it for the workbench in use, in column order, each with its tag. Clicking a line selects that item and brings it into view.
 - **SH-5** *Find…* searches every sheet's contents and titles.
-- **SH-6** The `⚙` on a sheet, or double-clicking its name, opens its settings in Properties: *Sheet title*, *Sheet type* (Schematic, Spare, GA) and, on a schematic sheet, *Panel boundary*.
+- **SH-6** The `⚙` on a sheet, or double-clicking its name, opens its settings in Properties: *Sheet title*, *Sheet type* (Schematic, Spare, GA) and, on a schematic sheet, *Panel boundary*. On a GA sheet they go on, by its view:
+  - every view: *View*, and *Generic sizes…* for the project's generic part sizes;
+  - **Backplate:** *Scale* with *Fit*; *Enclosure width* and *height*; *Backplate width* and *height* (25 mm in unless typed over, with *25 mm in from the enclosure* once typed over); *Behind* (the whole panel, or a door), and *Size from its door* when it's behind one; each DIN rail's fill;
+  - **Door front:** *Scale* with *Fit*; *Door* (its own, laid out here, or one on another sheet); for its own door, *Width* and *height*, *Leaves* with each leaf's hinge and the left leaf's width, or for a modular door each column's width and each door's name, height and hinge with *Split* and *Join*; *Shows* (the whole door, a leaf or one door); *Add a backplate for each door* on a door of more than one;
+  - **Door back:** *Scale* with *Fit*; *Door* (the door front it's the back of); *Shows*; each DIN rail's fill;
+  - **Detail:** a note that it holds frames, with no enclosure and no scale of its own.
 - **SH-7** A spare sheet is badged *spare* and a GA sheet *GA* in the list.
 - **SH-8** A spare sheet holds annotations only (notes, tables, pictures). Draft and Layout are unavailable on it.
 - **SH-9** *Sheet type* changes a sheet's kind. Only an empty sheet can become a GA (otherwise it says how many things are on it), and a GA sheet with things laid out can't change type until they're deleted. A sheet with parts or wires on it can't become a spare sheet either: it says how many are in the way.
@@ -522,7 +527,7 @@ Tag prefixes follow IEC 81346-2 as applied in `docs/designations.md`. Untagged p
 
 Text, boxes, pictures, sections and clouds that explain the drawing. In Annotate only annotations can be selected; the drawing is grey and can't be picked. Selecting, moving, nudging, duplicating, deleting, aligning and undo work as in Draft (DR-6 to DR-12).
 
-- **AN-1** The parts list: under *Drawing*, Section, Revision cloud, Text, Box, Arrow, Highlight, Call-out, Polygon, Picture; under *Tables*, Revision list, Controller map, Network diagram, Symbol legend.
+- **AN-1** The parts list: under *Drawing*, Section, Revision cloud, Text, Box, Arrow, Highlight, Call-out, Polygon, Picture; under *Tables*, Revision list, Controller map, Network diagram, Bill of materials, Symbol legend.
 - **AN-2** **Text** is Markdown, with buttons for the usual marks: `# Title` (5 mm), `## Heading` (3.5 mm), `### Small heading` (bold), bold, italic, struck, code, bullets, numbered lists, task lists, quotes, fenced code, tables (a `|---|` row under the first makes it the heading row), and `---` for a line across. Links print as their text. Body text is 2.5 mm.
 - **AN-3** Text aligns left, centre or right, and wraps at the width set (0: no wrapping).
 - **AN-4** Text can hold fields that fill themselves in: any project detail as `{project:title}`, `{project:panelName}`, `{project:client}`, `{project:jobNo}`, `{project:drawingNo}`…; `{sheets}` (the number of sheets); `{rev}` (the latest revision); and plant fields (a plant's tag or description).
@@ -540,23 +545,24 @@ Text, boxes, pictures, sections and clouds that explain the drawing. In Annotate
 - **AN-16** **Controller map**: the controller's modules in rail order, one box each with its tag, its bus address in a circle, maker, model, type and every sheet-column it's drawn at; spare slots dashed. It wraps onto more rows to fit its width and keeps up by itself.
 - **AN-17** **Network diagram**: Design's networks (DE-63), redrawn as they change; its width is set in its properties.
 - **AN-18** `R`, or *Read up the page* in its properties, turns a Text to read up the page, its first line on the left, to run beside a vertical wire; `R` again (*Level*) sets it level. It turns no other way.
+- **AN-19** A **Bill of materials** table (*Tables*) lists the rows of the bill of materials (SC-8), everything placed on the GA sheets: GA sheet, item, maker, part number, quantity, unit and tags, long text cut to its column. It keeps itself up to date as the other tables do, and its *Size* sets its text. Placed before anything is on a GA sheet, it says so.
 
 ---
 
 ## 10. Layout (LA)
 
-General arrangement (GA) sheets drawn to scale. Positions and sizes are in millimetres, measured from the enclosure's top-left corner as the sheet sees it.
+General arrangement (GA) sheets drawn to scale. Positions and sizes are in millimetres, measured from the backplate's top-left corner on a backplate sheet, and from the door's (as the sheet sees it) on a door sheet.
 
 ### Sheets
 
-- **LA-1** A GA sheet is added from `▾` beside `+` in Sheets: *GA sheet…* asks for the view, the enclosure width and height, and the scale, adds the sheet after the current one and opens it in Layout. *(v0.5: A58. On a backplate sheet the size is the enclosure's, with the plate drawn inside it)*
+- **LA-1** A GA sheet is added from `▾` beside `+` in Sheets: *GA sheet…* asks for the view, the enclosure width and height (a door's, on a door sheet), and the scale, adds the sheet after the current one and opens it in Layout. On a backplate sheet the size typed is the enclosure's: its outline is drawn, dashed, for reference, and the **backplate** is drawn inside it, 25 mm in from each edge (600 × 800 gives a 550 × 750 plate), with both sizes in the sheet's title. The plate's size can be typed over in the sheet's settings, no larger than the enclosure, and sits in the middle of it. Positions and dimensions are measured from the plate's top-left corner: nothing snaps to the enclosure's outline or measures from it.
 - **LA-2** Views: **Backplate**, **Door front**, **Door back**, **Detail**.
-- **LA-3** The scale is any number typed (1:7.5, 1:12). ~~Left empty, or with *Fit* in the sheet's settings, it's the first of 1:1, 1:2, 1:2.5, 1:5, 1:10, 1:20, 1:25 and 1:50 at which the enclosure fits the sheet.~~ *(v0.5: A60)*
+- **LA-3** The scale is any number typed (1:7.5, 1:12). Left empty, or with *Fit* in the sheet's settings, it's the largest scale at which the enclosure fits the sheet beside its dimensions, to one decimal place (1:5.5), and never larger than 1:1. *Fit* pressed again on a sheet that already fits changes nothing.
 - **LA-4** A **door back** is drawn from its door front: seen from inside, mirrored, with the front's devices dashed with their cut-outs. The door front must exist first.
 - **LA-5** A door has **one leaf**, **two leaves**, or **columns of doors**: each column a width, each door in it a name, a height (the last takes what's left) and a hinge side; a door can be split in two up-and-down or side-by-side, or joined with the one below.
 - **LA-6** A device belongs to the door its centre is on and is dimensioned from that door's edges.
 - **LA-7** *Shows*: the whole door, both leaves, either leaf, or any one door, on a sheet of its own.
-- **LA-8** *Add a backplate for each door* makes a backplate sheet behind each door that hasn't one, sized from the door less 25 mm all round. A backplate's *Behind* says which door it's behind; *Size from its door* resizes it.
+- **LA-8** *Add a backplate for each door* makes a backplate sheet behind each door that hasn't one: the door's opening is its enclosure, and the plate is 25 mm in all round. A backplate's *Behind* says which door it's behind; *Size from its door* sizes it so again.
 
 ### Tools and items
 
@@ -582,7 +588,7 @@ General arrangement (GA) sheets drawn to scale. Positions and sizes are in milli
 
 - **LA-26** The **Detail** tool drags a dashed box round an area on any GA sheet. Boxes are lettered A, B, C… across the project, take a title, and are labelled with the sheet they're shown on: `A (13)`.
 - **LA-27** A GA sheet whose view is Detail has no enclosure and no scale of its own. *Place detail…* puts each detail in a **frame**.
-- **LA-28** A frame shows what's inside its box, cut off at the frame's edge, at the frame's own scale: 2:1, 1:1, 1:2 or 1:5 (the largest that fits, by default), with a caption `DETAIL A: SUPPLY FAN, 1:1 (12)` naming the sheet it's drawn on.
+- **LA-28** A frame shows what's inside its box, cut off at the frame's edge, at the frame's own scale: 2:1, 1:1, 1:2 or 1:5 (the largest that fits, to start with, and again with *Fit* beside the scale in its Properties), with a caption `DETAIL A: SUPPLY FAN, 1:1 (12)` naming the sheet it's drawn on.
 - **LA-29** Moving or sizing the box changes the frame.
 - **LA-30** You can work through a frame: pick, move, size and edit what it shows, and add rail, trunking or label plates in it. The change is made on the sheet the detail is drawn on and shows in both; Properties says which sheet.
 - **LA-31** A dimension drawn in a frame belongs to the frame and shows only there.
@@ -752,7 +758,7 @@ Design's findings appear only once a project uses Design.
 - **SC-5** **Markers:** one at each real end of a wire, where it lands on a terminal or a part; not at a tee or a link end, so a wire carried across two sheets has two. A panel wire on a supply says the supply's number; any other panel wire says the terminal it lands on, or its own number when it reaches none. A field core's say the terminal at the panel end and the device's tag at the field end. *Group duplicates* gives each marker once with a count. Renumber first.
 - **SC-6** **IO points:** Controller, Module, Point, Form, Pins, Label, Wired to (followed through link ends). With no controller it says *No controller yet (Design → Controller)*.
 - **SC-7** **Plant points:** Device, Description, Point, Form, Pins, Wired to.
-- **SC-8** **Bill of materials:** GA sheet, Item, Maker, Part number, Qty, Unit, Tags. It's counted from the GA sheets only: devices by the device picked (or their generic size), each distribution block on a line of its own saying the ways it needs (*needs at least 5 ways*), terminals each, label plates, and DIN rail and trunking by length. A schematic part never placed on a GA isn't on it (CK-41). *(v0.5: A71. Also as a table placed on a GA sheet)*
+- **SC-8** **Bill of materials:** GA sheet, Item, Maker, Part number, Qty, Unit, Tags. It's counted from the GA sheets only: devices by the device picked (or their generic size), each distribution block on a line of its own saying the ways it needs (*needs at least 5 ways*), terminals each, label plates, and DIN rail and trunking by length. A schematic part never placed on a GA isn't on it (CK-41). The same rows can be placed on a sheet as a table (AN-19).
 - **SC-9** **Export PDF** saves first, then downloads every sheet as one A4 landscape PDF on white, with osifont embedded.
 - **SC-10** PDF export uses Edge, or Chrome, in the background (or the browser named by `FERRULE_BROWSER`). If it can't, it says why and offers *Print → Save as PDF*, which makes the same sheets.
 - **SC-11** **Print** opens the same sheets in a new tab and opens the print dialog.

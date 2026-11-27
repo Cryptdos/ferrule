@@ -4,6 +4,7 @@ import { voltageBand, type Element, type Project } from "./model";
 import { isBar, requireSymbol, type GeometryText } from "./symbols";
 import { isTimed, masterOf, xrefText } from "./xref";
 import { resolveFields } from "./fields";
+import { billOfMaterials } from "./schedules";
 import { labelOnLinkEnd, routeOf, wireLabelOf } from "./wires";
 import { controllerMapEntries, moduleTitle } from "./modules";
 import { legendEntries, revisionRows } from "./annotations";
@@ -49,6 +50,7 @@ export function elementTexts(el: Element, project: Project): GeometryText {
   if (el.symbol === "ctrlmap") t.modules = controllerMapEntries(project, String(el.params.ctrl ?? ""));
   if (el.symbol === "netmap") t.network = networkData(project);
   if (el.symbol === "revtable") t.rows = revisionRows(project);
+  else if (el.symbol === "bomtable") t.bom = billOfMaterials(project).map((r) => [r.sheet, r.item, r.maker, r.part, String(Math.round(r.quantity * 100) / 100), r.unit, r.tags]);
   else if (el.symbol === "legend") t.legend = legendEntries(project);
   else if (isBar(el)) {
     // On a supply: a block or rail is named after it, with its tag (CCT 4, design-wire-numbering §2).

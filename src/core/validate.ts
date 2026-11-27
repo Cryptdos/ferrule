@@ -490,6 +490,9 @@ function parsePage(pg: Record<string, unknown>, i: number): Project["pages"][num
       .slice(0, 2)
       .map((l) => ({ w: l.w as number, hinge: l.hinge === "right" ? ("right" as const) : ("left" as const) }));
     if (ga.view === "door-front" && leaves.length) ga.leaves = leaves;
+    // A backplate's plate typed over (v0.5 A58), no larger than its enclosure.
+    const pl = pg.ga.plate;
+    if (ga.view === "backplate" && isObj(pl) && typeof pl.w === "number" && typeof pl.h === "number" && pl.w > 0 && pl.h > 0 && pl.w <= ga.enclosure.w && pl.h <= ga.enclosure.h) ga.plate = { w: pl.w, h: pl.h };
     // A modular door's columns of stacked doors (v0.4.x M13).
     const hinge = (v: unknown) => (v === "right" ? ("right" as const) : ("left" as const));
     const columns = arr(pg.ga.columns)

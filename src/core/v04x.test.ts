@@ -28,7 +28,7 @@ import { Nets } from "./wiring";
 import { moveOnNetwork, networkChain, networkData, putOnNetwork, updateNetwork } from "./network";
 import { designChecks } from "./checks";
 import { networkDiagram } from "./networkdraw";
-import { ENCL, PLATE_MARGIN, gaCandidates, sizeKey, dimLayout, doorPanes, plateDoor, platesOf, drawnGaItems, gaFrame, paneOf, paneRef, sheetPanes } from "./ga";
+import { ENCL, PLATE_MARGIN, plateRect, gaCandidates, sizeKey, dimLayout, doorPanes, plateDoor, platesOf, drawnGaItems, gaFrame, paneOf, paneRef, sheetPanes } from "./ga";
 import { renumber } from "./renumber";
 import { deleteGaItems, deleteElements, splitGaStrip, updateGaItem, updateSection } from "./ops";
 import { itemStrip, plateTextLayout, stripLabel, stripParts, syncGaStrips } from "./ga";
@@ -203,13 +203,14 @@ describe("step 1b: modular doors (M13)", () => {
     expect(doorPanes(front).length).toBe(1);
   });
 
-  test("a backplate for each door: the door's size less the margin, named for it, in column then row order", () => {
+  test("a backplate for each door: the door's opening its enclosure, the plate the margin in (v0.5 A58), named for it, in column then row order", () => {
     const { p, front } = twoByThree();
     const plates = addPlatesForDoors(p, front.id);
     expect(plates.length).toBe(6);
     expect(plates.map((x) => x.ga!.behind!.pane)).toEqual([[0, 0], [0, 1], [0, 2], [1, 0], [1, 1], [1, 2]]);
     expect(plates[0]!.title).toBe("Backplate: Incomer");
-    expect(plates[3]!.ga!.enclosure).toEqual({ w: 600 - 2 * PLATE_MARGIN, h: 600 - 2 * PLATE_MARGIN });
+    expect(plates[3]!.ga!.enclosure).toEqual({ w: 600, h: 600 });
+    expect(plateRect(plates[3]!.ga!)).toEqual({ x: PLATE_MARGIN, y: PLATE_MARGIN, w: 600 - 2 * PLATE_MARGIN, h: 600 - 2 * PLATE_MARGIN });
     expect(plateDoor(p, plates[3]!)?.pane).toMatchObject({ col: 1, row: 0 });
     expect(platesOf(p, front).get("1:0")?.id).toBe(plates[3]!.id);
     // Doors that have one are skipped; a plate's size is its own once made.
@@ -1074,7 +1075,7 @@ describe("step 12: cores per device, markers, enclosure fit (T18, M10, T20)", ()
     const back = p.pages.find((pg) => pg.ga?.view === "backplate")!;
     const rail = back.gaItems!.find((it) => it.kind === "rail")!;
     rail.w = 760;
-    expect(msgs()).toContain(`Sheet ${back.number}: a DIN rail lies outside the backplate (800 × 1200 mm)`);
+    expect(msgs()).toContain(`Sheet ${back.number}: a DIN rail lies outside the backplate (750 × 1150 mm)`);
     rail.w = 640;
     const door = p.pages.find((pg) => pg.ga?.view === "door-front")!;
     door.ga!.leaves = [{ w: 400, hinge: "left" }, { w: 400, hinge: "right" }];

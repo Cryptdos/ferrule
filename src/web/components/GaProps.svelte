@@ -7,6 +7,7 @@
     deviceSize,
     gaItemDevice,
     itemStrip,
+    plateRect,
     doorColumns,
     doorLeaves,
     doorPanes,
@@ -29,6 +30,7 @@
     frameCaption,
     frameOf,
     zoomText,
+    fitZoom,
   } from "../../core/ga";
   import type { DoorLeaf, GaView, TextPlace } from "../../core/model";
   /** The nine places for a label plate's text, row by row. */
@@ -129,9 +131,15 @@
       <p class="hint">{frameCaption(editor.project, one)}</p>
       <label>
         Scale
-        <select value={String(one.zoom ?? 1)} onchange={(e) => editor.apply((p) => updateGaItem(p, ip.id, one.id, { zoom: Number(e.currentTarget.value) }))}>
-          {#each DETAIL_ZOOMS as k (k)}<option value={String(k)}>{zoomText(k)}</option>{/each}
-        </select>
+        <span class="scale">
+          <select value={String(one.zoom ?? 1)} onchange={(e) => editor.apply((p) => updateGaItem(p, ip.id, one.id, { zoom: Number(e.currentTarget.value) }))}>
+            {#each DETAIL_ZOOMS as k (k)}<option value={String(k)}>{zoomText(k)}</option>{/each}
+          </select>
+          {#if d}
+            {@const best = fitZoom(d.it.w, d.it.h)}
+            <button title="The largest that fits the sheet, as a new frame starts: {zoomText(best)}" onclick={() => editor.apply((p) => updateGaItem(p, ip.id, one.id, { zoom: best }))}>Fit</button>
+          {/if}
+        </span>
       </label>
       {#if d}<button class="link-btn" onclick={() => editor.goTo(d.it.id)}>Show detail {d.it.letter} on sheet {d.page.number} →</button>{/if}
     {/if}
@@ -337,8 +345,8 @@
     {/if}
     {#if !page.ga.of && page.ga.view !== "detail"}
       <div class="grid">
-        <label>Width (mm)<input type="number" step="10" value={page.ga.enclosure.w} onchange={(e) => editor.apply((p) => setGaSettings(p, editor.pageId, { enclosure: { w: num(e.currentTarget.value), h: page.ga!.enclosure.h } }))} /></label>
-        <label>Height (mm)<input type="number" step="10" value={page.ga.enclosure.h} onchange={(e) => editor.apply((p) => setGaSettings(p, editor.pageId, { enclosure: { w: page.ga!.enclosure.w, h: num(e.currentTarget.value) } }))} /></label>
+        <label>{page.ga.view === "backplate" ? "Enclosure width (mm)" : "Width (mm)"}<input type="number" step="10" value={page.ga.enclosure.w} onchange={(e) => editor.apply((p) => setGaSettings(p, editor.pageId, { enclosure: { w: num(e.currentTarget.value), h: page.ga!.enclosure.h } }))} /></label>
+        <label>{page.ga.view === "backplate" ? "Enclosure height (mm)" : "Height (mm)"}<input type="number" step="10" value={page.ga.enclosure.h} onchange={(e) => editor.apply((p) => setGaSettings(p, editor.pageId, { enclosure: { w: page.ga!.enclosure.w, h: num(e.currentTarget.value) } }))} /></label>
       </div>
     {/if}
     {#if ownDoor}
@@ -450,6 +458,13 @@
       </div>
     {/if}
     {#if page.ga.view === "backplate"}
+      <!-- The plate inside the enclosure (v0.5 A58): 25 mm in from each edge unless typed over; positions are measured from its corner. -->
+      {@const pr = plateRect(page.ga)}
+      <div class="grid" title="The backplate is drawn inside the enclosure, 25 mm in from each edge unless typed over here. Positions and dimensions are measured from its top-left corner">
+        <label>Backplate width (mm)<input type="number" step="5" value={pr.w} onchange={(e) => editor.apply((p) => setGaSettings(p, editor.pageId, { plate: { w: num(e.currentTarget.value), h: pr.h } }))} /></label>
+        <label>Backplate height (mm)<input type="number" step="5" value={pr.h} onchange={(e) => editor.apply((p) => setGaSettings(p, editor.pageId, { plate: { w: pr.w, h: num(e.currentTarget.value) } }))} /></label>
+      </div>
+      {#if page.ga.plate}<div class="buttons"><button onclick={() => editor.apply((p) => setGaSettings(p, editor.pageId, { plate: null }))} title="Back to 25 mm in from each edge of the enclosure">25 mm in from the enclosure</button></div>{/if}
       <label>
         Behind
         <select
@@ -466,7 +481,7 @@
       </label>
       {#if page.ga.behind && !plateDoor(editor.project, page)}<p class="hint warn">The door it was behind has been joined to another or removed.</p>{/if}
       {#if plateDoor(editor.project, page)}
-        <div class="buttons"><button onclick={() => editor.apply((p) => sizePlateFromDoor(p, editor.pageId))} title="Its door's width and height, less 25 mm all round">Size from its door</button></div>
+        <div class="buttons"><button onclick={() => editor.apply((p) => sizePlateFromDoor(p, editor.pageId))} title="Its door's opening is its enclosure, the plate 25 mm in all round">Size from its door</button></div>
       {/if}
     {/if}
     {#if page.ga.view === "door-back"}
@@ -480,7 +495,7 @@
     {#if sheetLeaves(editor.project, page).length === 0 && page.ga.view === "door-back"}<p class="hint warn">Pick the door this is the back of.</p>{/if}
     <p class="hint">
       The Layout tools are in the browser on the left; parts from the schematic in <em>Place parts…</em>.
-      Positions are measured from the enclosure's top-left corner, as this sheet sees it.
+      Positions are measured from {page.ga.view === "backplate" ? "the backplate's top-left corner" : "the enclosure's top-left corner, as this sheet sees it"}.
     </p>
     <div class="buttons">
       <button onclick={() => (showSizes = !showSizes)} title="The size each kind of part has when no device is picked">{showSizes ? "Hide generic sizes" : "Generic sizes…"}</button>

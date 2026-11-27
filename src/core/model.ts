@@ -23,8 +23,9 @@ export const FORMAT = "ferrule";
  * 15: v0.5 step 8c, a module can be an adapter; a plant's mark is a picture or Other with letters.
  * 16: v0.5 step 8d, a device is picked for a part, a strip or a plant item, not for what's placed on a GA.
  * 17: v0.5 step 8d, what a thing takes, gives and draws is on its device; an incoming supply's gives is a value and AC or DC.
+ * 18: v0.5 step 9, a backplate sheet's size is its enclosure's, its plate inside, positions measured from the plate.
  */
-export const FORMAT_VERSION = 17;
+export const FORMAT_VERSION = 18;
 
 export type ParamValue = string | number | boolean;
 
@@ -138,6 +139,12 @@ export interface GaSettings {
   scale: number;
   /** Inside of the enclosure, or the door, mm. A door view of another sheet's door takes that door's size. */
   enclosure: { w: number; h: number };
+  /**
+   * A backplate sheet's plate, mm, typed over (v0.5 A58). Unset: 25 mm in
+   * from each edge of the enclosure. The plate sits in the middle of the
+   * enclosure, and positions on the sheet are measured from its top-left corner.
+   */
+  plate?: { w: number; h: number };
   /**
    * What the sheet shows: the backplate, the door from the front (what the
    * operator sees) or the door from inside (mirrored: what's mounted through

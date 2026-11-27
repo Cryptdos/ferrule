@@ -4,7 +4,7 @@
  */
 import { distributionChecks, supplyChecks } from "./supplies";
 import { loadText, supplyLoads, usesLoads } from "./supplyload";
-import { allDetails, allFrames, sheetLeaves, changedGaStrips, detailOf, doorOwner, frameOf, gaCandidates, paneName, panesUnder, plateDoor, railFill, railNumber } from "./ga";
+import { plateRect, allDetails, allFrames, sheetLeaves, changedGaStrips, detailOf, doorOwner, frameOf, gaCandidates, paneName, panesUnder, plateDoor, railFill, railNumber } from "./ga";
 import { compile, pinNode } from "./sim";
 import { controllerName, modulesOf, moduleTypeName, slotAddress, viewsOf } from "./modules";
 import { contactPins, isAnalogueForm, isInputForm, missingRefs, describeExpectation, things } from "./points";
@@ -246,12 +246,13 @@ export function checkProject(project: Project, opts: { proofs?: Proofs | null } 
       if (page.ga?.view === "backplate" && page.ga.behind) {
         const d = plateDoor(project, page);
         if (!d) out.push({ level: "info", message: `Sheet ${page.number}: its backplate's door has been joined to another or removed, so nothing is behind it now: pick its door in Sheet settings, or clear it`, pageId: page.id, ids: [] });
-        else if (page.ga.enclosure.w > d.pane.w + 0.01 || page.ga.enclosure.h > d.pane.h + 0.01)
-          out.push({ level: "info", message: `Sheet ${page.number}: the backplate (${page.ga.enclosure.w} × ${page.ga.enclosure.h} mm) is larger than its door's opening, ${paneName(d.pane)} (${d.pane.w} × ${d.pane.h} mm)`, pageId: page.id, ids: [] });
+        else if (plateRect(page.ga).w > d.pane.w + 0.01 || plateRect(page.ga).h > d.pane.h + 0.01)
+          out.push({ level: "info", message: `Sheet ${page.number}: the backplate (${plateRect(page.ga).w} × ${plateRect(page.ga).h} mm) is larger than its door's opening, ${paneName(d.pane)} (${d.pane.w} × ${d.pane.h} mm)`, pageId: page.id, ids: [] });
       }
       // Does it fit (v0.4.x T20)? Rails, trunking, devices and label plates inside the backplate, or the door and one leaf of it.
       if (page.ga && (page.ga.view === "backplate" || (page.ga.view === "door-front" && !page.ga.of))) {
-        const { w: W, h: H } = page.ga.enclosure;
+        // A backplate's positions are measured from its plate (v0.5 A58).
+        const { w: W, h: H } = page.ga.view === "backplate" ? plateRect(page.ga) : page.ga.enclosure;
         const door = page.ga.view === "door-front";
         const leaves = door && !page.ga.columns?.length ? sheetLeaves(project, page) : [];
         const e = 0.5;
@@ -568,7 +569,7 @@ const NOT_EQUIPMENT = new Set(["terminal", "plant-view", "junction", "link", "bu
  * drawn are in controllerChecks.
  */
 /** Parts whose body doesn't count as something a label can overlap: rails, blocks, annotations. */
-const NOT_A_BODY = new Set(["busbar", "rail", "terminal", "junction", "text", "box", "arrow", "highlight", "callout", "polygon", "image", "revtable", "ctrlmap", "netmap", "legend", "strip-line", "screen"]);
+const NOT_A_BODY = new Set(["busbar", "rail", "terminal", "junction", "text", "box", "arrow", "highlight", "callout", "polygon", "image", "revtable", "ctrlmap", "netmap", "legend", "bomtable", "strip-line", "screen"]);
 
 /**
  * A hint, not a solver (v0.4.x T7): a part's label block that overlaps

@@ -74,8 +74,9 @@
       {#if view === "door-back" && !doorFronts.length}<p class="hint warn">Add the door front first: the back is drawn from it.</p>{/if}
     {/if}
     {#if !owner && view !== "detail"}
-      <label>Width (mm) <input type="number" min="50" step="10" bind:value={w} /></label>
-      <label>Height (mm) <input type="number" min="50" step="10" bind:value={h} /></label>
+      <label>{view === "backplate" ? "Enclosure width (mm)" : "Width (mm)"} <input type="number" min="50" step="10" bind:value={w} /></label>
+      <label>{view === "backplate" ? "Enclosure height (mm)" : "Height (mm)"} <input type="number" min="50" step="10" bind:value={h} /></label>
+      {#if view === "backplate"}<p class="hint">The backplate is drawn inside, 25 mm in from each edge ({Math.max(10, w - 50)} × {Math.max(10, h - 50)} mm), and positions are measured from its corner. Its size can be typed over in Sheet settings.</p>{/if}
     {/if}
     {#if view === "door-front" && !owner}
       <label>

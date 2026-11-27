@@ -786,7 +786,7 @@ export const TOOLS: Tool[] = [
   {
     name: "place_controller",
     description:
-      "Lay a controller's modules out on a GA sheet (backplate or door back), side by side in rail order from x, y (mm from the enclosure's top-left corner: the left end and top), snapped onto a DIN rail they sit across. Each is sized by its model from the device table, else generically by type and channels. Modules already on a GA are left where they are.",
+      "Lay a controller's modules out on a GA sheet (backplate or door back), side by side in rail order from x, y (mm from the top-left corner of the backplate, or of the door: the left end and top), snapped onto a DIN rail they sit across. Each is sized by its model from the device table, else generically by type and channels. Modules already on a GA are left where they are.",
     inputSchema: obj(
       { project, sheet, controller: { type: "string", description: "Controller id, tag or description" }, x: { type: "number" }, y: { type: "number" } },
       ["project", "sheet", "controller", "x", "y"],

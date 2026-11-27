@@ -379,6 +379,49 @@ export function revisionTable(rows: string[][], min: number, size: number): { pr
 }
 
 // ---------------------------------------------------------------------------
+// Bill of materials (v0.5 A71)
+
+/** The bill of materials table's columns: widths in multiples of the text size. */
+export const BOM_COLUMNS = [
+  { title: "SHEET", w: 4.5 },
+  { title: "ITEM", w: 30 },
+  { title: "MAKER", w: 12 },
+  { title: "PART NO.", w: 13 },
+  { title: "QTY", w: 4.5 },
+  { title: "UNIT", w: 5 },
+  { title: "TAGS", w: 22 },
+] as const;
+
+/**
+ * The bill of materials as a table on a sheet (v0.5 A71): the rows of the
+ * Schedules tab, everything placed on the GA sheets. Long text is cut to its
+ * column; the table grows with its rows.
+ */
+export function bomTable(rows: string[][], size: number): { prims: Prim[]; w: number; h: number } {
+  const rowH = size * 1.8;
+  const cols = BOM_COLUMNS.map((c) => ({ ...c, w: c.w * size }));
+  const total = cols.reduce((a, c) => a + c.w, 0);
+  const all = rows.length ? rows : [["", "Nothing placed on a GA sheet yet", "", "", "", "", ""]];
+  const prims: Prim[] = [];
+  const n = all.length + 1;
+  const mid = (r: number) => r * rowH + rowH / 2 + (size * CAP_HEIGHT) / 2;
+  let x = 0;
+  cols.forEach((c, ci) => {
+    prims.push(txt(x + size * 0.5, mid(0), c.title, size, true));
+    all.forEach((r, ri) => {
+      let s = r[ci] ?? "";
+      while (s && textWidth(s, size) > c.w - size) s = s.slice(0, -2) + "…";
+      if (s) prims.push(txt(x + size * 0.5, mid(ri + 1), s, size));
+    });
+    x += c.w;
+    prims.push(vline(x, 0, n * rowH, ci === cols.length - 1 ? RULE : THIN));
+  });
+  prims.push(vline(0, 0, n * rowH, RULE));
+  for (let r = 0; r <= n; r++) prims.push(hline(0, total, r * rowH, r === 0 || r === 1 || r === n ? RULE : THIN));
+  return { prims, w: total, h: n * rowH };
+}
+
+// ---------------------------------------------------------------------------
 // Symbol legend
 
 /** The params that make a part look different (and mean something different). */
