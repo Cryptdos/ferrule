@@ -708,7 +708,7 @@ export const TOOLS: Tool[] = [
   {
     name: "add_module",
     description:
-      "Add a module to a controller's rail, or change one (give 'module': its tag or id). type: psu, host, di, do, uio, ai, ao; channels is its count (a DI-8 is type di, channels 8). Its pins are generated from pattern {channels, ids, first, group, start, shared, shareBy, form} (default: the type's usual one): ids are each channel's pin ids in order ('VO RET CO', 'IO C', 'Y ⊥'), first the first pin number, group the name pattern ('DI#' → DI1, DI2…), start the first channel's number (for numbering across a controller), shared ids shared by shareBy channels (a common), form each channel's point form. Giving pattern to an existing module regenerates its pins (points that keep their name keep their form and label). labels sets what each point does on this job: {DI1: 'SF-01 running'}, printed along its wire. spare: true adds a spare slot instead. Fine-tune pins with add_plant (plant: the module's tag) and its pins/points. Place its views with place_plant_view, near the top of a sheet: a module view's terminals are along its bottom edge.",
+      "Add a module to a controller's rail, or change one (give 'module': its tag or id). type: psu, host, adapter, di, do, uio, ai, ao (an adapter carries the bus and power on to further modules: no channels, its terminals entered by hand); channels is its count (a DI-8 is type di, channels 8). Its pins are generated from pattern {channels, ids, first, group, start, shared, shareBy, form} (default: the type's usual one): ids are each channel's pin ids in order ('VO RET CO', 'IO C', 'Y ⊥'), first the first pin number, group the name pattern ('DI#' → DI1, DI2…), start the first channel's number (for numbering across a controller), shared ids shared by shareBy channels (a common), form each channel's point form. Giving pattern to an existing module regenerates its pins (points that keep their name keep their form and label). labels sets what each point does on this job: {DI1: 'SF-01 running'}, printed along its wire. spare: true adds a spare slot instead. Fine-tune pins with add_plant (plant: the module's tag) and its pins/points. Place its views with place_plant_view, near the top of a sheet: a module view's terminals are along its bottom edge.",
     inputSchema: obj(
       {
         project,
@@ -776,7 +776,7 @@ export const TOOLS: Tool[] = [
             maker: s("maker"),
             model: s("model"),
             at: n("at"),
-            pattern: a.pattern !== undefined ? patternArg(t, n("channels"), a.pattern) : t === "host" ? null : undefined,
+            pattern: a.pattern !== undefined ? patternArg(t, n("channels"), a.pattern) : t === "host" || t === "adapter" ? null : undefined,
           });
           if (typeof a.address === "number") updateModule(p, item.id, { address: a.address });
         }

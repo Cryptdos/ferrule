@@ -23,6 +23,7 @@ export const MODULE_TYPES: {
 }[] = [
   { value: "psu", label: "Power supply", short: "PSU", heading: "Power supply", channels: false },
   { value: "host", label: "Host", short: "Host", heading: "Host", channels: false },
+  { value: "adapter", label: "Adapter", short: "Adapter", heading: "Adapter", channels: false },
   { value: "di", label: "Digital inputs", short: "DI", heading: "Digital inputs", channels: true },
   { value: "do", label: "Digital outputs", short: "DO", heading: "Digital outputs", channels: true },
   { value: "uio", label: "Universal IO", short: "UIO", heading: "Universal IO", channels: true },

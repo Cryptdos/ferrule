@@ -1325,7 +1325,7 @@ export function setGroupSide(project: Project, pageId: string, id: string, group
   else delete el.params.sides;
 }
 
-export const PLANT_VIEW_KEYS = ["plant", "show", "terms", "pdesc", "pinfo", "ppins", "pgroups", "pbo", "pmod", "pmark"];
+export const PLANT_VIEW_KEYS = ["plant", "show", "terms", "pdesc", "pinfo", "ppins", "pgroups", "pbo", "pmod", "pmark", "pmarkt"];
 
 export function syncPlantViews(project: Project): void {
   for (const page of project.pages) {
@@ -1343,6 +1343,8 @@ export function syncPlantViews(project: Project): void {
       el.params.pbo = item?.powerByOthers === true;
       if (item?.mark) el.params.pmark = item.mark;
       else delete el.params.pmark;
+      if (item?.mark === "other" && item.markText) el.params.pmarkt = item.markText;
+      else delete el.params.pmarkt;
       // A controller's module is drawn at the top of the sheet, terminals underneath (controller.md §5).
       if (item?.module) {
         el.params.pmod = moduleParam(item);

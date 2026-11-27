@@ -344,6 +344,7 @@ export const GA_SIZES: Record<string, GaSize> = {
   handle: { w: 65, h: 65, label: "Door handle (isolator worked through the door)" },
   ctrlPsu: { w: 36, h: 90, label: "Controller power supply" },
   ctrlHost: { w: 90, h: 100, label: "Controller host" },
+  ctrlAdapter: { w: 22.5, h: 90, label: "Controller adapter" },
   ctrlIo: { w: 9, h: 100, label: "Controller IO module, per 2 channels", perPole: true },
   panelPlant: { w: 50, h: 90, label: "Panel device (power supply, UPS, battery)" },
   connBlock: { w: 6, h: 45, label: "Connector block, per 2 terminals", perPole: true },
@@ -359,7 +360,8 @@ export function moduleGaSize(project: Project, item: PlantItem): { w: number; h:
   // Plant in the panel (v0.4.x T3): one size for all, until a device is picked.
   if (!m) return { w: sizes.panelPlant!.w, h: sizes.panelPlant!.h };
   if (m?.type === "psu") return { w: sizes.ctrlPsu!.w, h: sizes.ctrlPsu!.h };
-  if (!m || m.type === "host") return { w: sizes.ctrlHost!.w, h: sizes.ctrlHost!.h };
+  if (m.type === "adapter") return { w: sizes.ctrlAdapter!.w, h: sizes.ctrlAdapter!.h };
+  if (m.type === "host") return { w: sizes.ctrlHost!.w, h: sizes.ctrlHost!.h };
   const io = sizes.ctrlIo!;
   return { w: Math.round(io.w * Math.ceil(Math.max(4, m.channels ?? 8) / 2) * 10) / 10, h: io.h };
 }

@@ -20,8 +20,9 @@ export const FORMAT = "ferrule";
  * 12: v0.5 step 7a, a wire's label is placed as one (labelAt).
  * 13: v0.5 step 7b, link ends in place of link arrows (symbol link).
  * 14: v0.5 step 8a, a point's form can be none yet; plant has no Enabled by or Source.
+ * 15: v0.5 step 8c, a module can be an adapter; a plant's mark is a picture or Other with letters.
  */
-export const FORMAT_VERSION = 14;
+export const FORMAT_VERSION = 15;
 
 export type ParamValue = string | number | boolean;
 
@@ -284,8 +285,10 @@ export interface PlantItem {
   terminals: string[];
   /** Its power supply isn't on these drawings: a break on the left, marked POWER BY OTHERS. */
   powerByOthers?: boolean;
-  /** A small picture inside its view's box (v0.4.x M1): what kind of device it is. The picture only. */
+  /** A small picture inside its view's box (v0.4.x M1): what kind of device it is. *Other* draws `markText` instead (v0.5 A66). */
   mark?: PlantMark;
+  /** With the mark *Other*: up to four letters (T, RH, ΔP, CO2), in a circle, or a lozenge for three or four. */
+  markText?: string;
   /**
    * In the panel (v0.4.x T3): a power supply, UPS or battery. Still plant
    * (points, pins, a view), but listed under *Panel* in Design, drawn above
@@ -361,7 +364,7 @@ export interface Network {
 }
 
 /** The generic module types Ferrule ships (controller.md §4). */
-export type ModuleType = "psu" | "host" | "di" | "do" | "uio" | "ai" | "ao";
+export type ModuleType = "psu" | "host" | "adapter" | "di" | "do" | "uio" | "ai" | "ao";
 
 /** What makes a plant item a controller's module. */
 export interface ModuleInfo {
@@ -454,19 +457,22 @@ export const INPUT_FORMS: PointForm[] = ["dry-in", "powered-in", "supply-in"];
 export const OUTPUT_FORMS: PointForm[] = ["contact", "powered-out", "supply-out"];
 export const ANALOGUE_FORMS: PointForm[] = ["analogue-in", "analogue-out"];
 
-/** Field device marks drawn inside a plant view (v0.4.x M1). */
-export type PlantMark = "temperature" | "pressure" | "humidity" | "dp-switch" | "valve" | "damper" | "meter" | "power-supply" | "battery";
+/** Field device marks drawn inside a plant view (v0.4.x M1): pictures, or *Other* with letters typed (v0.5 A66). */
+export type PlantMark = "fan" | "pump" | "valve" | "damper" | "meter" | "power-supply" | "battery" | "other";
 export const PLANT_MARKS: { value: PlantMark; label: string }[] = [
-  { value: "temperature", label: "Temperature" },
-  { value: "pressure", label: "Pressure" },
-  { value: "humidity", label: "Humidity" },
-  { value: "dp-switch", label: "ΔP switch" },
+  { value: "fan", label: "Fan" },
+  { value: "pump", label: "Pump" },
   { value: "valve", label: "Valve" },
   { value: "damper", label: "Damper" },
   { value: "meter", label: "Meter" },
   { value: "power-supply", label: "Power supply" },
   { value: "battery", label: "Battery" },
+  { value: "other", label: "Other" },
 ];
+/** The most letters a mark can have (v0.5 A66). */
+export const MARK_LETTERS = 4;
+/** Letters for the mark *Other*: trimmed, at most four characters. */
+export const markLetters = (s: string): string => [...s.trim()].slice(0, MARK_LETTERS).join("");
 
 /** What a supply gives or a load takes (v0.4.x M11): 24 V DC, 230 V AC… */
 export interface SupplyType {

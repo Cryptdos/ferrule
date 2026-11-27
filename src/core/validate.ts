@@ -13,7 +13,7 @@ import { AREA_UNITS } from "./geometry";
 import { tidyDesign } from "./design";
 import { RELEASES_URL, VERSION } from "./version";
 import { MAX_CONDITIONS } from "./interlocks";
-import { PLANT_MARKS, TEXT_PLACES, type TextPlace, DISTRIBUTION_KINDS, type DistributionKind, POINT_FORMS, type Condition, type Controller, type ControllerSlot, type DesignTemplate, type ModuleInfo, type ModuleType, type PlantItem, type Expectation, type IoPoint, type Interlock, type Network, type PinInfo, type PointForm, FORMAT, FORMAT_VERSION, type GaDim, type GaDimPoint, type GaItem, type Page, type Project, emptyInfo } from "./model";
+import { PLANT_MARKS, markLetters, TEXT_PLACES, type TextPlace, DISTRIBUTION_KINDS, type DistributionKind, POINT_FORMS, type Condition, type Controller, type ControllerSlot, type DesignTemplate, type ModuleInfo, type ModuleType, type PlantItem, type Expectation, type IoPoint, type Interlock, type Network, type PinInfo, type PointForm, FORMAT, FORMAT_VERSION, type GaDim, type GaDimPoint, type GaItem, type Page, type Project, emptyInfo } from "./model";
 import { allowedRotation, defaultParams, getSymbol } from "./symbols";
 import { gaToSheet } from "./ga";
 import { MODULE_TYPES } from "./modules";
@@ -232,6 +232,7 @@ export function parsePlant(v: unknown): Project["plant"] {
       ...(pl.powerByOthers === true ? { powerByOthers: true } : {}),
       ...(pl.inPanel === true ? { inPanel: true } : {}),
       ...(typeof pl.mark === "string" && PLANT_MARKS.some((m) => m.value === pl.mark) ? { mark: pl.mark as PlantItem["mark"] } : {}),
+      ...(pl.mark === "other" && typeof pl.markText === "string" && markLetters(pl.markText) ? { markText: markLetters(pl.markText) } : {}),
       description: strOr(pl.description),
       terminals: arr(pl.terminals).filter((t): t is string => typeof t === "string"),
       ...parsePoints(pl.points, pl.pins),

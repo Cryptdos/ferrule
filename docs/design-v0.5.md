@@ -325,6 +325,12 @@ Judgement calls made while building, by step, with the reason.
 - **8b: a group that is a channel's isn't offered as a serial port** in the Terminals window; only the other groups are (a comms group, a host's ports).
 - **8b, left as it was: the one line shows a terminal shared by two points under the first only,** since a number repeated across points there means two terminals (`Run: 11 14 | Fault: 11 14`). Typing a module's line back loses the sharing, so on a module with shared commons the table and Generate are the way to change it. For QA.
 - **8b: the Controller view keeps three columns:** the plant points on the left to allocate from, the rail and module columns in the middle, Properties on the right. A module is moved along the rail by dragging it or with *← Move* and *Move →* in its Properties.
+- **8c: an adapter has a generic GA size of its own,** 22.5 × 90 mm (*Controller adapter* in the sizes), used until a device is picked, as the host and power supply have.
+- **8c: a host and an adapter are added with no terminals;** a power supply still comes with its supply in. An adapter's supply out is made to follow its supply in from the point's *In Simulate*, as for any supply out.
+- **8c: the fan and pump marks are the motor part's pictures drawn small** in the mark's circle; the letters keep the detail size (1.8 mm). The lozenge is as wide as its letters plus a margin, the same height as the circle.
+- **8c: a mark's letters are stored only with *Other*,** and a picture chosen after it clears them. A file with one of the four removed marks is a file of an older format, refused as all are. File format 15.
+- **8c: a module whose type has no channels never has any** (`channelTypes`), whatever its points' forms: an adapter's *Bus* typed in as a contact isn't counted as a DO. On 0.4.5 a host's or power supply's point with an IO form was counted as a channel.
+- **8c: a module with no channels lists each point's form and terminals** in its column (*supply in · 1 2*), as in mock-up 3.
 
 ### Title block (ruled 27 Nov 2026, before step 7)
 

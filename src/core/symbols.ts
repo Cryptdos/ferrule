@@ -1748,7 +1748,8 @@ const SYMBOLS: SymbolDef[] = [
       for (const g of lay.groups) g.lines.forEach((l, i) => prims.push(text((g.x0 + g.x1) / 2, lay.termH + lay.idH + 1.9 + i * PLANT.group * LINE, l, PLANT.group, "middle", "note")));
       // Its mark, small, inside the box at the end away from the terminals' names (v0.4.x M1).
       const mark = str(el, "pmark", "");
-      if (mark) prims.push(...markPrims(mark, right - 1.8, h / 2 + 0.3));
+      const letters = str(el, "pmarkt", "");
+      if (mark) prims.push(...markPrims(mark, right - 0.7 - markWidth(mark, letters) / 2, h / 2 + 0.3, letters));
       // Tag, description and information under the box, centred, wrapped to
       // the box plus 1.5 units each side and never narrower than 12 (v0.4.x F4):
       // words at spaces; a tag only at a hyphen, and only when it must.
@@ -2591,8 +2592,8 @@ export function plantViewLayout(el: Element): {
   const termH = tall([...terms.map((t) => t.name), PLANT.minName], PLANT.termH, TAG);
   const ids = terms.map((t) => t.pinId).filter(Boolean);
   const idH = ids.length ? tall(ids, PLANT.idH, DETAIL) : 0;
-  // Room at the right end for a mark (v0.4.x M1).
-  if (str(el, "pmark", "") && !str(el, "pmod", "")) right += 3.4;
+  // Room at the right end for a mark (v0.4.x M1), wider for a lozenge of letters (v0.5 A66).
+  if (str(el, "pmark", "") && !str(el, "pmod", "")) right += markWidth(str(el, "pmark", ""), str(el, "pmarkt", "")) + 1.2;
   // Room under the boxes for the tallest wrapped group name.
   const nameLines = Math.max(1, ...groups.map((g) => g.lines.length));
   const below = Math.max(PLANT.below, Math.ceil((1.9 + (nameLines - 1) * PLANT.group * LINE + 1.1) * 2) / 2);
@@ -2871,19 +2872,45 @@ export function localGeometry(el: Element, texts: string | GeometryText): Geomet
   return { prims, terminals, body, bbox };
 }
 
-/** A field device's mark, drawn small inside its view's box, centred at (cx, cy) (v0.4.x M1). The picture only. */
-export function markPrims(mark: string, cx: number, cy: number): Prim[] {
-  const r = 1.1;
-  const letter = (s: string): Prim[] => [circle(cx, cy, r), text(cx, cy + (DETAIL * CAP_HEIGHT) / 2, s, DETAIL, "middle", "note")];
+/** A mark's radius: a circle 4 mm across, and the height of a lozenge. */
+const MARK_R = 1.1;
+
+/** How wide a mark is drawn: a circle, or for three or four letters a lozenge of the same height (v0.5 A66). */
+export function markWidth(mark: string, letters = ""): number {
+  if (mark !== "other" || [...letters].length < 3) return 2 * MARK_R;
+  return Math.max(2 * MARK_R, textWidth(letters, DETAIL) + 1.1);
+}
+
+/**
+ * A field device's mark, drawn small inside its view's box, centred at (cx, cy)
+ * (v0.4.x M1): a picture, or for *Other* its letters (v0.5 A66), one or two in
+ * a circle, three or four in a lozenge of the same height.
+ */
+export function markPrims(mark: string, cx: number, cy: number, letters = ""): Prim[] {
+  const r = MARK_R;
+  const k = r / 3.6; // The motor part's pictures, drawn in a circle of 3.6, made small.
   switch (mark) {
-    case "temperature":
-      return letter("T");
-    case "pressure":
-      return letter("P");
-    case "humidity":
-      return letter("H");
-    case "dp-switch":
-      return letter("ΔP");
+    case "other": {
+      if (!letters) return [];
+      const label = text(cx, cy + (DETAIL * CAP_HEIGHT) / 2, letters, DETAIL, "middle", "note");
+      const w = markWidth(mark, letters);
+      if (w <= 2 * r) return [circle(cx, cy, r), label];
+      const x0 = cx - w / 2 + r;
+      const x1 = cx + w / 2 - r;
+      return [
+        line([x0, cy - r], [x1, cy - r]),
+        { t: "arc", from: [x1, cy - r], to: [x1, cy + r], r, sweep: 1 },
+        line([x1, cy + r], [x0, cy + r]),
+        { t: "arc", from: [x0, cy + r], to: [x0, cy - r], r, sweep: 1 },
+        label,
+      ];
+    }
+    case "fan":
+      // The motor part's fan: two small blades across the circle and the hub.
+      return [circle(cx, cy, r), { t: "ellipse", c: [cx - 1.4 * k, cy], rx: 1.3 * k, ry: 0.55 * k }, { t: "ellipse", c: [cx + 1.4 * k, cy], rx: 1.3 * k, ry: 0.55 * k }, circle(cx, cy, 0.3 * k, true)];
+    case "pump":
+      // The motor part's pump: its triangle, pointing the way it pumps.
+      return [circle(cx, cy, r), line([cx - 1.6 * k, cy - 2.4 * k], [cx + 3.2 * k, cy], [cx - 1.6 * k, cy + 2.4 * k], [cx - 1.6 * k, cy - 2.4 * k])];
     case "meter":
       return [rect(cx - 1.4, cy - 0.9, 2.8, 1.8), text(cx, cy + (DETAIL * CAP_HEIGHT) / 2, "kWh", DETAIL, "middle", "note")];
     case "valve":

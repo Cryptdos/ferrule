@@ -23,7 +23,7 @@
     type PlantDesign,
     type PointDesign,
   } from "../../core/design";
-  import { CONNECTS, GOES_TO, PLANT_MARKS, POINT_FORMS, SIGNAL_SUGGESTIONS, type PointForm } from "../../core/model";
+  import { CONNECTS, GOES_TO, MARK_LETTERS, PLANT_MARKS, POINT_FORMS, SIGNAL_SUGGESTIONS, type PointForm } from "../../core/model";
   import { deletePlant, plantLabel, updatePlant } from "../../core/ops";
   import { describeExpectation, isOutputForm, pointRef, printedPin, things } from "../../core/points";
   import { updatePoint } from "../../core/ops";
@@ -290,6 +290,11 @@
           {#each PLANT_MARKS as m (m.value)}<option value={m.value}>{m.label}</option>{/each}
         </select>
       </label>
+      {#if plant.mark === "other"}
+        <label title="One or two letters sit in a circle; three or four widen it into a lozenge">Its letters (up to {MARK_LETTERS})
+          <input value={plant.markText ?? ""} maxlength={MARK_LETTERS} placeholder="e.g. T, RH, ΔP, CO2, IAQ" onchange={(e) => setPlant({ markText: e.currentTarget.value })} />
+        </label>
+      {/if}
       <label>Information (under its box on the drawing)
         <textarea rows="2" value={plant.info ?? ""} placeholder="Model, rating, supply…" onchange={(e) => editor.apply((p) => updatePlant(p, plant.id, { info: e.currentTarget.value }))}></textarea>
       </label>
