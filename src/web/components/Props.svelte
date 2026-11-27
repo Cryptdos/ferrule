@@ -14,9 +14,8 @@
     deleteClouds,
     updateCloud,
     resetRoute,
-    reverseSegment,
     setWireKind,
-    setWireTextAt,
+    setWireLabelAt,
     flipElements,
     rotateElements,
     setConductorNumber,
@@ -650,22 +649,16 @@
           Show colour
         </label>
       {/if}
-      {#if cond.colour}
-        <div class="row">
-          Colour and number print at the {describe(seg.from)} end.
-          <button class="small" onclick={() => editor.apply((p) => reverseSegment(p, editor.pageId, seg.id))}>Other end</button>
-        </div>
-      {/if}
       <p class="hint">
-        The colour prints at the end the wire was drawn from, the number just after it; the function prints beside each
-        terminal end. Conductor joins {cond.terminals.length} terminals.
+        Number and colour print as one label, number first, above the wire (left of it on a vertical run). The function
+        doesn't print: it's how the wire takes its colour. Conductor joins {cond.terminals.length} terminals.
       </p>
     {/if}
     <div class="row">Route: {seg.route === "manual" ? "adjusted by hand" : "automatic"}</div>
-    <p class="hint">Drag a leg of the wire to move it. The ends stay on their terminals. Drag its number or colour to slide it along the wire.</p>
-    {#if seg.numberAt !== undefined || seg.colourAt !== undefined}
+    <p class="hint">Drag a leg of the wire to move it. The ends stay on their terminals. Drag its label to slide it along the wire.</p>
+    {#if seg.labelAt !== undefined}
       <div class="buttons">
-        <button onclick={() => { const id = seg.id; editor.apply((p) => setWireTextAt(p, editor.pageId, id, { numberAt: null, colourAt: null })); }}>Number and colour back to their place</button>
+        <button onclick={() => { const id = seg.id; editor.apply((p) => setWireLabelAt(p, editor.pageId, id, null)); }}>Label back to its place</button>
       </div>
     {/if}
     <div class="buttons">
@@ -764,7 +757,7 @@
           onclick={() => {
             const ids = sel.map((e) => e.id);
             editor.apply((p) => rotateElements(p, editor.pageId, ids));
-          }}>Rotate (R)</button
+          }}>{sel.length === 1 && sel[0]!.symbol === "text" ? (sel[0]!.rot ? "Level (R)" : "Read up the page (R)") : "Rotate (R)"}</button
         >
       {/if}
       <button
@@ -853,11 +846,6 @@
     font-weight: 600;
     color: #334;
     margin-top: 4px;
-  }
-  button.small {
-    font-size: 11px;
-    padding: 1px 6px;
-    margin-left: 6px;
   }
   .ticks {
     display: flex;

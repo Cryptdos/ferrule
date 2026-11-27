@@ -17,7 +17,7 @@ import { elementTexts } from "./tags";
 import { textWidth } from "./textwidth";
 import { AREA_UNITS, textUnits } from "./geometry";
 import { moduleTitle, viewsOf } from "./modules";
-import { addElement, addGaDevice, addPlant, connect, portGroups, setGroupPort, resetRoute, rotateElements, deletePlant, linkContact, setGroupSide, setViewSide, setViewSpan, setWireTextAt, moveElements, placePlantView, addGaDim, addGaItem, addGaPage, addPlatesForDoors, joinDoorBelow, setPlateBehind, setBoundary, setGaSettings, splitDoor, updateElement } from "./ops";
+import { addElement, addGaDevice, addPlant, connect, portGroups, setGroupPort, resetRoute, rotateElements, deletePlant, linkContact, setGroupSide, setViewSide, setViewSpan, setWireLabelAt, moveElements, placePlantView, addGaDim, addGaItem, addGaPage, addPlatesForDoors, joinDoorBelow, setPlateBehind, setBoundary, setGaSettings, splitDoor, updateElement } from "./ops";
 import { earthConductors, removeLoops, fractionAlong, isFieldWire, numberByDefault, pointAlong, wireTexts } from "./wires";
 import { routePage } from "./routing";
 import { billOfMaterials, coresPerDevice, groupMarkers, pointsSchedule, wireMarkers } from "./schedules";
@@ -485,26 +485,31 @@ describe("step 6: movable labels (T14, T7, T13)", () => {
     expect(hints().length).toBe(0);
   });
 
-  test("T13: a wire's number slides along its own wire, and the fraction survives a re-route", () => {
+  test("T13, A26: a wire's label slides along its own wire as one, and the fraction survives a re-route", () => {
     const pts: [number, number][] = [[0, 0], [0, 10], [20, 10]];
     expect(pointAlong(pts, 0.5).at).toEqual([5, 10]);
     expect(fractionAlong(pts, [5, 12])).toBeCloseTo(0.5);
-    const t = wireTexts(pts, { number: "3-12", numberAt: 0.25 });
+    const t = wireTexts(pts, { number: "3-12", labelAt: 0.25 });
     expect(t.length).toBe(1);
     // On the first leg, vertical, centred at y 7.5 beside it.
     expect(t[0]!.vertical).toBe(true);
     expect(t[0]!.at[1]).toBeCloseTo(7.5);
+    // Number and colour go together.
+    const both = wireTexts(pts, { number: "3-12", colour: "Bn", labelAt: 0.75 });
+    expect(both.map((x) => x.role)).toEqual(["number", "colour"]);
+    expect(both.every((x) => !x.vertical && x.at[1] === 9.65)).toBe(true);
     const { project: p } = fresh();
     const pg = p.pages[1]!;
     const seg = pg.segments[0]!;
-    setWireTextAt(p, pg.id, seg.id, { numberAt: 0.8, colourAt: 2 });
-    expect([seg.numberAt, seg.colourAt]).toEqual([0.8, 1]);
+    setWireLabelAt(p, pg.id, seg.id, 2);
+    expect(seg.labelAt).toBe(1);
+    setWireLabelAt(p, pg.id, seg.id, 0.8);
     routePage(AvoidLib.getInstance(), pg);
-    expect(seg.numberAt).toBe(0.8);
+    expect(seg.labelAt).toBe(0.8);
     const back = parseProject(JSON.parse(JSON.stringify(p)));
-    expect(back.pages[1]!.segments[0]!.numberAt).toBe(0.8);
-    setWireTextAt(p, pg.id, seg.id, { numberAt: null, colourAt: null });
-    expect(seg.numberAt).toBeUndefined();
+    expect(back.pages[1]!.segments[0]!.labelAt).toBe(0.8);
+    setWireLabelAt(p, pg.id, seg.id, null);
+    expect(seg.labelAt).toBeUndefined();
   });
 });
 

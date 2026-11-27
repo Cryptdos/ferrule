@@ -10,7 +10,7 @@
     flipElements,
     rotateElements,
   } from "../../core/ops";
-  import { benchOf, canRotate } from "../../core/symbols";
+  import { benchOf, canRotate, nextRotation } from "../../core/symbols";
   import { api, ApiError } from "../api";
   import FileBrowser from "./FileBrowser.svelte";
   import Browser from "./Browser.svelte";
@@ -412,7 +412,7 @@
       editor.selection = [];
     } else if ((e.key === "r" || e.key === "R") && editor.tool === "place" && editor.placeSymbol && editor.placeSymbol !== "plant-view") {
       // Turn the part before it's placed (35), if it turns at all (A39).
-      if (canRotate({ symbol: editor.placeSymbol })) editor.placeRot = ((editor.placeRot + 90) % 360) as 0 | 90 | 180 | 270;
+      if (canRotate({ symbol: editor.placeSymbol })) editor.placeRot = nextRotation(editor.placeSymbol, editor.placeRot);
       else editor.flash("This part doesn't turn: F flips it");
     } else if ((e.key === "f" || e.key === "F") && editor.tool === "place" && editor.placeSymbol && editor.placeSymbol !== "plant-view") {
       editor.placeFlip = !editor.placeFlip;

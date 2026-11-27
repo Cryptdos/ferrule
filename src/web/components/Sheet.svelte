@@ -68,7 +68,7 @@
     /** Simulate: lamps lit, by schematic id, drawn lit on a door GA (design-v0.3 §4). */
     litLamps?: Set<string> | null;
     /** A wire's number or colour being slid along it (v0.4.x T13): where it shows while dragged. */
-    textAt?: (seg: Segment) => { numberAt?: number; colourAt?: number } | null;
+    textAt?: (seg: Segment) => number | null;
   } = $props();
   const dimDraft = $derived(focus === "annotate");
   const dimAnnotate = $derived(focus === "draft");
@@ -162,14 +162,14 @@
         {/if}
       {/if}
       {#if c}
+        {@const at = textAt?.(seg) ?? seg.labelAt}
         {#each wireTexts(pts, {
-          // Shown by the usual rules, unless the wire says otherwise.
+          // Shown by the usual rules, unless the wire says otherwise. The function doesn't print (A26).
           number: numbered.has(seg.id) ? c.number : "",
           colour: seg.showColour === false ? undefined : looks.get(c.id)?.colour,
-          func: c.function,
           railFrom: onBusbar(seg.from),
           railTo: onBusbar(seg.to),
-          ...(textAt?.(seg) ?? { numberAt: seg.numberAt, colourAt: seg.colourAt }),
+          ...(at !== undefined ? { labelAt: at } : {}),
         }) as t, i (i)}
           <text
             class="wirenum"

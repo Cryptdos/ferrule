@@ -295,6 +295,13 @@ Judgement calls made while building, by step, with the reason.
 - **A supply out's distribution for the short check is the first one its wiring reaches**, in place of the one it was set to, so a battery and the UPS output it backs, both wired to one bus, still aren't a short.
 - **Removing the pickers moved the file format to 11.** CK-20 keeps its ID, saying there's no such check now.
 
+### Step 7
+
+- **A wire's label sits in the middle of its longest run** (the note says what it is, not where). That was the number's place; the colour used to start at the source end, which depended on the way the wire was drawn. A label too long for a short wire that lands on a block or rail runs away from the block, as the number did.
+- **A wire whose number prints on another of its runs** shows its colour alone on this one, as before.
+- **A29 confirmed from the code before building:** R stored a quarter turn on a Text and the text stayed level, its lines shuffled along one baseline. A text now has two ways, level and turned to read up the page (stored as 270), and R swaps them; a file or a placement asking for any other turn gets the nearest of the two. *Rotate (R)* reads *Read up the page (R)* or *Level (R)* for one text.
+- **Dragging the label moved the file format to 12:** a wire keeps one `labelAt` in place of the number's and the colour's.
+
 ### Title block (ruled 27 Nov 2026, before step 7)
 
 - **A1 laid out again:** *Sheet*, *Job no.* and *Checked* in three equal cells (24 mm); *Drawing ref.* and *Drawn* in two (36 mm); *Client* across the row (72 mm). A long *Checked* name and date is squeezed to fit its cell, as every cell's value is.

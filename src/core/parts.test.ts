@@ -276,26 +276,30 @@ describe("wire colour and function", () => {
 });
 
 describe("wire text placement", () => {
-  test("colour, function and number together at the source end, inset along the wire (67)", () => {
+  test("A26: one label, number then colour in the reading direction, whichever end the wire was drawn from", () => {
     const { wireTexts } = require("./wires") as typeof import("./wires");
-    const pts: [number, number][] = [
+    const down: [number, number][] = [
       [10, 10],
       [10, 40],
     ];
-    const t = wireTexts(pts, { number: "17-38", colour: "Bu", func: "0V" });
-    expect(t.map((x) => x.role)).toEqual(["colour", "function", "number"]);
-    const [colour, fn, num] = t as [any, any, any];
-    expect(colour.text).toBe("Bu");
+    const t = wireTexts(down, { number: "17-38", colour: "Bu" });
+    expect(t.map((x) => [x.role, x.text])).toEqual([["number", "17-38"], ["colour", "Bu"]]);
+    const [num, colour] = t as [any, any];
     expect(t.every((x) => x.vertical)).toBe(true);
-    // Inset about 2 from the source terminal, in order, all beside the wire.
-    expect(colour.at[1]).toBeGreaterThan(11.9);
-    expect(colour.at[1]).toBeLessThan(fn.at[1]);
-    expect(fn.at[1]).toBeLessThan(num.at[1]);
-    expect(num.at[1]).toBeLessThan(25);
+    // Bottom up: the number below the colour, both just left of the wire, the pair centred on it.
+    expect(num.at[1]).toBeGreaterThan(colour.at[1]);
     expect(new Set(t.map((x) => x.at[0]))).toEqual(new Set([9.65]));
-    // No colour: the number goes mid-wire as before.
-    const plain = wireTexts(pts, { number: "17-38" });
-    expect(plain[0]!.at[1]).toBe(25);
+    expect(Math.abs((num.at[1] + colour.at[1]) / 2 - 25)).toBeLessThan(1.5);
+    // Drawn the other way, the same label in the same place.
+    const up = wireTexts([[10, 40], [10, 10]], { number: "17-38", colour: "Bu" });
+    expect(up).toEqual(t);
+    // Left to right on a horizontal run, above it, either way it was drawn.
+    const across = wireTexts([[40, 10], [10, 10]], { number: "17-38", colour: "Bu" });
+    expect(across[0]!.at[0]).toBeLessThan(across[1]!.at[0]);
+    expect(across.every((x) => x.at[1] === 9.65)).toBe(true);
+    // One or the other alone prints alone, mid-wire.
+    expect(wireTexts(down, { number: "17-38" })[0]!.at[1]).toBe(25);
+    expect(wireTexts(down, { colour: "Bu" }).map((x) => [x.role, x.at[1]])).toEqual([["colour", 25]]);
   });
 
   test("on a wire no longer than its text, the text is centred on it (T6)", () => {

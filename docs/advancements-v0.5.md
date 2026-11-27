@@ -114,7 +114,7 @@ Decided in discussion. The aim: Ferrule runs the same way on a desk or on one ce
   - The design, the rulings and the mock-ups are in `design-wire-numbering.md`. Build from that, not from this line.
   - Big enough for a sprint step of its own, and it changes the numbers on every existing drawing at the next Renumber.
 
-- [ ] **A26. One label for a wire.** *Tweak. DR-23 to DR-26. Build 0.4.5.* A wire's number and colour are two pieces of text, dragged separately, in an order that depends on which end the wire was drawn from. They become one label: number then colour, no separator, dragged as one, the wire underlining it. The function stops printing on the wire (the field stays, for colour), and *Other end* goes.
+- [x] **A26. One label for a wire.** *Built: PR 131.* *Tweak. DR-23 to DR-26. Build 0.4.5.* A wire's number and colour are two pieces of text, dragged separately, in an order that depends on which end the wire was drawn from. They become one label: number then colour, no separator, dragged as one, the wire underlining it. The function stops printing on the wire (the field stays, for colour), and *Other end* goes.
   - The design is in `design-wire-labels-and-links.md` §2.
 
 - [ ] **A27. Link ends in place of the link arrow.** *Tweak, large. DR-40 to DR-47, PT-18. Build 0.4.5.* The link arrow is a part that's placed, and can be dropped straight onto a terminal, which leaves a wire with no line: nothing to select to set its colour, and no markers. The part goes. A wire ends or starts on bare paper, and that end is a link end: a source when the wire is drawn out to it, a destination when the wire is drawn from it. New outline shapes for the two, struck through until linked.
@@ -124,7 +124,7 @@ Decided in discussion. The aim: Ferrule runs the same way on a desk or on one ce
 - [ ] **A28. Markers counted at link arrows.** *Fix. SC-5. Build 0.4.5.* The Markers schedule is built from the lines as drawn, so it puts a marker at each link arrow, where none goes. A wire across two sheets is one wire with two ends and two markers. Count markers per connection, once at each real end.
   - Found by running the schedule on the QA project, 26 Nov 2026: 34 rows too many, one for each of its 34 arrows.
 
-- [ ] **A29. Text that can be turned.** *Missing. AN-2, AN-3. Build 0.4.5.* A Text annotation can't be drawn turned, so a note can't run up the sheet beside a vertical wire. With the function no longer printed on wires (A26), a note is how a wire gets extra description, so text needs to turn in 90° steps like a part. Turned text reads bottom up.
+- [x] **A29. Text that can be turned.** *Built: PR 131.* *Missing. AN-2, AN-3. Build 0.4.5.* A Text annotation can't be drawn turned, so a note can't run up the sheet beside a vertical wire. With the function no longer printed on wires (A26), a note is how a wire gets extra description, so text needs to turn in 90° steps like a part. Turned text reads bottom up.
   - From reading the code, 26 Nov 2026: pressing R stores a rotation on the text, but nothing draws the text turned. Whoever builds it confirms that first.
 
 - [x] **A30. Drop the old-files rule.** *Built: PR 118.* *Docs, with a small fix. ST-18. Build 0.4.5.* The repo's working notes say old project files must open unchanged at every step, and keep a mapping for files from test builds. Both go: there's no backwards compatibility before release.

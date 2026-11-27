@@ -129,7 +129,7 @@ describe("terminals a column apart (v0.3 §2)", () => {
         [0, 0],
         [0, 30],
       ],
-      { number: "7-30", colour: "Bu", func: "0V" },
+      { number: "7-30", colour: "Bu" },
     );
     expect(w.find((x) => x.role === "number")!.size).toBe("tag");
     expect(w.find((x) => x.role === "colour")!.size).toBe("detail");

@@ -14,7 +14,7 @@ import { tidyDesign } from "./design";
 import { RELEASES_URL, VERSION } from "./version";
 import { MAX_CONDITIONS } from "./interlocks";
 import { PLANT_MARKS, TEXT_PLACES, type TextPlace, DISTRIBUTION_KINDS, type DistributionKind, POINT_FORMS, type Condition, type Controller, type ControllerSlot, type DesignTemplate, type ModuleInfo, type ModuleType, type PlantItem, type Expectation, type IoPoint, type Interlock, type Network, type PinInfo, type PointForm, FORMAT, FORMAT_VERSION, type GaDim, type GaDimPoint, type GaItem, type Page, type Project, emptyInfo } from "./model";
-import { canRotate, defaultParams, getSymbol } from "./symbols";
+import { allowedRotation, defaultParams, getSymbol } from "./symbols";
 import { gaToSheet } from "./ga";
 import { MODULE_TYPES } from "./modules";
 import { colourCode, lampColour } from "./wirecolours";
@@ -414,7 +414,7 @@ function parsePage(pg: Record<string, unknown>, i: number): Project["pages"][num
       delete e.params.style;
     }
     // A part that doesn't turn is always upright (A39).
-    const rot = [0, 90, 180, 270].includes(e.rot as number) && canRotate({ symbol: String(e.symbol) }) ? (e.rot as 0 | 90 | 180 | 270) : 0;
+    const rot = [0, 90, 180, 270].includes(e.rot as number) ? allowedRotation(String(e.symbol), e.rot as 0 | 90 | 180 | 270) : 0;
     return {
       id: e.id,
       symbol: e.symbol as string,
@@ -451,8 +451,7 @@ function parsePage(pg: Record<string, unknown>, i: number): Project["pages"][num
         ...(typeof s.field === "boolean" ? { field: s.field } : {}),
         ...(typeof s.showNumber === "boolean" ? { showNumber: s.showNumber } : {}),
         ...(s.showColour === false ? { showColour: false } : {}),
-        ...(typeof s.numberAt === "number" && s.numberAt >= 0 && s.numberAt <= 1 ? { numberAt: s.numberAt } : {}),
-        ...(typeof s.colourAt === "number" && s.colourAt >= 0 && s.colourAt <= 1 ? { colourAt: s.colourAt } : {}),
+        ...(typeof s.labelAt === "number" && s.labelAt >= 0 && s.labelAt <= 1 ? { labelAt: s.labelAt } : {}),
       };
     });
   const sections = arr(pg.sections)

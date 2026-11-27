@@ -17,8 +17,9 @@ export const FORMAT = "ferrule";
  * 9: v0.5 step 6a, a supply's tag; a link arrow has no distribution or typed reference.
  * 10: v0.5 step 6b, a device's ways (distribution blocks).
  * 11: v0.5 step 6c, no distributions on an incoming supply or a plant's supply out.
+ * 12: v0.5 step 7a, a wire's label is placed as one (labelAt).
  */
-export const FORMAT_VERSION = 11;
+export const FORMAT_VERSION = 12;
 
 export type ParamValue = string | number | boolean;
 
@@ -82,10 +83,8 @@ export interface Segment {
   showNumber?: boolean;
   /** Print the core colour here. Unset: printed when the conductor has one. */
   showColour?: boolean;
-  /** Where its number sits along it, 0–1 of its drawn length (v0.4.x T13). Unset: the usual place. */
-  numberAt?: number;
-  /** Where its colour (and function) sits along it, 0–1 (v0.4.x T13). */
-  colourAt?: number;
+  /** Where its label (number, then colour) sits along it, 0–1 of its drawn length (v0.5 A26). Unset: its usual place. */
+  labelAt?: number;
 }
 
 export interface Conductor {
