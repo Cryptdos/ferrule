@@ -225,15 +225,15 @@ From the notes written into the QA copy of the specification (`v0.4.0-pre Notes\
 
 - [x] **A40. Flip turns the symbol only.** *Built: PR 119.* *Fix. DR-8. Build 0.4.5.* Flipping a part puts its tag below its label. The symbol flips; the tag stays above the label.
 
-- [ ] **A41. A selector's pole choices fit its positions.** *Fix. PT-3. Build 0.4.5.* On a 2 position selector the pole list still offers the 3 position choices (*closed in II*, *closed in I and II*, *opened in II*). The list shows only what's valid for the positions set.
+- [x] **A41. A selector's pole choices fit its positions.** *Built: PR 124.* *Fix. PT-3. Build 0.4.5.* On a 2 position selector the pole list still offers the 3 position choices (*closed in II*, *closed in I and II*, *opened in II*). The list shows only what's valid for the positions set.
   - Changing a selector from 3 positions to 2 puts a pole that was on a 3 position choice back to the default. The symbol shows what it now is, which is notice enough.
   - From reading the code: the drawing and the simulator already fall back this way, but the properties keep showing the 3 position choice.
   - *Changeover* leaves the pole list altogether (A43), and its long label with it: *Changeover (2 position: 12 in 0, 14 in I; 3 position: …)*.
 
-- [ ] **A42. A selector's poles drawn as they are in Simulate.** *Fix. PT-3, SM-3, SM-5. Build 0.4.5.* Found on the build: a 3 position selector with pole 2 set *NO, closed in II*. In position I the pole is drawn closed, and nothing through it is energised. A pole set *NC, opened in II* is likewise drawn open in I.
+- [x] **A42. A selector's poles drawn as they are in Simulate.** *Built: PR 124.* *Fix. PT-3, SM-3, SM-5. Build 0.4.5.* Found on the build: a 3 position selector with pole 2 set *NO, closed in II*. In position I the pole is drawn closed, and nothing through it is energised. A pole set *NC, opened in II* is likewise drawn open in I.
   - From reading the code: the circuit is right and the drawing is wrong. In Simulate the whole switch is treated as operated whenever it's off 0, and every NO and NC pole is drawn from that one fact. Each pole should be drawn from the positions it's set to. A 3 position changeover is already drawn properly.
 
-- [ ] **A43. Two terminals with one number on a selector, and the wire tool goes blind.** *Fix, serious. PT-3, DR-18. Build 0.4.5.* Found on the build: in one project the wire tool still drew wires but showed no terminals and no mark where the wire started, through a reload and a restart of Ferrule. A new project was fine.
+- [x] **A43. Two terminals with one number on a selector, and the wire tool goes blind.** *Built: PR 124.* *Fix, serious. PT-3, DR-18. Build 0.4.5.* Found on the build: in one project the wire tool still drew wires but showed no terminals and no mark where the wire started, through a reload and a restart of Ferrule. A new project was fine.
   - **Cause, found in that project's file (`test1.ferrule`):** a 3 position selector with 4 poles, pole 1 normally open and pole 4 a changeover. A 3 position changeover is numbered as makers do, pole 4 being 15, 14, 13, and pole 1's contact is 13, 14. The part has two terminals numbered 13 and two numbered 14.
   - The wire tool draws its terminal dots by number within each part, and falls over on the repeat. Everything it draws on that sheet goes with it: dots, the start mark and the line being drawn. Reproduced on a two-part test sheet, 26 Nov 2026.
   - It isn't one unlucky set-up: 252 selector set-ups clash, among them any with pole 1 normally closed and pole 3 a changeover (two 11s). No other part can do it.
@@ -245,7 +245,7 @@ From the notes written into the QA copy of the specification (`v0.4.0-pre Notes\
 
 - [x] **A45. Delete leaves the backup behind.** *Built: PR 119.* *Fix. ST-8, ST-14. Build 0.4.5.* *Delete* moves a project's file into `Deleted` and leaves its `.bak` in the projects folder. Seen in the test folder, 26 Nov 2026 (`test1-copy.ferrule.bak`), and the code agrees: only the file itself is moved. The `.bak` goes with it.
 
-- [ ] **A46. Selector: its name, and a fourth position.** *Tweak. PT-3. Build 0.4.5.*
+- [x] **A46. Selector: its name, and a fourth position.** *Built: PR 124.* *Tweak. PT-3. Build 0.4.5.*
   - The part is called **Selector**. *Selector / keyswitch* says the same thing twice: *Key operated* is already a tick box.
   - **4 position** is added to 2 and 3. Its positions are 1, 2, 3 and 4, with no off position.
   - On a 4 position selector each pole is closed in exactly one position, picked from a list of four. A pole closed in more than one would defeat the switch.
