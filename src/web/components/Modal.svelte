@@ -105,6 +105,17 @@
     e.preventDefault();
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     drag = { cx: e.clientX, cy: e.clientY, x: win.offsetLeft, y: win.offsetTop };
+    window.addEventListener("keydown", escDrag, true);
+  }
+  /** Esc while dragging cancels the drag (A53): the window goes back where it was, still open, and no tile stays lit. */
+  function escDrag(e: KeyboardEvent) {
+    if (e.key !== "Escape" || !drag) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    pos = clamp({ x: drag.x, y: drag.y });
+    drag = null;
+    docking.hint = null;
+    window.removeEventListener("keydown", escDrag, true);
   }
   function move(e: PointerEvent) {
     if (!drag) return;
@@ -122,6 +133,7 @@
     }
   }
   function up() {
+    window.removeEventListener("keydown", escDrag, true);
     if (!drag) return;
     drag = null;
     save();

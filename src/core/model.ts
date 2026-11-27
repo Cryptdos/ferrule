@@ -707,6 +707,11 @@ export function newId(prefix: string): string {
   return `${prefix}_${rand}${counter.toString(36).padStart(2, "0")}`;
 }
 
+/** A date as the title block and revisions write it, day first: 27/11/2026. */
+export function dateText(d = new Date()): string {
+  return d.toLocaleDateString("en-GB");
+}
+
 export function newPage(number: number, title = ""): Page {
   return { id: newId("pg"), number, title, boundaryY: null, sections: [], elements: [], segments: [] };
 }

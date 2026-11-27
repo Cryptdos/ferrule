@@ -275,13 +275,15 @@ describe("alignment tools (design-v0.3 §5)", () => {
     const ra = body(a);
     expect(Math.abs(ra.x + ra.w / 2 - USABLE.w / 2)).toBeLessThanOrEqual(0.5);
     expect(Math.abs(ra.y + ra.h / 2 - USABLE.h / 2)).toBeLessThanOrEqual(0.5);
-    // Then the second lines up under the first: the first stays put.
-    const before: [number, number] = [a.pos[0], a.pos[1]];
+    // Then the first lines up with the second: the last clicked stays put (v0.5 A54).
+    const before: [number, number] = [b.pos[0], b.pos[1]];
     alignElements(p, pg, [a.id, b.id], "centre");
-    expect(a.pos).toEqual(before);
-    expect(body(b).x + body(b).w / 2).toBeCloseTo(body(a).x + body(a).w / 2, 0);
+    expect(b.pos).toEqual(before);
+    expect(body(a).x + body(a).w / 2).toBeCloseTo(body(b).x + body(b).w / 2, 0);
+    const top = body(a).y;
     alignElements(p, pg, [b.id, a.id], "top");
-    expect(body(a).y).toBe(body(b).y);
+    expect(body(a).y).toBe(top);
+    expect(body(b).y).toBe(top);
   });
 
   test("a box selection aligns to the outline around them all", async () => {
@@ -319,13 +321,13 @@ describe("alignment tools (design-v0.3 §5)", () => {
     const b = addElement(p, pg, "coil", [40, 50]);
     connect(p, pg, [a.id, "A2"], [b.id, "A1"]);
     alignElements(p, pg, [a.id, b.id], "centre");
-    expect(b.pos[0]).toBe(20);
+    expect(a.pos[0]).toBe(40);
     expect(p.pages[0]!.segments).toHaveLength(1);
   });
 });
 
 describe("alignment on a GA (design-v0.3 §5)", () => {
-  test("GA items align in whole mm to the first picked, and distribute down", async () => {
+  test("GA items align in whole mm to the last picked, and distribute down", async () => {
     const { alignGaItems, distributeGaItems } = await import("./align");
     const { addGaPage, addGaItem } = await import("./ops");
     const { p } = project();
@@ -334,8 +336,9 @@ describe("alignment on a GA (design-v0.3 §5)", () => {
     const b = addGaItem(p, ga.id, { kind: "rail", x: 230, y: 140, w: 20, h: 10 });
     const c = addGaItem(p, ga.id, { kind: "rail", x: 160, y: 400, w: 30, h: 10 });
     alignGaItems(p, ga.id, [a.id, b.id, c.id], "left");
+    expect(c.x).toBe(160);
     expect(b.x).toBe(c.x);
-    expect(Math.abs(b.x - a.x)).toBeLessThanOrEqual(0.5);
+    expect(Math.abs(a.x - c.x)).toBeLessThanOrEqual(0.5);
     distributeGaItems(p, ga.id, [a.id, b.id, c.id], "down");
     expect(b.y - (a.y + a.h)).toBeCloseTo(c.y - (b.y + b.h), 0);
   });

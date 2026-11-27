@@ -806,7 +806,6 @@ const SYMBOLS: SymbolDef[] = [
           { value: "turn", label: "Rotary handle" },
           { value: "door", label: "Door handle (door interlocked)" },
           { value: "key", label: "Key" },
-          { value: "none", label: "None (worked by something else)" },
         ],
         when: (el) => str(el, "function", "isolator") === "isolator",
         fixed: "none",
@@ -847,7 +846,9 @@ const SYMBOLS: SymbolDef[] = [
       // An RCD (v0.4.x M1): the residual current mark, a core round every pole's lead below the contacts.
       if (fn === "rcd") prims.push({ t: "ellipse", c: [((poles - 1) * gap) / 2, 1.85], rx: ((poles - 1) * gap) / 2 + 0.8, ry: 0.32 }, dashed([(poles - 1) * gap + 0.8, 1.85], [lastMid + 0.6, 1.85], [lastMid + 0.6, 0]));
       // Only a switch-disconnector has a handle of its own; a contactor is worked by its coil.
-      const op = fn === "isolator" ? str(el, "operator", "turn") : "none";
+      // Every isolator has a handle (A47): an operator that isn't one of the three is drawn as rotary.
+      const set = str(el, "operator", "turn");
+      const op = fn === "isolator" ? (set === "door" || set === "key" ? set : "turn") : "none";
       const hx = -2.4;
       prims.push(dashed([op === "none" ? NO_MID[0] : hx, 0], [lastMid, 0]));
       if (op === "turn" || op === "door") prims.push(...turnHead(hx));
@@ -998,7 +999,7 @@ const SYMBOLS: SymbolDef[] = [
         options: LAMP_COLOURS.map((c) => ({ value: c.code, label: `${c.code} ${c.name}` })),
         default: "Wh",
       },
-      { key: "testPin", label: "Lamp test terminal (T)", type: "bool", default: false },
+      { key: "testPin", label: "Lamp test terminal (LT)", type: "bool", default: false },
       ACCEPTS_PARAM,
       VA_PARAM,
     ],
@@ -2673,7 +2674,20 @@ export function localGeometry(el: Element, texts: string | GeometryText): Geomet
     if (m) return labelLines[Number(m[1])] ?? "";
     return s;
   };
-  const rotated = raw.map((p) => rotatePrim(el.flip ? flipPrim(p) : p, el.rot));
+  // Flipped, the symbol turns over but its tag stays above its label (A40): the label block
+  // moves to where flipping would put it, in its own order.
+  const keep = (p: Prim): p is Extract<Prim, { t: "text" }> => p.t === "text" && !p.placed && !p.vertical && inLabelBlock(p);
+  let shift = 0;
+  if (el.flip) {
+    const block = raw.filter(keep);
+    if (block.length) {
+      const flipped = Math.min(...block.map((p) => -p.at[1] + p.size * CAP_HEIGHT));
+      shift = flipped - Math.min(...block.map((p) => p.at[1]));
+    }
+  }
+  const rotated = raw.map((p) =>
+    rotatePrim(el.flip ? (keep(p) ? { ...p, at: [p.at[0], p.at[1] + shift] as Vec } : flipPrim(p)) : p, el.rot),
+  );
   const tagAt = rotated.find((p) => p.t === "text" && p.text === "{tag}");
   const prims = rotated.flatMap((q): Prim[] => {
     if (q.t !== "text") return [q];
@@ -2807,7 +2821,8 @@ export function poleMates(el: Element, terminal: string): string[] {
       pairs.push(["11", "14"], ["11", "12"]);
       break;
     case "pushbutton":
-      pairs.push(["13", "14"], ["21", "22"]);
+      // Pole k: k3/k4 when normally open, k1/k2 when closed (A25), every pole.
+      pushPoles(el).forEach((nc, i) => pairs.push(nc ? [`${i + 1}1`, `${i + 1}2`] : [`${i + 1}3`, `${i + 1}4`]));
       break;
     case "selector":
       selectorPoles(el).forEach((p, i) => {

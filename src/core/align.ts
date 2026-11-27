@@ -4,8 +4,9 @@
  *
  * - One item aligns to the sheet's usable space (inside the border, above
  *   the title block).
- * - Two or more align to the first one picked, which stays put; a box
- *   selection has no first, so it aligns to the outline around them all.
+ * - Two or more align to the last one clicked, which stays put (v0.5 A54);
+ *   a box selection has no click order, so it aligns to the outline around
+ *   them all.
  * - Distribute (three or more) keeps the two outer items and makes the gaps
  *   between bodies equal.
  *
@@ -86,7 +87,7 @@ function bodyOf(project: Project, el: Project["pages"][number]["elements"][numbe
 
 function target(boxes: Box[], usable: Rect, fromBox: boolean): Rect {
   if (boxes.length === 1) return usable;
-  return fromBox ? outline(boxes) : boxes[0]!;
+  return fromBox ? outline(boxes) : boxes[boxes.length - 1]!;
 }
 
 /**
@@ -102,7 +103,7 @@ export function alignElements(project: Project, pageId: string, ids: string[], h
   });
   if (!boxes.length) throw new OpError("Pick something to align");
   const deltas = alignDeltas(boxes, how, target(boxes, USABLE, fromBox));
-  // The first picked stays put; the rest line up to it.
+  // The last clicked stays put; the rest line up to it.
   for (const [id, d] of deltas) {
     const r: Vec = [Math.round(d[0]), Math.round(d[1])];
     if (r[0] || r[1]) moveElements(project, pageId, [id], r);

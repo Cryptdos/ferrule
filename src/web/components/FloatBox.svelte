@@ -159,6 +159,8 @@
   }
   .body {
     overflow-y: auto;
+    /* Never sideways (A61): what's in it wraps to the panel's width instead. */
+    overflow-x: hidden;
     min-height: 0;
   }
 </style>
