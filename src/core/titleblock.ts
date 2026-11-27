@@ -54,13 +54,14 @@ export function titleBlock(project: Project, page: Page): TitleBlock {
     { x: logoW, y: 0, w: projW, h: third, label: "Project", value: info.title, big: true },
     { x: logoW, y: third, w: projW, h: third, label: "Panel", value: info.panelName, big: true },
     { x: logoW, y: 2 * third, w: projW, h: third, label: "Sheet title", value: resolveFields(page.title, project), big: true },
-    // Sheet, Job no. and Client share the top row in three equal cells (v0.5 A1).
+    // Sheet, Job no. and Checked in three equal cells; Drawing ref. and Drawn in two; Client
+    // across the whole width (v0.5 A1, ruled 27 Nov 2026).
     { x: sx, y: 0, w: sheetW / 3, h: third, label: "Sheet", value: sheetNo },
     { x: sx + sheetW / 3, y: 0, w: sheetW / 3, h: third, label: "Job no.", value: info.jobNo },
-    { x: sx + (2 * sheetW) / 3, y: 0, w: sheetW / 3, h: third, label: "Client", value: info.client },
-    { x: sx, y: third, w: half, h: third, label: "Drawn", value: drawn },
-    { x: sx + half, y: third, w: half, h: third, label: "Checked", value: checked },
-    { x: sx, y: 2 * third, w: sheetW, h: third, label: "Drawing ref.", value: info.drawingNo },
+    { x: sx + (2 * sheetW) / 3, y: 0, w: sheetW / 3, h: third, label: "Checked", value: checked },
+    { x: sx, y: third, w: half, h: third, label: "Drawing ref.", value: info.drawingNo },
+    { x: sx + half, y: third, w: half, h: third, label: "Drawn", value: drawn },
+    { x: sx, y: 2 * third, w: sheetW, h: third, label: "Client", value: info.client },
   ];
 
   const rows = project.revisions.slice(-REVISION_ROWS).map((r) => [r.rev, r.date, r.drawnBy]);

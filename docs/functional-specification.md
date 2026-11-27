@@ -180,7 +180,7 @@ IDs are kept when the document is revised: a withdrawn statement is struck throu
 - **SH-12** The drawing area is 150 × 90 units. Parts snap to the grid.
 - **SH-13** All drawing text is osifont. Sizes on paper: title 5 mm, heading 3.5 mm, tags, labels and terminal, pin and wire numbers 2.5 mm, notes 2.5 mm, detail (cross-references, pin ids, colours, ratings, contact tables) 1.8 mm. Nothing prints smaller than 1.8 mm.
 - **SH-14** Line weights on paper: symbols and wires 0.25 mm; a power rail 0.35 mm on an extra-low-voltage supply (up to 50 V AC or 120 V DC, as BS 7671) and 0.5 mm on a low-voltage one; the terminal block and plant outlines 0.5 mm; distribution blocks and the frame 0.7 mm.
-- **SH-15** The title block along the bottom shows the logo, *Project*, *Panel name*, the sheet's title, *Sheet x of y*, job no. and client (three equal cells side by side), drawing ref., drawn by and date, checked by and date, and the latest four revisions with the newest at the bottom.
+- **SH-15** The title block along the bottom shows the logo; *Project*, *Panel name* and the sheet's title; then three rows: *Sheet x of y*, job no. and checked by and date (three equal cells), drawing ref. and drawn by and date (two equal cells), and client (the whole width); and the latest four revisions with the newest at the bottom.
 
 ### Moving about
 
