@@ -3,7 +3,7 @@
  * history and autosave. All model changes go through `apply`, which calls
  * the core operations, records an undo step and schedules a save.
  */
-import { mergeProofs, provingJob } from "../core/interlocks";
+import { interlockStatus, mergeProofs, provingJob } from "../core/interlocks";
 import type { Project } from "../core/model";
 import { OpError } from "../core/ops";
 import { routePage } from "../core/routing";
@@ -48,6 +48,8 @@ export class Editor {
    * a spare slot; in the Devices view, a row (its key) or a device by itself.
    */
   designPick: { plant: string[]; point?: string; system?: string; controller?: string; slot?: number; row?: string; device?: string } = $state({ plant: [] });
+  /** The network picked in Design's Network view (its id). Not saved. */
+  networkPick: string = $state("");
   /** Rows ticked in the Devices view (their keys), for *Set picked to…*. Not saved. */
   deviceTicks: string[] = $state([]);
   /** Go to a thing's row in Design's Devices view (v0.5 A70): from Layout, or a plant's or module's Properties. */
@@ -92,6 +94,18 @@ export class Editor {
 
   cancelProving(): void {
     this.stopProving = true;
+  }
+
+  /**
+   * On entering Simulate (v0.5 A75): prove the interlocks whose proofs are
+   * out of date, one at a time in the background, so Simulate isn't held up.
+   * Proving all of the BMS fixture's takes well under a second.
+   */
+  proveStale(): void {
+    if (this.proving) return;
+    const st = interlockStatus($state.snapshot(this.project) as Project, this.proofs);
+    const stale = [...st].filter(([, x]) => x.kind === "unchecked").map(([id]) => id);
+    if (stale.length) void this.proveInterlocks(stale);
   }
   /** The plant or module the Terminals window shows (A67). */
   terminalsOf: string | null = $state(null);

@@ -197,3 +197,36 @@ describe("step 8d1: devices are picked in Design (A70)", () => {
     expect(() => setDevices(p, [`plant:${m.id}`], drive.id)).toThrow(/doesn't suit/);
   });
 });
+
+describe("step 8e: networks by kind, interlocks proved on entering Simulate (A65, A75)", () => {
+  test("only an electrical change makes a proof stale: a label dragged, a part moved or retagged, a route changed don't", async () => {
+    const { buildBms01 } = await import("../bench/bms01");
+    const { circuitKey, proveInterlocks, interlockStatus } = await import("./interlocks");
+    const { project: p } = buildBms01(null);
+    const t0 = performance.now();
+    const proofs = proveInterlocks(p);
+    // About a second is quick enough to prove on entering Simulate (D12); the fixture is well under.
+    expect(performance.now() - t0).toBeLessThan(5000);
+    const key = circuitKey(p);
+    const pg = p.pages.find((x) => x.segments.length && x.elements.some((e) => e.symbol === "coil"))!;
+    const coil = pg.elements.find((e) => e.symbol === "coil")!;
+    coil.labelAt = [2, 3];
+    coil.pos = [coil.pos[0] + 4, coil.pos[1]];
+    coil.tag = "K99";
+    coil.label = "SOMETHING ELSE";
+    pg.segments[0]!.points = pg.segments[0]!.points.map(([x, y]) => [x, y + 1]);
+    pg.segments[0]!.labelAt = 0.3;
+    expect(circuitKey(p)).toBe(key);
+    expect([...interlockStatus(p, proofs).values()].every((x) => x.kind !== "unchecked")).toBe(true);
+    // A wire taken away is electrical.
+    pg.segments.pop();
+    expect(circuitKey(p)).not.toBe(key);
+  });
+
+  test("a network is made with its kind", async () => {
+    const { addNetwork } = await import("./network");
+    const p = newProject("t");
+    expect(addNetwork(p, "bus")).toMatchObject({ kind: "bus", name: "Bus 1", protocol: "Modbus RTU" });
+    expect(addNetwork(p, "lan")).toMatchObject({ kind: "lan", name: "LAN 1" });
+  });
+});

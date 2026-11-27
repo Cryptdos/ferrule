@@ -299,7 +299,7 @@ Design lists what the panel has before anything is drawn: systems, plant and poi
 
 ### Network view
 
-- **DE-59** *+ Network* adds a network (*LAN 1*, *Bus 1*…) with a name, a protocol (free text) and a kind: **LAN, off a switch** or **Bus, off the controller**.
+- **DE-59** *+ Network ▾* offers the kinds, **LAN, off a switch** or **Bus, off the controller**, and adds a network of the kind picked (*LAN 1*, *Bus 1*…), picked, with a name and a protocol (free text, *BACnet IP* or *Modbus RTU* to start).
 - **DE-60** Comms plant is put on a network in the plant's Properties (*Network*) or from the network's list (*Put a device on it…*).
 - **DE-61** Devices are in table row order, which is the order along a bus. ↑ ↓ moves a device, and its row in the table moves with it.
 - **DE-62** Deleting a network leaves its devices on none.
@@ -326,7 +326,7 @@ Design lists what the panel has before anything is drawn: systems, plant and poi
 - **DE-77** Each interlock makes a *never* expectation, shown in Expectations… as made by an interlock. It can't be edited or deleted there, only in Design.
 - **DE-78** The expectation follows: renaming either point or duplicating the plant keeps it right; deleting the interlock removes it.
 - **DE-79** *Prove* (Properties), *Prove all* (To draw) or *Check logic* (Simulate) tries every sequence that can affect it. Results: **Proved**; **fails** (Check logic shows how); **never on: is it powered?** (its point can't come on, so nothing is proved); **not drawn** (a point it names isn't on a sheet); **not proved: too many sequences**; or **not proved yet**.
-- **DE-80** A proof is for the drawing as it was. Change the drawing and the interlock reads *not proved yet* until proved again. ~~Proving is asked for, never run on each edit.~~ *(v0.5: A75. Proved on entering Simulate)*
+- **DE-80** A proof is for the circuit as it was. An electrical change (a wire, a part, a link, a point, an interlock) and the interlock reads *not proved yet* until proved again; moving a part or its label, retagging it, a wire's route or a note doesn't. Entering Simulate proves those not proved yet, one at a time in the background, and the Simulation panel shows *Proving 1 of 2…* with *Cancel*, then how many are proved. It's never run on each edit.
 
 ### Export points schedule
 

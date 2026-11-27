@@ -14,8 +14,7 @@
 
   const diagram = $derived(networkDiagram(networkData(editor.project)));
   const nets = $derived(editor.project.networks ?? []);
-  let picked = $state("");
-  const net = $derived(nets.find((n) => n.id === picked) ?? nets[0]);
+  const net = $derived(nets.find((n) => n.id === editor.networkPick) ?? nets[0]);
   /** In order: from the drawing when its serial port is wired (v0.4.x M7), else Design's row order. */
   const order = $derived(net ? networkOrder(editor.project, net) : { drawn: false, devices: [] });
   const devices = $derived(order.devices);
@@ -43,7 +42,7 @@
           <thead><tr><th>Network</th><th>Protocol</th><th>Kind</th><th class="n">Devices</th></tr></thead>
           <tbody>
             {#each nets as n (n.id)}
-              <tr class:on={n.id === net?.id} onclick={() => (picked = n.id)}>
+              <tr class:on={n.id === net?.id} onclick={() => (editor.networkPick = n.id)}>
                 <td><strong>{n.name}</strong></td><td>{n.protocol}</td><td>{n.kind === "lan" ? "LAN" : "bus"}</td><td class="n">{devicesOn(editor.project, n.id).length}</td>
               </tr>
             {/each}

@@ -351,6 +351,10 @@ Judgement calls made while building, by step, with the reason.
 - **8d2: sheet, section and Design templates carry the devices their parts and plant are,** and bring them into a project that hasn't got them, as a distribution comes with a template.
 - **8d2: the BMS fixture gives its modules, power supply and actuators devices** (their makers and models moved there), so its drawings print as before.
 
+- **8e: *Prove all* on the BMS fixture took about a quarter of a second** (two interlocks, 140 to 250 ms), well inside D12's second, so entering Simulate proves what's out of date, in the background, one at a time; the Simulation panel shows the progress with *Cancel*, then *n of m proved*. Built to D12's recommended answer.
+- **8e: a proof's key is the circuit only:** each part's id, symbol, zone, links and params less those that only describe it (description, information, mark, printed rating, colour…); each wire's two ends; each plant item's terminals, points' forms, pins and what they follow, its interlocks and commons; each distribution's kind. On 0.4.5 the key was the whole drawing, so dragging a label, moving a part or a wire's route, or renumbering, dropped every proof: fixed here, as the entry asks.
+- **8e: `+ Network ▾` picks the new network** in the Network view, as `+ Module ▾` picks the new module. *Place as sheet* is left as it is (D10).
+
 ### Title block (ruled 27 Nov 2026, before step 7)
 
 - **A1 laid out again:** *Sheet*, *Job no.* and *Checked* in three equal cells (24 mm); *Drawing ref.* and *Drawn* in two (36 mm); *Client* across the row (72 mm). A long *Checked* name and date is squeezed to fit its cell, as every cell's value is.

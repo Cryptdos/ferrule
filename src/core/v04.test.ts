@@ -689,9 +689,11 @@ describe("interlocks (§6)", () => {
     expect(interlockStatus(p, proofs).get(ok.id)).toEqual({ kind: "proved" });
     expect(interlockStatus(p, proofs).get(bad.id)).toEqual({ kind: "fails" });
     expect(designChecks(p, { proofs }).some((f) => /SF-01 running never on while FA Fire alarm off fails/.test(f.message))).toBe(true);
-    // A change to the drawing: unchecked again until proved again.
+    // An electrical change: unchecked again until proved again (moving a part isn't one, v0.5 A75).
     const key = circuitKey(p);
     p.pages[1]!.elements[0]!.pos = [p.pages[1]!.elements[0]!.pos[0] + 2, p.pages[1]!.elements[0]!.pos[1]];
+    expect(circuitKey(p)).toBe(key);
+    p.pages[1]!.segments.pop();
     expect(circuitKey(p)).not.toBe(key);
     expect(interlockStatus(p, proofs).get(ok.id)).toEqual({ kind: "unchecked" });
   });
