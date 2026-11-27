@@ -2,6 +2,7 @@
   import { api, type ProjectSummary } from "../api";
   import FileBrowser from "./FileBrowser.svelte";
   import DeletedDialog from "./DeletedDialog.svelte";
+  import BackupsDialog from "./BackupsDialog.svelte";
   import logo from "../logo/ferrule.svg";
 
   let { onopen }: { onopen: (id: string) => void } = $props();
@@ -15,6 +16,8 @@
   let asking: { id: string; kind: "duplicate" | "rename"; value: string } | null = $state(null);
   let browsing = $state(false);
   let showDeleted = $state(false);
+  /** The project whose backups are open (A12). */
+  let backupsOf: ProjectSummary | null = $state(null);
   let uploader: HTMLInputElement | undefined = $state();
 
   /** A .ferrule file from this computer into the projects folder (A9). */
@@ -171,6 +174,7 @@
               <button onclick={() => duplicate(p)} title="A copy in the projects folder, under a name you give it">Duplicate…</button>
               <button onclick={() => rename(p)} title="Rename the project's file where it is">Rename…</button>
               <a class="button" href={`/api/projects/${encodeURIComponent(p.id)}/file`} download title="Download the .ferrule file">Download</a>
+              <button onclick={() => (backupsOf = p)} title="The dated copies taken as it's worked on, to restore one into a new project">Backups…</button>
             {/if}
             {#if p.where === "elsewhere"}
               <button onclick={() => forget(p)} title="Take it off this list; the file stays where it is">Remove from list</button>
@@ -183,6 +187,9 @@
   {/if}
   <p class="deleted-link"><button class="link" onclick={() => (showDeleted = true)} title="The projects that have been deleted, to restore or delete for good">Deleted projects…</button></p>
 </div>
+{#if backupsOf}
+  <BackupsDialog project={backupsOf} onrestored={() => void refresh()} onclose={() => (backupsOf = null)} />
+{/if}
 {#if showDeleted}
   <DeletedDialog onrestored={() => void refresh()} onclose={() => (showDeleted = false)} />
 {/if}

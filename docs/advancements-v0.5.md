@@ -81,7 +81,7 @@ Decided in discussion. The aim: Ferrule runs the same way on a desk or on one ce
 
 - [x] **A11. Linux build.** *Built: PR 120.* *Missing. ST-1.* The build script already has a Linux target; CI publishes only the Windows exe. Publish `ferrule-linux` as well, test it end to end, and add a short note on running it as a service (`--host`, `--no-open`).
 
-- [ ] **A12. Rolling backups.** *Missing. PR-1 to PR-7, ST-8.* Set under *Project…*, per project: **how often** a copy is taken and **how many** are kept. Ferrule keeps dated copies of the project as it's worked on, the oldest going when the count is reached.
+- [x] **A12. Rolling backups.** *Built: PR 143.* *Missing. PR-1 to PR-7, ST-8.* Set under *Project…*, per project: **how often** a copy is taken and **how many** are kept. Ferrule keeps dated copies of the project as it's worked on, the oldest going when the count is reached.
   - The copies go in a `Backups` folder beside the project's file. For a project in the projects folder that's `projects\Backups`, next to `Deleted`; for a project kept elsewhere it's beside that file, so the copies follow the project and are picked up by whatever backs up that folder.
   - Restoring is from the project list: a button beside each project opens its copies by date, and one is restored **into a new project**, leaving the current one alone. It asks for the new project's name, as restoring a deleted project does (A16).
   - After *Save as…* the new file starts its own run of copies and the old file keeps the ones it had. The settings are in the project, so they carry over.

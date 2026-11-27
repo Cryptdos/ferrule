@@ -13,7 +13,7 @@ import { AREA_UNITS } from "./geometry";
 import { tidyDesign } from "./design";
 import { RELEASES_URL, VERSION } from "./version";
 import { MAX_CONDITIONS } from "./interlocks";
-import { PLANT_MARKS, markLetters, TEXT_PLACES, type TextPlace, DISTRIBUTION_KINDS, type DistributionKind, POINT_FORMS, type Condition, type Controller, type ControllerSlot, type DesignTemplate, type ModuleInfo, type ModuleType, type PlantItem, type Expectation, type IoPoint, type Interlock, type Network, type PinInfo, type PointForm, FORMAT, FORMAT_VERSION, type GaDim, type GaDimPoint, type GaItem, type Page, type Project, emptyInfo } from "./model";
+import { PLANT_MARKS, markLetters, TEXT_PLACES, type TextPlace, DISTRIBUTION_KINDS, type DistributionKind, POINT_FORMS, type Condition, type Controller, type ControllerSlot, type DesignTemplate, type ModuleInfo, type ModuleType, type PlantItem, type Expectation, type IoPoint, type Interlock, type Network, type PinInfo, type PointForm, FORMAT, FORMAT_VERSION, type Backups, BACKUP_LIMITS, DEFAULT_BACKUPS, type GaDim, type GaDimPoint, type GaItem, type Page, type Project, emptyInfo } from "./model";
 import { allowedRotation, defaultParams, getSymbol } from "./symbols";
 import { gaToSheet } from "./ga";
 import { MODULE_TYPES } from "./modules";
@@ -32,6 +32,14 @@ const strOr = (v: unknown, d = ""): string => (typeof v === "string" ? v : d);
  * save writes the Ferrule that made it (`savedBy`), so the message names the
  * build to open it in; old builds stay on the releases page for that.
  */
+/** A project's backup settings (v0.5 A12), kept within their limits; missing ones as a new project's. */
+export function parseBackups(input: unknown): Backups {
+  const b = isObj(input) ? input : {};
+  const within = (v: unknown, k: keyof typeof BACKUP_LIMITS) =>
+    typeof v === "number" && Number.isFinite(v) ? Math.min(BACKUP_LIMITS[k].max, Math.max(BACKUP_LIMITS[k].min, Math.round(v))) : DEFAULT_BACKUPS[k];
+  return { every: within(b.every, "every"), keep: within(b.keep, "keep") };
+}
+
 export function notOpened(version: number, savedBy: unknown): string {
   const by = typeof savedBy === "string" ? savedBy.trim() : "";
   if (by) return `Not opened. This file needs Ferrule ${by}${version > FORMAT_VERSION ? " or later" : ""}. Builds: ${RELEASES_URL}`;
@@ -67,6 +75,7 @@ export function parseProject(input: unknown): Project {
     },
     titleBlock: strOr(input.titleBlock, "default-a4"),
     assets: {},
+    backups: parseBackups(input.backups),
     plant: parsePlant(input.plant),
     distributions: parseDistributions(input.distributions),
     pages: [],

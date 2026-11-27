@@ -91,8 +91,16 @@ export const slugify = fileKey;
 
 const isProjectFile = (name: string) => name.endsWith(EXT);
 const stem = (name: string) => (name.endsWith(EXT) ? name.slice(0, -EXT.length) : name);
-/** A deleted file's name: `<name> <when>.ferrule`, the time with `:` and `.` made `-`. */
-const DELETED_RE = /^(.*) (\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})-(\d{3})Z\.ferrule$/;
+/** A deleted file's or a backup's name: `<name> <when>.ferrule`, the time with `:` and `.` made `-`. */
+const STAMPED_RE = /^(.*) (\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})-(\d{3})Z\.ferrule$/;
+const stamped = (name: string, when: Date) => `${name} ${when.toISOString().replace(/[:.]/g, "-")}${EXT}`;
+/** The name and time read back from a stamped file name, or null. */
+function unstamp(file: string): { name: string; when: string } | null {
+  const m = STAMPED_RE.exec(file);
+  return m ? { name: m[1]!, when: `${m[2]}T${m[3]}:${m[4]}:${m[5]}.${m[6]}Z` } : null;
+}
+/** The folder a project's backups go in: beside its file (v0.5 A12). */
+const BACKUPS = "Backups";
 
 /** Move a file, copying when a rename can't (across drives). */
 async function move(from: string, to: string): Promise<void> {
@@ -112,7 +120,11 @@ export class Storage {
   /** Files opened from outside the projects folder: id → path. */
   private recent: { id: string; path: string; opened: string }[] = [];
 
-  constructor(readonly dir: string) {}
+  /** `now`: the clock, in ms (tests move it on). */
+  constructor(
+    readonly dir: string,
+    private readonly now: () => number = Date.now,
+  ) {}
 
   async init(): Promise<void> {
     await mkdir(this.dir, { recursive: true });
@@ -312,7 +324,67 @@ export class Storage {
       throw new StorageError("This project was changed elsewhere since you opened it", 409);
     }
     await this.writeProject(file, project);
+    // A dated copy now and then (A12); a copy going wrong doesn't stop the save.
+    await this.backUp(file, project).catch((e) => console.error(`Couldn't take a backup of ${file}`, e));
     return project;
+  }
+
+  /** A project file's backups, oldest first: in `Backups` beside it, named `<its name> <when>.ferrule`. */
+  private async backupsOf(file: string): Promise<{ path: string; file: string; when: string }[]> {
+    const dir = join(dirname(file), BACKUPS);
+    if (!existsSync(dir)) return [];
+    const name = stem(basename(file));
+    const out: { path: string; file: string; when: string }[] = [];
+    for (const f of await readdir(dir)) {
+      const u = unstamp(f);
+      if (u?.name === name) out.push({ path: join(dir, f), file: f, when: u.when });
+    }
+    return out.sort((a, b) => a.when.localeCompare(b.when));
+  }
+
+  /**
+   * Take a backup of a file just saved (v0.5 A12, D1): only when the last
+   * is at least `every` minutes old and the project has changed since it,
+   * the oldest going once there are more than `keep`. None while `keep` is 0.
+   */
+  private async backUp(file: string, project: Project): Promise<void> {
+    const { every, keep } = project.backups;
+    if (keep <= 0) return;
+    const now = this.now();
+    const mine = await this.backupsOf(file);
+    const last = mine.at(-1);
+    if (last && now - Date.parse(last.when) < every * 60_000) return;
+    if (last && (await readFile(last.path, "utf8")) === (await readFile(file, "utf8"))) return;
+    const dir = join(dirname(file), BACKUPS);
+    await mkdir(dir, { recursive: true });
+    const to = join(dir, stamped(stem(basename(file)), new Date(now)));
+    await copyFile(file, to);
+    const all = [...mine, { path: to }];
+    for (const old of all.slice(0, Math.max(0, all.length - keep))) await rm(old.path, { force: true });
+  }
+
+  /** A project's backups for the list (v0.5 A12), newest first, with its settings. */
+  async backups(id: string): Promise<{ every: number; keep: number; copies: { file: string; taken: string; pages: number; error?: string }[] }> {
+    const file = this.path(id);
+    const project = await this.load(id);
+    const copies: { file: string; taken: string; pages: number; error?: string }[] = [];
+    for (const b of (await this.backupsOf(file)).reverse()) {
+      try {
+        copies.push({ file: b.file, taken: b.when, pages: parseProject(JSON.parse(await readFile(b.path, "utf8"))).pages.length });
+      } catch (e) {
+        copies.push({ file: b.file, taken: b.when, pages: 0, error: e instanceof ProjectFormatError ? e.message : "It can't be read" });
+      }
+    }
+    return { ...project.backups, copies };
+  }
+
+  /** Restore one of a project's backups into a new project in the projects folder (v0.5 A12), under a name: legal and not taken. The project itself is left alone. */
+  async restoreBackup(id: string, file: string, name: string): Promise<string> {
+    const b = (await this.backupsOf(this.path(id))).find((x) => x.file === file);
+    if (!b) throw new StorageError("That isn't one of this project's backups", 404);
+    const n = this.newName(name);
+    await copyFile(b.path, join(this.dir, n + EXT));
+    return fileKey(n);
   }
 
   private async writeProject(file: string, project: Project): Promise<void> {
@@ -430,8 +502,12 @@ export class Storage {
     return newId;
   }
 
-  /** Backups follow their project's file name (A12, A21): none yet. */
-  private async renameBackups(_dir: string, _from: string, _to: string): Promise<void> {}
+  /** A project's backups follow its file's name (A12, A21), each keeping its time. */
+  private async renameBackups(dir: string, from: string, to: string): Promise<void> {
+    for (const b of await this.backupsOf(join(dir, from + EXT))) {
+      await move(b.path, join(dir, BACKUPS, stamped(to, new Date(b.when))));
+    }
+  }
 
   /** Add a `.ferrule` file sent from the user's own machine (v0.5 A9): checked as opening one is, under its own name. Returns its id. */
   async upload(fileName: string, text: string): Promise<string> {
@@ -458,9 +534,9 @@ export class Storage {
       const full = join(this.bin, file);
       const st = await stat(full).catch(() => null);
       if (!st?.isFile()) continue;
-      const m = DELETED_RE.exec(file);
-      const name = m ? m[1]! : stem(file);
-      const deleted = m ? `${m[2]}T${m[3]}:${m[4]}:${m[5]}.${m[6]}Z` : st.mtime.toISOString();
+      const u = unstamp(file);
+      const name = u ? u.name : stem(file);
+      const deleted = u ? u.when : st.mtime.toISOString();
       try {
         const p = parseProject(JSON.parse(await readFile(full, "utf8")));
         out.push({ file, name, deleted, title: p.project.title, pages: p.pages.length });
@@ -507,8 +583,7 @@ export class Storage {
     const file = this.path(id);
     if (deleteFile && existsSync(file)) {
       await mkdir(this.bin, { recursive: true });
-      const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-      const to = join(this.bin, `${stem(basename(file))} ${stamp}${EXT}`);
+      const to = join(this.bin, stamped(stem(basename(file)), new Date(this.now())));
       // The previous save goes with it (A45), so nothing of the project is left in its folder.
       await move(file, to);
       if (existsSync(file + ".bak")) await move(file + ".bak", to + ".bak");

@@ -132,3 +132,92 @@ describe("step 10b: Rename, deleted projects, Upload (A21, A16, A9)", () => {
     expect(await names()).not.toContain("Old.ferrule");
   });
 });
+
+describe("step 10c: rolling backups (A12, D1)", () => {
+  let clock = Date.parse("2026-11-27T09:00:00Z");
+  let s: Storage;
+  let a: ReturnType<typeof createApp>;
+  let d: string;
+  const minutes = (n: number) => (clock += n * 60_000);
+  const copies = async (name: string) => ((await readdir(join(d, "Backups")).catch(() => [])) as string[]).filter((f) => f.startsWith(name + " 2026")).sort();
+  beforeAll(async () => {
+    d = await mkdtemp(join(tmpdir(), "ferrule-step10c-"));
+    s = new Storage(d, () => clock);
+    await s.init();
+    a = createApp({ storage: s, examples: {} });
+  });
+  afterAll(() => rm(d, { recursive: true, force: true }));
+
+  test("a new project starts at a copy every 30 minutes, 10 kept; the settings are kept within limits", async () => {
+    const p = await s.create("AHU 1");
+    expect(p.backups).toEqual({ every: 30, keep: 10 });
+    const { parseProject } = await import("../core/validate");
+    expect(parseProject({ ...p, backups: { every: 0, keep: 500 } }).backups).toEqual({ every: 1, keep: 100 });
+    expect(parseProject({ ...p, backups: undefined }).backups).toEqual({ every: 30, keep: 10 });
+  });
+
+  test("a copy is taken on a save when the last is old enough and the project has changed since", async () => {
+    const p = await s.load("ahu-1");
+    await s.save("ahu-1", p);
+    expect(await copies("AHU 1")).toHaveLength(1);
+    // Saved again ten minutes on: too soon.
+    minutes(10);
+    p.project.title = "Air handler";
+    await s.save("ahu-1", p);
+    expect(await copies("AHU 1")).toHaveLength(1);
+    // Half an hour on: a second copy.
+    minutes(25);
+    await s.save("ahu-1", p);
+    expect(await copies("AHU 1")).toHaveLength(2);
+    // Saved again later with nothing changed since that copy: none.
+    minutes(60);
+    await s.save("ahu-1", p);
+    expect(await copies("AHU 1")).toHaveLength(2);
+  });
+
+  test("the oldest go once there are more than are kept; keeping none takes none", async () => {
+    const p = await s.load("ahu-1");
+    p.backups = { every: 1, keep: 3 };
+    for (let i = 0; i < 5; i++) {
+      minutes(2);
+      p.project.jobNo = `J${i}`;
+      await s.save("ahu-1", p);
+    }
+    const kept = await copies("AHU 1");
+    expect(kept).toHaveLength(3);
+    // The newest are the ones kept.
+    expect(kept.at(-1)).toContain("2026-11-27T10-45");
+    p.backups = { every: 1, keep: 0 };
+    minutes(5);
+    p.project.jobNo = "J9";
+    await s.save("ahu-1", p);
+    expect(await copies("AHU 1")).toHaveLength(3);
+  });
+
+  test("the list shows them newest first; one restores into a new project under a name, the project left alone", async () => {
+    const list = await (await a.request("/api/projects/ahu-1/backups")).json();
+    expect(list.keep).toBe(0);
+    expect(list.copies).toHaveLength(3);
+    expect(list.copies[0].taken > list.copies[2].taken).toBe(true);
+    const oldest = list.copies[2];
+    expect((await a.request("/api/projects/ahu-1/backups/restore", json({ file: oldest.file, name: "AHU 1" }))).status).toBe(409);
+    expect((await a.request("/api/projects/ahu-1/backups/restore", json({ file: "../AHU 1.ferrule", name: "x" }))).status).toBe(404);
+    const res = await a.request("/api/projects/ahu-1/backups/restore", json({ file: oldest.file, name: "AHU 1 before" }));
+    expect(res.status).toBe(201);
+    const { id } = await res.json();
+    expect((await s.load(id)).project.jobNo).toBe("J2");
+    expect((await s.load("ahu-1")).project.jobNo).toBe("J9");
+    // A restored project starts its own run of copies.
+    expect(await copies("AHU 1 before")).toHaveLength(0);
+  });
+
+  test("Rename takes the backups with it, each keeping its time", async () => {
+    const before = await copies("AHU 1");
+    const { id } = await (await a.request("/api/projects/ahu-1/rename", json({ name: "AHU-01" }))).json();
+    expect(id).toBe("ahu-01");
+    const after = await copies("AHU-01");
+    expect(after.map((f) => f.slice("AHU-01".length))).toEqual(before.map((f) => f.slice("AHU 1".length)));
+    expect(await copies("AHU 1 ")).toHaveLength(0);
+    expect((await (await a.request("/api/projects/ahu-01/backups")).json()).copies).toHaveLength(3);
+  });
+});

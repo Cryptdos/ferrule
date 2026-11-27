@@ -24,8 +24,9 @@ export const FORMAT = "ferrule";
  * 16: v0.5 step 8d, a device is picked for a part, a strip or a plant item, not for what's placed on a GA.
  * 17: v0.5 step 8d, what a thing takes, gives and draws is on its device; an incoming supply's gives is a value and AC or DC.
  * 18: v0.5 step 9, a backplate sheet's size is its enclosure's, its plate inside, positions measured from the plate.
+ * 19: v0.5 step 10c, a project says how often a backup copy is taken and how many are kept.
  */
-export const FORMAT_VERSION = 18;
+export const FORMAT_VERSION = 19;
 
 export type ParamValue = string | number | boolean;
 
@@ -694,7 +695,21 @@ export interface Project {
   stripDevices?: Record<string, string>;
   /** Offer the shared device library in this project. Off: only the project's own devices. */
   useDeviceLibrary?: boolean;
+  /** Rolling backups (v0.5 A12): a dated copy at most every so many minutes, while it changes, so many kept (none: no copies). */
+  backups: Backups;
 }
+
+export interface Backups {
+  /** Minutes between copies, at least. */
+  every: number;
+  /** How many copies are kept, the oldest going first. 0: none are taken. */
+  keep: number;
+}
+
+/** What a new project starts with (§5 D1): a copy every 30 minutes while it changes, 10 kept. */
+export const DEFAULT_BACKUPS: Backups = { every: 30, keep: 10 };
+/** The limits the settings are kept within. */
+export const BACKUP_LIMITS = { every: { min: 1, max: 1440 }, keep: { min: 0, max: 100 } } as const;
 
 /** An image kept inside the project file. */
 export interface Asset {
@@ -755,5 +770,6 @@ export function newProject(id: string, title = "Untitled project"): Project {
     templates: [],
     expectations: [],
     assets: {},
+    backups: { ...DEFAULT_BACKUPS },
   };
 }

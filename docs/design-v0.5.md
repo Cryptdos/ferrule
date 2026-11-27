@@ -376,6 +376,12 @@ Judgement calls made while building, by step, with the reason.
 - **10b: *Deleted projects…* is a link under the project list,** opening a window. *Restore…* asks for the name in its row, as *Duplicate…* does. The sheet count is read from the file; a deleted file that can't be opened in this build is listed with the reason and can still be restored or deleted.
 - **10b: *Upload…* sits beside *Open file…*,** and a name that's taken is refused rather than asked again: *Rename…* on the one already there, or on the file before uploading, settles it.
 - **10b: *Delete* moves a file across drives by copying it and removing the original,** where it used to leave the original renamed `.deleted`, using the same move as *Rename…* and *Restore…*.
+- **10c: built to D1's recommended answer.** A copy is taken on a save, when the last is at least *every* minutes old and the file differs from it, so nothing is copied while a project sits unchanged. A new project starts at every 30 minutes, 10 kept. *Every* is 1 to 1440 minutes; *keep* is 0 to 100, and 0 takes no copies without removing those there.
+- **10c: the copies are named `<file name> <time>.ferrule`,** in the same form as a deleted file, and a project's are the ones with its exact file name. A copy that goes wrong is logged, and the save still succeeds.
+- **10c: *Backups…* is a button beside each project, opening a window.** *Restore…* starts from `<name> <date> <hh.mm>`, since the project's own name is taken.
+- **10c: *Delete* leaves a project's copies in `Backups`.** The entry doesn't say what happens to them, and leaving them means a project restored under its old name has its copies again.
+- **10c: file format 19.** A project holds its backup settings.
+- **10c: in passing,** *Use the shared device library* under *Project…* has its tick beside its words again, as the backup settings do.
 
 ### Title block (ruled 27 Nov 2026, before step 7)
 
