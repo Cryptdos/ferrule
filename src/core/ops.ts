@@ -1764,17 +1764,21 @@ export function setGaSettings(
     ga.scale = patch.scale;
   }
   if (patch.view && patch.view !== ga.view) {
-    if (patch.view === "detail" || ga.view === "detail") throw new OpError("A detail sheet is added as one, and stays one");
+    // An empty GA sheet changes to any view (v0.5 A33); a detail sheet holds frames, the others items.
+    if ((patch.view === "detail" || ga.view === "detail") && (page.gaItems ?? []).length)
+      throw new OpError(`Only an empty sheet changes ${ga.view === "detail" ? "from" : "to"} a detail sheet: delete what's on it first`);
     // Only what the new view takes may be on the sheet.
     const misfit = (page.gaItems ?? []).filter((it) => !viewTakes(patch.view!, it.kind));
     if (misfit.length) throw new OpError(`A ${patch.view.replace("-", " ")} can't have the ${misfit.length} rail, trunking or label item${misfit.length === 1 ? "" : "s"} on this sheet: delete them first`);
     if (patch.view === "door-back" && !patch.of && !ga.of) throw new OpError("A door back is the back of a door front: pick its sheet");
     if (ga.view === "door-front" && project.pages.some((p) => p.ga?.of === page.id)) throw new OpError("Other sheets show this door: change them first");
     ga.view = patch.view;
-    if (ga.view === "backplate") {
+    if (ga.view === "backplate" || ga.view === "detail") {
       delete ga.of;
       delete ga.leaf;
     }
+    // A detail sheet has no scale of its own: each frame has one.
+    if (ga.view === "detail") ga.scale = 1;
     if (ga.view !== "door-front") delete ga.leaves;
   }
   if (patch.of !== undefined) {

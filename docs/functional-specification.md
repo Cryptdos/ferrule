@@ -109,19 +109,19 @@ IDs are kept when the document is revised: a withdrawn statement is struck throu
 ### Top bar
 
 - **WN-1** Row one, left to right: back to the project list, the project title, the workbenches (**Design, Draft, Annotate, Layout, Simulate**), then *Project…*, *Save as…*, *Export PDF*, *Print*, help, *Settings*, and the save status.
-- **WN-2** Row two is in the same order on every workbench: undo and redo; the view (*Fit*, *Split*, and in Draft *Colour check*); the tools (*Select*, and in Draft *Wire*); the eight align and distribute icons; then the workbench's menus. *(v0.5: A34. The order of the groups changes: undo and redo, Fit and Split, align and distribute, Select, then the workbench's tools)*
+- **WN-2** Row two is in the same order on every workbench: undo and redo; the view (*Fit*, *Split*, and in Draft *Colour check*); the eight align and distribute icons; the tools (*Select*, and in Draft *Wire*); then the workbench's own buttons, starting with the menus the workbenches share in the order *Check*, *Expectations…*, *Schedules*.
 
   | Workbench | Row two after undo/redo |
   |---|---|
   | Design | Views ~~*Table, Controller, Network, To draw*~~ *(v0.5: A69, A70. Plant, Controller, Devices, Network, To draw)*; *Check*; *Export points schedule*; then the view's own buttons (§5) |
-  | Draft | Fit, Split, Colour check; Select, Wire; align/distribute; *Renumber, Templates, Plant, Distribution, Table, Check, Expectations…, Schedules* |
-  | Annotate | Fit, Split; Select; align/distribute |
+  | Draft | Fit, Split, Colour check; align/distribute; Select, Wire; *Check, Expectations…, Schedules, Renumber, Templates, Plant, Distribution, Table* |
+  | Annotate | Fit, Split; align/distribute; Select |
   | Layout | Fit, Split; Select; align/distribute; *Check, Schedules, Place parts…* (*Place detail…* on a detail sheet), *Device table…* |
   | Simulate | Fit, Split; a note that editing is off; *Expectations…* (no undo/redo) |
 
 - **WN-3** Hovering any icon shows its name. A menu's button opens its window; clicked again, it closes it.
 - **WN-4** Switching workbench clears the selection and returns to the Select tool. Leaving Simulate ends the simulation.
-- **WN-5** *Draft* is greyed out while a spare sheet is the active sheet. *(v0.5: A35. Draft is also greyed out on a GA sheet, and Layout on a spare sheet)*
+- **WN-5** A workbench is greyed out on a sheet it can't work on, with a tip that says why: *Draft* on a spare sheet and on a GA sheet; *Layout* on any sheet that isn't a GA (a schematic sheet's tip says to add a GA sheet from `▾`). Moving to a sheet the workbench in use can't work on takes you to the one that can.
 
 ### Panels over the drawing
 
@@ -163,14 +163,14 @@ IDs are kept when the document is revised: a withdrawn statement is struck throu
 
 ### The sheet list
 
-- **SH-1** `+` adds a schematic sheet after the current one. `▾` beside it offers *Sheet* or *Spare sheet*.
+- **SH-1** `+` adds a schematic sheet after the current one. `▾` beside it offers the three kinds: *Sheet*, *Spare sheet* or *GA sheet…* (LA-1).
 - **SH-2** The buttons beside it duplicate the sheet, move it up, move it down and delete it. Sheet numbers follow the order. A copy lands straight after the sheet it was made from, with its tags cleared. Delete asks first, naming the sheet.
 - **SH-3** `PgUp`/`PgDn` go to the previous and next sheet in every workbench except Design. It's always the very next sheet, whatever its kind, and the workbench doesn't change.
 - **SH-4** `▸` on a sheet lists what's on it for the workbench in use, in column order, each with its tag. Clicking a line selects that item and brings it into view.
 - **SH-5** *Find…* searches every sheet's contents and titles.
 - **SH-6** The `⚙` on a sheet, or double-clicking its name, opens its settings in Properties: *Sheet title*, *Sheet type* (Schematic, Spare, GA) and, on a schematic sheet, *Panel boundary*.
 - **SH-7** A spare sheet is badged *spare* and a GA sheet *GA* in the list.
-- **SH-8** A spare sheet holds annotations only (notes, tables, pictures). Draft is unavailable on it.
+- **SH-8** A spare sheet holds annotations only (notes, tables, pictures). Draft and Layout are unavailable on it.
 - **SH-9** *Sheet type* changes a sheet's kind. Only an empty sheet can become a GA (otherwise it says how many things are on it), and a GA sheet with things laid out can't change type until they're deleted. A sheet with parts or wires on it can't become a spare sheet either: it says how many are in the way.
 - **SH-10** A sheet with revision clouds lists them in its settings (*Cloud 1, columns 12–30*) with *Remove*.
 
@@ -539,7 +539,7 @@ General arrangement (GA) sheets drawn to scale. Positions and sizes are in milli
 
 ### Sheets
 
-- **LA-1** In Layout, with a sheet open that isn't a GA, the browser offers *New GA sheet*: it asks for the view, the enclosure width and height, and the scale, and adds the sheet after the current one. *(v0.5: A58. On a backplate sheet the size is the enclosure's, with the plate drawn inside it)*
+- **LA-1** A GA sheet is added from `▾` beside `+` in Sheets: *GA sheet…* asks for the view, the enclosure width and height, and the scale, adds the sheet after the current one and opens it in Layout. *(v0.5: A58. On a backplate sheet the size is the enclosure's, with the plate drawn inside it)*
 - **LA-2** Views: **Backplate**, **Door front**, **Door back**, **Detail**.
 - **LA-3** The scale is any number typed (1:7.5, 1:12). ~~Left empty, or with *Fit* in the sheet's settings, it's the first of 1:1, 1:2, 1:2.5, 1:5, 1:10, 1:20, 1:25 and 1:50 at which the enclosure fits the sheet.~~ *(v0.5: A60)*
 - **LA-4** A **door back** is drawn from its door front: seen from inside, mirrored, with the front's devices dashed with their cut-outs. The door front must exist first.
@@ -587,6 +587,7 @@ General arrangement (GA) sheets drawn to scale. Positions and sizes are in milli
 - **LA-37** A part sized by hand keeps its size; Properties shows the table's size and *Back to the table size*.
 - **LA-38** *To library* puts a project device in the shared library. *Remove* takes one out of the project; parts that are that device keep their size.
 - **LA-39** With the shared library switched off for the project, only the project's own devices are offered; devices already in use stay.
+- **LA-40** A GA sheet's *View* is changed in its settings. An empty sheet changes to any view, *Detail* included; one holding things the new view can't take is refused, and the message says why (*Only an empty sheet changes to a detail sheet: delete what's on it first*; a door back without its door: *pick its sheet*).
 
 ---
 

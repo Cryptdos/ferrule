@@ -172,7 +172,7 @@ Decided while going through the specification's window and sheet sections.
     - **Design's *Templates…*.** It has *Cancel* and *Insert* and closes on Insert, so today it behaves as a prompt, while Draft's *Templates* is a window that docks. One of them changes; it goes with the check on the two Templates lists.
   - Already in its favour: every window and most prompts are built from the same part, so this is a change to which ones may dock, not a new window handler. Yes-or-no questions use the browser's own box.
 
-- [ ] **A33. GA sheet in the add menu.** *Missing. SH-1, LA-1. Build 0.4.5.* There are three kinds of sheet, and `▾` beside `+` offers two: *Sheet* and *Spare sheet*. A GA sheet can only be made from inside Layout. The menu gets the third, *GA sheet*, which opens the same prompt Layout uses: the view, the enclosure's width and height, and the scale. Each kind of sheet is then made from the one place.
+- [x] **A33. GA sheet in the add menu.** *Built: PR 122.* *Missing. SH-1, LA-1. Build 0.4.5.* There are three kinds of sheet, and `▾` beside `+` offers two: *Sheet* and *Spare sheet*. A GA sheet can only be made from inside Layout. The menu gets the third, *GA sheet*, which opens the same prompt Layout uses: the view, the enclosure's width and height, and the scale. Each kind of sheet is then made from the one place.
   - To settle while building: whether Layout's own *New GA sheet* stays as a second way in. It's what the browser offers there when the sheet open isn't a GA, so it does no harm.
   - **Found on the build, 26 Nov 2026: a detail sheet is awkward to make.** On a GA sheet the view couldn't be changed to *Detail* in the sheet's settings. The only way found was to leave for a sheet that isn't a GA, use *New GA sheet* there to pick Detail, then move the new sheet to where it belongs. With GA sheet in the add menu it's made from any sheet and lands after the one that's open. Two things go with it: an empty GA sheet can be changed to any view in its settings, and a view that can't be picked says why, as Door back does (*pick its sheet*).
   - To confirm before building: exactly what the settings did when Detail was chosen, so the right thing is fixed.
@@ -196,11 +196,11 @@ Findings from testing the v0.4.x builds go here, in the order they're found.
 
 From the notes written into the QA copy of the specification (`v0.4.0-pre Notes\QA`) and from testing talked through the same day.
 
-- [ ] **A34. One order for row two.** *Tweak. WN-2. Build 0.4.5.* Row two is to be in one standard order on every workbench: undo and redo | Fit and Split | align and distribute | Select | the workbench's own tools. Today Select comes before the align icons.
+- [x] **A34. One order for row two.** *Built: PR 122.* *Tweak. WN-2. Build 0.4.5.* Row two is to be in one standard order on every workbench: undo and redo | Fit and Split | align and distribute | Select | the workbench's own tools. Today Select comes before the align icons.
   - A button that only one workbench has stays with its group: *Colour check* with Fit and Split, *Wire* with Select.
   - To settle: the order of the menus the workbenches share (Check, Schedules, Expectations…), which is the rest of the check below.
 
-- [ ] **A35. A workbench is greyed out on a sheet it can't work on.** *Fix. WN-5, SH-8. Build 0.4.5.* Only *Draft* on a spare sheet is greyed out today. Two more, found by testing:
+- [x] **A35. A workbench is greyed out on a sheet it can't work on.** *Built: PR 122.* *Fix. WN-5, SH-8. Build 0.4.5.* Only *Draft* on a spare sheet is greyed out today. Two more, found by testing:
   - *Draft* is greyed out on a GA sheet. It isn't on this build.
   - *Layout* is greyed out on a spare sheet.
   - To settle: *Layout* on a schematic sheet. Today it's allowed, and the browser offers *New GA sheet* there (LA-1); with A33 that button has another home.
