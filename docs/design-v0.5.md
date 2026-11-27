@@ -404,6 +404,13 @@ Judgement calls made while building, by step, with the reason.
   - The Network view's *Kind* is no longer cut off at the side, and its note no longer says *in v0.4*.
 - **Screenshots:** design, controllers, network, ga, editor-draft, simulate and annotate are retaken on the BMS-01 and LSP-01 fixtures. drawing-sheet and terminal-block are left as they are, since their sheets print the same.
 
+### After step 12: QA on 0.5.28
+
+- ***+ Module ▾* opened behind the Controller view in the dark theme,** and so did *+ Network ▾* behind the Network view. The dark theme draws the top bar through a filter, which keeps the bar's menus in the bar's own layer, and the Design workbench, filtered as well and later on the page, was drawn over that layer. The top bar now sits above the workbench, under the windows. A menu opened from the bar is measured once it's placed, so it lands under its button in either theme.
+- ***Add the controller* did nothing on a project without one.** The editor holds the project as a reactive proxy, and the operation gave the project a bare list and then added the controller to the bare list, which the proxy never saw. *Save as device* on a module, adding a module from a device, and a Design template's devices failed in the editor too, because `structuredClone` refuses a proxy. These all passed in the tests, which run on plain data.
+- **An edit now runs on a plain copy of the project,** which then becomes the project, the way undo already swapped it. This makes the editor behave as the tests do, and editing a busy sheet takes the same time as before.
+- **Model code copies with `clone`** (`src/core/model.ts`) rather than `structuredClone`, since a library device or a Design template can still come from the editor's own state. A test holds an edit's inputs as the editor does, and another checks that `structuredClone` doesn't come back.
+
 ### Title block (ruled 27 Nov 2026, before step 7)
 
 - **A1 laid out again:** *Sheet*, *Job no.* and *Checked* in three equal cells (24 mm); *Drawing ref.* and *Drawn* in two (36 mm); *Client* across the row (72 mm). A long *Checked* name and date is squeezed to fit its cell, as every cell's value is.

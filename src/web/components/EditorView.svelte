@@ -777,6 +777,12 @@
     flex-direction: column;
     border-bottom: 1px solid #cfd4d8;
     background: #f4f5f6;
+    /* Above the workbench below it, so a menu opened from the bar shows over
+       it: in the dark theme the bar is filtered, which keeps its menus in its
+       own layer, and the Design workbench, filtered too, would otherwise be
+       drawn over them. Under the windows (from 41). */
+    position: relative;
+    z-index: 25;
   }
   .row {
     display: flex;

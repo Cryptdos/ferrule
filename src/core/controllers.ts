@@ -5,7 +5,7 @@
  * scheduled and simulated like plant.
  */
 import type { Controller, ModuleInfo, ModuleType, PlantItem, Project } from "./model";
-import { newId } from "./model";
+import { clone, newId } from "./model";
 import { OpError, addGaItem, addPlant, addProjectDevice, deletePlant, getPlant, setDevices, syncPlantViews, useLibraryDevice } from "./ops";
 import type { DeviceEntry, ModuleTemplate, ProjectDevice } from "./devices";
 import { moduleGaSize, snapToRail } from "./ga";
@@ -24,7 +24,10 @@ const prefixOrA = (p: string | undefined) => (p ?? "").trim().toUpperCase().repl
 
 export function addController(project: Project, description = "", prefix = "A"): Controller {
   const c: Controller = { id: newId("ctl"), description: description.trim(), prefix: prefixOrA(prefix), slots: [] };
-  (project.controllers ??= []).push(c);
+  // Assigned, then pushed to through the project: in the editor the project is
+  // a reactive proxy, and a push to the bare array it was given isn't seen.
+  project.controllers ??= [];
+  project.controllers.push(c);
   return c;
 }
 
@@ -210,7 +213,7 @@ export function moduleTemplate(item: PlantItem): ModuleTemplate {
     type: m.type,
     ...(m.channels ? { channels: m.channels } : {}),
     terminals: [...item.terminals],
-    ...(item.pins ? { pins: structuredClone(item.pins) } : {}),
+    ...(item.pins ? { pins: clone(item.pins) } : {}),
     ...(item.points?.length ? { points: item.points.map((p) => ({ name: p.name, form: p.form, pins: [...p.pins] })) } : {}),
   };
 }
@@ -241,8 +244,8 @@ export function addModuleFromDevice(project: Project, controllerId: string, devi
   const t = dev.module!;
   const item = addModule(project, controllerId, { type: t.type, channels: t.channels, at, pattern: null });
   item.terminals = [...t.terminals];
-  if (t.pins) item.pins = structuredClone(t.pins);
-  if (t.points?.length) item.points = cleanPoints(structuredClone(t.points), item.terminals);
+  if (t.pins) item.pins = clone(t.pins);
+  if (t.points?.length) item.points = cleanPoints(clone(t.points), item.terminals);
   item.device = dev.id;
   syncPlantViews(project);
   return item;

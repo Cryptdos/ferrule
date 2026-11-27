@@ -5,6 +5,7 @@
  */
 
 import type { IoPoint, ModuleType, PinInfo, SupplyType } from "./model";
+import { clone } from "./model";
 import { MODULE_TYPES as TYPES } from "./modules";
 
 /**
@@ -214,7 +215,7 @@ export function parseProjectDevices(v: unknown): ProjectDevice[] {
 
 /** The project's copy of a library entry. */
 export function projectCopy(e: DeviceEntry): ProjectDevice {
-  return { id: e.id, name: e.name, maker: e.maker, part: e.part, kind: e.kind, w: e.w, h: e.h, d: e.d, library: true, ...(e.module ? { module: structuredClone(e.module) } : {}), ...electrics(e as unknown as Record<string, unknown>) };
+  return { id: e.id, name: e.name, maker: e.maker, part: e.part, kind: e.kind, w: e.w, h: e.h, d: e.d, library: true, ...(e.module ? { module: clone(e.module) } : {}), ...electrics(e as unknown as Record<string, unknown>) };
 }
 
 /** "Relay 4CO (Maker 1234…) 30.6 × 101.8" for lists. */

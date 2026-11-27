@@ -4,6 +4,7 @@
    * `+ Module ▾` offers types, so a bus isn't made as a LAN and remade.
    */
   import { addNetwork } from "../../core/network";
+  import { fixedAt } from "../fixedat";
   import type { Editor } from "../editor.svelte";
 
   let { editor }: { editor: Editor } = $props();
@@ -32,7 +33,7 @@
 <div class="wrap">
   <button bind:this={btn} class:active={open} onclick={toggle} title="A network comms plant can be on: pick its kind first">+ Network ▾</button>
   {#if open}
-    <div class="menu" role="menu" style:left="{at.x}px" style:top="{at.y}px">
+    <div class="menu" role="menu" use:fixedAt={at}>
       {#each KINDS as k (k.kind)}
         <button class="item" onclick={() => add(k.kind)} title={k.hint}>{k.label}</button>
       {/each}
