@@ -30,8 +30,9 @@
       return;
     }
     try {
-      const [{ project, version }] = await Promise.all([api.load(id), loadAvoid()]);
+      const [{ project, version, file }] = await Promise.all([api.load(id), loadAvoid()]);
       editor = new Editor(project, version);
+      editor.fileName = file;
       editor.watch();
       const url = `?project=${encodeURIComponent(id)}`;
       if (location.search !== url) history.pushState(null, "", url);

@@ -9,7 +9,7 @@
  */
 import { VERSION } from "../core/version";
 import { mkdir, readdir, readFile, rename, rm, stat, writeFile, copyFile } from "node:fs/promises";
-import { existsSync, statSync, watch, type FSWatcher } from "node:fs";
+import { existsSync, readdirSync, statSync, watch, type FSWatcher } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { homedir, platform } from "node:os";
 import { createHash } from "node:crypto";
@@ -17,6 +17,7 @@ import { type Project, dateText, newProject } from "../core/model";
 import { parseDesignTemplate, parseProject, parseTemplate, ProjectFormatError } from "../core/validate";
 import type { DesignTemplate, Template } from "../core/model";
 import { templateCounts, type Counts } from "../core/design";
+import { fileKey, fileNameProblem } from "../core/filenames";
 
 /** The project file extension. */
 export const EXT = ".ferrule";
@@ -35,6 +36,9 @@ export class StorageError extends Error {
 
 export interface ProjectSummary {
   id: string;
+  /** Its file's name, as typed (v0.5 A17): what the project is known by. */
+  name: string;
+  /** Its title block's title, once there is one. */
   title: string;
   pages: number;
   modified: string;
@@ -68,14 +72,8 @@ export function stampSaved(project: Project): Record<string, unknown> {
   return { format, version, savedBy: VERSION, ...rest };
 }
 
-export function slugify(title: string): string {
-  const s = title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 48);
-  return s || "project";
-}
+/** A file's key: how names are compared, and a project's id (v0.5 A8). */
+export const slugify = fileKey;
 
 const isProjectFile = (name: string) => name.endsWith(EXT);
 const stem = (name: string) => (name.endsWith(EXT) ? name.slice(0, -EXT.length) : name);
@@ -155,7 +153,7 @@ export class Storage {
     try {
       this.watcher = watch(this.dir, (_event, name) => {
         if (!name || !isProjectFile(String(name))) return;
-        this.changed(stem(String(name)));
+        this.changed(fileKey(stem(String(name))));
       });
     } catch (e) {
       console.error("Can't watch the projects folder; live updates are off", e);
@@ -199,12 +197,41 @@ export class Storage {
     return resolve(dirname(file)) === resolve(this.dir);
   }
 
-  /** The file a project id refers to. */
+  /** The file a project id refers to: one opened from elsewhere, else the projects folder's file whose name has that key. */
   path(id: string): string {
     if (!ID_RE.test(id)) throw new StorageError(`Invalid project id "${id}"`);
     const r = this.recent.find((x) => x.id === id);
     if (r) return r.path;
-    return join(this.dir, id + EXT);
+    const name = this.folderFiles().find((n) => fileKey(stem(n)) === id);
+    return join(this.dir, name ?? id + EXT);
+  }
+
+  /** The project files in the projects folder. */
+  private folderFiles(): string[] {
+    try {
+      return readdirSync(this.dir).filter(isProjectFile);
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Is a name taken (v0.5 A8)? Names are compared as file names, by their
+   * key, so `LSP 01` and `lsp-01` are the same; a project opened from
+   * elsewhere takes its key too.
+   */
+  taken(name: string): boolean {
+    const key = fileKey(name);
+    return this.folderFiles().some((n) => fileKey(stem(n)) === key) || this.recent.some((r) => r.id === key);
+  }
+
+  /** A name for a new file in the projects folder: legal (D2) and not taken (A8), or refused with the reason. */
+  private newName(name: string): string {
+    const n = name.trim();
+    const bad = fileNameProblem(n);
+    if (bad) throw new StorageError(bad);
+    if (this.taken(n)) throw new StorageError(`A file by that name already exists: ${n}${EXT}`, 409);
+    return n;
   }
 
   async list(): Promise<ProjectSummary[]> {
@@ -213,19 +240,23 @@ export class Storage {
       try {
         const p = await this.load(id);
         const st = await stat(file);
-        out.push({ id, title: p.project.title, pages: p.pages.length, modified: st.mtime.toISOString(), path: file, where, ...(opened ? { opened } : {}) });
+        out.push({ id, name: stem(basename(file)), title: p.project.title, pages: p.pages.length, modified: st.mtime.toISOString(), path: file, where, ...(opened ? { opened } : {}) });
       } catch (e) {
         // A project this version can't open is listed with the reason, so it doesn't just vanish.
         if (e instanceof ProjectFormatError) {
           const st = await stat(file).catch(() => null);
-          if (st) out.push({ id, title: stem(basename(file)), pages: 0, modified: st.mtime.toISOString(), path: file, where, error: e.message, ...(opened ? { opened } : {}) });
+          if (st) out.push({ id, name: stem(basename(file)), title: "", pages: 0, modified: st.mtime.toISOString(), path: file, where, error: e.message, ...(opened ? { opened } : {}) });
         }
         // Anything else (unreadable, gone) is skipped; files stay on disk untouched.
       }
     };
+    const seen = new Set<string>();
     for (const name of (await readdir(this.dir)).filter(isProjectFile)) {
-      const id = stem(name);
-      if (ID_RE.test(id) && !this.recent.some((r) => r.id === id)) await add(id, join(this.dir, name), "projects");
+      const id = fileKey(stem(name));
+      // Two files whose names compare the same: the first is the project (A8 stops a second being made).
+      if (seen.has(id) || this.recent.some((r) => r.id === id)) continue;
+      seen.add(id);
+      await add(id, join(this.dir, name), "projects");
     }
     for (const r of this.recent) if (existsSync(r.path)) await add(r.id, r.path, "elsewhere", r.opened);
     return out.sort((a, b) => (b.opened ?? b.modified).localeCompare(a.opened ?? a.modified));
@@ -263,20 +294,32 @@ export class Storage {
     await rename(tmp, file);
   }
 
-  async create(title: string, opts: { useDeviceLibrary?: boolean } = {}): Promise<Project> {
-    const base = slugify(title);
-    let id = base;
-    for (let i = 2; existsSync(this.path(id)) || this.recent.some((r) => r.id === id); i++) id = `${base}-${i}`;
-    const project = newProject(id, title.trim() || "Untitled project");
+  /**
+   * A new project from a file name (v0.5 A17): legal and not taken, or
+   * refused with the reason. It has no title until one's typed in *Project…*.
+   */
+  async create(name: string, opts: { useDeviceLibrary?: boolean } = {}): Promise<Project> {
+    const n = this.newName(name);
+    const id = fileKey(n);
+    const project = newProject(id, "");
     // Dated the day it's made: its drawn date and revision A (A49).
     project.project.drawnDate = project.revisions[0]!.date = dateText();
     if (opts.useDeviceLibrary === false) project.useDeviceLibrary = false;
-    return this.save(id, project);
+    await this.writeProject(join(this.dir, n + EXT), project);
+    return project;
+  }
+
+  /** A project made elsewhere (an example, an upload) put in the projects folder under a name: legal and not taken. Returns its id. */
+  async add(name: string, project: Project): Promise<string> {
+    const n = this.newName(name);
+    const id = fileKey(n);
+    await this.writeProject(join(this.dir, n + EXT), { ...project, id });
+    return id;
   }
 
   /** The id for a file: its name in the projects folder, else its name plus a short hash of where it is. */
   private idFor(file: string): string {
-    const name = slugify(stem(basename(file))).slice(0, 60);
+    const name = fileKey(stem(basename(file))).slice(0, 60);
     if (this.inProjectsFolder(file)) return name;
     const hash = createHash("sha1").update(resolve(file).toLowerCase()).digest("hex").slice(0, 6);
     return `${name}-${hash}`;
@@ -301,7 +344,11 @@ export class Storage {
   async saveAs(id: string, path: string, overwrite = false): Promise<string> {
     let file = resolve(path);
     if (!isProjectFile(basename(file))) file += EXT;
+    const bad = fileNameProblem(stem(basename(file)));
+    if (bad) throw new StorageError(bad);
     if (existsSync(file) && !overwrite) throw new StorageError(`${basename(file)} is already there`, 409);
+    // In the projects folder a name that compares the same as another's is taken too (v0.5 A8).
+    if (!existsSync(file) && this.inProjectsFolder(file) && this.taken(stem(basename(file)))) throw new StorageError(`A file by that name already exists: ${stem(basename(file))}${EXT}`, 409);
     const project = await this.load(id);
     await this.writeProject(file, project);
     const newId = await this.open(file);
@@ -310,13 +357,14 @@ export class Storage {
     return newId;
   }
 
-  /** A copy beside the original. */
-  async duplicate(id: string): Promise<string> {
-    const project = await this.load(id);
-    const copy = await this.create(`${project.project.title} copy`);
-    const out = { ...project, id: copy.id, project: { ...project.project, title: `${project.project.title} (copy)` } };
-    await this.save(copy.id, out);
-    return copy.id;
+  /** A copy in the projects folder, under the name asked for (v0.5 A8): a copy is made for a reason, and its name says what. */
+  async duplicate(id: string, name: string): Promise<string> {
+    return this.add(name, await this.load(id));
+  }
+
+  /** The file name a project has, without `.ferrule`. */
+  fileName(id: string): string {
+    return stem(basename(this.path(id)));
   }
 
   /**

@@ -159,6 +159,9 @@ export class Editor {
   /** A change seen while a save was in flight, to check once it lands. */
   private remoteSeen: string | null = null;
 
+  /** The project's file name, without `.ferrule` (v0.5 A17): what the project is known by. */
+  fileName = $state("");
+
   constructor(project: Project, version = "") {
     this.project = project;
     this.version = version;

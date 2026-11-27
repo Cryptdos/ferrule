@@ -364,6 +364,13 @@ Judgement calls made while building, by step, with the reason.
 - **A71: the table has a *Size* and nothing else to set**, and lists every GA sheet's rows with the sheet in its first column, as the Schedules tab does. Its text starts at the detail size, since the list is long. It can be placed on any sheet, as the other tables can.
 - **SH-6 written out** with what a GA sheet's settings show for each view.
 
+### Step 10
+
+- **10a: names compare by their letters and digits, whatever the case** (`fileKey`), which makes `LSP 01` and `lsp-01` the same as the entry asks; that key is also the project's id in the app's addresses, so a file's own name can be anything legal. Built to D2's recommended answer: Windows' rules everywhere, plus no name Windows keeps for devices (CON, NUL, COM1…), none starting with a space, and 120 characters at most.
+- **10a: a new project has no title,** so the title block's *Project* cell is empty until it's typed under *Project…*; the list and the top bar show the file name and the title beside it in grey.
+- **10a: *Duplicate…* asks for the name in its row,** starting from `<name> copy`, rather than in a separate prompt.
+- **10a: the LSP-01 example is added as `LSP-01.ferrule`.** A PDF with no drawing number or title is named after the file.
+
 ### Title block (ruled 27 Nov 2026, before step 7)
 
 - **A1 laid out again:** *Sheet*, *Job no.* and *Checked* in three equal cells (24 mm); *Drawing ref.* and *Drawn* in two (36 mm); *Client* across the row (72 mm). A long *Checked* name and date is squeezed to fit its cell, as every cell's value is.

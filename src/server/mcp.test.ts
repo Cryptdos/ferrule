@@ -58,7 +58,7 @@ describe("MCP protocol", () => {
 
 describe("MCP tools", () => {
   test("draw a rung, renumber and check", async () => {
-    const { data: created } = await call("create_project", { title: "MCP Panel" });
+    const { data: created } = await call("create_project", { name: "MCP Panel" });
     const project = created.id;
     const add = async (symbol: string, x: number, y: number, extra: Record<string, unknown> = {}) =>
       (await call("add_element", { project, sheet: 1, symbol, x, y, ...extra })).data;
@@ -160,7 +160,7 @@ describe("MCP over HTTP", () => {
 
 describe("MCP simulation", () => {
   test("simulate and check_logic", async () => {
-    const project = (await call("create_project", { title: "Sim Panel" })).data.id;
+    const project = (await call("create_project", { name: "Sim Panel" })).data.id;
     const add = async (symbol: string, x: number, y: number, params = {}) =>
       (await call("add_element", { project, sheet: 1, symbol, x, y, params })).data;
     const cd = (await call("add_distribution", { project, name: "CCT", kind: "dc+" })).data[0];
@@ -197,7 +197,7 @@ describe("MCP simulation", () => {
 
 describe("MCP controller tools", () => {
   test("add a controller and modules, place a view, renumber, and refer to its points", async () => {
-    const proj = (await call("create_project", { title: "Controllers" })).data;
+    const proj = (await call("create_project", { name: "Controllers" })).data;
     const c = (await call("controller", { project: proj.id, description: "AHU-1 outstation" })).data;
     expect(c.tag).toBe("A?");
     await call("add_module", { project: proj.id, controller: c.id, type: "host" });

@@ -302,11 +302,12 @@ export const TOOLS: Tool[] = [
   },
   {
     name: "create_project",
-    description: "Create a new project with one empty sheet. Returns its id.",
-    inputSchema: obj({ title: { type: "string" } }, ["title"]),
+    description:
+      "Create a new project with one empty sheet from its file name, kept exactly as given (capitals and spaces too; none of \\ / : * ? \" < > |). A name already in the projects folder is refused: names are compared as file names, so 'LSP 01' and 'lsp-01' are the same. Its title and the rest of the title block are set with update_project_info. Returns its id.",
+    inputSchema: obj({ name: { type: "string", description: "The file name, without .ferrule" } }, ["name"]),
     run: async (a, ctx) => {
-      const p = await ctx.storage.create(str(a, "title"));
-      return { id: p.id };
+      const p = await ctx.storage.create(str(a, "name"));
+      return { id: p.id, file: `${ctx.storage.fileName(p.id)}.ferrule` };
     },
   },
   {
