@@ -85,7 +85,7 @@ Ferrule is also an [MCP server](docs/mcp.md): connect Claude to it and ask for a
 
 ### Portable Windows .exe
 
-`ferrule.exe` is the whole thing in one file. Put it in a folder (e.g. `C:\Temp\eCAD`), double-click it, and your browser opens on Ferrule. A console window shows the address; close it to stop Ferrule. New projects are saved in a `projects` folder next to the .exe; *Open file…* and *Save as…* work with a project file anywhere.
+`ferrule.exe` is the whole thing in one file. Put it in a folder (e.g. `C:\Temp\eCAD`), double-click it, and your browser opens on Ferrule. A console window shows the address; close it to stop Ferrule. Run it again while it's running and it opens your browser at the one that's running rather than starting another, which is also how to get a closed page back. New projects are saved in a `projects` folder next to the .exe; *Open file…* and *Save as…* work with a project file anywhere.
 
 PDF export uses Microsoft Edge in the background (or Chrome, if Edge isn't there). Nothing needs installing. Windows may warn the first time because the .exe isn't signed: *More info → Run anyway*.
 
@@ -132,7 +132,7 @@ A project is one `.ferrule` file (JSON) with everything in it, pictures included
 
 Set `FERRULE_BROWSER` to the path of a Chromium-based browser to choose which one makes PDFs.
 
-**Claude:** Ferrule is also an MCP server, at `http://127.0.0.1:4810/mcp`, or `ferrule.exe --mcp` over stdio. See [docs/mcp.md](docs/mcp.md).
+**Claude:** Ferrule is also an MCP server, at `http://127.0.0.1:4810/mcp`, or `ferrule.exe --mcp` over stdio. For a Ferrule on another machine, `ferrule.exe --mcp http://server:4810` relays Claude to it. See [docs/mcp.md](docs/mcp.md).
 
 Server options: `--port 4810`, `--host 0.0.0.0` (to reach it from another machine), `--projects <folder>`, `--no-open`.
 

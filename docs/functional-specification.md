@@ -72,7 +72,7 @@ IDs are kept when the document is revised: a withdrawn statement is struck throu
 
 - **ST-1** Double-clicking `ferrule.exe` opens a console window that shows the address, and opens the browser on the project list. Nothing is installed.
 - **ST-2** Closing the console window stops Ferrule. *Quit Ferrule* under Settings → Status does the same, and the page then reads *Ferrule has stopped. Start it again from ferrule.exe; this page can be closed.*
-- **ST-3** The address is `http://127.0.0.1:4810/` unless changed. If that port is taken, the next free one is used, up to 19 higher; the console shows which. Options: `--port <n>`, `--host <address>` (to reach it from another machine), `--projects <folder>`, `--no-open` (don't open the browser), `--mcp` (MCP over stdio), `--help`. *(v0.5: A5. Starting Ferrule while one is running will open that one, not start a second on the next port. Don't test that case)*
+- **ST-3** The address is `http://127.0.0.1:4810/` unless changed. Started while a Ferrule answers on that port, Ferrule doesn't start a second: its console says which version is running there (and this one's, if they differ), it opens the browser at that one and closes by itself, so running the exe again is how a lost page is reopened. A port taken by anything else is passed over for the next free one, up to 19 higher; the console shows which, and a Ferrule found on one of those is used as on the first. Options: `--port <n>`, `--host <address>` (to reach it from another machine), `--projects <folder>`, `--no-open` (don't open the browser), `--mcp [address]` (MCP over stdio, MC-2), `--help`.
 - **ST-4** Folders, all made as needed:
 
   | Folder | Holds |
@@ -157,7 +157,7 @@ IDs are kept when the document is revised: a withdrawn statement is struck throu
 - **WN-21** *Dark interface*: the interface goes to dark greys; the sheet stays paper-coloured and the drawing black.
 - **WN-22** *Buttons*: *Labels* (default), *Labels and icons*, or *Icons* (name on hover). The align icons are always icons.
 - **WN-23** Theme, button style and *Keep placing until Esc* are kept for this browser, not in the project.
-- **WN-24** *Status* shows the version, the projects folder, the address, whether Claude is connected (and its last tool), the settings to paste into Claude Desktop and Claude Code with *Copy* buttons, and *Quit Ferrule*.
+- **WN-24** *Status* shows the version, the projects folder, the address, whether Claude is connected (and its last tool), the settings to paste into Claude Desktop and Claude Code with *Copy* buttons, and *Quit Ferrule*; opened from another computer, as MC-9 says.
 - **WN-25** The help button opens a floating summary of keyboard and mouse use.
 - **WN-26** In any number box, scrolling steps the value; `Shift`+scroll steps by ten.
 - **WN-27** Align (Draft, Annotate and Layout): one thing picked lines up with the sheet's usable space (inside the border, above the title block); two or more line up with the last one clicked, which stays put; picked with a box, they have no click order and line up with the outline around them all. Distribute (three or more) keeps the outer two and makes the gaps between them equal.
@@ -787,13 +787,14 @@ Design's findings appear only once a project uses Design.
 ## 15. Claude (MC)
 
 - **MC-1** Ferrule is an MCP server at `http://127.0.0.1:4810/mcp`, or over stdio with `ferrule.exe --mcp`.
-- **MC-2** With `--mcp`, Ferrule relays to a Ferrule already running on port 4810, so the editor and Claude share one server; if none is running it starts one without opening a browser.
+- **MC-2** With `--mcp`, Ferrule relays to a Ferrule already running on port 4810, so the editor and Claude share one server; if none is running it starts one without opening a browser. Given an address, `--mcp server`, `--mcp 192.168.1.20:4810` or `--mcp http://server:4810`, it relays to the Ferrule there, on this machine or another (without a port, 4810), and starts none of its own: one that isn't answering yet has each of Claude's requests answered *Ferrule isn't reachable*. Every tool works the same; a sheet's view (`view_page`) needs Chrome or Chromium on the machine Ferrule runs on, and `export_pdf` saves into that machine's `exports` folder. Whoever can reach the server can edit drawings through it, as through the page.
 - **MC-3** Settings → Status shows whether Claude is connected, the client's name, and the last tool it used and when.
 - **MC-4** Everything Claude does is an ordinary edit through the same operations as the editor.
 - **MC-5** An open editor tab follows Claude's changes: it reloads the project and says so. Undo history is cleared on that reload.
 - **MC-6** If you were mid-edit when Claude saved, your unsaved change is refused, not written over Claude's, and the tab reloads with a message.
 - **MC-7** The endpoint listens on 127.0.0.1 only unless started with `--host`, and refuses requests from web pages served by other sites.
 - **MC-8** Tools: `list_projects`, `create_project`, `project_info`, `update_project_info`, `list_symbols`, `get_page`, `view_page`, `add_page`, `update_page`, `delete_page`, `add_element`, `update_element`, `move_element`, `delete_element`, `connect`, `disconnect`, `label_wire`, `link`, `add_distribution`, `add_plant`, `place_plant_view`, `add_section`, `controller`, `add_module`, `place_controller`, `save_template`, `apply_template`, `renumber`, `check`, `schedules`, `simulate`, `set_expectation`, `check_logic`, `export_pdf`. What each does is in `docs/mcp.md`.
+- **MC-9** Settings → Status opened from another computer shows the address it was opened at, no *Quit Ferrule* (only the machine it runs on can stop it), and Claude Desktop's settings for that computer: `ferrule.exe --mcp` with this Ferrule's address, the path to the exe left to fill in, and Claude Code's command with the same address.
 
 ---
 

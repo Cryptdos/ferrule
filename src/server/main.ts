@@ -2,7 +2,11 @@
  * Ferrule server entry point.
  *
  *   ferrule [--port 4810] [--host 127.0.0.1] [--projects <folder>] [--no-open]
- *   ferrule --mcp      MCP over stdio, for Claude Desktop and similar clients
+ *   ferrule --mcp [address]   MCP over stdio, for Claude Desktop and similar
+ *                             clients, relayed to the Ferrule at that address
+ *
+ * Started while a Ferrule is running, it opens the browser at that one and
+ * exits (v0.5 A5).
  *
  * MCP over HTTP is always available at http://127.0.0.1:4810/mcp.
  * By default projects live in a "projects" folder next to the program, so
@@ -31,17 +35,19 @@ export interface StartOptions {
   argv?: string[];
 }
 
-interface Args {
+export interface Args {
   port: number;
   host: string;
   projects: string | null;
   open: boolean;
   help: boolean;
   mcp: boolean;
+  /** With `--mcp`, the address of the Ferrule to relay to (v0.5 A10). */
+  mcpTo: string | null;
 }
 
-function parseArgs(argv: string[]): Args {
-  const args: Args = { port: 4810, host: "127.0.0.1", projects: null, open: true, help: false, mcp: false };
+export function parseArgs(argv: string[]): Args {
+  const args: Args = { port: 4810, host: "127.0.0.1", projects: null, open: true, help: false, mcp: false, mcpTo: null };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]!;
     const next = () => {
@@ -57,11 +63,33 @@ function parseArgs(argv: string[]): Args {
     else if (a === "--mcp") {
       args.mcp = true;
       args.open = false;
+      // An address after it is the Ferrule to relay to.
+      const v = argv[i + 1];
+      if (v !== undefined && !v.startsWith("-")) args.mcpTo = argv[++i]!;
     }
     else throw new Error(`Unknown option ${a}`);
   }
   if (!Number.isInteger(args.port) || args.port < 1 || args.port > 65535) throw new Error("Invalid --port");
+  if (args.mcpTo !== null) args.mcpTo = ferruleAddress(args.mcpTo, args.port);
   return args;
+}
+
+/**
+ * A Ferrule's address as typed after `--mcp` (v0.5 A10): `server`,
+ * `server:4810`, `192.168.1.20` or a full `http://…` address. Without a
+ * scheme it's `http://` and, without a port, the Ferrule port.
+ */
+export function ferruleAddress(typed: string, port = 4810): string {
+  const t = typed.trim().replace(/\/+$/, "").replace(/\/mcp$/, "");
+  const schemed = /^https?:\/\//i.test(t);
+  let url: URL;
+  try {
+    url = new URL(schemed ? t : `http://${t}`);
+  } catch {
+    throw new Error(`--mcp: "${typed}" isn't an address`);
+  }
+  if (!schemed && !url.port) url.port = String(port);
+  return url.origin;
 }
 
 function openBrowser(url: string): void {
@@ -89,16 +117,23 @@ export async function start(opts: StartOptions = {}): Promise<void> {
     process.exit(2);
   }
   if (args.help) {
-    console.log("ferrule [--port 4810] [--host 127.0.0.1] [--projects <folder>] [--no-open] [--mcp]");
+    console.log("ferrule [--port 4810] [--host 127.0.0.1] [--projects <folder>] [--no-open] [--mcp [address]]");
     return;
   }
 
   if (args.mcp) {
     // stdout carries the protocol; everything else goes to stderr.
     console.log = console.error;
+    // Given an address, relay to that Ferrule, on this machine or another (A10).
+    if (args.mcpTo) {
+      const v = await ferruleAt(args.mcpTo);
+      console.error(v ? `Ferrule MCP: relaying to Ferrule ${v} at ${args.mcpTo}` : `Ferrule MCP: relaying to ${args.mcpTo}, which isn't answering yet`);
+      await relayStdio(`${args.mcpTo}/mcp`);
+      return;
+    }
     // If Ferrule is already running, relay to it so the browser and Claude share one server.
     const base = `http://127.0.0.1:${args.port}`;
-    if (await isFerrule(base)) {
+    if (await ferruleAt(base)) {
       console.error(`Ferrule MCP: relaying to the running Ferrule at ${base}`);
       await relayStdio(`${base}/mcp`);
       return;
@@ -146,6 +181,21 @@ export async function start(opts: StartOptions = {}): Promise<void> {
       server = Bun.serve({ port, hostname: args.host, fetch: app.fetch, idleTimeout: 120 });
     } catch (e) {
       if ((e as { code?: string }).code !== "EADDRINUSE") throw e;
+      // A Ferrule already here: use that one, not a second on the next port (A5). Anything else, move on.
+      const there = `http://${local.includes(":") ? `[${local}]` : local}:${port}`;
+      const v = await ferruleAt(there);
+      if (v === null) continue;
+      if (args.mcp) {
+        console.error(`Ferrule MCP: relaying to the running Ferrule at ${there}`);
+        await relayStdio(`${there}/mcp`);
+        return;
+      }
+      console.log(`Ferrule ${v} is already running at ${there}/${v === VERSION ? "" : ` (this is ${VERSION})`}.`);
+      console.log(args.open ? "Opening it in your browser. This window closes by itself." : "Use that one; this one stops.");
+      if (args.open) openBrowser(`${there}/`);
+      // Long enough to read before the console window closes.
+      setTimeout(() => process.exit(0), args.open ? 4000 : 0);
+      return;
     }
   }
   if (!server) {
@@ -166,12 +216,14 @@ export async function start(opts: StartOptions = {}): Promise<void> {
   }
 }
 
-async function isFerrule(base: string): Promise<boolean> {
+/** The version of the Ferrule answering at an address, or null if none does. */
+export async function ferruleAt(base: string): Promise<string | null> {
   try {
-    const res = await fetch(`${base}/api/health`, { signal: AbortSignal.timeout(800) });
-    return res.ok && (await res.json())?.ok === true;
+    const res = await fetch(`${base}/api/health`, { signal: AbortSignal.timeout(1500) });
+    const body = res.ok ? await res.json() : null;
+    return body?.ok === true ? String(body.version ?? "of an earlier build") : null;
   } catch {
-    return false;
+    return null;
   }
 }
 

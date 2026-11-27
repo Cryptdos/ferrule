@@ -27,6 +27,21 @@ claude mcp add --transport http ferrule http://127.0.0.1:4810/mcp
 
 With `--mcp`, Ferrule checks for a running Ferrule on port 4810 and relays to it, so the browser editor and Claude share one server. If none is running, it starts one itself (without opening a browser; the address is in Claude's MCP log), so you can still open http://127.0.0.1:4810/ to watch.
 
+**Ferrule on another machine** (a central Ferrule on the home network or VPN). Give `--mcp` that Ferrule's address, and the exe on your own machine relays Claude to it and starts none of its own:
+
+```json
+{
+  "mcpServers": {
+    "ferrule": {
+      "command": "C:\\path\\to\\ferrule.exe",
+      "args": ["--mcp", "http://server:4810"]
+    }
+  }
+}
+```
+
+`server`, `server:4810` and `192.168.1.20` work too; without a port it's 4810. Opened from another computer, **Settings → Status** shows these settings with the address filled in. Claude Code takes the address directly: `claude mcp add --transport http ferrule http://server:4810/mcp`. Every tool works the same, with two things to know. Claude's view of a sheet needs Chrome or Chromium on the machine Ferrule runs on. A PDF export is saved into that machine's `exports` folder. The endpoint is as open as the page: whoever can reach the server can edit drawings through it.
+
 ## Working alongside the editor
 
 An open editor tab follows changes Claude makes: it reloads the project and says so. If you were mid-edit when Claude saved, your unsaved change is refused rather than overwriting Claude's, and the tab reloads with a message. Undo history is cleared on reload, because it no longer applies.
