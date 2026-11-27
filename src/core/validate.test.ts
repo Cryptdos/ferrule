@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { newProject } from "./model";
+import { FORMAT_VERSION, newProject } from "./model";
 import { addElement } from "./ops";
 import { parseProject, ProjectFormatError } from "./validate";
 
@@ -12,20 +12,25 @@ describe("parseProject", () => {
   });
 
   test("fills fields a hand-written file leaves out", () => {
-    const back = parseProject({ format: "ferrule", version: 3, id: "x", pages: [{ id: "pg1", elements: [] }] });
+    const back = parseProject({ format: "ferrule", version: FORMAT_VERSION, id: "x", pages: [{ id: "pg1", elements: [] }] });
     expect(back.project.title).toBe("Untitled project");
     expect(back.pages[0]!.number).toBe(1);
     expect(back.pages[0]!.segments).toEqual([]);
   });
 
-  test("rejects non-projects, older and newer formats, and unknown symbols", () => {
+  test("rejects non-projects, other formats, and unknown symbols", () => {
     expect(() => parseProject({})).toThrow(ProjectFormatError);
-    expect(() => parseProject({ format: "ferrule", version: 99, id: "x" })).toThrow(/newer/);
-    // No upgrading before 1.0: a 0.1 file (format 1 or 2) is refused plainly.
-    expect(() => parseProject({ format: "ferrule", version: 2, id: "x" })).toThrow(/made with Ferrule 0\.1; this version can't open it/);
-    expect(() => parseProject({ format: "ferrule", version: 1, id: "x" })).toThrow(/Ferrule 0\.1/);
+    // No backwards compatibility (v0.5 A30): any other format is refused, naming the Ferrule it needs when the file says.
+    expect(() => parseProject({ format: "ferrule", version: 99, id: "x" })).toThrow("Not opened. This file is from a newer Ferrule.");
+    expect(() => parseProject({ format: "ferrule", version: FORMAT_VERSION - 1, id: "x" })).toThrow(
+      "Not opened. This file is from an older Ferrule and can't be opened in this one.",
+    );
+    expect(() => parseProject({ format: "ferrule", version: FORMAT_VERSION - 1, savedBy: "0.4.5", id: "x" })).toThrow(
+      "Not opened. This file needs Ferrule 0.4.5. Builds: https://github.com/Cryptdos/ferrule/releases",
+    );
+    expect(() => parseProject({ format: "ferrule", version: 1, id: "x" })).toThrow(/older Ferrule/);
     expect(() =>
-      parseProject({ format: "ferrule", version: 3, id: "x", pages: [{ id: "p", elements: [{ id: "e", symbol: "zz", pos: [0, 0] }] }] }),
+      parseProject({ format: "ferrule", version: FORMAT_VERSION, id: "x", pages: [{ id: "p", elements: [{ id: "e", symbol: "zz", pos: [0, 0] }] }] }),
     ).toThrow(/Unknown symbol/);
   });
 });

@@ -100,7 +100,7 @@
     <input type="checkbox" bind:checked={useLibrary} /> Use the shared device library for GA sheets
   </label>
   <p class="example">
-    Or <button class="link" onclick={example}>add the LSP-01 example</button>: a 16-sheet life safety panel drawn
+    Or <button class="link" onclick={example}>add the LSP-01 example</button>: a life safety panel drawn
     entirely with Ferrule's own tools.
   </p>
   {#if error}<p class="error">{error}</p>{/if}

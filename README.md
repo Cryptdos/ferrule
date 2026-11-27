@@ -6,7 +6,7 @@ It's one portable `.exe` for Windows: no install, nothing to configure. Your bro
 
 ![Ferrule drafting a controls sheet in one tile with a starter sheet in another: the browser of sheets and parts on the left, the active tile outlined with its overview, and a timer coil's properties on the right](docs/images/editor-draft.png)
 
-**[Download the latest release](https://github.com/Cryptdos/ferrule/releases/latest)**: unzip `ferrule.exe` anywhere (e.g. `C:\Temp\eCAD`) and double-click it. Status: **0.1.0 preview**, for feature testing.
+**[Download the latest release](https://github.com/Cryptdos/ferrule/releases/latest)**: unzip `ferrule.exe` anywhere (e.g. `C:\Temp\eCAD`) and double-click it. Status: **preview**, for feature testing.
 
 Ferrule is provided free, as is, with no support. Issues and pull requests are welcome, with no promise of a response.
 
@@ -66,7 +66,7 @@ Every sheet exports as one A4 landscape PDF, in [osifont](https://github.com/hik
 
 ### Claude can draft for you
 
-Ferrule is also an [MCP server](docs/mcp.md): connect Claude to it and ask for a starter sheet, a set of plant, or a whole controls section, and watch it appear in the editor. The [LSP-01 example](docs/benchmark-lsp01.md) (on the project list) is a 16-sheet life safety panel drawn entirely with Ferrule's own tools.
+Ferrule is also an [MCP server](docs/mcp.md): connect Claude to it and ask for a starter sheet, a set of plant, or a whole controls section, and watch it appear in the editor. The [LSP-01 example](docs/benchmark-lsp01.md) (on the project list) is a life safety panel drawn entirely with Ferrule's own tools.
 
 ## More
 
@@ -75,7 +75,9 @@ Ferrule is also an [MCP server](docs/mcp.md): connect Claude to it and ask for a
 - [v0.2 design](docs/design-v0.2.md): what's changing after testing v0.1.0-pre
 - [v0.2.1 design](docs/design-v0.2.1.md): fixes from testing the v0.2 builds (ended at its step 2)
 - [v0.3 design](docs/design-v0.3.md): busbars, terminals and numbering, tiling windows, alignment tools, GA detail sheets (built, being tested)
-- [v0.4 design](docs/design-v0.4.md): the plan now being built (the Design workbench: plant, points and the controller; GA renamed Layout; network drawings)
+- [v0.4 design](docs/design-v0.4.md): the Design workbench (plant, points and the controller), GA renamed Layout, network drawings; its revision sprint is [v0.4.x](docs/design-v0.4.x.md) (built)
+- [v0.5 plan](docs/design-v0.5.md): the sprint now being built, working through [the v0.5 list](docs/advancements-v0.5.md); design notes for [wire numbering](docs/design-wire-numbering.md), [wire labels and link ends](docs/design-wire-labels-and-links.md) and [the Design workbench](docs/design-design-workbench.md)
+- [Functional specification](docs/functional-specification.md): what every part of Ferrule does, as numbered statements to test against
 - [Benchmark: LSP-01 life safety panel](docs/benchmark-lsp01.md)
 - [MCP server: letting Claude draft drawings](docs/mcp.md)
 
@@ -99,7 +101,7 @@ bun run build      # build the browser UI into dist/web
 bun run start      # start the server and open http://127.0.0.1:4810/
 ```
 
-A project is one `.ferrule` file (JSON) with everything in it, pictures included, so it can be copied, emailed or kept in a job folder. New projects go in a `projects` folder (next to the program when running as the .exe, otherwise in the current folder); files opened from elsewhere stay where they are and are remembered in the project list. The previous save is kept as `.bak`. Ferrule 0.2 can't open projects made with 0.1 (there's no upgrading before 1.0); they need redrawing. *Delete* on the project list moves the file to `projects/Deleted`.
+A project is one `.ferrule` file (JSON) with everything in it, pictures included, so it can be copied, emailed or kept in a job folder. New projects go in a `projects` folder (next to the program when running as the .exe, otherwise in the current folder); files opened from elsewhere stay where they are and are remembered in the project list. The previous save is kept as `.bak`. There's no backwards compatibility before release: a file saved by a build of another file format isn't opened, and says which Ferrule it needs (every build stays downloadable from the releases page). *Delete* on the project list moves the file to `projects/Deleted`.
 
 Set `FERRULE_BROWSER` to the path of a Chromium-based browser to choose which one makes PDFs.
 
@@ -177,9 +179,9 @@ Everything else (Plant, Check, Schedules, Settings…) opens in a **window**: dr
 - **Link arrows:** select one and click *Link…*, then click its partner on any sheet (or *Link to a new arrow* to drop one). A destination shows its source's label unless you untick *Same label as its source*.
 - **Wires:** select a wire to set its number, core colour (IEC codes written Bu, Bn, GnYe…) and function (0V, 24V…). They print together at the end the wire was drawn from (*Other end* flips it); on a wire too short for them they're centred on it. Wires go straight onto a terminal and keep their number through it. **Wire colours by function** (Project…): a table of functions (phase, neutral, earth, 24 V +, 0 V, DC signal, AC signal, external supply, and any you add) and their colours, empty to start; a wire with no colour of its own takes its function's, which comes from its distribution when it's on one, else from the function set on the wire.
 - **Field wires:** *Kind: Field* draws a wire dashed. Wires below the panel boundary are field wires automatically. Field wires don't print their number unless you tick *Show number*; any wire's *Show number* and *Show colour* can be unticked to cut clutter where nothing is lost.
-- **Lamps** have +V and -V terminals and an optional lamp-test terminal LT; colours are codes (Rd, Gn, Ye, Bu, Wh, Cl). **Timer coils** take an IEC 61131-3 function (TON on-delay, TOF off-delay, TP pulse, flashers), a time (`500ms`, `5s`, `1.5s`, `2min`) and the maker's code for it; the simulator runs each one.
+- **Lamps** have +V and -V terminals and an optional lamp-test terminal LT; colours are codes (Rd, Gn, Ye, Bu, Wh; white for a clear lens). **Timer coils** take an IEC 61131-3 function (TON on-delay, TOF off-delay, TP pulse, flashers), a time (`500ms`, `5s`, `1.5s`, `2min`) and the maker's code for it; the simulator runs each one.
 - **Contacts** linked to a timer coil are timed by it: they switch with the timer's function, print 17-18 (NO), 15-16 (NC) or 15-16/18, and carry the delay mark. Tick *Instantaneous* for a timer relay's plain contacts. **Push button**: 1 to 4 poles on one head, each NO (k3/k4) or NC (k1/k2). **Selector / keyswitch**: 2 positions (0–I) or 3 (I–0–II), 1 to 4 poles, each pole NO or NC and closed in the positions you pick, or a changeover (on a 3-position switch numbered as makers do: common 2, closed to 3 in I, open in 0, to 1 in II; the next pole 7, 6, 5). Each position has a name (*SUPPLY 1*, *OFF*, *SUPPLY 2*), drawn under the head as `SUPPLY 1 – OFF – SUPPLY 2`; in Simulate a click steps it to its next position and the one it's in is boxed. **Isolators** take a rotary handle, door handle, key, or none (worked by something else).
-- **Earth** takes a type (earth, protective, functional, chassis, equipotential: IEC 60417 symbols). The **socket** has L and N on top, 3 apart to line up under an MCB, and E out to the side.
+- **Earth** takes a type (earth, protective, functional, chassis, equipotential: IEC 60417 symbols). The **socket** has L and N on top, 3 apart to line up under an MCB, and E beside them.
 - **Incoming supply** (Connection group) is where the simulator's power comes from: pick 3-phase + N, 3-phase, single phase or DC.
 - Fields such as *Ratings* show an example as placeholder text, so every plant is written the same way.
 - **Plant…:** the plant made in Design, to give it pins and *Place view* on any sheet (field equipment is defined once, in Design: prefix, description, information lines such as model and rating). The tag works like every other tag: prefix plus sheet-column where it's first shown, e.g. `SEF-3-13` for a safety extract fan, `U3-13` with the default prefix; type a tag (in Design) to fix it instead. Its terminals (pins) are split into **points**, one signal each, written as `Mains: L N E | R1: C NO NC | R2: C NO NC`: pins sit in boxes along the top with each point's name in capitals under them (the same pin names can be used in different points). *Pins and points…* opens the full table: each pin's number (what's wired), id (C, Y1, VO) and group (IO1, AO1), drawn when present; and each point's **form** (contact, powered output, dry or powered input, analogue in or out, supply in, supply out, comms) and how it simulates. Tick the terminals a sheet shows; hidden ones give the box a break line. *Power by others* adds a break on the left. The tag and details print under the box. Labels can include `{plant:…}` fields (the *+ field* picker) so they always match the plant's tag.

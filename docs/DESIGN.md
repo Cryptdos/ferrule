@@ -19,7 +19,7 @@ Status: draft for discussion. Nothing here is fixed until we've agreed it.
 
 - About 20 symbols (see §5).
 - Placing, moving and connecting symbols. Wires that stay attached, route at right angles and can be dragged by hand.
-- 100-column page grid, and position-based references (sheet-column).
+- 75-column page grid, and position-based references (sheet-column).
 - Automatic wire numbering and terminal numbering.
 - Element linking and cross-references (coil ↔ contacts), including contact tables under coils.
 - Plant items split across pages (see §6).
@@ -205,7 +205,7 @@ Each page has a real boundary between panel internals and field equipment, not j
 
 ### Position-based numbering (default)
 
-The 100-column grid gives every point on a page an address: `page-column`, e.g. `10-16`. With a printout on site, a reference tells you exactly which page and column to go to.
+The 75-column grid gives every point on a page an address: `page-column`, e.g. `10-16`. With a printout on site, a reference tells you exactly which page and column to go to.
 
 - **Component tags:** prefix + position, e.g. relay coil `K10-16` (sheet 10, column 16). The position is the coil, or the main part of a component.
 - **Conductor numbers:** position of the conductor's start point, e.g. `11-22`.
@@ -376,6 +376,7 @@ Reference drawings from other companies are proprietary. They are never committe
 | Supply load, v0.4.x step 14 (2026-11-24) | M12: `va` and `ratingVa` parameters, `IoPoint.va` / `ratingVa` / `efficiency`, `ModuleInfo.va`, device `va`; `supplyLoads`, `loadText`, `usesLoads` (`supplyload.ts`); Simulate's Supplies list and figures beside supplies; Check's undrawn count and over-rating warning |
 | Wire colours and relay pins, v0.4.x step 15 (2026-11-24) | M3: `Project.wireColours`, `conductorLooks`, `functionRows`, `setFunctionColour` (`wirecolours.ts`, `ops.ts`). M4: device `relayPins`, `parseRelayPins`, `relayPinMarks` (`xref.ts`) into `GeometryText.pins`; on- and off-delay contacts' tag moved clear of the mark |
 | Version 0.4.5 (2026-11-25) | After the v0.4.x sprint the version moves from `0.4.0-pre` to `0.4.5` (`package.json`, read by `src/core/version.ts`), and each test build after moves the last number on, so a build and the files it saves say which build it is. File format unchanged |
+| v0.5 start, step 0 (2026-11-27) | Version `0.5.1`: the last number counts the PRs under 0.5. No backwards compatibility before release (A30): the test-build mapping (`preRelease()`) is gone and `parseProject` refuses any file whose format isn't this build's, with `notOpened()` naming the Ferrule that saved it (`savedBy`), or saying it's from an older or newer one when the file doesn't say. A build that changes what a file must hold moves `FORMAT_VERSION` on; it's 4 from here, so files from 0.4.5 and earlier say they need that build. The v0.5 plan, list, specification and design notes are in `docs/` |
 
 ## 16. Open questions
 

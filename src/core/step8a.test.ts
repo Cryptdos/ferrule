@@ -98,33 +98,6 @@ describe("pins and points", () => {
     expect(back.expectations).toEqual(p.expectations);
   });
 
-  test("files from the test builds: plant groups become points, logic rules become never statements", () => {
-    const { p, pg } = project();
-    const k1 = addElement(p, pg, "coil", [20, 40]);
-    const k2 = addElement(p, pg, "coil", [40, 40]);
-    const raw = JSON.parse(JSON.stringify(p)) as Record<string, unknown>;
-    raw.plant = [
-      {
-        id: "p_1",
-        tag: "SF-01",
-        prefix: "SF",
-        description: "Fan",
-        terminals: ["1", "2", "3", "4"],
-        groups: [
-          { name: "ENABLE", terminals: ["1", "2"] },
-          { name: "RUNNING", terminals: ["3", "4"], follows: "ENABLE", delay: 3 },
-        ],
-      },
-    ];
-    delete raw.expectations;
-    raw.rules = [{ id: "r_1", kind: "never-both", a: k1.id, b: k2.id }];
-    const back = parseProject(raw);
-    expect(back.plant[0]!.points).toEqual([
-      { name: "ENABLE", form: "powered-in", pins: ["1", "2"] },
-      { name: "RUNNING", form: "contact", pins: ["3", "4"], follows: [{ ref: "plant:p_1:ENABLE", on: true }], delay: 3 },
-    ]);
-    expect(back.expectations).toEqual([{ id: "r_1", kind: "never", when: [{ ref: k1.id, on: true }, { ref: k2.id, on: true }], join: "and" }]);
-  });
 });
 
 describe("simulating points", () => {

@@ -106,9 +106,9 @@ describe("step 1: small fixes", () => {
     // Read back, it's ignored.
     expect(() => parseProject(JSON.parse(JSON.stringify(file)))).not.toThrow();
     const newer = { ...file, version: 99, savedBy: "0.9.1" };
-    expect(() => parseProject(newer)).toThrow(`Saved by Ferrule 0.9.1 (format 99). This is ${VERSION} (format 3). Open it in 0.9.1 or later: https://github.com/Cryptdos/ferrule/releases`);
+    expect(() => parseProject(newer)).toThrow("Not opened. This file needs Ferrule 0.9.1 or later. Builds: https://github.com/Cryptdos/ferrule/releases");
     const { savedBy: _, ...old } = newer;
-    expect(() => parseProject(old)).toThrow("saved by a newer Ferrule (format 99)");
+    expect(() => parseProject(old)).toThrow("Not opened. This file is from a newer Ferrule.");
   });
 });
 
