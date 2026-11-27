@@ -6,7 +6,7 @@ It's one portable `.exe` for Windows: no install, nothing to configure. Your bro
 
 ![Ferrule drafting a controls sheet in one tile with a starter sheet in another: the browser of sheets and parts on the left, the active tile outlined with its overview, and a timer coil's properties on the right](docs/images/editor-draft.png)
 
-**[Download the latest release](https://github.com/Cryptdos/ferrule/releases/latest)**: unzip `ferrule.exe` anywhere (e.g. `C:\Temp\eCAD`) and double-click it. Status: **preview**, for feature testing.
+**[Download a build](https://github.com/Cryptdos/ferrule/releases)**: every test build is listed there, newest first, for Windows and Linux. On Windows, unzip `ferrule.exe` anywhere (e.g. `C:\Temp\eCAD`) and double-click it. Status: **preview**, for feature testing.
 
 Ferrule is provided free, as is, with no support. Issues and pull requests are welcome, with no promise of a response.
 
@@ -90,6 +90,33 @@ Ferrule is also an [MCP server](docs/mcp.md): connect Claude to it and ask for a
 PDF export uses Microsoft Edge in the background (or Chrome, if Edge isn't there). Nothing needs installing. Windows may warn the first time because the .exe isn't signed: *More info → Run anyway*.
 
 To build it yourself: install [Bun](https://bun.sh), then `bun install` and `bun run build:exe` (→ `dist/ferrule.exe`). [docs/BUILDING.md](docs/BUILDING.md) goes through it step by step, on Windows, Mac or Linux. CI also builds it on every pull request; it's attached to the run as the `ferrule-windows` artifact.
+
+### Running it on a server
+
+`ferrule-linux-v<version>` is the same program for Linux, so one machine on the network can keep every drawing in one place and serve Ferrule to any browser that can reach it (over a VPN, say). Make it executable and start it listening on the network, with no browser of its own:
+
+```sh
+mv ferrule-linux-v* ferrule-linux && chmod +x ferrule-linux
+./ferrule-linux --host 0.0.0.0 --no-open --projects /srv/ferrule/projects
+```
+
+Then open `http://<server>:4810/` from another machine. To keep it running, as a systemd service (`/etc/systemd/system/ferrule.service`):
+
+```ini
+[Unit]
+Description=Ferrule
+After=network-online.target
+
+[Service]
+ExecStart=/opt/ferrule/ferrule-linux --host 0.0.0.0 --no-open --projects /srv/ferrule/projects
+Restart=on-failure
+User=ferrule
+
+[Install]
+WantedBy=multi-user.target
+```
+
+then `systemctl enable --now ferrule`. There's no sign-in: anyone who can reach the address can open and change every drawing, so it's for a home or office network or a VPN, never the open internet. PDF export needs Chrome or Chromium installed on the server.
 
 ### From source
 

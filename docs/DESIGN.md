@@ -378,6 +378,7 @@ Reference drawings from other companies are proprietary. They are never committe
 | Version 0.4.5 (2026-11-25) | After the v0.4.x sprint the version moves from `0.4.0-pre` to `0.4.5` (`package.json`, read by `src/core/version.ts`), and each test build after moves the last number on, so a build and the files it saves say which build it is. File format unchanged |
 | v0.5 start, step 0 (2026-11-27) | Version `0.5.1`: the last number counts the PRs under 0.5. No backwards compatibility before release (A30): the test-build mapping (`preRelease()`) is gone and `parseProject` refuses any file whose format isn't this build's, with `notOpened()` naming the Ferrule that saved it (`savedBy`), or saying it's from an older or newer one when the file doesn't say. A build that changes what a file must hold moves `FORMAT_VERSION` on; it's 4 from here, so files from 0.4.5 and earlier say they need that build. The v0.5 plan, list, specification and design notes are in `docs/` |
 | Small fixes, v0.5 step 1 (2026-11-27) | A4: Schedules' empty IO points message. A13: *Lamp test terminal (LT)*. A14: `Ctrl`+click keeps the part being placed (`Canvas.svelte`). A25: `poleMates` pairs every push button pole by `pushPoles`. A40: `localGeometry` flips the symbol but moves the label block whole, in its own order, to where flipping puts it. A45: `Storage.remove` moves the `.bak` with the file. A47: an isolator's operator is rotary, door or key; anything else draws as rotary. A49: `Storage.create` dates a new project (`dateText()`, day first, as *Add revision*). A53: `Esc` while a window is dragged cancels the drag (`Modal.svelte`). A54: align lines up with the last one clicked (`align.ts`). A59: *Place parts…* closes off a GA sheet. A61: Properties wraps, never scrolls sideways. A74: `duplicatePlant` blanks a copy's description; inserting a Design template keeps the template's |
+| Builds, v0.5 step 2 (2026-11-27) | A11: CI builds `ferrule-linux` beside `ferrule.exe`, and `scripts/smoke-test.ts` runs each end to end (start on a scratch folder, create and open a project, add the example, print a sheet). A22: `publish.yml`, run by hand (D5), builds and smoke-tests both at the commit picked and publishes `v<version>` as a pre-release holding `ferrule-windows-v<version>.zip` and `ferrule-linux-v<version>`; a version already published is refused; *dry run* publishes nothing. Making one the release is done by hand on GitHub. The README's download link goes to the list of builds (D4) and it says how to run Ferrule as a service |
 
 ## 16. Open questions
 
@@ -392,6 +393,9 @@ GitHub Actions, in `.github/workflows/ci.yml`. Runs on every push and pull reque
 2. Install dependencies.
 3. Type-check.
 4. Run tests (core module: numbering, cross-references, checks, simulator).
+5. Build the UI, then `ferrule.exe` on Windows and `ferrule-linux` on Linux, each smoke-tested end to end (`scripts/smoke-test.ts`) and attached to the run.
+
+Builds are published by `.github/workflows/publish.yml`, run by hand only (v0.5 A22): the same checks and builds, then `v<version>` on the releases page, marked pre-release.
 
 Later: render the LSP-01 benchmark and compare it against a stored result, so layout changes are caught.
 

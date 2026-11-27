@@ -99,6 +99,8 @@ IDs are kept when the document is revised: a withdrawn statement is struck throu
 - **ST-17** One `.ferrule` file holds everything, pictures included: copying the file copies the whole project.
 - **ST-18** A file of any other format than this build's isn't opened, older or newer: there's no backwards compatibility before release. It's listed with the reason, *Not opened. This file needs Ferrule 0.4.5*, naming the Ferrule that last saved it (*0.9.1 or later* for a newer file), with the address of the builds. A file too old to say which Ferrule saved it reads *Not opened. This file is from an older Ferrule and can't be opened in this one*. A build that changes what a file must hold moves the format number on.
 - **ST-19** Undo and redo cover the last 200 changes in the open session. An align or distribute, a Renumber *Apply* and a Suggest *Accept ticked* are each one step.
+- **ST-20** Builds are on the repository's releases page, one entry for each, named `v<version>` and marked pre-release, holding `ferrule-windows-v<version>.zip` and `ferrule-linux-v<version>`. A build is made only when asked for, by running *Publish a build* by hand; nothing is published on a merge, and a version already published is refused. Old builds stay there.
+- **ST-21** `ferrule-linux` is the same program for Linux. Started with `--host 0.0.0.0 --no-open`, it serves Ferrule to any browser that can reach the machine, with no browser of its own.
 
 ---
 

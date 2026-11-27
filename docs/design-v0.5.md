@@ -221,6 +221,14 @@ Judgement calls made while building, by step, with the reason.
 - **A74: only *Duplicate ×n* empties the description.** Inserting a Design template keeps the template's descriptions, since that's a copy of something saved on purpose, not of the row beside it.
 - **One PR for the step.** The thirteen entries went in together rather than as two PRs: they're small and nothing between them depends on another.
 
+### Step 2
+
+- **D4 and D5 built to the recommended answer.** The README links to the list of builds; a build is a CI job run by hand, at the commit picked, published as `v<version>` and marked pre-release.
+- **A *dry run* tick on the publish job.** It builds and smoke-tests both without publishing, so the job can be checked without putting a build up that wasn't asked for. It was run once that way after this step merged.
+- **The end-to-end test is a script, run on both builds.** `scripts/smoke-test.ts` starts a build on a scratch folder and works it over HTTP: the version, the page served from inside the binary, a project created and opened, the example added and opened, a sheet printed. CI runs it on every PR for Windows and Linux, and the publish job before publishing.
+- **The Linux build is the bare file,** `ferrule-linux-v<version>`, as the entry names it. A download loses the file's executable bit, so the README and the release notes say `chmod +x`.
+- **A version already published is refused.** Every PR moves the version on, so a second build at the same number would be of the same commit.
+
 ## 7. After the build
 
 What QA on v0.5 starts from:
