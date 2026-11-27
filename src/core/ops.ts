@@ -1099,7 +1099,6 @@ export function updatePoint(
     follows?: Condition[] | null;
     join?: "and" | "or";
     delay?: number;
-    dists?: Record<string, string>;
     /** What it does on this job, printed along its wire under a module's terminals. */
     label?: string;
   },

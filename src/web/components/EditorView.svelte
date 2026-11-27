@@ -28,6 +28,7 @@
   import Props from "./Props.svelte";
   import ProjectDialog from "./ProjectDialog.svelte";
   import PlantDialog from "./PlantDialog.svelte";
+  import PointsDialog from "./PointsDialog.svelte";
   import ControllersDialog from "./ControllersDialog.svelte";
   import DistributionDialog from "./DistributionDialog.svelte";
   import ExpectationsDialog from "./ExpectationsDialog.svelte";
@@ -40,7 +41,7 @@
   import DuplicateDialog from "./DuplicateDialog.svelte";
   import DesignTemplatesDialog from "./DesignTemplatesDialog.svelte";
   import SuggestDialog from "./SuggestDialog.svelte";
-  import { addDesignPlant, addSystem, allocate } from "../../core/design";
+  import { addDesignPlant, addDesignPoint, addSystem, allocate } from "../../core/design";
   import { addNetwork, placeNetworkSheet } from "../../core/network";
   import { POINTS_COLS, pointsSchedule, toCsv } from "../../core/schedules";
   import Tiles from "./Tiles.svelte";
@@ -211,9 +212,16 @@
     let id = "";
     if (editor.apply((p) => (id = addDesignPlant(p, sys, after).id))) {
       editor.designPick = { plant: [id] };
-      editor.designAdding = false;
       editor.designFolded = editor.designFolded.filter((n) => n !== sys);
     }
+  }
+
+  /** + Point (A69): an empty point under the picked plant, picked and ready to fill in from Properties. No prompt. */
+  function newPoint() {
+    const id = editor.designPick.plant[0];
+    if (!id) return;
+    let name = "";
+    if (editor.apply((p) => (name = addDesignPoint(p, id).name))) editor.designPick = { plant: [id], point: name };
   }
 
   /** The point picked in Design, when it's on a channel. */
@@ -314,7 +322,6 @@
         void editor.saveNow();
       } else if (e.key === "Escape") {
         if (closeTopmost()) return;
-        editor.designAdding = false;
         editor.designPick = { plant: [] };
       }
       return;
@@ -512,7 +519,7 @@
       {/if}
       {#if editor.mode === "design"}
         <div class="workbench" role="group" aria-label="Design view">
-          <button class:active={editor.designView === "table"} onclick={() => (editor.designView = "table")} title="Systems, plant and points">Table</button>
+          <button class:active={editor.designView === "plant"} onclick={() => (editor.designView = "plant")} title="Systems, plant and points">Plant</button>
           <button class:active={editor.designView === "controller"} onclick={() => (editor.designView = "controller")} title="The panel's controller: its modules, their channels, and the points on them">Controller</button>
           <button class:active={editor.designView === "network"} onclick={() => (editor.designView = "network")} title="Comms plant by network: a LAN off a switch, or a bus off the controller">Network</button>
           <button class:active={editor.designView === "todraw"} onclick={() => (editor.designView = "todraw")} title="What Design has that isn't on a sheet yet: place it from here">To draw</button>
@@ -533,7 +540,7 @@
         {:else}
         <button onclick={newSystem} title="A name that groups plant: Chilled water, Ventilation">+ System</button>
         <button onclick={newPlant} title="An empty plant row, in the picked system (or the picked plant's)">+ Plant</button>
-        <button onclick={() => (editor.designAdding = true)} disabled={editor.designPick.plant.length !== 1} title={editor.designPick.plant.length === 1 ? "A point on the picked plant: its form, name and signal" : "Pick one plant row first"}>+ Point</button>
+        <button onclick={newPoint} disabled={editor.designPick.plant.length !== 1} title={editor.designPick.plant.length === 1 ? "An empty point on the picked plant, picked to fill in here" : "Pick one plant row first"}>+ Point</button>
         <span class="sep"></span>
         <button class:active={!!editor.open.designDuplicate} disabled={!editor.designPick.plant.length} onclick={() => (editor.open.designDuplicate = !editor.open.designDuplicate)} title={editor.designPick.plant.length ? "Copy the picked rows n times, tags stepping on" : "Pick plant rows first (Ctrl+click for a group)"}>Duplicate ×n…</button>
         <button class:active={!!editor.open.designTemplates} onclick={() => (editor.open.designTemplates = !editor.open.designTemplates)} title="Your Design templates: insert one, or save the picked rows as one">Templates…</button>
@@ -632,6 +639,9 @@
     {/if}
     {#if editor.message}<div class="toast">{editor.message}</div>{/if}
     {#if editor.stampLinks}<StampLinks {editor} />{/if}
+    {#if editor.terminalsOf}
+      <PointsDialog {editor} plantId={editor.terminalsOf} onclose={() => (editor.terminalsOf = null)} onexpectations={() => (open.expectations = true)} />
+    {/if}
   </main>
 </div>
 {#if savingAs}

@@ -271,8 +271,6 @@ export interface PlantDesign {
   connects?: "hardwired" | "comms" | "both";
   protocol?: string;
   network?: string;
-  enabledBy?: string;
-  source?: string;
   /** In the panel (v0.4.x T3). */
   inPanel?: boolean;
   /** The picture inside its view (v0.4.x M1); empty clears it. */
@@ -282,7 +280,7 @@ export interface PlantDesign {
 /** Set a plant item's Design fields; an empty value clears one. */
 export function setPlantDesign(project: Project, id: string, patch: PlantDesign): void {
   const it = getPlant(project, id);
-  for (const k of ["system", "protocol", "network", "enabledBy", "source"] as const) {
+  for (const k of ["system", "protocol", "network"] as const) {
     const v = patch[k];
     if (v === undefined) continue;
     if (v.trim()) it[k] = v.trim();
@@ -372,14 +370,15 @@ export interface PointDesign {
 }
 
 /** Add a point with no pins (design-v0.4 §2, `+ Point`): a form, a name and a signal. */
-export function addDesignPoint(project: Project, plantId: string, p: { name?: string; form: PointForm; signal?: string }): IoPoint {
+/** A point on a plant (A69): `+ Point` adds an empty one, its form not chosen yet, named Point n. */
+export function addDesignPoint(project: Project, plantId: string, p: { name?: string; form?: PointForm; signal?: string } = {}): IoPoint {
   const it = getPlant(project, plantId);
   if (it.module) throw new OpError("A module's points are its channels: change them in the controller");
   const have = new Set((it.points ?? []).map((q) => q.name));
   let name = (p.name ?? "").trim();
   if (name && have.has(name)) throw new OpError(`${plantLabelOf(it)} already has a point "${name}"`);
   if (!name) for (let i = have.size + 1; ; i++) if (!have.has((name = `Point ${i}`))) break;
-  const point: IoPoint = { name, form: p.form, pins: [], ...(p.signal?.trim() ? { signal: p.signal.trim() } : {}) };
+  const point: IoPoint = { name, form: p.form ?? "none", pins: [], ...(p.signal?.trim() ? { signal: p.signal.trim() } : {}) };
   it.points = [...(it.points ?? []), point];
   return point;
 }
@@ -734,6 +733,7 @@ const PIN_COUNT: Record<PointForm, number> = {
   "analogue-out": 2,
   "supply-in": 3,
   "supply-out": 2,
+  none: 2,
   comms: 3,
 };
 
@@ -774,7 +774,7 @@ export const needsPins = (item: PlantItem): boolean => !item.terminals.length ||
 // Interlocks (design-v0.4 §6), on a plant item: each generates an expectation.
 
 /** Points that can be on or off: not analogue, not comms. */
-export const interlockable = (form: PointForm): boolean => !["analogue-in", "analogue-out", "comms"].includes(form);
+export const interlockable = (form: PointForm): boolean => !["analogue-in", "analogue-out", "comms", "none"].includes(form);
 
 /** A condition an interlock can name: a point already in the table, that can be on or off. */
 function checkCondition(project: Project, c: Condition, self: string): void {

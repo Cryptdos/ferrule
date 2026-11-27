@@ -41,7 +41,7 @@ export class Editor {
   /** Workbench: Design (what the panel has, design-v0.4), drafting the electrics, annotating, the panel layout (GA), or simulating. */
   mode: "design" | "draft" | "annotate" | "ga" | "simulate" = $state("draft");
   /** Which of Design's views is showing. */
-  designView: "table" | "controller" | "network" | "todraw" = $state("table");
+  designView: "plant" | "controller" | "network" | "todraw" = $state("plant");
   /** What's picked in Design: plant (ids, in the order picked), a point of the first, or a system by name. */
   designPick: { plant: string[]; point?: string; system?: string } = $state({ plant: [] });
   /** Systems folded in Design's table (by name; "" is the unnamed group). Not saved. */
@@ -77,8 +77,8 @@ export class Editor {
   cancelProving(): void {
     this.stopProving = true;
   }
-  /** + Point: the new point's form is open in Properties. */
-  designAdding: boolean = $state(false);
+  /** The plant or module whose Terminals window is open (A67). */
+  terminalsOf: string | null = $state(null);
   placeSymbol: string | null = $state(null);
   /** A section template waiting to be stamped where you click. */
   stamp: { templateId: string; plant: import("../core/templates").PlantMapping; size: [number, number]; name: string } | null =

@@ -19,8 +19,9 @@ export const FORMAT = "ferrule";
  * 11: v0.5 step 6c, no distributions on an incoming supply or a plant's supply out.
  * 12: v0.5 step 7a, a wire's label is placed as one (labelAt).
  * 13: v0.5 step 7b, link ends in place of link arrows (symbol link).
+ * 14: v0.5 step 8a, a point's form can be none yet; plant has no Enabled by or Source.
  */
-export const FORMAT_VERSION = 13;
+export const FORMAT_VERSION = 14;
 
 export type ParamValue = string | number | boolean;
 
@@ -312,10 +313,6 @@ export interface PlantItem {
   protocol?: string;
   /** For comms: the network it's on (a `Network` id). */
   network?: string;
-  /** Free text: what enables it ("ventilation time zone"). */
-  enabledBy?: string;
-  /** Free text: where in the client's document it came from. */
-  source?: string;
   /** Hardwired interlocks (design-v0.4 §6): each becomes a generated expectation. */
   interlocks?: Interlock[];
 }
@@ -431,18 +428,24 @@ export type PointForm =
   | "analogue-out"
   | "supply-in"
   | "supply-out"
-  | "comms";
+  | "comms"
+  /** Not chosen yet (v0.5 A69): a point just added, marked until its form is set. It needs no channel and doesn't simulate. */
+  | "none";
 
+/**
+ * The nine forms, each saying in plain words what it is (v0.5 A69,
+ * design-design-workbench §5). The channel it needs is `pointType`'s.
+ */
 export const POINT_FORMS: { value: PointForm; label: string; hint: string }[] = [
-  { value: "contact", label: "Contact", hint: "C + NO, C + NC, or C + NO + NC: the device switches it" },
-  { value: "powered-out", label: "Powered output", hint: "Output + common: the device puts out a voltage" },
-  { value: "dry-in", label: "Dry input", hint: "Input + common: on when the loop between them is closed" },
-  { value: "powered-in", label: "Powered input", hint: "Input + common: on when there's a voltage across them" },
-  { value: "analogue-in", label: "Analogue input", hint: "Signal + common: drawn and scheduled, not simulated" },
-  { value: "analogue-out", label: "Analogue output", hint: "Signal + common: drawn and scheduled, not simulated" },
-  { value: "supply-in", label: "Supply in", hint: "Power to the device: on when it's powered" },
-  { value: "supply-out", label: "Supply out", hint: "Power from the device: a source, on its distributions" },
-  { value: "comms", label: "Comms", hint: "RS485, Modbus…: drawn and scheduled, not simulated" },
+  { value: "contact", label: "Contact", hint: "The device switches it: a fault, a status" },
+  { value: "powered-out", label: "Powered output", hint: "The device puts out a voltage" },
+  { value: "dry-in", label: "Dry input", hint: "On when the panel closes its loop: an enable" },
+  { value: "powered-in", label: "Powered input", hint: "On when the panel puts a voltage on it" },
+  { value: "analogue-out", label: "Analogue output", hint: "A signal from the device" },
+  { value: "analogue-in", label: "Analogue input", hint: "A signal to the device" },
+  { value: "supply-in", label: "Supply in", hint: "Power to the device" },
+  { value: "supply-out", label: "Supply out", hint: "Power from the device" },
+  { value: "comms", label: "Comms", hint: "RS485, Modbus…" },
 ];
 
 /** Forms the device senses. */

@@ -35,7 +35,7 @@
           <button
             onclick={() => {
               editor.mode = "design";
-              editor.designView = "table";
+              editor.designView = "plant";
               editor.designPick = { plant: [d.plant], ...(d.point ? { point: d.point } : {}) };
               onclose();
             }}>Show</button

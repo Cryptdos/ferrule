@@ -113,7 +113,7 @@ IDs are kept when the document is revised: a withdrawn statement is struck throu
 
   | Workbench | Row two after undo/redo |
   |---|---|
-  | Design | Views ~~*Table, Controller, Network, To draw*~~ *(v0.5: A69, A70. Plant, Controller, Devices, Network, To draw)*; *Check*; *Export points schedule*; then the view's own buttons (§5) |
+  | Design | Views *Plant, Controller, Network, To draw* *(v0.5: A70. Devices comes after Controller)*; *Check*; *Export points schedule*; then the view's own buttons (§5) |
   | Draft | Fit, Split, Colour check; align/distribute; Select, Wire; *Check, Expectations…, Schedules, Renumber, Templates, Plant, Distribution, Table* |
   | Annotate | Fit, Split; align/distribute; Select |
   | Layout | Fit, Split; Select; align/distribute; *Check, Schedules, Place parts…* (*Place detail…* on a detail sheet), *Device table…* |
@@ -190,14 +190,14 @@ IDs are kept when the document is revised: a withdrawn statement is struck throu
 
 ## 5. Design (DE)
 
-Design lists what the panel has before anything is drawn: systems, plant and points in one table, the controller and its allocation, and the networks. Nothing is drawn here. A project with no plant and no controller works in Draft alone, and Design shows an empty table.
+Design lists what the panel has before anything is drawn: systems, plant and points in the Plant view, the controller and its allocation, and the networks. Its views run Plant, Controller, Network, To draw. Nothing is drawn here. A project with no plant and no controller works in Draft alone, and Design shows an empty table.
 
-### The table
+### The Plant view
 
 - **DE-1** *+ System* adds a system (a name that groups plant). Picking its row shows its name, *Move up*, *Move down* and *Delete system* in Properties.
 - **DE-2** Deleting a system leaves its plant in the table under *No system*. Renaming one keeps its plant with it.
 - **DE-3** *+ Plant* adds an empty plant row in the picked system, after the picked plant.
-- **DE-4** ~~*+ Point* is available with exactly one plant row picked. It asks for the point's name, form and signal.~~ *(v0.5: A69: `+ Point` adds an empty row)*
+- **DE-4** *+ Point* is available with one plant, or one of its points, picked. It adds an empty point under that plant, named *Point n* and picked, ready to fill in from Properties; there's no prompt. Until its form is chosen it's marked ● with *–* for its form, and it needs no channel and doesn't simulate.
 - **DE-5** A point with no pins is marked ○. It gets pins when the plant's pins are given or it's placed.
 - **DE-6** Columns: Tag, Description, Point, Form, Signal, Type, Channel. A plant item with several points takes one line per point, its tag and description on the first.
 - **DE-7** Systems fold (▸) and show a count when folded.
@@ -205,25 +205,26 @@ Design lists what the panel has before anything is drawn: systems, plant and poi
 - **DE-9** Plant marked *In the panel* is listed in a group of its own, **Panel**, not under a system.
 - **DE-10** Plant from projects older than v0.4 is listed under *No system*.
 - **DE-11** `Esc` lets go of what's picked. `Ctrl+Z`/`Ctrl+Y` undo and redo.
+- **DE-85** A plant shares a line with its first point. Clicking its tag or description picks the plant; clicking from a point's name across picks that point. Properties shows the one thing picked and nothing else.
 
 ### A plant item's Properties
 
-- **DE-12** Fields: *Tag*; *Description*; *Prefix*; *System*; *Connects by* (Hardwired, Comms, Hardwired and comms); ~~*Enabled by*; *Source* (where in the client's document it's from);~~ *(v0.5: A69)* *Information* (printed under its box on the drawing); *In the panel*; *Mark*; *Power by others*; ~~*Pins, from the datasheet*; and its points~~ *(v0.5: A67, A69)*.
+- **DE-12** Fields: *Tag*; *Description*; *Prefix*; *System*; *Connects by* (Hardwired, Comms, Hardwired and comms); *Mark*; *Information* (printed under its box on the drawing); *In the panel*; *Power by others*; ~~*Pins, from the datasheet*~~ *(v0.5: A67)*. Buttons: *Terminals…*, *Duplicate ×n…*, *Save as template…*, *Delete plant*. Its points aren't listed here: each is picked in its own row (DE-19).
 - **DE-13** With the tag left empty, Renumber tags the plant from its prefix and where its first view is drawn (prefix `P` at sheet 3, column 12: `P3-12`; default prefix `U`). A typed tag is kept.
 - **DE-14** Choosing *Comms* or *Hardwired and comms* adds *Protocol* (free text) and *Network*.
 - **DE-15** *In the panel* (a power supply, UPS or battery) lists the plant under Panel, draws it above the boundary with solid, numbered wiring, and lets it be placed on a GA sheet like any panel part.
 - **DE-16** *Mark* puts a small picture in its view: ~~Temperature, Pressure, Humidity, ΔP switch,~~ *(v0.5: A66: typed as letters)* Valve, Damper, Meter, Power supply, Battery, or None.
 - **DE-17** *Power by others* draws a break on the left of its view.
 - **DE-18** *Pins* is one line, each point and its pins with `|` between: `enable: 1 2 | fault: 11 14`. Points not named in the line keep the pins they have. The same pin number can be in two points (a shared common). *(v0.5: A67. The line is in the Terminals window only)*
-- **DE-19** Each point has a name, a **form**, a **signal** (free text; suggested: volt-free, 24 V, 230 V, 0–10 V, 4–20 mA, thermistor, pulse), **goes to**, and a **channel**. *(v0.5: A69. A point is edited in its own Properties, by picking its row)*
-- **DE-20** Forms, from the plant's side, and the controller channel type each needs:
+- **DE-19** A point is edited in one place, its own Properties, by picking its row: its **name**, **form**, **signal** (free text; suggested: volt-free, 24 V, 230 V, 0–10 V, 4–20 mA, thermistor, pulse), **goes to** and **channel**, with how it's wired to its channel (DE-23). Shown, not set there: its terminals, with *Terminals…*. For an output, *In Simulate*: clicked, or follows (what, on or off, after how long). Its interlocks and expectations, with *+ Interlock* and *Expectations…*. *Delete point*.
+- **DE-20** Forms, from the plant's side, and the controller channel type each needs. In the list, and under the box once one is picked, each says in plain words what it is and the channel it needs:
 
   | Form | Meaning | Type needed |
   |---|---|---|
-  | Contact | The device switches it (a fault, a status) | DI |
+  | Contact | The device switches it: a fault, a status | DI |
   | Powered output | The device puts out a voltage | DI |
-  | Dry input | On when the loop is closed (an enable) | DO |
-  | Powered input | On when there's a voltage across it | DO |
+  | Dry input | On when the panel closes its loop: an enable | DO |
+  | Powered input | On when the panel puts a voltage on it | DO |
   | Analogue output | A signal from the device | AI |
   | Analogue input | A signal to the device | AO |
   | Supply in | Power to the device | none |
@@ -311,7 +312,7 @@ Design lists what the panel has before anything is drawn: systems, plant and poi
 
 ### Interlocks
 
-- **DE-75** *+ Interlock* in a plant item's Properties makes *this point is never on while that condition holds*: the point is one of the plant's own; a condition is any on/off point in the table, on or off. *(v0.5: A69. Made in the point's Properties)*
+- **DE-75** *+ Interlock* in a point's Properties makes *this point is never on while that condition holds*: a condition is any on/off point in the table, on or off. A point's interlocks are listed in its Properties.
 - **DE-76** An interlock takes several conditions, joined by **all of** (only while every condition holds) or **any of**. *+ Condition* adds one.
 - **DE-77** Each interlock makes a *never* expectation, shown in Expectations… as made by an interlock. It can't be edited or deleted there, only in Design.
 - **DE-78** The expectation follows: renaming either point or duplicating the plant keeps it right; deleting the interlock removes it.

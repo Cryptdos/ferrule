@@ -324,7 +324,7 @@ export function compile(project: Project): Circuit {
       const said = pointLabel(project, item, pt, views);
       names.set(key, said);
       points.set(key, { form: pt.form, plant: item.id, name: pt.name });
-      if (isAnalogueForm(pt.form) || pt.form === "comms") continue;
+      if (isAnalogueForm(pt.form) || pt.form === "comms" || pt.form === "none") continue;
       if (pt.form === "dry-in" || pt.form === "powered-in" || pt.form === "supply-in") {
         // Sensed: a dry input when its loop is closed, the others when there's a voltage across them.
         const { sig, com } = signalPins(pt);
