@@ -361,10 +361,10 @@ The electrical drawing: parts, wires, rails, plant views, numbering and links. I
 - **DR-20** A wire to a distribution block or rail drops straight onto it.
 - **DR-21** Wires route themselves at right angles around parts, and keep a clear unit off terminal strips and module pin rows.
 - **DR-22** Selecting a wire and dragging a leg adjusts the route by hand (*Route: adjusted by hand*); the ends stay on their terminals. *Reset route* hands it back to the router.
-- **DR-23** A wire's Properties: *Wire number* and *Lock number*; *Core colour*; *Function* (suggested: 0V, 24V, 24V AC, 24V DC, 230V, L, N, L1–L3, PE, 0-10V, SIG, COM, FE, plus the project's own); *Kind*; *Show number*; *Show colour*; ~~*Other end*~~ *(v0.5: A26)*.
-- **DR-24** ~~Colour, number and function print together at the end the wire was drawn from; *Other end* flips them. On a wire too short for them, they're centred on it.~~ *(v0.5: A26)*
+- **DR-23** A wire's Properties: *Wire number* and *Lock number*; *Core colour*; *Function* (suggested: 0V, 24V, 24V AC, 24V DC, 230V, L, N, L1–L3, PE, 0-10V, SIG, COM, FE, plus the project's own); *Kind*; *Show number*; *Show colour*.
+- **DR-24** A wire's number and colour print as one label, number then colour (`8-23A Bn`), with no separator: the number at 2.5 mm, the colour at 1.8 mm. It reads left to right just above a horizontal run and bottom up just left of a vertical one, so the wire underlines it, whichever end the wire was drawn from. It sits in the middle of the longest run; too long for a short wire that lands on a block or rail, it runs away from the block instead of across it. A wire that shows only one of the two prints that one. The function doesn't print: it's how the wire takes its colour (DR-28), and a Text note says anything more.
 - **DR-25** A wire's number prints once per sheet, on its longest run. Earth and field wires don't print theirs unless *Show number* is ticked.
-- **DR-26** ~~The number and colour can be dragged along their own wire. *Number and colour back to their place* undoes it.~~ *(v0.5: A26)*
+- **DR-26** The label is dragged along its own wire as one piece. *Label back to its place* undoes it.
 - **DR-27** A new wire takes its colour from the block or rail it leaves, or from the wire on the other side of the fuse, contact or terminal it's drawn from. A push button carries it between the two terminals of each pole, normally open or closed; a plant or module view between the pins of a point that switches (a relay output's common and NO, a plant's fault contact).
 - **DR-28** A wire with no colour of its own takes its function's colour from *Wire colours by function* in the Distribution window (DR-48); its function comes from its distribution when it's on one, else from the function set on the wire. Properties says where the colour came from.
 - **DR-29** A wire goes straight onto a terminal and keeps its number through it.
@@ -531,6 +531,7 @@ Text, boxes, pictures, sections and clouds that explain the drawing. In Annotate
 - **AN-15** **Symbol legend** draws one of each kind of part used in the project with its name, in 1 to 4 columns, and keeps itself up to date. A part whose setting changes its symbol gets an entry for each kind in use, under its own name: contacts NO, NC and changeover; relay, contactor and timer coils (a timer by its function); motor, fan and pump; the earth and terminal types. A part that stretches (a block, rail, terminal strip line or cable screen) is drawn about 10 units long, and a symbol taller than a contact or wider than a four-pole isolator is drawn smaller to fit, its text at full size.
 - **AN-16** **Controller map**: the controller's modules in rail order, one box each with its tag, its bus address in a circle, maker, model, type and every sheet-column it's drawn at; spare slots dashed. It wraps onto more rows to fit its width and keeps up by itself.
 - **AN-17** **Network diagram**: Design's networks (DE-63), redrawn as they change; its width is set in its properties.
+- **AN-18** `R`, or *Read up the page* in its properties, turns a Text to read up the page, its first line on the left, to run beside a vertical wire; `R` again (*Level*) sets it level. It turns no other way.
 
 ---
 

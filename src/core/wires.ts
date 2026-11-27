@@ -275,100 +275,87 @@ export interface WireText {
   /** Reads up the page, beside a vertical leg. */
   vertical: boolean;
   anchor: "start" | "middle" | "end";
-  role: "number" | "colour" | "function";
-  /** The number is at the tag size (2.5 mm, v0.3 §2); colour and function at the detail size. */
+  role: "number" | "colour";
+  /** The number is at the tag size (2.5 mm, v0.3 §2); the colour at the detail size. */
   size: "tag" | "detail";
 }
 
 const WIRE_TEXT = { tag: textUnits("tag"), detail: textUnits("detail") };
 const sizeOf = (role: WireText["role"]): WireText["size"] => (role === "number" ? "tag" : "detail");
 const textLen = (s: string, role: WireText["role"]) => textWidth(s, WIRE_TEXT[sizeOf(role)]);
-/** Gap between the pieces of a wire's text, and its inset from the source terminal (67). */
+/** Gap between a wire's number and its colour. */
 const TEXT_GAP = 0.8;
-const SOURCE_INSET = 2;
+/** How far the label sits off its wire, so the wire underlines it. */
+const OFF_WIRE = 0.35;
 
 /**
- * Everything printed along a wire, as on a manufacturer's drawing:
- * - colour, function and number together, running along the wire at the
- *   source end (the end it was drawn from), inset about 2 units from the
- *   terminal (67);
- * - if the first leg can't take them, on the longest leg, centred;
- * - a number on its own sits at the middle of the longest leg;
- * - on a wire no longer than its text, everything is centred on it (T6).
+ * A wire's label (v0.5 A26, design-wire-labels-and-links §2): its number then
+ * its colour, as one piece, reading left to right on a horizontal run and
+ * bottom up on a vertical one, just above or left of the wire so it underlines
+ * them. Either can be missing: a wire that shows only one prints that one.
+ * - Its place: centred on the longest leg, whichever end the wire was drawn
+ *   from. Too long for a wire that lands on a block or rail, it runs away from
+ *   the block instead of across it.
+ * - Dragged along its wire by hand (`labelAt`, 0–1 of its length), it's centred there.
+ * The wire's function doesn't print: it's how the wire takes its colour.
  */
 export function wireTexts(
   points: Vec[],
   info: {
     number?: string;
     colour?: string;
-    func?: string;
     /** Ends on a busbar: text too long for a short wire runs away from the bar instead of across it. */
     railFrom?: boolean;
     railTo?: boolean;
-    /** Slid along the wire by hand (v0.4.x T13): the number's, and the colour's (with its function), as 0–1 of its length. */
-    numberAt?: number;
-    colourAt?: number;
+    /** Slid along the wire by hand: 0–1 of its length. */
+    labelAt?: number;
   },
 ): WireText[] {
-  const out: WireText[] = [];
-  if (points.length < 2) return out;
-  // Slid by hand: that part sits centred where it was put along its own wire, the rest as usual.
-  if (info.numberAt !== undefined || info.colourAt !== undefined) {
-    const rest = { ...info, numberAt: undefined, colourAt: undefined };
-    if (info.numberAt !== undefined && info.number) {
-      out.push(...placedAlong(points, [{ text: info.number, role: "number" }], info.numberAt));
-      rest.number = undefined;
-    }
-    if (info.colourAt !== undefined && (info.colour || info.func)) {
-      const parts: { text: string; role: WireText["role"] }[] = [];
-      if (info.colour) parts.push({ text: info.colour, role: "colour" });
-      if (info.func) parts.push({ text: info.func, role: "function" });
-      out.push(...placedAlong(points, parts, info.colourAt));
-      rest.colour = undefined;
-      rest.func = undefined;
-    }
-    return [...out, ...wireTexts(points, rest)];
-  }
-  const along = (from: Vec, to: Vec, dist: number): Vec => {
-    const len = Math.abs(to[0] - from[0]) + Math.abs(to[1] - from[1]) || 1;
-    return [from[0] + ((to[0] - from[0]) / len) * dist, from[1] + ((to[1] - from[1]) / len) * dist];
-  };
-  const legLen = (a: Vec, b: Vec) => Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]);
-  const beside = (p: Vec, vertical: boolean): Vec => (vertical ? [p[0] - 0.35, p[1]] : [p[0], p[1] - 0.35]);
+  if (points.length < 2) return [];
   const parts: { text: string; role: WireText["role"] }[] = [];
-  if (info.colour) parts.push({ text: info.colour, role: "colour" });
-  if (info.func) parts.push({ text: info.func, role: "function" });
   if (info.number) parts.push({ text: info.number, role: "number" });
-  if (!parts.length) return out;
-  const need = parts.reduce((s, p) => s + textLen(p.text, p.role), 0) + TEXT_GAP * (parts.length - 1);
-
-  let longest = 0;
-  for (let k = 0; k < points.length - 1; k++) if (legLen(points[k]!, points[k + 1]!) > legLen(points[longest]!, points[longest + 1]!)) longest = k;
-  const onlyNumber = parts.length === 1 && parts[0]!.role === "number";
-  // At the source: the first leg, if the text fits after the inset with a little to spare.
-  const atSource = !onlyNumber && legLen(points[0]!, points[1]!) >= SOURCE_INSET + need + 0.5;
-  const i = atSource ? 0 : longest;
+  if (info.colour) parts.push({ text: info.colour, role: "colour" });
+  if (!parts.length) return [];
+  if (info.labelAt !== undefined) {
+    const { at, leg } = pointAlong(points, info.labelAt);
+    const a = points[leg]!;
+    const b = points[leg + 1] ?? a;
+    return labelAround(at, a[0] === b[0] && a[1] !== b[1], parts);
+  }
+  const legLen = (a: Vec, b: Vec) => Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]);
+  let i = 0;
+  for (let k = 0; k < points.length - 1; k++) if (legLen(points[k]!, points[k + 1]!) > legLen(points[i]!, points[i + 1]!)) i = k;
   const a = points[i]!;
   const b = points[i + 1]!;
-  if (legLen(a, b) === 0) return out;
-  const vertical = a[0] === b[0];
-  // Start of the group along the leg: the inset at the source, else centred (even if it overhangs),
-  // except that an overhang doesn't cross a busbar the wire lands on.
   const len = legLen(a, b);
-  let d = atSource ? SOURCE_INSET : (len - need) / 2;
-  if (!atSource && need > len) {
+  if (len === 0) return [];
+  const need = labelLength(parts);
+  // Where its middle goes, as a distance from a along the leg.
+  let mid = len / 2;
+  if (need > len) {
     const railA = i === 0 && !!info.railFrom;
     const railB = i === points.length - 2 && !!info.railTo;
-    if (railA && !railB) d = 0.3;
-    else if (railB && !railA) d = len - 0.3 - need;
+    if (railA && !railB) mid = 0.3 + need / 2;
+    else if (railB && !railA) mid = len - 0.3 - need / 2;
   }
-  // Colour nearest the source, as before.
-  for (const p of parts) {
+  const c: Vec = [a[0] + ((b[0] - a[0]) / len) * mid, a[1] + ((b[1] - a[1]) / len) * mid];
+  return labelAround(c, a[0] === b[0], parts);
+}
+
+const labelLength = (parts: { text: string; role: WireText["role"] }[]) =>
+  parts.reduce((s, p) => s + textLen(p.text, p.role), 0) + TEXT_GAP * (parts.length - 1);
+
+/** The label's pieces in reading order, centred on a point of the wire: left to right, or bottom up. */
+function labelAround(c: Vec, vertical: boolean, parts: { text: string; role: WireText["role"] }[]): WireText[] {
+  const need = labelLength(parts);
+  let d = -need / 2;
+  return parts.map((p) => {
     const w = textLen(p.text, p.role);
-    out.push({ text: p.text, at: beside(along(a, b, d + w / 2), vertical), vertical, anchor: "middle", role: p.role, size: sizeOf(p.role) });
+    const along = d + w / 2;
     d += w + TEXT_GAP;
-  }
-  return out;
+    const at: Vec = vertical ? [c[0] - OFF_WIRE, c[1] - along] : [c[0] + along, c[1] - OFF_WIRE];
+    return { text: p.text, at, vertical, anchor: "middle" as const, role: p.role, size: sizeOf(p.role) };
+  });
 }
 
 /** A point a fraction of the way along a route, and its leg (v0.4.x T13). */
@@ -406,25 +393,6 @@ export function fractionAlong(points: Vec[], p: Vec): number {
     run += l;
   }
   return best.f;
-}
-
-/** Parts of a wire's text centred together at a fraction along it, on the leg there. */
-function placedAlong(points: Vec[], parts: { text: string; role: WireText["role"] }[], f: number): WireText[] {
-  const { at, leg } = pointAlong(points, f);
-  const a = points[leg]!;
-  const b = points[leg + 1] ?? a;
-  const vertical = a[0] === b[0] && a[1] !== b[1];
-  const need = parts.reduce((s, p) => s + textLen(p.text, p.role), 0) + TEXT_GAP * (parts.length - 1);
-  const dir: Vec = vertical ? [0, Math.sign(b[1] - a[1]) || 1] : [Math.sign(b[0] - a[0]) || 1, 0];
-  let d = -need / 2;
-  const out: WireText[] = [];
-  for (const p of parts) {
-    const w = textLen(p.text, p.role);
-    const c: Vec = [at[0] + dir[0] * (d + w / 2), at[1] + dir[1] * (d + w / 2)];
-    out.push({ text: p.text, at: vertical ? [c[0] - 0.35, c[1]] : [c[0], c[1] - 0.35], vertical, anchor: "middle", role: p.role, size: sizeOf(p.role) });
-    d += w + TEXT_GAP;
-  }
-  return out;
 }
 
 export { BLOCK_HALF, BLOCK_INSET } from "./blocks";

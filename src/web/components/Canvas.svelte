@@ -33,7 +33,7 @@
     moveGaItems,
     updateGaItem,
     updateElement,
-    setWireTextAt,
+    setWireLabelAt,
     setViewSpan,
     updateSection,
     setPartPoints,
@@ -127,7 +127,7 @@
     | { kind: "table"; coil: string; start: Vec; at: Vec; delta: Vec; row: number }
     | { kind: "labelblock"; id: string; start: Vec; from: Vec; delta: Vec }
     | { kind: "span"; id: string; start: Vec; width: number; dx: number }
-    | { kind: "wiretext"; seg: string; what: "numberAt" | "colourAt"; f: number }
+    | { kind: "wiretext"; seg: string; f: number }
     | { kind: "boundary"; y: number }
     | null;
   type Rect4 = [number, number, number, number];
@@ -941,14 +941,13 @@
       return;
     }
 
-    // A wire's number or colour slides along its own wire (v0.4.x T13).
+    // A wire's label slides along its own wire, number and colour as one (A26).
     const wt = (e.target as globalThis.Element | null)?.closest?.("[data-wiretext]") as HTMLElement | SVGElement | null;
     if (wt && bench === "draft" && !page.ga) {
       const segId = wt.getAttribute("data-wiretext")!;
       const seg = page.segments.find((x) => x.id === segId);
       if (seg) {
-        const what = wt.getAttribute("data-role") === "number" ? "numberAt" : "colourAt";
-        gesture = { kind: "wiretext", seg: seg.id, what, f: fractionAlong(routeOf(page, seg), pt) };
+        gesture = { kind: "wiretext", seg: seg.id, f: fractionAlong(routeOf(page, seg), pt) };
         editor.selection = [seg.id];
         return;
       }
@@ -1177,7 +1176,7 @@
       return;
     }
     if (g.kind === "wiretext") {
-      editor.apply((p) => setWireTextAt(p, editor.pageId, g.seg, { [g.what]: g.f }));
+      editor.apply((p) => setWireLabelAt(p, editor.pageId, g.seg, g.f));
       return;
     }
     if (g.kind === "drag" && (g.delta[0] || g.delta[1])) {
@@ -1477,10 +1476,9 @@
     return { x: lb.r.x + d[0], y: lb.r.y + d[1], w: lb.r.w, h: lb.r.h, moving: g?.kind === "labelblock" };
   });
   /** A wire text being slid: where it shows while dragged. */
-  const wireTextAt = (seg: { id: string; numberAt?: number; colourAt?: number }) => {
+  const wireTextAt = (seg: { id: string }) => {
     const g = gesture as Gesture;
-    if (g?.kind !== "wiretext" || g.seg !== seg.id) return null;
-    return { numberAt: seg.numberAt, colourAt: seg.colourAt, [g.what]: g.f };
+    return g?.kind === "wiretext" && g.seg === seg.id ? g.f : null;
   };
 
   const tablePreview = $derived.by(() => {

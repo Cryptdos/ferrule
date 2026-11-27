@@ -33,7 +33,7 @@ import {
   type TerminalRef,
   newId,
 } from "./model";
-import { benchOf, canRotate, tidySelector, defaultParams, isBar, formatPoints, getSymbol, partPoints, plantViewLayout, poleMates, requireSymbol, terminalPoint, viewSides, type ViewSide } from "./symbols";
+import { allowedRotation, benchOf, canRotate, nextRotation, tidySelector, defaultParams, isBar, formatPoints, getSymbol, partPoints, plantViewLayout, poleMates, requireSymbol, terminalPoint, viewSides, type ViewSide } from "./symbols";
 import { moduleType, moduleTypeName } from "./modules";
 import { channelLabel, renamePointDesign, tidyDesign } from "./design";
 import { cleanPoints, formatQuickEntry, mergePoints, isInputForm, missingRefs, parseQuickEntry, pointOfPin, printedPin } from "./points";
@@ -100,7 +100,7 @@ export function addElement(
     tag: opts.tag ?? "",
     label: symbol === "text" ? (opts.label ?? "Text") : (opts.label ?? "").replace(/\s*\n\s*/g, " "),
     pos: clampToArea(snapVec(pos)),
-    rot: canRotate({ symbol }) ? (opts.rot ?? 0) : 0,
+    rot: allowedRotation(symbol, opts.rot ?? 0),
     zone: opts.zone ?? "internal",
     params: normaliseParams(symbol, { ...defaultParams(symbol), ...opts.params }),
     links: [],
@@ -151,7 +151,7 @@ export function rotateElements(project: Project, pageId: string, ids: string[]):
       el.params.pts = formatPoints(pts.slice(1).map((q) => rotate([q[0] - el.pos[0], q[1] - el.pos[1]], 90)));
       continue;
     }
-    el.rot = (((el.rot + 90) % 360) as Rotation);
+    el.rot = nextRotation(el.symbol, el.rot);
   }
   updateZones(page);
 }
@@ -451,17 +451,14 @@ export function resetRoute(project: Project, pageId: string, ids: string[]): voi
  * (numbers on panel wires, not field wires; colour whenever there is one).
  */
 /**
- * Slide a wire's number or colour along it (v0.4.x T13): a fraction 0–1 of
- * its drawn length, kept through re-routing; null puts it back in its usual place.
+ * Slide a wire's label along it (v0.5 A26): number and colour as one, at a
+ * fraction 0–1 of its drawn length, kept through re-routing; null puts it back
+ * in its usual place.
  */
-export function setWireTextAt(project: Project, pageId: string, id: string, at: { numberAt?: number | null; colourAt?: number | null }): void {
+export function setWireLabelAt(project: Project, pageId: string, id: string, at: number | null): void {
   const seg = getSegment(getPage(project, pageId), id);
-  for (const k of ["numberAt", "colourAt"] as const) {
-    const v = at[k];
-    if (v === undefined) continue;
-    if (v === null) delete seg[k];
-    else seg[k] = Math.round(Math.max(0, Math.min(1, v)) * 1000) / 1000;
-  }
+  if (at === null) delete seg.labelAt;
+  else seg.labelAt = Math.round(Math.max(0, Math.min(1, at)) * 1000) / 1000;
 }
 
 export function setWireKind(
@@ -480,13 +477,6 @@ export function setWireKind(
     if (opts.showColour === null || opts.showColour === true) delete seg.showColour;
     else if (opts.showColour === false) seg.showColour = false;
   }
-}
-
-/** Turn a wire end for end: its colour and number print at the other end. The route stays as it is. */
-export function reverseSegment(project: Project, pageId: string, id: string): void {
-  const seg = getSegment(getPage(project, pageId), id);
-  [seg.from, seg.to] = [seg.to, seg.from];
-  seg.points = [...seg.points].reverse();
 }
 
 /**

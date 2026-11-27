@@ -168,6 +168,11 @@ export interface SymbolDef {
    * switches, protection, lamps…) is drawn the way the sheet runs. Flip still works.
    */
   noRotate?: boolean;
+  /**
+   * Its text turns with it (v0.5 A29): turned, it reads up the page. It has two
+   * ways, level and turned (stored as 270), and R swaps them.
+   */
+  turnsText?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -1765,6 +1770,7 @@ const SYMBOLS: SymbolDef[] = [
     name: "Text",
     group: "Drawing",
     palette: true,
+    turnsText: true,
     params: [
       {
         key: "align",
@@ -2603,6 +2609,20 @@ export function canRotate(el: Pick<Element, "symbol">): boolean {
   return !getSymbol(el.symbol)?.noRotate;
 }
 
+/** What R does to a part's turn: a quarter turn, or for text level and turned in turn (A29). */
+export function nextRotation(symbol: string, rot: Rotation): Rotation {
+  if (getSymbol(symbol)?.turnsText) return rot ? 0 : 270;
+  return ((rot + 90) % 360) as Rotation;
+}
+
+/** A turn a part can have: none for one that doesn't turn; level or turned (270) for text. */
+export function allowedRotation(symbol: string, rot: Rotation): Rotation {
+  const def = getSymbol(symbol);
+  if (!def || def.noRotate) return 0;
+  if (def.turnsText) return rot ? 270 : 0;
+  return rot;
+}
+
 const BY_ID = new Map(SYMBOLS.map((s) => [s.id, s]));
 
 /** Which workbench an element is edited in. */
@@ -2796,8 +2816,14 @@ export function localGeometry(el: Element, texts: string | GeometryText): Geomet
       shift = flipped - Math.min(...block.map((p) => p.at[1]));
     }
   }
+  // Text that turns reads up the page, its first line on the left (A29).
+  const turned = !!def.turnsText && el.rot !== 0;
   const rotated = raw.map((p) =>
-    rotatePrim(el.flip ? (keep(p) ? { ...p, at: [p.at[0], p.at[1] + shift] as Vec } : flipPrim(p)) : p, el.rot),
+    turned
+      ? p.t === "text"
+        ? { ...p, at: rotate(p.at, 270), vertical: true }
+        : rotatePrim(p, 270)
+      : rotatePrim(el.flip ? (keep(p) ? { ...p, at: [p.at[0], p.at[1] + shift] as Vec } : flipPrim(p)) : p, el.rot),
   );
   const tagAt = rotated.find((p) => p.t === "text" && p.text === "{tag}");
   const prims = rotated.flatMap((q): Prim[] => {
@@ -2828,7 +2854,7 @@ export function localGeometry(el: Element, texts: string | GeometryText): Geomet
     at: rotate(el.flip ? flipVec(t.at) : t.at, el.rot),
     dir: rotateDir(el.flip ? flipDir(t.dir) : t.dir, el.rot),
   }));
-  const body = rotateRect(el.flip ? flipRect(d.body) : d.body, el.rot);
+  const body = rotateRect(el.flip && !turned ? flipRect(d.body) : d.body, turned ? 270 : el.rot);
   let bbox = body;
   for (const p of prims) {
     const b = primBounds(p);
