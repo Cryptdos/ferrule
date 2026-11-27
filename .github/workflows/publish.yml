@@ -1,0 +1,99 @@
+name: Publish a build
+
+# A build is made only when asked for (v0.5 A22): run this by hand, from the
+# Actions tab or `gh workflow run publish.yml`. It builds Windows and Linux at
+# the commit picked, checks each end to end, and puts them on the releases
+# page as v<version>, marked pre-release. Nothing is published on a merge.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Build and check only; publish nothing"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bun run typecheck
+      - run: bun test
+      - id: v
+        run: echo "version=$(bun -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Not published already
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "v${{ steps.v.outputs.version }}" > /dev/null 2>&1; then
+            echo "::error::v${{ steps.v.outputs.version }} is already on the releases page. A build is made at a PR, and each PR moves the version on."
+            exit 1
+          fi
+
+  windows:
+    needs: check
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bun run build:exe
+      - name: Smoke test
+        run: bun scripts/smoke-test.ts dist/ferrule.exe
+      - name: Zip
+        run: Compress-Archive -Path dist/ferrule.exe -DestinationPath dist/ferrule-windows-v${{ needs.check.outputs.version }}.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: dist/ferrule-windows-v${{ needs.check.outputs.version }}.zip
+          retention-days: 7
+
+  linux:
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bun scripts/build-exe.ts --target linux
+      - name: Smoke test
+        run: bun scripts/smoke-test.ts dist/ferrule-linux
+      - run: mv dist/ferrule-linux dist/ferrule-linux-v${{ needs.check.outputs.version }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: dist/ferrule-linux-v${{ needs.check.outputs.version }}
+          retention-days: 7
+
+  publish:
+    needs: [check, windows, linux]
+    if: ${{ !inputs.dry_run }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+      - name: Publish as a pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          V: ${{ needs.check.outputs.version }}
+        run: |
+          cat > notes.md <<NOTES
+          A test build of Ferrule ${V}, made at ${GITHUB_SHA::7}. It's a pre-release, for testing.
+
+          - **Windows:** unzip \`ferrule-windows-v${V}.zip\` anywhere and double-click \`ferrule.exe\`.
+          - **Linux:** \`chmod +x ferrule-linux-v${V}\`, then run it. To serve it to the network, see *Running it on a server* in the README.
+
+          A project file saved by this build opens in builds of the same file format; older and newer ones say which build they need.
+          NOTES
+          gh release create "v${V}" out/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease --title "Ferrule ${V}" --notes-file notes.md

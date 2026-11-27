@@ -25,8 +25,26 @@ jobs:
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
       - run: bun run build:exe
+      - name: Smoke test
+        run: bun scripts/smoke-test.ts dist/ferrule.exe
       - uses: actions/upload-artifact@v4
         with:
           name: ferrule-windows
           path: dist/ferrule.exe
+          retention-days: 30
+
+  linux:
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - run: bun scripts/build-exe.ts --target linux
+      - name: Smoke test
+        run: bun scripts/smoke-test.ts dist/ferrule-linux
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ferrule-linux
+          path: dist/ferrule-linux
           retention-days: 30

@@ -96,14 +96,16 @@ How it fits together, and why, is in the [design document](DESIGN.md).
 
 ## CI
 
-Every push to `main` and every pull request runs the type checks, the tests and the UI build on GitHub Actions (`.github/workflows/ci.yml`), then builds `ferrule.exe`. The exe is attached to the run as the `ferrule-windows` artifact: open the run from the PR's *Checks* tab and download it from *Artifacts*.
+Every push to `main` and every pull request runs the type checks, the tests and the UI build on GitHub Actions (`.github/workflows/ci.yml`), then builds `ferrule.exe` on Windows and `ferrule-linux` on Linux, and runs each end to end with `scripts/smoke-test.ts` (it starts the build on a scratch folder, creates and opens a project, adds the example and prints a sheet). Both are attached to the run as artifacts, `ferrule-windows` and `ferrule-linux`: open the run from the PR's *Checks* tab and download them from *Artifacts*.
 
-## Making a release
+## Publishing a build
 
-1. Set the version in `package.json` (e.g. `0.1.0-pre`). The exe prints it when it starts.
-2. Merge to `main` and let CI pass.
-3. Build the exe (`bun run build:exe`, or download the CI artifact from the merge) and zip it as `ferrule-windows-v<version>.zip`, e.g. `ferrule-windows-v0.3.0-pre.zip`, matching the release tag.
-4. On GitHub: *Releases → Draft a new release*, tag `v` plus the version on `main`, attach the zip, publish.
+Builds go on the repository's releases page, and only when asked for: nothing is published on a merge.
+
+1. The version is in `package.json`, and every PR moves its last number on (`0.5.12` is the twelfth PR under 0.5). The exe prints it when it starts.
+2. Run **Publish a build** (`.github/workflows/publish.yml`) by hand: *Actions → Publish a build → Run workflow*, picking the branch (normally `main`), or `gh workflow run publish.yml`. Tick *dry run* to build and check without publishing.
+3. It runs the checks and tests, builds Windows and Linux at that commit, smoke-tests each, and publishes them as `v<version>`, **marked pre-release**, holding `ferrule-windows-v<version>.zip` and `ferrule-linux-v<version>`. It refuses a version that's already published.
+4. A build becomes *the* release only by hand: on its releases page, *Edit*, untick *Set as a pre-release*, tick *Set as the latest release*. Builds are never deleted, so an older file can always be opened in the build it names.
 
 ## If something goes wrong
 
