@@ -24,12 +24,14 @@
   import Icon from "./Icon.svelte";
   import { docking, isDockable } from "../docking.svelte";
   import { zoneAt } from "../tiles";
+  import { keepPlace, placeOf } from "../places";
 
   /**
    * A floating window (design-v0.2 §10): a title bar with minimise and close,
    * in the interface's greys. It can be dragged by its title bar, doesn't
-   * block the drawing behind it, and remembers where it was put (per
-   * `store`, the title by default). Esc closes it while it has the focus.
+   * block the drawing behind it, and stays where it was put for the session
+   * (per `store`, the title by default), not after a reload (v0.5 A73). Esc
+   * closes it while it has the focus.
    */
   let {
     title,
@@ -47,19 +49,11 @@
   // Windows opened from inside this one (a prompt, say) float, and aren't this window.
   setContext("ferrule.window", undefined);
 
-  const KEY = `ferrule.win.${store ?? title}`;
-  function load(): { x: number; y: number; min?: boolean } | null {
-    try {
-      const v = JSON.parse(localStorage.getItem(KEY) ?? "null");
-      return v && typeof v.x === "number" && typeof v.y === "number" ? v : null;
-    } catch {
-      return null;
-    }
-  }
+  const KEY = `win.${store ?? title}`;
   const placed = !docked && nextAt ? nextAt : null;
   if (placed) nextAt = null;
-  const saved = load();
-  let pos: { x: number; y: number } | null = $state(placed ?? (saved ? { x: saved.x, y: saved.y } : null));
+  const saved = placeOf(KEY);
+  let pos: { x: number; y: number } | null = $state(placed ?? (saved && saved.x !== undefined && saved.y !== undefined ? { x: saved.x, y: saved.y } : null));
   let min = $state(!!saved?.min);
   let z = $state(++topZ);
   const cascade = openCount++ * 28;
@@ -78,11 +72,7 @@
   const w = $derived(width ?? (wide ? 1100 : 720));
 
   function save() {
-    try {
-      localStorage.setItem(KEY, JSON.stringify({ ...(pos ?? {}), min }));
-    } catch {
-      /* storage may be unavailable */
-    }
+    keepPlace(KEY, { ...(pos ?? {}), min });
   }
   function clamp(p: { x: number; y: number }): { x: number; y: number } {
     const ww = win?.offsetWidth ?? w;
@@ -120,16 +110,15 @@
   function move(e: PointerEvent) {
     if (!drag) return;
     pos = clamp({ x: drag.x + e.clientX - drag.cx, y: drag.y + e.clientY - drag.cy });
-    // Over a tile: show where it would dock (an edge splits the tile, the middle replaces it).
+    // Close to a tile's edge: show where it would dock (it splits the tile there). Anywhere else it just moves (A64).
     if (dockName) {
       const tileEl = document
         .elementsFromPoint(e.clientX, e.clientY)
         .map((el) => (el as HTMLElement).closest<HTMLElement>("[data-tile]"))
         .find((el) => !!el && !win?.contains(el));
-      if (tileEl) {
-        const r = tileEl.getBoundingClientRect();
-        docking.hint = { tile: tileEl.dataset.tile!, zone: zoneAt(r, e.clientX, e.clientY), rect: { left: r.left, top: r.top, width: r.width, height: r.height } };
-      } else docking.hint = null;
+      const r = tileEl?.getBoundingClientRect();
+      const zone = r ? zoneAt(r, e.clientX, e.clientY) : null;
+      docking.hint = tileEl && r && zone ? { tile: tileEl.dataset.tile!, zone, rect: { left: r.left, top: r.top, width: r.width, height: r.height } } : null;
     }
   }
   function up() {

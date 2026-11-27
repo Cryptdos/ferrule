@@ -96,7 +96,7 @@ Thirteen entries with nothing between them. Each is as its entry says.
 
 ### Step 3: windows, row two, sheets
 
-- **A32.** Windows and most prompts are already one part: `Modal.svelte` with `docking.svelte.ts`, which lets eight dock, picked by name. The change is to which may dock, by the test in the entry. Properties, help and the Simulation panel are `FloatBox` and never dock. *Device table…* and *Pins and points…* go in step 8, so don't make them dock here; the Terminals window docks when it's built.
+- **A32.** Windows and most prompts are already one part: `Modal.svelte` with `docking.svelte.ts`, which lets eight dock, picked by name. The change is to which may dock, by the test in the entry. Properties and the Simulation panel are `FloatBox` and never dock; help is a window and docks, as the list has it (corrected 27 Nov 2026: this line first had help among the panels). *Device table…* and *Pins and points…* go in step 8, so don't make them dock here; the Terminals window docks when it's built.
 - **A64** makes docking edge-only. **A73** stops window places being kept: they're in the browser's storage today, from `Modal.svelte` and `FloatBox.svelte`. Settings stay kept (`settings.svelte.ts`).
 - **A34.** Row two is laid out in `EditorView.svelte`. The order of the groups is in the entry; the order of the shared menus is §5, D8. Design's row changes again in step 8.
 - **A35 and A33** go together: which workbench is greyed out on which sheet, and a GA sheet made from the add menu. Before building A33, reproduce on the build what a GA sheet's settings do when *Detail* is chosen, so the right thing is fixed. §5, D7 settles Layout on a schematic sheet.
@@ -228,6 +228,13 @@ Judgement calls made while building, by step, with the reason.
 - **The end-to-end test is a script, run on both builds.** `scripts/smoke-test.ts` starts a build on a scratch folder and works it over HTTP: the version, the page served from inside the binary, a project created and opened, the example added and opened, a sheet printed. CI runs it on every PR for Windows and Linux, and the publish job before publishing.
 - **The Linux build is the bare file,** `ferrule-linux-v<version>`, as the entry names it. A download loses the file's executable bit, so the README and the release notes say `chmod +x`.
 - **A version already published is refused.** Every PR moves the version on, so a second build at the same number would be of the same commit.
+
+### Step 3
+
+- **Help docks** (A32). The plan first had it as a `FloatBox` panel; the list has it among the windows, opened from a button and closed only by closing it, so the list won and the plan was corrected. It's a window of its own now (`HelpDialog.svelte`), and its text says `Ctrl`+click keeps the part (A14).
+- **How close to an edge docks** (A64): within 80 px of a tile's edge, or a quarter of the tile when it's smaller than that. Anywhere else a dragged window just moves.
+- **Places are kept for the session** (A73), in memory, as WN-11's note said: a window reopened comes back where it was left, and a reload starts everything in its usual place. The places older builds kept in the browser are cleared on loading.
+- **Window titles in a tile's bar** follow the window's own (*Project details*, *Place parts*).
 
 ## 7. After the build
 

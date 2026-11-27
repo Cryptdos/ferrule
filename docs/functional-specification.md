@@ -133,7 +133,7 @@ IDs are kept when the document is revised: a withdrawn statement is struck throu
 ### Windows
 
 - **WN-10** Plant, Templates, Schedules, Table, Controller…, Distribution, Expectations…, Check, Settings and the rest open as windows: dragged by the title bar, `–` minimises to the title, `×` or `Esc` closes.
-- **WN-11** Windows don't block the drawing: you can scroll, select and edit behind them, and several can be open at once. ~~Each remembers where it was put.~~ *(v0.5: A73. For the session only)*
+- **WN-11** Windows don't block the drawing: you can scroll, select and edit behind them, and several can be open at once. Each stays where it was put for the session: reopened, it comes back there. After a reload every window, Properties and help start in their usual place; where they were isn't kept.
 - **WN-12** `Esc` on the drawing cancels what's being drawn or placed first; then closes the window on top; then clears the selection. While a window is being dragged, `Esc` cancels the drag and nothing else: the window goes back where it was, still open, and no tile stays lit.
 - **WN-13** With the keyboard focus in a text box or inside a window, the drawing's shortcuts (R, F, W, Del…) don't act on the drawing.
 
@@ -143,7 +143,7 @@ IDs are kept when the document is revised: a withdrawn statement is struck throu
 - **WN-15** Dragging a divider shares the space between tiles.
 - **WN-16** Each tile has its own sheet, zoom and pan; the same sheet can be open in two tiles.
 - **WN-17** Clicking a tile makes it active: it's outlined, and the browser, Properties, sheet list, overview, *Fit* and `PgUp`/`PgDn` follow it.
-- **WN-18** Plant, Templates, Schedules, Table, Controller…, Distribution, Expectations… and Check can be dragged by the title bar onto a tile: dropped on an edge they split the tile, ~~in the middle they replace what's there~~ *(v0.5: A64)*. Dragging the tile's bar out floats the window again. Small prompts always float.
+- **WN-18** Everything that opens is a window, a prompt or a panel, and the kind decides whether it docks. A **window** is opened from a button and kept open to work beside, and closing it is the only way out: Plant, Templates, Schedules, Table, Controller…, Distribution, Expectations…, Check, Place parts…, Project…, Settings and help. A window dragged by its title bar close to the edge of a tile docks there, splitting the tile on that side; dragged anywhere else it just moves. Dragging the tile's bar out floats it again. A **prompt** is one step of an action, finished by a button (Renumber, Suggest…, Duplicate ×n, Open file… and Save as…, New GA sheet, a name to type, a question, a message), and always floats. A **panel** comes up by itself with what you're doing (Properties, the Simulation panel), and always floats.
 - **WN-19** Tiles aren't saved: a project opens with one.
 
 ### Settings and help

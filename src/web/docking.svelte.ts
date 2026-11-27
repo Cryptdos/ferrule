@@ -11,8 +11,13 @@ export const docking = $state<{
   dock: ((name: string, tile: string, zone: DropZone) => void) | null;
 }>({ hint: null, dock: null });
 
-/** Windows that can go in a tile: the ones that show the project (design-v0.3 §7). Prompts stay floating. */
-export const DOCKABLE = ["plant", "templates", "schedules", "table", "controllers", "distribution", "expectations", "checks"] as const;
+/**
+ * Windows, which can go in a tile (v0.5 A32): anything opened from a button
+ * on the row and left open to work beside, with closing it the only way out.
+ * A prompt (one step of an action, finished by a button) and a panel
+ * (Properties, the Simulation panel: they come up by themselves) always float.
+ */
+export const DOCKABLE = ["plant", "templates", "schedules", "table", "controllers", "distribution", "expectations", "checks", "place", "project", "settings", "help"] as const;
 export type DockableName = (typeof DOCKABLE)[number];
 export const isDockable = (name: string): name is DockableName => (DOCKABLE as readonly string[]).includes(name);
 
@@ -26,4 +31,8 @@ export const WINDOW_TITLES: Record<DockableName, string> = {
   distribution: "Distribution",
   expectations: "Expectations",
   checks: "Check",
+  place: "Place parts",
+  project: "Project details",
+  settings: "Settings",
+  help: "Help",
 };

@@ -31,12 +31,14 @@ describe("tiles (design-v0.3 §7)", () => {
     const w = { kind: "leaf" as const, id: "w", content: { type: "window" as const, name: "plant" } };
     const left = dropOn(a, a.id, "left", w);
     expect(left.kind === "split" && left.dir === "row" && left.a.id === "w").toBe(true);
-    const mid = dropOn(a, a.id, "middle", w);
-    expect(mid.kind === "leaf" && mid.content.type === "window" && mid.id === "w").toBe(true);
-    expect(findLeaf(mid, a.id)).toBeNull();
+    // Docking is splitting only (v0.5 A64): close to an edge, or nothing.
     const rect = { left: 0, top: 0, width: 100, height: 100 };
     expect(zoneAt(rect, 5, 50)).toBe("left");
     expect(zoneAt(rect, 50, 95)).toBe("bottom");
-    expect(zoneAt(rect, 50, 50)).toBe("middle");
+    expect(zoneAt(rect, 50, 50)).toBeNull();
+    const big = { left: 0, top: 0, width: 1600, height: 900 };
+    expect(zoneAt(big, 1560, 450)).toBe("right");
+    expect(zoneAt(big, 300, 450)).toBeNull();
+    expect(zoneAt(big, 800, 860)).toBe("bottom");
   });
 });

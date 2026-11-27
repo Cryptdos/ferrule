@@ -51,6 +51,7 @@
   import TemplatesDialog from "./TemplatesDialog.svelte";
   import SimPanel from "./SimPanel.svelte";
   import SettingsDialog from "./SettingsDialog.svelte";
+  import HelpDialog from "./HelpDialog.svelte";
   import Modal, { closeTopmost } from "./Modal.svelte";
   import { Simulator } from "../sim.svelte";
 
@@ -99,16 +100,14 @@
       lastSelected = now;
     });
   });
-  let showProject = $state(false);
   /** Open windows: they don't block the drawing, and several can be open at once. */
-  type DialogName = "expectations" | "plant" | "controllers" | "table" | "distribution" | "checks" | "schedules" | "templates" | "renumber" | "devices" | "settings" | "place";
+  type DialogName = "expectations" | "plant" | "controllers" | "table" | "distribution" | "checks" | "schedules" | "templates" | "renumber" | "devices" | "settings" | "place" | "project" | "help";
   const open: Partial<Record<DialogName, boolean>> = editor.open;
   /** Windows in tiles (design-v0.3 §7), and where a dragged window would go. */
   const inTile = $derived(new Set(leaves(editor.tiles).flatMap((l) => (l.content.type === "window" ? [l.content.name] : []))));
   docking.dock = (name, tile, zone) => editor.dockWindow(name, tile, zone);
   /** Export PDF failed: what went wrong, with the Print way round it. */
   let pdfError = $state("");
-  let help = $state(false);
   let browserWidth = $state(0);
   const gaSelected = $derived((editor.gaSelectionPage.gaItems ?? []).some((i) => editor.selection.includes(i.id)));
 
@@ -143,6 +142,8 @@
   // Place parts… has nothing to place onto off a GA sheet: it closes when the sheet in view stops being one (A59).
   $effect(() => {
     if (open.place && !editor.page.ga) {
+      const tile = editor.windowTile("place");
+      if (tile) editor.closeTile(tile);
       open.place = false;
       editor.gaPlace = null;
     }
@@ -457,7 +458,7 @@
   onkeydown={onKey}
   onpaste={(e) => {
     // Ctrl+V with a picture on the clipboard puts it on the sheet (Annotate).
-    if (editor.mode === "simulate" || editor.mode === "ga" || editor.mode === "design" || isTyping(e.target) || inWindow(e.target) || showProject) return;
+    if (editor.mode === "simulate" || editor.mode === "ga" || editor.mode === "design" || isTyping(e.target) || inWindow(e.target) || open.project) return;
     const files = [...(e.clipboardData?.files ?? [])].filter((f) => f.type.startsWith("image/"));
     if (!files.length) return;
     e.preventDefault();
@@ -490,13 +491,13 @@
       </div>
       <span class="grow"></span>
       <div class="group">
-        <LabelButton icon="project" label="Project…" onclick={() => (showProject = true)} title="Project details, logo and revisions (title block)" />
+        <LabelButton icon="project" label="Project…" onclick={() => toggle("project")} title="Project details, logo and revisions (title block)" />
         <button class="icon" onclick={() => (savingAs = true)} title="Save as… (a copy of this project, to a file anywhere)"><Icon name="saveAs" /></button>
         <button class="icon" onclick={exportPdf} disabled={exporting} title={exporting ? "Exporting…" : "Export PDF: every sheet as an A4 PDF"}><Icon name="pdf" /></button>
         <button class="icon" onclick={print} title="Print (opens the print view)"><Icon name="print" /></button>
         <span class="sep"></span>
-        <button class="icon" class:active={help} onclick={() => (help = !help)} title="Keyboard and mouse help"><Icon name="help" /></button>
-        <button class="icon" class:active={!!open.settings} onclick={() => (open.settings = !open.settings)} title="Settings, and Status: Claude's connection, Quit Ferrule"><Icon name="gear" /></button>
+        <button class="icon" class:active={!!open.help} onclick={() => toggle("help")} title="Keyboard and mouse help"><Icon name="help" /></button>
+        <button class="icon" class:active={!!open.settings} onclick={() => toggle("settings")} title="Settings, and Status: Claude's connection, Quit Ferrule"><Icon name="gear" /></button>
       </div>
       <span class="status" class:error={editor.saveState === "error"}>{saveText}</span>
     </div>
@@ -581,7 +582,7 @@
         <span class="sep"></span>
         <LabelButton icon="check" label="Check" active={!!open.checks} onclick={() => toggle("checks")} title="Check the drawing for problems, with how full each DIN rail is" />
         <LabelButton icon="schedules" label="Schedules" active={!!open.schedules} onclick={() => toggle("schedules")} title="Terminal and cable schedules, and the bill of materials" />
-        <LabelButton icon="place" label={editor.page.ga?.view === "detail" ? "Place detail…" : "Place parts…"} active={!!open.place} onclick={() => (open.place = !open.place)} title="Parts from the schematic not on a GA yet: pick one, then click on the sheet" />
+        <LabelButton icon="place" label={editor.page.ga?.view === "detail" ? "Place detail…" : "Place parts…"} active={!!open.place} onclick={() => toggle("place")} title="Parts from the schematic not on a GA yet: pick one, then click on the sheet" />
         <LabelButton icon="devices" label="Device table…" active={!!open.devices} onclick={() => toggle("devices")} title="Real devices with their sizes, datasheets and pictures" />
       {/if}
     </div>
@@ -607,18 +608,6 @@
     {:else if editor.selection.length || editor.sheetSettings}
       <FloatBox title={editor.selection.length ? "Properties" : "Sheet"} store="props" onclose={closeProps}>
         {#if editor.selection.length}<Props {editor} />{:else}<SheetProps {editor} />{/if}
-      </FloatBox>
-    {/if}
-    {#if help}
-      <FloatBox title="Help" store="help" top={162} right={344} width={280} onclose={() => (help = false)}>
-        <div class="help">
-          <p>Pick a part in the browser and click to place it; then it's back to Select (or keep placing until <kbd>Esc</kbd>: Settings). Drag to move, <kbd>R</kbd> rotate, <kbd>Del</kbd> delete, <kbd>Ctrl</kbd>+<kbd>D</kbd> duplicate, arrows nudge.</p>
-          <p>Scroll to zoom, middle-drag or <kbd>Space</kbd>+drag to pan; tap <kbd>Space</kbd> to fit the sheet. <kbd>R</kbd> rotates, <kbd>F</kbd> flips top to bottom. Drag the outline in the overview (top right of the tile you're in) to move about.</p>
-          <p><kbd>W</kbd> wire tool: click a terminal, then another; click on a wire to tee into it. <kbd>Esc</kbd> cancels, <kbd>S</kbd> back to select.</p>
-          <p><kbd>PgUp</kbd>/<kbd>PgDn</kbd> change sheet. Double-click a contact, coil or link arrow to jump to its partner.</p>
-          <p>Split the drawing into tiles from a tile's bar (split right, split down); click a tile to work in it. Drag a window's title bar onto a tile to put it there, and its tile's bar out to float it again.</p>
-          <p><kbd>Ctrl</kbd>+<kbd>Z</kbd> undo, <kbd>Ctrl</kbd>+<kbd>Y</kbd> redo, <kbd>Ctrl</kbd>+<kbd>A</kbd> select all on this workbench. Saving is automatic.</p>
-        </div>
       </FloatBox>
     {/if}
     {#if editor.mode === "design" && editor.open.designDuplicate}
@@ -670,13 +659,21 @@
     <TemplatesDialog {editor} onclose={() => toggle("templates")} />
   {:else if name === "schedules"}
     <SchedulesDialog {editor} onclose={() => toggle("schedules")} />
+  {:else if name === "place"}
+    <PlacePartsDialog {editor} onclose={() => (toggle("place"), (editor.gaPlace = null))} />
+  {:else if name === "project"}
+    <ProjectDialog {editor} onclose={() => toggle("project")} />
+  {:else if name === "settings"}
+    <SettingsDialog onclose={() => toggle("settings")} />
+  {:else if name === "help"}
+    <HelpDialog onclose={() => toggle("help")} />
   {/if}
 {/snippet}
 {#snippet tileWindow(name: string, tile: string)}
   <Dockable {name} {tile}>{@render windowBody(name)}</Dockable>
 {/snippet}
 {#each DOCKABLE as name (name)}
-  {#if open[name] && !inTile.has(name) && (name !== "table" || editor.mode === "draft")}
+  {#if open[name] && !inTile.has(name) && (name !== "table" || editor.mode === "draft") && (name !== "place" || editor.mode === "ga")}
     <Dockable {name}>{@render windowBody(name)}</Dockable>
   {/if}
 {/each}
@@ -693,14 +690,8 @@
 {#if open.renumber}
   <RenumberDialog {editor} onclose={() => (open.renumber = false)} />
 {/if}
-{#if open.place && editor.mode === "ga"}
-  <PlacePartsDialog {editor} onclose={() => ((open.place = false), (editor.gaPlace = null))} />
-{/if}
 {#if open.devices}
   <DevicesDialog {editor} onclose={() => (open.devices = false)} />
-{/if}
-{#if open.settings}
-  <SettingsDialog onclose={() => (open.settings = false)} />
 {/if}
 {#if pdfError}
   <Modal title="Export PDF" store="pdf-error" width={520} onclose={() => (pdfError = "")}>
@@ -717,9 +708,6 @@
       <button onclick={() => (pdfError = "")}>Close</button>
     </div>
   </Modal>
-{/if}
-{#if showProject}
-  <ProjectDialog {editor} onclose={() => (showProject = false)} />
 {/if}
 
 <style>
@@ -873,22 +861,6 @@
     min-width: 0;
     min-height: 0;
     overflow: hidden;
-  }
-  .help {
-    padding: 8px 12px;
-    font-size: 12px;
-    color: #445;
-    line-height: 1.5;
-  }
-  .help p {
-    margin: 0 0 6px;
-  }
-  kbd {
-    font-size: 11px;
-    border: 1px solid #ccd;
-    border-radius: 3px;
-    padding: 0 3px;
-    background: #f6f7f8;
   }
   .linkbar {
     position: absolute;

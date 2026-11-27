@@ -1,10 +1,12 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
   import Icon from "./Icon.svelte";
+  import { keepPlace, placeOf } from "../places";
 
   /**
    * A floating, see-through box over the drawing (properties, simulation).
-   * Drag it by its title bar; it remembers where it was put (per `store` key).
+   * Drag it by its title bar; it stays where it was put for the session
+   * (per `store` key), not after a reload (v0.5 A73).
    */
   let {
     title,
@@ -26,27 +28,15 @@
     actions?: Snippet;
   } = $props();
 
-  const KEY = `ferrule.box.${store}`;
-  function load(): { x: number; y: number; min?: boolean } | null {
-    try {
-      const v = JSON.parse(localStorage.getItem(KEY) ?? "null");
-      return v && typeof v.x === "number" && typeof v.y === "number" ? v : null;
-    } catch {
-      return null;
-    }
-  }
-  const saved = load();
-  let pos: { x: number; y: number } | null = $state(saved ? { x: saved.x, y: saved.y } : null);
+  const KEY = `box.${store}`;
+  const saved = placeOf(KEY);
+  let pos: { x: number; y: number } | null = $state(saved && saved.x !== undefined && saved.y !== undefined ? { x: saved.x, y: saved.y } : null);
   let min = $state(!!saved?.min);
   let box: HTMLDivElement | undefined = $state();
   let drag: { cx: number; cy: number; x: number; y: number } | null = null;
 
   function save() {
-    try {
-      localStorage.setItem(KEY, JSON.stringify({ ...(pos ?? {}), min }));
-    } catch {
-      /* storage may be unavailable */
-    }
+    keepPlace(KEY, { ...(pos ?? {}), min });
   }
 
   function clamp(p: { x: number; y: number }): { x: number; y: number } {
