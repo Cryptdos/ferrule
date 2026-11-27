@@ -13,6 +13,7 @@ import { benchOf, contactKind, getSymbol, isBar, labelBlockRect, localGeometry, 
 import { numberingTerminal } from "./renumber";
 import { supplyOf } from "./conductors";
 import { blockWays } from "./wires";
+import { deviceRows } from "./devicerows";
 import { displayTag, elementTexts } from "./tags";
 import { isMaster, isSlave, masterOf, partnerOf, slavesOf } from "./xref";
 import { drawnOn, fieldPlant, needsChannel, onNetworkOnly } from "./design";
@@ -30,6 +31,8 @@ export interface Finding {
   design?: { plant: string; point?: string };
   /** A point whose wiring to its channel is to review: it can be confirmed by hand. */
   confirm?: { plant: string; point: string };
+  /** A row in Design's Devices view it's about (v0.5 A31): Show goes there. */
+  devices?: string;
 }
 
 const NO_TERMINAL_CHECK = new Set(["busbar", "rail", "junction", "plant-view", "isolator", "transformer", "motor", "socket"]);
@@ -182,15 +185,28 @@ export function checkProject(project: Project, opts: { proofs?: Proofs | null } 
   if (project.pages.some((pg) => pg.segments.length)) {
     const circuit = compile(project);
     out.push(...distributionChecks(project, circuit), ...supplyChecks(project, circuit));
-    // Supply load (v0.4.x M12): once draws are used, how many parts have none; and a supply its worst case is over.
+    // Supply load (v0.4.x M12): a supply its worst case is over.
     if (usesLoads(project)) {
       const sl = supplyLoads(project, circuit);
-      if (sl.undrawn) out.push({ level: "info", message: `${sl.undrawn} part${sl.undrawn === 1 ? " has" : "s have"} no draw set (coils, lamps, plant supply in, modules), so ${sl.undrawn === 1 ? "counts" : "count"} as nothing in a supply's load`, ids: [] });
       for (const x of sl.supplies)
         if (x.ratingVa && x.worstVa > x.ratingVa)
           out.push({ level: "warning", message: `${x.name}: worst case ${loadText(x.worstVa, x.gives)} is over its rating, ${loadText(x.ratingVa, x.gives)} (see Simulate)`, ids: /^plant:|^rails$/.test(x.id) ? [] : [x.id] });
     }
   }
+
+  // A31: once the project has devices, what has none yet: what it takes and draws isn't known.
+  if (project.devices?.length) {
+    const rows = deviceRows(project);
+    const none = rows.filter((r) => !r.device);
+    if (none.length)
+      out.push({
+        level: "warning",
+        message: `${none.length} of ${rows.length} thing${rows.length === 1 ? "" : "s"} ${none.length === 1 ? "has" : "have"} no device yet (${none.slice(0, 3).map((r) => r.tag).join(", ")}${none.length > 3 ? "…" : ""}): what ${none.length === 1 ? "it takes and draws isn't" : "they take and draw isn't"} known, so a supply's load leaves ${none.length === 1 ? "it" : "them"} out (Design → Devices)`,
+        ids: [],
+        devices: none[0]!.key,
+      });
+  }
+  out.push(...polesChecks(project));
 
   // With a GA drawn, say what isn't on it yet; and GA devices whose schematic part has gone.
   if (project.pages.some((p) => p.ga)) {
@@ -436,6 +452,32 @@ export function supplyJoinChecks(project: Project): Finding[] {
       ...(page ? { pageId: page.id } : {}),
       ids: page ? page.segments.filter((s) => s.conductor === c.id).map((s) => s.id) : [],
     });
+  }
+  return out;
+}
+
+/**
+ * A relay's or contactor's device says how many poles it has (v0.5 A70):
+ * Check warns when its contacts use more. A contact is a pole; a contactor's
+ * main contacts count each of their poles and auxiliaries.
+ */
+export function polesChecks(project: Project): Finding[] {
+  const out: Finding[] = [];
+  for (const page of project.pages) {
+    if (page.ga) continue;
+    for (const el of page.elements) {
+      if (el.symbol !== "coil" || !el.device) continue;
+      const dev = project.devices?.find((d) => d.id === el.device);
+      if (!dev?.poles) continue;
+      const used = slavesOf(project, el).reduce((n, s) => n + (s.el.symbol === "isolator" ? (Number(s.el.params.poles) || 1) + (Number(s.el.params.aux) || 0) : 1), 0);
+      if (used > dev.poles)
+        out.push({
+          level: "warning",
+          message: `Sheet ${page.number}: ${displayTag(el, project)} uses ${used} poles and its device, ${dev.name}, has ${dev.poles}`,
+          pageId: page.id,
+          ids: [el.id],
+        });
+    }
   }
   return out;
 }

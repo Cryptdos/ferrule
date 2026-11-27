@@ -8,7 +8,7 @@ import { gaCandidates } from "./ga";
 import { billOfMaterials, ioSchedule, plantPointsSchedule } from "./schedules";
 import { newProject, type Project } from "./model";
 import { defaultPattern, generatePins, moduleTitle, moduleTypeName, slotAddress, controllerTag } from "./modules";
-import { addElement, addGaItem, addGaPage, addPlant, connect, addPage, linkContact, pairLinkEnds, placePlantView, setExpectation, updatePoint } from "./ops";
+import { addElement, addGaItem, addGaPage, addPlant, addProjectDevice, connect, addPage, linkContact, pairLinkEnds, placePlantView, setDevices, setExpectation, updatePoint } from "./ops";
 import { describeExpectation, findThing, pointRef, things } from "./points";
 import { renumber } from "./renumber";
 import { compile, initialState, judge, toggle } from "./sim";
@@ -85,7 +85,8 @@ describe("controllers and modules", () => {
   test("a module view sits above its terminals: they're along the bottom, wires leave downwards", () => {
     const { p, pg } = project();
     const c = addController(p, "Outstation");
-    const ao = addModule(p, c.id, { type: "ao", channels: 2, maker: "Maker", model: "AO-2X", pattern: { ids: "VO RET CO" } });
+    const ao = addModule(p, c.id, { type: "ao", channels: 2, pattern: { ids: "VO RET CO" } });
+    setDevices(p, [`plant:${ao.id}`], addProjectDevice(p, { name: "AO-2X", maker: "Maker", part: "AO-2X", kind: "module", w: 36, h: 90, d: 0 }).id);
     const v = placePlantView(p, pg, ao.id, [20, 30]);
     updatePoint(p, ao.id, "AO1", { label: "SF-01 speed" });
     renumber(p);
@@ -188,7 +189,7 @@ describe("controllers and modules", () => {
   test("controllers and modules survive saving; a module whose controller has gone is plant", () => {
     const { p, pg } = project();
     const c = addController(p, "Outstation");
-    const di = addModule(p, c.id, { type: "di", channels: 4, maker: "M", model: "X" });
+    const di = addModule(p, c.id, { type: "di", channels: 4 });
     addSpareSlot(p, c.id);
     updatePoint(p, di.id, "DI1", { label: "Filter dirty" });
     placePlantView(p, pg, di.id, [20, 20]);
@@ -220,7 +221,7 @@ describe("8b2: controller map, schedules, GA, library models, checks", () => {
     const pg2 = addPage(p, "Sheet 2").id;
     const c = addController(p, "AHU-1 outstation");
     const host = addModule(p, c.id, { type: "host", pattern: null });
-    const di = addModule(p, c.id, { type: "di", channels: 4, maker: "Maker", model: "DI4" });
+    const di = addModule(p, c.id, { type: "di", channels: 4 });
     const dout = addModule(p, c.id, { type: "do", channels: 8 });
     addSpareSlot(p, c.id);
     placePlantView(p, pg, host.id, [8, 20]);
@@ -244,7 +245,9 @@ describe("8b2: controller map, schedules, GA, library models, checks", () => {
   }
 
   test("the controller map: modules in rail order, addresses, where each is drawn, spare slots", () => {
-    const { p, pg, c } = job();
+    const { p, pg, c, di } = job();
+    // Its maker and model are its device's (v0.5 A38).
+    setDevices(p, [`plant:${di.id}`], addProjectDevice(p, { name: "DI4", maker: "Maker", part: "DI4", kind: "module", w: 36, h: 90, d: 0 }).id);
     const map = addElement(p, pg, "ctrlmap", [10, 60], { params: { ctrl: c.id } });
     const t = elementTexts(map, p);
     expect(t.modules!.map((m) => [m.tag, m.address, m.type, m.where, !!m.spare])).toEqual([
@@ -300,14 +303,13 @@ describe("8b2: controller map, schedules, GA, library models, checks", () => {
     // Saved as a model: the GA takes its size, the BOM its name.
     const dev = saveModuleDevice(p, di.id, { w: 45, h: 110 });
     expect(items[1]!.w).toBe(45);
-    expect(billOfMaterials(p).find((r) => r.item === "Maker DI4")!.tags).toBe("A1-23");
+    expect(billOfMaterials(p).find((r) => r.item === "DI-4 module")!.tags).toBe("A1-23");
     // A model makes the next module in seconds.
     const again = addModuleFromDevice(p, c.id, p.devices!.find((d) => d.id === dev.id)!);
     expect(again.terminals).toEqual(di.terminals);
     expect(again.points!.map((x) => x.name)).toEqual(di.points!.map((x) => x.name));
     expect(again.points![0]!.label).toBeUndefined();
     expect(again.device).toBe(dev.id);
-    expect(again.module!.model).toBe("DI4");
     void host;
     void dout;
     // The device table round trip keeps the model's pins.

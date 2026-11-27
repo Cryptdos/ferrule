@@ -22,8 +22,9 @@ export const FORMAT = "ferrule";
  * 14: v0.5 step 8a, a point's form can be none yet; plant has no Enabled by or Source.
  * 15: v0.5 step 8c, a module can be an adapter; a plant's mark is a picture or Other with letters.
  * 16: v0.5 step 8d, a device is picked for a part, a strip or a plant item, not for what's placed on a GA.
+ * 17: v0.5 step 8d, what a thing takes, gives and draws is on its device; an incoming supply's gives is a value and AC or DC.
  */
-export const FORMAT_VERSION = 16;
+export const FORMAT_VERSION = 17;
 
 export type ParamValue = string | number | boolean;
 
@@ -353,6 +354,8 @@ export interface DesignTemplate {
   name: string;
   /** Copies of the rows: no module, no channels, no system (the system is picked when inserting). */
   plant: PlantItem[];
+  /** The devices its plant is (v0.5 A70), so it brings them with it. */
+  devices?: ProjectDevice[];
 }
 
 /** A network comms plant is on (design-v0.4 §7): a LAN off a switch, or a bus off the controller. */
@@ -376,8 +379,6 @@ export interface ModuleInfo {
   type: ModuleType;
   /** Channels, like a contactor's poles: a DI module with 8 is a DI-8. Unset on a power supply or host. */
   channels?: number;
-  maker?: string;
-  model?: string;
   /** Its position on the controller's bus, set by hand to match its DIP switches. Unset: from rail order. */
   address?: number;
   /**
@@ -385,8 +386,6 @@ export interface ModuleInfo {
    * list per set that's linked. Set: *Commons are linked inside the module*.
    */
   commons?: string[][];
-  /** Its expected draw, VA (v0.4.x M12), carried by the controller's power supply module. Unset: its model's, or none. */
-  va?: number;
 }
 
 /**
@@ -494,16 +493,6 @@ export interface IoPoint {
   join?: "and" | "or";
   /** Seconds it takes to follow. */
   delay?: number;
-  /** Supply out or powered out: what it gives (v0.4.x M11). Unset: not stated. */
-  gives?: SupplyType;
-  /** Supply in or powered in: what it accepts, any of these (v0.4.x M11). Unset: not stated. */
-  accepts?: SupplyType[];
-  /** Supply in or powered in: its expected draw, VA (v0.4.x M12). */
-  va?: number;
-  /** Supply out or powered out: its rating, VA (v0.4.x M12). */
-  ratingVa?: number;
-  /** Supply out: the share of what it takes in that it gives out (0.85 unless set). */
-  efficiency?: number;
   /** What it does on this job, printed along its wire under a module's terminals: "SF-01 RUNNING". */
   label?: string;
   // Design (design-v0.4 §2, §4). A point made in Design may have no pins yet.
@@ -606,6 +595,8 @@ export interface Template {
   size: [number, number];
   /** Distributions referred to, as they were when the template was saved. */
   distributions?: Distribution[];
+  /** The devices its parts and plant are (v0.5 A70), so it brings them with it. */
+  devices?: ProjectDevice[];
 }
 
 /**

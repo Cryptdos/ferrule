@@ -6,7 +6,7 @@
    * with no pins gets them first, from a suggestion you edit.
    */
   import { channelText, needsPins, suggestPins, toDraw, type ToDraw } from "../../core/design";
-  import { moduleTypeName } from "../../core/modules";
+  import { makerModel, moduleTypeName } from "../../core/modules";
   import { plantLabel, setQuickEntry } from "../../core/ops";
   import { startPlacing } from "../placing";
   import { describeInterlock, interlockStatus } from "../../core/interlocks";
@@ -134,7 +134,7 @@
       <div class="row">
         <span class="dot" title="Not drawn yet">●</span>
         <strong>{plantLabel(t.item)}</strong>
-        <span class="what">{moduleTypeName(t.item.module!)}{t.item.module?.model ? ` · ${t.item.module.model}` : ""}{!t.item.terminals.length ? " · no pins yet: Controller… → Generate" : ""}</span>
+        <span class="what">{moduleTypeName(t.item.module!)}{makerModel(editor.project, t.item) ? ` · ${makerModel(editor.project, t.item)}` : ""}{!t.item.terminals.length ? " · no terminals yet: Terminals… in its Properties" : ""}</span>
         <button disabled={!t.item.terminals.length} onclick={() => startPlacing(editor, t.item)} title="Place it at the top of a sheet in Draft, terminals underneath">Place on sheet</button>
       </div>
     {/each}

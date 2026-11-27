@@ -131,7 +131,8 @@ describe("step 8d1: devices are picked in Design (A70)", () => {
     const mods = rows.filter((r) => r.group === "controller").map((r) => r.what);
     expect(mods[0]).toBe("Host");
     expect(rows.find((r) => r.tag === "AHU-01-TT-01")!.what).toMatch(/field$/);
-    expect(rows.every((r) => !r.device)).toBe(true);
+    // The fixture's modules and its supply and actuators have devices; its parts don't yet.
+    expect(rows.filter((r) => r.device).every((r) => r.group === "controller" || r.group === "plant")).toBe(true);
   });
 
   test("a device is given to rows that it suits; what's placed takes its size; deleting it leaves them with none", async () => {

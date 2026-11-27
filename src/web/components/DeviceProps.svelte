@@ -7,7 +7,8 @@
    */
   import { SUITS } from "../../core/ga";
   import { rowsUsing, type DeviceRow } from "../../core/devicerows";
-  import { formatRelayPins, parseRelayPins, type DeviceEntry, type ProjectDevice } from "../../core/devices";
+  import { deviceSays, type DeviceEntry, type ProjectDevice, type Takes } from "../../core/devices";
+  import type { SupplyType } from "../../core/model";
   import { removeProjectDevice, renameDevice, updateProjectDevice, useLibraryDevice } from "../../core/ops";
   import { api } from "../api";
   import { deviceLibrary } from "../devices.svelte";
@@ -40,14 +41,16 @@
     }
   }
 
-  type Patch = Partial<Pick<DeviceEntry, "name" | "maker" | "part" | "kind" | "w" | "h" | "d" | "va" | "ways" | "relayPins" | "notes">>;
+  type Patch = Partial<Pick<DeviceEntry, "name" | "maker" | "part" | "kind" | "w" | "h" | "d" | "va" | "ways" | "takes" | "gives" | "ratingVa" | "efficiency" | "poles" | "notes">>;
   /** One change: to the library entry (the copy follows), or to this project's own device. */
   function save(patch: Patch) {
     const d = dev;
     if (!d) return;
     if (d.library && lib) {
       void run("save", async () => {
-        const e = await api.devices.update(d.id, { ...patch, ...("relayPins" in patch ? { relayPins: patch.relayPins ?? null } : {}) } as never);
+        // null clears a value in the library (undefined wouldn't be sent).
+        const sent = Object.fromEntries(Object.entries(patch).map(([k, v]) => [k, v === undefined || v === 0 ? null : v]));
+        const e = await api.devices.update(d.id, sent as never);
         deviceLibrary.put(e);
         editor.apply((p) => void useLibraryDevice(p, e));
       });
@@ -57,17 +60,18 @@
     editor.apply((p) => updateProjectDevice(p, d.id, rest as Partial<ProjectDevice>));
   }
   const num = (v: string) => Number(v);
-  function savePins(text: string) {
-    try {
-      save({ relayPins: parseRelayPins(text) });
-    } catch (e) {
-      error = (e as Error).message;
-    }
+  const says = $derived(deviceSays(dev?.kind ?? ""));
+  /** What it takes: a value, with V AC, V DC or either beside it (v0.5 A38). */
+  function setTakes(v: number, kind: Takes["kind"]) {
+    save({ takes: v > 0 ? { v, kind } : undefined });
+  }
+  function setGives(v: number, ac: boolean) {
+    save({ gives: v > 0 ? ({ v, ac } as SupplyType) : undefined });
   }
 
   async function toLibrary(d: ProjectDevice) {
     await run("up", async () => {
-      const e = await api.devices.add({ name: d.name, maker: d.maker, part: d.part, kind: d.kind, w: d.w, h: d.h, d: d.d, ...(d.module ? { module: d.module } : {}), ...(d.va ? { va: d.va } : {}), ...(d.relayPins ? { relayPins: d.relayPins } : {}), ...(d.ways ? { ways: d.ways } : {}) });
+      const e = await api.devices.add({ name: d.name, maker: d.maker, part: d.part, kind: d.kind, w: d.w, h: d.h, d: d.d, ...(d.module ? { module: d.module } : {}), ...(d.va ? { va: d.va } : {}), ...(d.takes ? { takes: d.takes } : {}), ...(d.gives ? { gives: d.gives } : {}), ...(d.ratingVa ? { ratingVa: d.ratingVa } : {}), ...(d.efficiency ? { efficiency: d.efficiency } : {}), ...(d.poles ? { poles: d.poles } : {}), ...(d.ways ? { ways: d.ways } : {}) });
       deviceLibrary.put(e);
       // The project now has the library's entry in place of its own.
       editor.apply((p) => {
@@ -141,12 +145,43 @@
         <input type="number" min="0" step="0.1" value={dev.d} onchange={(e) => save({ d: num(e.currentTarget.value) || 0 })} />
       </span>
     </div>
-    <label title="Its expected draw from its data sheet, which Simulate adds up on the supply that feeds it">Draw (VA) <input type="number" min="0" step="0.1" value={dev.va ?? ""} placeholder="–" onchange={(e) => save({ va: num(e.currentTarget.value) || 0 })} /></label>
-    {#if dev.kind === "block"}
-      <label title="How many wires it takes. Each wire drawn onto a distribution block needs a way, and Check warns when the block's device has fewer">Ways <input type="number" min="0" step="1" value={dev.ways ?? ""} onchange={(e) => save({ ways: Math.floor(num(e.currentTarget.value) || 0) })} /></label>
+    {#if says.takes}
+      <div class="size" title="What supply it takes. Check warns when it's fed from a supply that gives something else">
+        <span class="lbl">Takes</span>
+        <span class="wh">
+          <input type="number" min="0" step="any" value={dev.takes?.v ?? ""} placeholder="–" onchange={(e) => setTakes(num(e.currentTarget.value), dev.takes?.kind ?? "dc")} />
+          <select value={dev.takes?.kind ?? "dc"} onchange={(e) => dev.takes && setTakes(dev.takes.v, e.currentTarget.value as Takes["kind"])}>
+            <option value="ac">V AC</option>
+            <option value="dc">V DC</option>
+            <option value="both">V AC or DC</option>
+          </select>
+        </span>
+      </div>
+      <label title="Its expected draw from its data sheet, which Simulate adds up on the supply that feeds it">Draw (VA) <input type="number" min="0" step="0.1" value={dev.va ?? ""} placeholder="–" onchange={(e) => save({ va: num(e.currentTarget.value) || 0 })} /></label>
     {/if}
-    {#if dev.kind === "relay" || dev.kind === "timer" || dev.kind === "contactor"}
-      <label title="A relay base's own terminal numbers, printed on its coil, contacts and contact table in place of A1/A2 and 11/12/14: the coil's two, then | and each pole's common, NC and NO (a dash for one it hasn't)">Relay pins <input value={formatRelayPins(dev.relayPins)} placeholder="e.g. A1 A2 | 11 12 14 | 21 22 24" onchange={(e) => savePins(e.currentTarget.value)} /></label>
+    {#if says.gives}
+      <div class="size" title="What it supplies, for a transformer or a power supply: Check compares it with what its loads take">
+        <span class="lbl">Gives (a supply)</span>
+        <span class="wh">
+          <input type="number" min="0" step="any" value={dev.gives?.v ?? ""} placeholder="–" onchange={(e) => setGives(num(e.currentTarget.value), dev.gives?.ac ?? false)} />
+          <select value={dev.gives ? (dev.gives.ac ? "ac" : "dc") : "dc"} onchange={(e) => dev.gives && setGives(dev.gives.v, e.currentTarget.value === "ac")}>
+            <option value="ac">V AC</option>
+            <option value="dc">V DC</option>
+          </select>
+        </span>
+      </div>
+      {#if dev.gives}
+        <div class="two">
+          <label title="What it can supply; its load in Simulate turns red over this">Rating (VA) <input type="number" min="0" step="any" value={dev.ratingVa ?? ""} placeholder="–" onchange={(e) => save({ ratingVa: num(e.currentTarget.value) || 0 })} /></label>
+          <label title="What it gives out of what it takes in: its load passes up to what feeds it divided by this">Efficiency % <input type="number" min="1" max="100" value={dev.efficiency ? Math.round(dev.efficiency * 100) : ""} placeholder="85" onchange={(e) => save({ efficiency: num(e.currentTarget.value) / 100 || 0 })} /></label>
+        </div>
+      {/if}
+    {/if}
+    {#if says.poles}
+      <label title="How many poles (changeover contacts) it has. Draft numbers a relay's terminals; only Check reads this, warning when its contacts use more">Poles <input type="number" min="0" step="1" value={dev.poles ?? ""} placeholder="–" onchange={(e) => save({ poles: Math.floor(num(e.currentTarget.value) || 0) })} /></label>
+    {/if}
+    {#if says.ways}
+      <label title="How many wires it takes. Each wire drawn onto a distribution block needs a way, and Check warns when the block's device has fewer">Ways <input type="number" min="0" step="1" value={dev.ways ?? ""} placeholder="–" onchange={(e) => save({ ways: Math.floor(num(e.currentTarget.value) || 0) })} /></label>
     {/if}
     {#if lib}
       <label>Notes <input value={lib.notes} placeholder="e.g. coil 24 V DC, 4 changeover" onchange={(e) => save({ notes: e.currentTarget.value })} /></label>

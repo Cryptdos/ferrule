@@ -168,7 +168,8 @@ export function parseDesignTemplate(v: unknown): DesignTemplate {
     for (const pt of p.points ?? []) delete pt.channel;
     return p as PlantItem;
   });
-  return { name: strOr(v.name, "Template").trim() || "Template", plant };
+  const devices = parseProjectDevices(v.devices);
+  return { name: strOr(v.name, "Template").trim() || "Template", plant, ...(devices.length ? { devices } : {}) };
 }
 
 /** A template, from a project file or a library file. */
@@ -181,6 +182,7 @@ export function parseTemplate(t: Record<string, unknown>, i = 0): Project["templ
     kind: t.kind === "section" ? "section" : "sheet",
     plant: parsePlant(t.plant),
     ...(Array.isArray(t.distributions) ? { distributions: parseDistributions(t.distributions) } : {}),
+    ...(Array.isArray(t.devices) && parseProjectDevices(t.devices).length ? { devices: parseProjectDevices(t.devices) } : {}),
     title: strOr(t.title),
     boundaryY: body.boundaryY,
     sections: body.sections,

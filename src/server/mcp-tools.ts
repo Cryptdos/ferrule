@@ -220,8 +220,7 @@ function describeController(p: Project, c: Controller) {
         module: item.id,
         tag: item.tag || `${item.prefix || "A"}?`,
         type: moduleTypeName(item.module),
-        maker: item.module.maker,
-        model: item.module.model,
+        device: (item.device ? p.devices?.find((d) => d.id === item.device)?.name : undefined) ?? null,
         drawn: viewsOf(p, item.id).map((v) => v.address),
         points: (item.points ?? []).map((pt) => ({
           name: pt.name,
@@ -717,15 +716,13 @@ export const TOOLS: Tool[] = [
         module: { type: "string", description: "Existing module's tag or id, to change" },
         type: { type: "string", enum: MODULE_TYPES.map((t) => t.value) },
         channels: { type: "number" },
-        maker: { type: "string" },
-        model: { type: "string" },
         address: { type: ["number", "null"], description: "Bus address set by hand (DIP switches); null: from rail order" },
         at: { type: "number", description: "Slot index on the rail (0 is first); a spare slot there is filled. Default: the end" },
         pattern: { type: "object", description: "How to generate its pins (see above)" },
         labels: { type: "object", description: "Point name → its job label" },
         spare: { type: "boolean", description: "Add a spare slot (Spare I/O) at 'at' instead of a module" },
-        device: { type: "string", description: "Add the module from a saved model in the project's device table (its name or id): type, channels and pins as entered" },
-        saveModel: { type: "boolean", description: "With module: save it as a model in the device table (pins and all), sized for the GA" },
+        device: { type: "string", description: "Add the module from a saved model in the project's device table (its name or id): type, channels and pins as entered. Its maker and model are that device's (see the devices tool)" },
+        saveModel: { type: "boolean", description: "With module: save it as a device in the device table (pins and all), sized for the GA, and make it that device" },
         move: { type: "number", description: "With module: move it to this slot index" },
         delete: { type: "boolean", description: "With module: delete it and its views" },
       },
@@ -750,8 +747,6 @@ export const TOOLS: Tool[] = [
           updateModule(p, item.id, {
             type: type as ModuleType | undefined,
             channels: n("channels"),
-            maker: s("maker"),
-            model: s("model"),
             ...(a.address !== undefined ? { address: typeof a.address === "number" ? a.address : null } : {}),
           });
           if (a.pattern !== undefined) generateModule(p, item.id, patternArg(item.module.type, item.module.channels, a.pattern));
@@ -774,8 +769,6 @@ export const TOOLS: Tool[] = [
           item = addModule(p, c.id, {
             type: t,
             channels: n("channels"),
-            maker: s("maker"),
-            model: s("model"),
             at: n("at"),
             pattern: a.pattern !== undefined ? patternArg(t, n("channels"), a.pattern) : t === "host" || t === "adapter" ? null : undefined,
           });
@@ -811,11 +804,11 @@ export const TOOLS: Tool[] = [
   {
     name: "devices",
     description:
-      "Design's Devices view (v0.5): everything that needs a real device (each drawn part, each terminal strip, each module and plant item) with the device it has, and the project's device table. set gives things a device: things are part tags (K3-16), strip names (X1) or plant tags; device is a device's name or id, or '' for none. A device that doesn't suit one of them is refused. add makes a device in this project first {name, maker, part, suits, w, h, d, va} (suits: relay, contactor, timer, mcb, isolator, fuse, terminal, lamp, pushbutton, selector, block, transformer, socket, connBlock, plugSocket, module, plant, or '' for anything; w × h as seen on the backplate, mm). What's placed on a GA takes its device's size.",
+      "Design's Devices view (v0.5): everything that needs a real device (each drawn part, each terminal strip, each module and plant item) with the device it has, and the project's device table. set gives things a device: things are part tags (K3-16), strip names (X1) or plant tags; device is a device's name or id, or '' for none. A device that doesn't suit one of them is refused. add makes a device in this project first {name, maker, part, suits, w, h, d, va, takes, gives, ratingVa, efficiency, poles}: what a thing takes, gives and draws is its device's (takes {v, kind: ac, dc or both}; gives {v, ac}; efficiency 0 to 1; poles, a relay's, which Check compares with its contacts) (suits: relay, contactor, timer, mcb, isolator, fuse, terminal, lamp, pushbutton, selector, block, transformer, socket, connBlock, plugSocket, module, plant, or '' for anything; w × h as seen on the backplate, mm). What's placed on a GA takes its device's size.",
     inputSchema: obj(
       {
         project,
-        add: { type: "object", description: "A device to make in this project: {name, maker?, part?, suits?, w, h, d?, va?}" },
+        add: { type: "object", description: "A device to make in this project: {name, maker?, part?, suits?, w, h, d?, va?, takes?: {v, kind}, gives?: {v, ac}, ratingVa?, efficiency?, poles?, ways?}" },
         set: { type: "object", description: "{things: [tags or strip names], device: name or id, '' for none}" },
       },
       ["project"],
@@ -826,7 +819,18 @@ export const TOOLS: Tool[] = [
           const o = (a.add ?? {}) as Record<string, unknown>;
           const t = (k: string) => (typeof o[k] === "string" ? (o[k] as string) : "");
           const n = (k: string) => (typeof o[k] === "number" ? (o[k] as number) : 0);
-          op.addProjectDevice(p, { name: t("name"), maker: t("maker"), part: t("part"), kind: t("suits"), w: n("w"), h: n("h"), d: n("d"), ...(n("va") > 0 ? { va: n("va") } : {}) });
+          const dev = op.addProjectDevice(p, { name: t("name"), maker: t("maker"), part: t("part"), kind: t("suits"), w: n("w"), h: n("h"), d: n("d") });
+          const tk = o.takes as { v?: unknown; kind?: unknown } | undefined;
+          const gv = o.gives as { v?: unknown; ac?: unknown } | undefined;
+          op.updateProjectDevice(p, dev.id, {
+            ...(n("va") > 0 ? { va: n("va") } : {}),
+            ...(n("ratingVa") > 0 ? { ratingVa: n("ratingVa") } : {}),
+            ...(n("efficiency") > 0 ? { efficiency: n("efficiency") } : {}),
+            ...(n("poles") > 0 ? { poles: n("poles") } : {}),
+            ...(n("ways") > 0 ? { ways: n("ways") } : {}),
+            ...(tk && typeof tk.v === "number" && (tk.kind === "ac" || tk.kind === "dc" || tk.kind === "both") ? { takes: { v: tk.v, kind: tk.kind } } : {}),
+            ...(gv && typeof gv.v === "number" && typeof gv.ac === "boolean" ? { gives: { v: gv.v, ac: gv.ac } } : {}),
+          });
         }
         if (a.set !== undefined) {
           const o = (a.set ?? {}) as Record<string, unknown>;
@@ -845,7 +849,7 @@ export const TOOLS: Tool[] = [
         }
         return {
           things: deviceRows(p).map((r) => ({ thing: r.tag, what: r.what, group: r.group, device: r.device?.name ?? null })),
-          devices: (p.devices ?? []).map((d) => ({ id: d.id, name: d.name, maker: d.maker, part: d.part, suits: d.kind, w: d.w, h: d.h, d: d.d, ...(d.va ? { va: d.va } : {}), library: d.library })),
+          devices: (p.devices ?? []).map(({ kind, module: _m, ...d }) => ({ ...d, suits: kind })),
         };
       }),
   },

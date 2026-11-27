@@ -2123,17 +2123,24 @@ export function updateProjectDevice(project: Project, id: string, patch: Partial
   if (patch.w !== undefined && patch.w > 0) dev.w = patch.w;
   if (patch.h !== undefined && patch.h > 0) dev.h = patch.h;
   if (patch.d !== undefined && patch.d >= 0) dev.d = patch.d;
-  if (patch.va !== undefined) {
-    if (patch.va > 0) dev.va = patch.va;
-    else delete dev.va;
+  // What it takes, gives and draws (v0.5 A38): a value or nothing, never 0.
+  for (const k of ["va", "ratingVa", "efficiency", "poles", "ways"] as const) {
+    if (!(k in patch)) continue;
+    const v = patch[k];
+    if (v === undefined || v === null || !(v > 0)) {
+      delete dev[k];
+      continue;
+    }
+    if (!Number.isFinite(v) || (k === "efficiency" && v > 1)) throw new OpError(k === "efficiency" ? "An efficiency is a percentage up to 100" : "Give a number");
+    dev[k] = k === "poles" || k === "ways" ? Math.floor(v) : v;
   }
-  if ("relayPins" in patch) {
-    if (patch.relayPins) dev.relayPins = patch.relayPins;
-    else delete dev.relayPins;
+  if ("takes" in patch) {
+    if (patch.takes && patch.takes.v > 0) dev.takes = { v: patch.takes.v, kind: patch.takes.kind };
+    else delete dev.takes;
   }
-  if (patch.ways !== undefined) {
-    if (patch.ways >= 1) dev.ways = Math.floor(patch.ways);
-    else delete dev.ways;
+  if ("gives" in patch) {
+    if (patch.gives && patch.gives.v > 0) dev.gives = { v: patch.gives.v, ac: patch.gives.ac };
+    else delete dev.gives;
   }
   if (old.w !== dev.w || old.h !== dev.h) resizeDeviceItems(project, id, old, dev);
 }

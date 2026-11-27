@@ -224,7 +224,7 @@ describe("MCP controller tools", () => {
     expect(io[0]).toMatchObject({ controller: "A? AHU-1 outstation", module: "A1-23 (DO-4)", point: "DO1", label: "SF-01 enable" });
     // Saved as a model, the next one comes from it.
     await call("add_module", { project: proj.id, module: "A1-23", saveModel: true });
-    const again = (await call("add_module", { project: proj.id, controller: c.id, device: "Digital outputs module" })).data;
+    const again = (await call("add_module", { project: proj.id, controller: c.id, device: "DO-4 module" })).data;
     expect(again.slots.at(-1).type).toBe("DO-4");
     await call("add_page", { project: proj.id, title: "GA" });
     await call("update_page", { project: proj.id, sheet: 2, type: "ga" });
