@@ -102,7 +102,7 @@
               {#each candidates as c (c.id)}<option value={c.id}>{plantLabel(c)} {c.description}{c.connects ? "" : " (hardwired now)"}</option>{/each}
             </select>
           {/if}
-          <p class="hint">{#if order.drawn}Its port is wired, so its devices and their order come from the drawing: followed from the port to each device's serial port and on.{:else}Order is the row order in the table: moving a device here moves its row.{/if} Addresses aren't kept in v0.4.</p>
+          <p class="hint">{#if order.drawn}Its port is wired, so its devices and their order come from the drawing: followed from the port to each device's serial port and on.{:else}Order is the row order in the table: moving a device here moves its row.{/if} Addresses aren't kept.</p>
           <button class="danger" onclick={() => {
             if (confirm(`Delete ${net.name}? Its devices stay, on no network.`)) editor.apply((p) => deleteNetwork(p, net.id));
           }}>Delete network</button>
@@ -193,8 +193,15 @@
     flex: 1;
   }
   .pair {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 6px;
+  }
+  .pair input,
+  .pair select {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
   }
   .sub {
     font-size: 12px;

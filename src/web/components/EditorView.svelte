@@ -287,7 +287,7 @@
     const text = toCsv(rows, POINTS_COLS);
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([text], { type: "text/csv" }));
-    a.download = `${editor.project.project.drawingNo || editor.project.id} points schedule.csv`;
+    a.download = `${editor.project.project.drawingNo || editor.fileName || editor.project.id} points schedule.csv`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
     editor.flash(`Points schedule: ${rows.length} row${rows.length === 1 ? "" : "s"}`);

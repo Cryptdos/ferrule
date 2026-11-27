@@ -27,7 +27,7 @@
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
   }
-  const base = $derived(editor.project.project.drawingNo || editor.project.id);
+  const base = $derived(editor.project.project.drawingNo || editor.fileName || editor.project.id);
 </script>
 
 <Modal title="Schedules" {onclose} wide>
