@@ -140,6 +140,13 @@
     }
   }
   $effect(() => () => sim?.stop());
+  // Place parts… has nothing to place onto off a GA sheet: it closes when the sheet in view stops being one (A59).
+  $effect(() => {
+    if (open.place && !editor.page.ga) {
+      open.place = false;
+      editor.gaPlace = null;
+    }
+  });
 
   // A GA sheet is laid out in the Layout workbench, a schematic sheet drafted:
   // moving between them takes you to the right one (Annotate and Simulate stay).

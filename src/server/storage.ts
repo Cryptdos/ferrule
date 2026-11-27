@@ -13,7 +13,7 @@ import { existsSync, statSync, watch, type FSWatcher } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { homedir, platform } from "node:os";
 import { createHash } from "node:crypto";
-import { type Project, newProject } from "../core/model";
+import { type Project, dateText, newProject } from "../core/model";
 import { parseDesignTemplate, parseProject, parseTemplate, ProjectFormatError } from "../core/validate";
 import type { DesignTemplate, Template } from "../core/model";
 import { templateCounts, type Counts } from "../core/design";
@@ -268,6 +268,8 @@ export class Storage {
     let id = base;
     for (let i = 2; existsSync(this.path(id)) || this.recent.some((r) => r.id === id); i++) id = `${base}-${i}`;
     const project = newProject(id, title.trim() || "Untitled project");
+    // Dated the day it's made: its drawn date and revision A (A49).
+    project.project.drawnDate = project.revisions[0]!.date = dateText();
     if (opts.useDeviceLibrary === false) project.useDeviceLibrary = false;
     return this.save(id, project);
   }
@@ -328,11 +330,16 @@ export class Storage {
       const bin = join(this.dir, "Deleted");
       await mkdir(bin, { recursive: true });
       const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-      await rename(file, join(bin, `${stem(basename(file))} ${stamp}${EXT}`)).catch(async () => {
-        // Across drives a rename fails: copy, then remove by renaming over a temp.
-        await copyFile(file, join(bin, `${stem(basename(file))} ${stamp}${EXT}`));
-        await rename(file, file + ".deleted");
-      });
+      const to = join(bin, `${stem(basename(file))} ${stamp}${EXT}`);
+      // The previous save goes with it (A45), so nothing of the project is left in its folder.
+      for (const [from, dest] of [[file, to], [file + ".bak", to + ".bak"]] as const) {
+        if (!existsSync(from)) continue;
+        await rename(from, dest).catch(async () => {
+          // Across drives a rename fails: copy, then remove by renaming over a temp.
+          await copyFile(from, dest);
+          await rename(from, from + ".deleted");
+        });
+      }
     } else if (!this.recent.some((r) => r.id === id)) {
       throw new StorageError("A project in the projects folder can only be deleted, not removed from the list");
     }

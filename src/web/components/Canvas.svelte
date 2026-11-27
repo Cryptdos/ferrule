@@ -878,9 +878,9 @@
         if (editor.placeFlip && symbol !== "plant-view") flipElements(p, editor.pageId, [id]);
       });
       if (id) editor.selection = [id];
-      // Place one, then back to Select (note 72), unless the setting says keep placing.
-      // A plant view is always placed once.
-      if (symbol === "plant-view" || !settings.keepPlacing) {
+      // Place one, then back to Select (note 72), unless the setting says keep placing or
+      // Ctrl is held: each Ctrl+click keeps the part for the next (A14). A plant view is always placed once.
+      if (symbol === "plant-view" || (!settings.keepPlacing && !e.ctrlKey)) {
         editor.tool = "select";
         editor.placeSymbol = null;
         editor.placeParams = {};

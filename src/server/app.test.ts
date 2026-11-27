@@ -147,7 +147,7 @@ describe("project files anywhere", () => {
       // Duplicate, then delete: the file moves to Deleted, not destroyed.
       const dup = await (await app.request(`/api/projects/${created.id}/duplicate`, { method: "POST" })).json();
       expect((await app.request(`/api/projects/${dup.id}?file=1`, { method: "DELETE" })).status).toBe(200);
-      expect((await readdir(join(dir, "Deleted"))).length).toBe(1);
+      expect((await readdir(join(dir, "Deleted"))).filter((f) => f.endsWith(".ferrule"))).toHaveLength(1);
       // Removing one from elsewhere from the list leaves its file alone.
       expect((await app.request(`/api/projects/${saved.id}`, { method: "DELETE" })).status).toBe(200);
       expect(await readdir(elsewhere)).toContain("Kitchen.ferrule");
@@ -209,6 +209,40 @@ describe("save as", () => {
     expect((await post()).status).toBe(409);
     expect((await post(true)).status).toBe(200);
     expect(existsSync(target + ".bak")).toBe(true);
+  });
+});
+
+describe("v0.5 step 1: the project list", () => {
+  test("A45: Delete takes the previous save with it", async () => {
+    const d = await mkdtemp(join(tmpdir(), "ferrule-del-"));
+    try {
+      const storage = new Storage(d);
+      await storage.init();
+      const p = await storage.create("Pump room");
+      await storage.save(p.id, p);
+      expect(await readdir(d)).toContain(`${p.id}.ferrule.bak`);
+      await storage.remove(p.id, true);
+      expect((await readdir(d)).filter((f) => f.startsWith(p.id))).toEqual([]);
+      const bin = await readdir(join(d, "Deleted"));
+      expect(bin.filter((f) => f.endsWith(".ferrule"))).toHaveLength(1);
+      expect(bin.filter((f) => f.endsWith(".ferrule.bak"))).toEqual([`${bin.find((f) => f.endsWith(".ferrule"))}.bak`]);
+    } finally {
+      await rm(d, { recursive: true, force: true });
+    }
+  });
+
+  test("A49: a new project is dated the day it's made", async () => {
+    const d = await mkdtemp(join(tmpdir(), "ferrule-date-"));
+    try {
+      const storage = new Storage(d);
+      await storage.init();
+      const p = await storage.create("Plant room");
+      const today = new Date().toLocaleDateString("en-GB");
+      expect(p.project.drawnDate).toBe(today);
+      expect(p.revisions).toEqual([expect.objectContaining({ rev: "A", date: today, description: "First issue" })]);
+    } finally {
+      await rm(d, { recursive: true, force: true });
+    }
   });
 });
 

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { addAsset, addRevision, deleteRevision, setLogo, setFunctionColour, setNumberingScheme, setTerminalStrips, updateProjectInfo, updateRevision } from "../../core/ops";
   import { readImage } from "../images";
-  import type { ProjectInfo, Revision } from "../../core/model";
+  import { dateText, type ProjectInfo, type Revision } from "../../core/model";
   import type { Editor } from "../editor.svelte";
   import Modal from "./Modal.svelte";
 
@@ -196,7 +196,7 @@
     <div class="row">
       <button
         onclick={() =>
-          editor.apply((p) => addRevision(p, { date: new Date().toLocaleDateString("en-GB"), drawnBy: p.project.drawnBy }))}
+          editor.apply((p) => addRevision(p, { date: dateText(), drawnBy: p.project.drawnBy }))}
         >Add revision</button
       >
       <span class="hint">The latest four show in the title block, newest at the bottom.</span>

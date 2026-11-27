@@ -116,7 +116,7 @@
         {#each io as r, i (i)}
           <tr>{#each IO_COLS as [k] (k)}<td>{r[k]}</td>{/each}</tr>
         {:else}
-          <tr><td colspan="7" class="hint">No controllers yet (Controllers… in Draft).</td></tr>
+          <tr><td colspan="7" class="hint">No controller yet (Design → Controller).</td></tr>
         {/each}
       </tbody>
     </table>

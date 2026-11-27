@@ -211,6 +211,16 @@ Judgement calls made while building, by step, with the reason.
 - **The other old-file code in the parser stays for now.** A few lines in `parseProject` still tidy fields from older files (a socket's earth, busbars split in v0.3, the door front's old name). Format 4 means no real file reaches them, and they also tidy hand-written files, so they're left; each goes when the step that reworks its part comes to it.
 - **The LSP-01 example's sheet count.** The start page, the README and ST-10 called it a 16-sheet panel; it's 14 sheets. Like A18, the number comes out of the sentence so it can't go out of date again.
 
+### Step 1
+
+- **A40: the label block moves whole.** Flipped, a part's tag, cross-reference and label keep their order and spacing, and the block moves to where flipping would have put it, so it stays on the same side of the symbol as before.
+- **A47: an isolator that still says *none*** (a hand-written file, or Claude) is drawn with a rotary handle, so no isolator is ever without one.
+- **A49: the date is written day first** (27/11/2026), as *Add revision* writes it, and only a project made from the project list (or by Claude) is dated. The built-in examples are made by their scripts and keep empty dates.
+- **A53: the window goes back where it was** when the drag is cancelled, rather than staying where it had been dragged to.
+- **A61: rows of buttons wrap** in Properties, and the panel never scrolls sideways at all, whatever is in it.
+- **A74: only *Duplicate ×n* empties the description.** Inserting a Design template keeps the template's descriptions, since that's a copy of something saved on purpose, not of the row beside it.
+- **One PR for the step.** The thirteen entries went in together rather than as two PRs: they're small and nothing between them depends on another.
+
 ## 7. After the build
 
 What QA on v0.5 starts from:

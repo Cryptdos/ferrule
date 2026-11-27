@@ -38,9 +38,9 @@ Found while writing the specification from the 0.4.5 source, and ruled on the sa
 
 - [x] **A3. Clear lamp colour: README.** *Built: PR 118.* *Docs. PT-8. Build 0.4.5.* Clear has been removed as a lamp colour; the build offers Rd, Ye, Gn, Bu and Wh, with white for a clear lens. The README's editor guide still lists *Cl* among the colour codes. Take it out.
 
-- [ ] **A4. IO schedule's empty message.** *Fix, text. SC-6. Build 0.4.5.* With no controller, Schedules → IO points reads *No controllers yet (Controllers… in Draft)*. The controller has been made in Design since v0.4, and a panel has one. Reword it to how it works now, for example *No controller yet (Design → Controller)*.
+- [x] **A4. IO schedule's empty message.** *Built: PR 119.* *Fix, text. SC-6. Build 0.4.5.* With no controller, Schedules → IO points reads *No controllers yet (Controllers… in Draft)*. The controller has been made in Design since v0.4, and a panel has one. Reword it to how it works now, for example *No controller yet (Design → Controller)*.
 
-- [ ] **A13. Lamp test terminal's label.** *Fix, text. PT-8. Build 0.4.5.* The terminal is LT, and has been for some time. The lamp's setting still reads *Lamp test terminal (T)*. Change the label to *(LT)*.
+- [x] **A13. Lamp test terminal's label.** *Built: PR 119.* *Fix, text. PT-8. Build 0.4.5.* The terminal is LT, and has been for some time. The lamp's setting still reads *Lamp test terminal (T)*. Change the label to *(LT)*.
 
 - ~~**A15. The Controller… window in the singular.**~~ *Withdrawn 27 Nov 2026.* The window goes (A67). What's left of the point: wording in the Controller view speaks of one controller, as *Add the controller* already does.
 
@@ -106,7 +106,7 @@ Decided in discussion. The aim: Ferrule runs the same way on a desk or on one ce
 
 ## Drawing (25 Nov 2026)
 
-- [ ] **A14. `Ctrl`+click keeps the part.** *Tweak. DR-1, WN-20. Build 0.4.5.* Each click made with `Ctrl` held places the part and keeps it ready for the next. The first click without `Ctrl` places one and ends it, back to Select.
+- [x] **A14. `Ctrl`+click keeps the part.** *Built: PR 119.* *Tweak. DR-1, WN-20. Build 0.4.5.* Each click made with `Ctrl` held places the part and keeps it ready for the next. The first click without `Ctrl` places one and ends it, back to Select.
   - The *Keep placing until Esc* setting stays. Some will prefer it, and it's there to be seen for anyone who doesn't use shortcuts.
 
 - [ ] **A23. Wire numbering by supply.** *Tweak, large. NU-5, NU-7, DR-48 to DR-53, SC-5. Build 0.4.5.* Found on the QA project: a wire off a block or rail gets its own number, so one supply carries a different number on every wire (0 V: 122 wires, 122 numbers), and the same circuit looped device to device is numbered differently. Each supply gets a numerical tag and every wire on it carries that tag; terminals keep their own numbers. With it: the control rail becomes the power rail, drawn by voltage; a distribution block's ways are counted from its wires.
@@ -186,7 +186,7 @@ Findings from testing the v0.4.x builds go here, in the order they're found.
 - [ ] **A24. Colour through a controller's relay output.** *Missing. DR-27. Build 0.4.5.* A new wire takes the colour of the wire on the other side of a fuse, contact, isolator pole, push button, selector or terminal. A controller module isn't on that list, nor is plant: a wire drawn from a relay output's normally open terminal doesn't take the colour of the wire on its common, though it's switched power in the same way (`design-wire-numbering.md` §2a). Carry the colour between the pins of one on/off point.
   - Found by reading the code, 26 Nov 2026. Whoever builds it confirms the cause on the BMS fixture first.
 
-- [ ] **A25. Colour through a push button's other poles.** *Fix. DR-27, PT-2. Build 0.4.5.* A push button carries a wire's colour through only between 13 and 14, and between 21 and 22. A first pole set normally closed (11, 12), a second pole set normally open (23, 24), and a third or fourth pole (33, 34 and 41, 42) carry nothing through.
+- [x] **A25. Colour through a push button's other poles.** *Built: PR 119.* *Fix. DR-27, PT-2. Build 0.4.5.* A push button carries a wire's colour through only between 13 and 14, and between 21 and 22. A first pole set normally closed (11, 12), a second pole set normally open (23, 24), and a third or fourth pole (33, 34 and 41, 42) carry nothing through.
   - Found by running the core code, 26 Nov 2026: a 4-pole push button pairs 13 with 14 and 21 with 22, and nothing else.
 
 - [ ] **A31. A part with no draw is a warning.** *Tweak. CK-19, SM-24. Build 0.4.5.* A part with no draw set counts as nothing towards its supply. *Check* mentions how many there are only as information, so a supply's worst-case figure can sit under its rating while half its relays have no draw. Raise it to a warning: the supply's total isn't accurate until every part it feeds says what it draws.
@@ -223,7 +223,7 @@ From the notes written into the QA copy of the specification (`v0.4.0-pre Notes\
   - Rotate stays on the earth and the cable screen.
   - To settle: the parts not ruled on. Terminal, socket outlet, connector (plug and socket), incoming supply, blocks and rails, terminal strip line, and plant and module views (which choose a side for their terminals instead).
 
-- [ ] **A40. Flip turns the symbol only.** *Fix. DR-8. Build 0.4.5.* Flipping a part puts its tag below its label. The symbol flips; the tag stays above the label.
+- [x] **A40. Flip turns the symbol only.** *Built: PR 119.* *Fix. DR-8. Build 0.4.5.* Flipping a part puts its tag below its label. The symbol flips; the tag stays above the label.
 
 - [ ] **A41. A selector's pole choices fit its positions.** *Fix. PT-3. Build 0.4.5.* On a 2 position selector the pole list still offers the 3 position choices (*closed in II*, *closed in I and II*, *opened in II*). The list shows only what's valid for the positions set.
   - Changing a selector from 3 positions to 2 puts a pole that was on a 3 position choice back to the default. The symbol shows what it now is, which is notice enough.
@@ -243,7 +243,7 @@ From the notes written into the QA copy of the specification (`v0.4.0-pre Notes\
 
 - ~~**A44. Incoming supply: *System* first.**~~ *Withdrawn 26 Nov 2026.* The pickers it was to sit above are removed (A57), which leaves *System* as the first choice there anyway.
 
-- [ ] **A45. Delete leaves the backup behind.** *Fix. ST-8, ST-14. Build 0.4.5.* *Delete* moves a project's file into `Deleted` and leaves its `.bak` in the projects folder. Seen in the test folder, 26 Nov 2026 (`test1-copy.ferrule.bak`), and the code agrees: only the file itself is moved. The `.bak` goes with it.
+- [x] **A45. Delete leaves the backup behind.** *Built: PR 119.* *Fix. ST-8, ST-14. Build 0.4.5.* *Delete* moves a project's file into `Deleted` and leaves its `.bak` in the projects folder. Seen in the test folder, 26 Nov 2026 (`test1-copy.ferrule.bak`), and the code agrees: only the file itself is moved. The `.bak` goes with it.
 
 - [ ] **A46. Selector: its name, and a fourth position.** *Tweak. PT-3. Build 0.4.5.*
   - The part is called **Selector**. *Selector / keyswitch* says the same thing twice: *Key operated* is already a tick box.
@@ -251,11 +251,11 @@ From the notes written into the QA copy of the specification (`v0.4.0-pre Notes\
   - On a 4 position selector each pole is closed in exactly one position, picked from a list of four. A pole closed in more than one would defeat the switch.
   - A 4 position selector can't be a changeover (A43).
 
-- [ ] **A47. An isolator's operator can't be *None*.** *Tweak. PT-4. Build 0.4.5.* *Operator* offers rotary handle, door handle, key and *none (worked by something else)*. Nothing in Ferrule works one isolator from another, so *none* gives a switch that nothing operates, and on this build it can still be clicked in Simulate. *None* comes off the list.
+- [x] **A47. An isolator's operator can't be *None*.** *Built: PR 119.* *Tweak. PT-4. Build 0.4.5.* *Operator* offers rotary handle, door handle, key and *none (worked by something else)*. Nothing in Ferrule works one isolator from another, so *none* gives a switch that nothing operates, and on this build it can still be clicked in Simulate. *None* comes off the list.
 
 - [ ] **A48. Connector block: columns.** *Tweak. PT-11. Build 0.4.5.* The block always lays its terminals out in two columns. It gets a *Columns* setting beside *Terminals*, and sizes itself from the two. *Terminals* is the total: four terminals in two columns is two rows. Two columns stays the default.
 
-- [ ] **A49. A new project is dated.** *Missing. ST-5, PR-1, PR-7. Build 0.4.5.* A new project's *Drawn date* and the date of revision A, *First issue*, are empty. Both are filled with the day the project is made.
+- [x] **A49. A new project is dated.** *Built: PR 119.* *Missing. ST-5, PR-1, PR-7. Build 0.4.5.* A new project's *Drawn date* and the date of revision A, *First issue*, are empty. Both are filled with the day the project is made.
   - *Add revision* dates a new revision with the current date in the same way (ruled 26 Nov 2026). It does already (from the code, 27 Nov 2026), so there's nothing to build for it.
 
 - [ ] **A50. Position numbering only.** *Tweak. PR-3, NU-11, NU-13. Build 0.4.5.* *Project…* offers a second numbering scheme, Sequential (K1, K2…, wires 100, 101…). Position numbering is part of the design, and a lot of work has gone into it: if it falls short it's fixed, not swapped for a backup. The Sequential scheme and the *Numbering scheme* setting are removed.
@@ -267,9 +267,9 @@ From the notes written into the QA copy of the specification (`v0.4.0-pre Notes\
 - [ ] **A52. Wire colours by function moves into Distribution.** *Tweak. PR-5, DR-28, DR-48. Build 0.4.5.* The table is under *Project…*, where nobody drafting would look for it. It becomes a section of the Distribution window, so all wire colour is set in one place.
   - Whether the rules earn their keep at all is a check below.
 
-- [ ] **A53. `Esc` while dragging a window leaves the highlight behind.** *Fix. WN-12, WN-18. Build 0.4.5.* Found on the build: drag a window that docks until a tile lights up blue, and press `Esc` with the mouse still down. The window closes, and the blue highlight stays on the tile with no way to clear it. `Esc` during a drag should cancel the drag: the highlight goes and the window stays open where it was.
+- [x] **A53. `Esc` while dragging a window leaves the highlight behind.** *Built: PR 119.* *Fix. WN-12, WN-18. Build 0.4.5.* Found on the build: drag a window that docks until a tile lights up blue, and press `Esc` with the mouse still down. The window closes, and the blue highlight stays on the tile with no way to clear it. `Esc` during a drag should cancel the drag: the highlight goes and the window stays open where it was.
 
-- [ ] **A54. Align to the last one clicked.** *Tweak. WN-2. Build 0.4.5.* Aligning lines everything up with the first thing clicked. It feels more natural to line up with the last. Things selected by dragging a box have no click order and align as they do now.
+- [x] **A54. Align to the last one clicked.** *Built: PR 119.* *Tweak. WN-2. Build 0.4.5.* Aligning lines everything up with the first thing clicked. It feels more natural to line up with the last. Things selected by dragging a box have no click order and align as they do now.
   - The specification doesn't say what align lines up with. It's added when this is built.
 
 - [ ] **A55. The symbol legend.** *Fix and tweak. AN-15. Build 0.4.5.* Three things, found on the build:
@@ -290,13 +290,13 @@ From the notes written into the QA copy of the specification (`v0.4.0-pre Notes\
   - The plate's size can be typed over, for an enclosure whose plate differs.
   - **Positions and dimensions are measured from the plate's top-left corner**, not the enclosure's: the plate is what's marked out and drilled. The enclosure's outline is for reference only: nothing snaps to it or measures from it.
 
-- [ ] **A59. Place parts… closes off a GA sheet.** *Fix. LA-11. Build 0.4.5.* Found on the build: with *Place parts…* open, moving to a sheet that isn't a GA leaves it open, where it has nothing to place onto. It closes when the sheet in view stops being a GA.
+- [x] **A59. Place parts… closes off a GA sheet.** *Built: PR 119.* *Fix. LA-11. Build 0.4.5.* Found on the build: with *Place parts…* open, moving to a sheet that isn't a GA leaves it open, where it has nothing to place onto. It closes when the sheet in view stops being a GA.
   - It doesn't dock today and will (A32).
 
 - [ ] **A60. *Fit* fills the sheet.** *Tweak. LA-3, LA-28. Build 0.4.5.* *Fit* picks the first standard scale at which the enclosure fits (1:1, 1:2, 1:2.5, 1:5, 1:10…), so a door that would fit at 1:5.5 is drawn at 1:10 with half the sheet empty, and pressing Fit again changes nothing. The scale isn't being used to measure from, so Fit takes the largest scale that fits, whatever the number, to one decimal place (1:5.5).
   - A detail's frame gets *Fit* as well. A new frame starts at the largest scale that fits, but once the scale is changed there's no way back to it.
 
-- [ ] **A61. Properties never scrolls sideways.** *Fix. WN-7, LA-5. Build 0.4.5.* Found on the build: a column of doors has so many *Split* and *Join* buttons in the sheet's settings that the panel has to be scrolled left and right. Buttons wrap onto another row. The panel isn't made wider, which would cover the drawing.
+- [x] **A61. Properties never scrolls sideways.** *Built: PR 119.* *Fix. WN-7, LA-5. Build 0.4.5.* Found on the build: a column of doors has so many *Split* and *Join* buttons in the sheet's settings that the panel has to be scrolled left and right. Buttons wrap onto another row. The panel isn't made wider, which would cover the drawing.
 
 - ~~**A62. Generate… on a module with no channels.**~~ *Folded into A67, 27 Nov 2026.* Generate shows only on IO modules, in the Terminals window; a pattern can leave a terminal out; *Shared by* is put in plain words; and it's plain which box is the controller's description. All in `design-design-workbench.md` §4 and §7.
 
@@ -345,7 +345,7 @@ Checks whose intended behaviour was already ruled, where the code shows the buil
 - [ ] **A73. Where a window was put isn't remembered.** *Tweak. WN-7, WN-11, WN-19. Build 0.4.5. Ruled 26 Nov 2026.* Settings are remembered and layout isn't. Today each window's place, and whether it's folded, is kept for the browser, as are Properties' and help's, so they come back after a reload. They stop being kept: a project opens with its windows closed, and a window opened starts in its usual place. Within a session a window still stays where it's put.
   - Still remembered, as settings: theme, button style, *Keep placing until Esc*, whether the browser panel and its sections are shown, whether the overview is shown, and the last folder browsed.
 
-- [ ] **A74. Copies from *Duplicate ×n* start with no description.** *Tweak. DE-30. Build 0.4.5. Ruled 26 Nov 2026.* Copies keep the description as it is, so three copies of *Supply fan 1* are all *Supply fan 1*. A copy's description comes out empty, ready to type, since it's always different. Everything else about a copy is as now.
+- [x] **A74. Copies from *Duplicate ×n* start with no description.** *Built: PR 119.* *Tweak. DE-30. Build 0.4.5. Ruled 26 Nov 2026.* Copies keep the description as it is, so three copies of *Supply fan 1* are all *Supply fan 1*. A copy's description comes out empty, ready to type, since it's always different. Everything else about a copy is as now.
 
 - [ ] **A75. Interlocks are proved on entering Simulate.** *Tweak. DE-74, DE-79, DE-80. Build 0.4.5. Direction ruled 26 Nov 2026.* Proving is a button to remember. It happens by itself when Simulate is entered, for any interlock whose proof is out of date, as long as it doesn't hold Simulate up.
   - Time *Prove all* on the BMS fixture first. If it's quick, it runs on entering Simulate, and only when the drawing has changed since the last proof. If it's slow, Simulate says which interlocks are stale and proving stays a choice.

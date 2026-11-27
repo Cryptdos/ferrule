@@ -84,10 +84,10 @@ IDs are kept when the document is revised: a withdrawn statement is struck throu
   | `library/design` | Design templates |
   | `exports` (beside `projects`) | PDFs exported by Claude over MCP |
 
-- **ST-5** ~~*Create project* with a title makes a project and opens it.~~ *(v0.5: A17)* A new project is bare: one empty schematic sheet titled *Sheet 1*, revision A *First issue*, position numbering, no distributions, plant, controller or templates.
+- **ST-5** ~~*Create project* with a title makes a project and opens it.~~ *(v0.5: A17)* A new project is bare: one empty schematic sheet titled *Sheet 1*, revision A *First issue*, position numbering, no distributions, plant, controller or templates. It's dated the day it's made: its *Drawn date* and revision A's date.
 - **ST-6** *Use the shared device library for GA sheets* (ticked by default) decides whether the new project's device table offers library devices. It can be changed later under *Project…*.
 - **ST-7** *Open file…* browses folders and lists `.ferrule` files; clicking one opens it. The file stays where it is and is remembered on the project list, shown with its path.
-- **ST-8** Each project on the list shows its title, sheet count and when it was saved, with ~~*Duplicate* (a copy beside it)~~ *(v0.5: A8)*, *Download* (the `.ferrule` file) and *Delete* (the file moves to `projects/Deleted`). A file opened from elsewhere also has *Remove from list*, which leaves the file alone.
+- **ST-8** Each project on the list shows its title, sheet count and when it was saved, with ~~*Duplicate* (a copy beside it)~~ *(v0.5: A8)*, *Download* (the `.ferrule` file) and *Delete* (the file moves to `projects/Deleted`, its `.bak` with it). A file opened from elsewhere also has *Remove from list*, which leaves the file alone.
 - **ST-9** A project file that can't be read is listed with its error; the rest of the list still loads.
 - **ST-10** *add the LSP-01 example* adds a life safety panel, drawn with Ferrule's own tools, to the list.
 - **ST-11** A project opens in Draft, on one tile.
@@ -124,7 +124,7 @@ IDs are kept when the document is revised: a withdrawn statement is struck throu
 ### Panels over the drawing
 
 - **WN-6** **Browser** (left): *Sheets*, and the parts or tools of the workbench in use. Each section folds (▸/▾); `«` folds the whole browser away and a button brings it back.
-- **WN-7** **Properties** (right) shows when something is selected, or a sheet's settings are opened. Dragged by its title bar it stays where it's put; `–` folds it to its title. Design has its own Properties beside its table.
+- **WN-7** **Properties** (right) shows when something is selected, or a sheet's settings are opened. Dragged by its title bar it stays where it's put; `–` folds it to its title. It scrolls up and down only: a row of buttons too long for it wraps onto another row. Design has its own Properties beside its table.
 - **WN-8** **Overview** (top right of the active tile) shows the whole sheet with the visible part outlined, and the sheet number. Dragging the outline, or clicking anywhere on it, moves the view. `–` hides it.
 - **WN-9** On screen the sheet is a warm off-white; print and PDF are white.
 
@@ -132,7 +132,7 @@ IDs are kept when the document is revised: a withdrawn statement is struck throu
 
 - **WN-10** Plant, Templates, Schedules, Table, Controller…, Distribution, Expectations…, Check, Settings and the rest open as windows: dragged by the title bar, `–` minimises to the title, `×` or `Esc` closes.
 - **WN-11** Windows don't block the drawing: you can scroll, select and edit behind them, and several can be open at once. ~~Each remembers where it was put.~~ *(v0.5: A73. For the session only)*
-- **WN-12** `Esc` on the drawing cancels what's being drawn or placed first; then closes the window on top; then clears the selection.
+- **WN-12** `Esc` on the drawing cancels what's being drawn or placed first; then closes the window on top; then clears the selection. While a window is being dragged, `Esc` cancels the drag and nothing else: the window goes back where it was, still open, and no tile stays lit.
 - **WN-13** With the keyboard focus in a text box or inside a window, the drawing's shortcuts (R, F, W, Del…) don't act on the drawing.
 
 ### Tiles
@@ -146,13 +146,14 @@ IDs are kept when the document is revised: a withdrawn statement is struck throu
 
 ### Settings and help
 
-- **WN-20** *Keep placing until Esc*: off (default), a part is placed once and the tool returns to Select; on, the same part is placed at each click until `Esc`.
+- **WN-20** *Keep placing until Esc*: off (default), a part is placed once and the tool returns to Select; on, the same part is placed at each click until `Esc`. With it off, each click made with `Ctrl` held places the part and keeps it for the next; the first click without `Ctrl` places one and ends it.
 - **WN-21** *Dark interface*: the interface goes to dark greys; the sheet stays paper-coloured and the drawing black.
 - **WN-22** *Buttons*: *Labels* (default), *Labels and icons*, or *Icons* (name on hover). The align icons are always icons.
 - **WN-23** Theme, button style and *Keep placing until Esc* are kept for this browser, not in the project.
 - **WN-24** *Status* shows the version, the projects folder, the address, whether Claude is connected (and its last tool), the settings to paste into Claude Desktop and Claude Code with *Copy* buttons, and *Quit Ferrule*.
 - **WN-25** The help button opens a floating summary of keyboard and mouse use.
 - **WN-26** In any number box, scrolling steps the value; `Shift`+scroll steps by ten.
+- **WN-27** Align (Draft, Annotate and Layout): one thing picked lines up with the sheet's usable space (inside the border, above the title block); two or more line up with the last one clicked, which stays put; picked with a box, they have no click order and line up with the outline around them all. Distribute (three or more) keeps the outer two and makes the gaps between them equal.
 
 ---
 
@@ -242,7 +243,7 @@ Design lists what the panel has before anything is drawn: systems, plant and poi
 - **DE-27** *Duplicate ×n…* copies the picked row or rows n times, after the last of them. The window shows each copy's tags before anything is made.
 - **DE-28** Tags step by the *Step* given on **the last number** (P1 → P2, P3; `AHU-01` → `AHU-02`), on **the first number** (`P1-12` → `P2-12`), or are **left blank** for Renumber.
 - **DE-29** A tag that's already taken is shown as taken and left empty on that copy.
-- **DE-30** Copies keep their points and signals. Links between rows of the copied group follow the copies. Copies aren't on any channel and aren't drawn. ~~Descriptions are copied as they are.~~ *(v0.5: A74)*
+- **DE-30** Copies keep their points and signals. Links between rows of the copied group follow the copies. Copies aren't on any channel and aren't drawn. A copy's description starts empty, ready to type.
 
 ### Design templates
 
@@ -330,7 +331,7 @@ The electrical drawing: parts, wires, rails, plant views, numbering and links. I
 
 ### Placing
 
-- **DR-1** Picking a part in the browser and clicking on the sheet places it, snapped to the grid. The tool then returns to Select (unless *Keep placing* is on).
+- **DR-1** Picking a part in the browser and clicking on the sheet places it, snapped to the grid. The tool then returns to Select, unless *Keep placing* is on or the click was made with `Ctrl` held, which keeps the part for the next click (WN-20).
 - **DR-2** Typing in *Find a part…* narrows the list by name or group; `Enter` picks the first match; `Esc` clears it.
 - **DR-3** While placing, ~~`R` turns the part 90° and~~ *(v0.5: A39)* `F` flips it before it's dropped.
 - **DR-4** Picking the active part again, or `S` or `Esc`, returns to Select.
@@ -340,7 +341,7 @@ The electrical drawing: parts, wires, rails, plant views, numbering and links. I
 
 - **DR-6** Click selects. Dragging on empty paper box-selects. `Shift`/`Ctrl`+click adds to the selection. `Ctrl+A` selects everything this workbench edits on the sheet.
 - **DR-7** Dragging moves the selection on the grid, its wires following.
-- **DR-8** ~~`R` rotates 90°.~~ *(v0.5: A39)* `F` flips top to bottom; a flipped contact's numbers still read the right way up.
+- **DR-8** ~~`R` rotates 90°.~~ *(v0.5: A39)* `F` flips top to bottom; a flipped contact's numbers still read the right way up. Only the symbol turns over: its tag stays above its label.
 - **DR-9** Arrow keys nudge by 1 unit, `Shift`+arrow by 2.
 - **DR-10** `Ctrl+D` duplicates the selection 4 units to the right and selects the copies.
 - **DR-11** `Del` or `Backspace` deletes selected parts, wires, sections and clouds.
@@ -362,7 +363,7 @@ The electrical drawing: parts, wires, rails, plant views, numbering and links. I
 - **DR-24** ~~Colour, number and function print together at the end the wire was drawn from; *Other end* flips them. On a wire too short for them, they're centred on it.~~ *(v0.5: A26)*
 - **DR-25** A wire's number prints once per sheet, on its longest run. Earth and field wires don't print theirs unless *Show number* is ticked.
 - **DR-26** ~~The number and colour can be dragged along their own wire. *Number and colour back to their place* undoes it.~~ *(v0.5: A26)*
-- **DR-27** A new wire takes its colour from the block or rail it leaves, or from the wire on the other side of the fuse, contact or terminal it's drawn from.
+- **DR-27** A new wire takes its colour from the block or rail it leaves, or from the wire on the other side of the fuse, contact or terminal it's drawn from. A push button carries it between the two terminals of each pole, normally open or closed.
 - **DR-28** A wire with no colour of its own takes its function's colour from *Wire colours by function* (PR-5); its function comes from its distribution when it's on one, else from the function set on the wire. Properties says where the colour came from.
 - **DR-29** A wire goes straight onto a terminal and keeps its number through it.
 - **DR-30** *Kind*: **Automatic** (by the panel boundary), **Panel wiring**, or **Field wire** (dashed).
@@ -463,11 +464,11 @@ Tag prefixes follow IEC 81346-2 as applied in `docs/designations.md`. Untagged p
 | **PT-1** | Contact NO / NC / Changeover | K, Q (from its coil) | ~~*Belongs to* (Relay, Contactor, Timer); *Instantaneous*~~ *(v0.5: A36)* | Unlinked: terminals 13-14, 21-22, 11-12-14. Linked: its coil's tag and pole numbers *(v0.5: A36. NO, NC and changeover become one Contact part)* |
 | **PT-2** | Push button | S | Poles 1–4; each pole NO or NC | One head. Pole *n* is numbered *n*3/*n*4 when NO and *n*1/*n*2 when NC (13/14 or 11/12, 23/24 or 21/22…) |
 | **PT-3** | Selector / keyswitch | S | 2 position (0–I) or 3 (I–0–II); poles 1–4; each pole NO closed in I, in II, or in both, NC opened in I or II, ~~or changeover~~ *(v0.5: A43)*; *Key operated*; a name per position | Position names print under the head as `SUPPLY 1 – OFF – SUPPLY 2`. A 3-position changeover is numbered common 2, to 3 in I, to 1 in II; the next pole 7, 6, 5 *(v0.5: A41, A43, A46. The pole choices, changeover and the part's name change; a 4 position selector is added)* |
-| **PT-4** | Isolator / MCB / contactor | Q or F | *Function*: Isolator (Q), Contactor main contacts (Q), Circuit breaker / MCB (F), RCD / RCBO (F); main poles 1–4; aux NO 0–3; aux NC 0–3; *Operator*: rotary handle, door handle, key, ~~none~~ *(v0.5: A47)* | Contactor poles are worked by the coil picked under *Driven by coil*. A breaker draws no operator. An RCD carries the residual current mark |
+| **PT-4** | Isolator / MCB / contactor | Q or F | *Function*: Isolator (Q), Contactor main contacts (Q), Circuit breaker / MCB (F), RCD / RCBO (F); main poles 1–4; aux NO 0–3; aux NC 0–3; *Operator* (an isolator only): rotary handle, door handle or key; every isolator has one | Contactor poles are worked by the coil picked under *Driven by coil*. A breaker draws no operator. An RCD carries the residual current mark |
 | **PT-5** | Fuse / fuse carrier | F | Poles 1–4; *Rating* | Rating prints beside it |
 | **PT-6** | Relay / contactor coil | K or Q | *Type*; ~~*Takes (supply)*; *Draw (VA)*~~ *(v0.5: A38)* | Terminals A1, A2; contact table once contacts are linked *(v0.5: A37. One Coil part with PT-7)* |
 | **PT-7** | Timer coil | K | *Function*: TON, TOF, TON+TOF, TP, Flasher ON first, Flasher OFF first; *Time* (`500ms`, `5s`, `1.5s`, `2min`); *Maker's function code*; ~~*Takes*; *Draw*~~ *(v0.5: A38)* | Function, time and code print by the coil; the simulator runs it |
-| **PT-8** | Indicator lamp | P | *Colour*: Rd, Ye, Gn, Bu, Wh; *Lamp test terminal*; ~~*Takes*; *Draw*~~ *(v0.5: A38)* | Terminals +V and −V; with lamp test, a third, LT. Every lamp has a colour (white covers a clear lens) |
+| **PT-8** | Indicator lamp | P | *Colour*: Rd, Ye, Gn, Bu, Wh; *Lamp test terminal (LT)*; ~~*Takes*; *Draw*~~ *(v0.5: A38)* | Terminals +V and −V; with lamp test, a third, LT. Every lamp has a colour (white covers a clear lens) |
 | **PT-9** | Terminal | (number only) | *Terminal strip* (default X1); *Type*; *Show the strip identifier beside it* | See DR-55 to DR-61 |
 | **PT-10** | Socket outlet | X | none | A box with L and N on top, 3 units apart to line up under an MCB, and E beside them |
 | **PT-11** | Connector block | X | *Terminals* 2–12 | A box of terminals all at one potential (an earth, 0 V or screen block); grows with each terminal; ~~rotates~~ *(v0.5: A39)* |
@@ -549,7 +550,7 @@ General arrangement (GA) sheets drawn to scale. Positions and sizes are in milli
 
 - **LA-9** Layout tools: **DIN rail** (drag along where it goes; 35 mm), **Trunking** (drag out its size), **Dimension**, **Label plate**, **Device (no schematic part)**, **Detail**. `Esc` stops a tool.
 - **LA-10** Rail and trunking go on a backplate or door back; label plates go on a door front. A tool that doesn't suit the sheet is unavailable and says why.
-- **LA-11** *Place parts…* lists every part from the schematic not yet on a GA (relays, timers, breakers, terminal strips, the controller's modules), with a search. Pick one and click to place it. Parts that belong on another kind of sheet are counted, not offered.
+- **LA-11** *Place parts…* lists every part from the schematic not yet on a GA (relays, timers, breakers, terminal strips, the controller's modules), with a search. Pick one and click to place it. Parts that belong on another kind of sheet are counted, not offered. It closes when the sheet in view stops being a GA.
 - **LA-12** A placed part keeps its schematic tag and snaps onto a rail.
 - **LA-13** A controller's modules go side by side in rail order.
 - **LA-14** On a door, lamps, push buttons, keyswitches and an isolator's handle are drawn from their schematic parts.
@@ -730,7 +731,7 @@ Design's findings appear only once a project uses Design.
 - **SC-3** **Terminals:** Strip, Terminal, Sheet-col, Wire, Internal, External. A terminal is listed as `X1:3-13`.
 - **SC-4** **Field cables:** Plant, Description, Plant terminal, Wire, Panel terminal, Sheet-col; and below, **cores per device** (how many cores each field device needs and on which terminals), with its own CSV.
 - **SC-5** ~~**Markers:** two on every wire. A panel wire's say the terminal it lands on, or its own number when it reaches none. A field core's say the terminal at the panel end and the device's tag at the field end. *Group duplicates* gives each marker once with a count. Renumber first.~~ *(v0.5: A23, A28)*
-- **SC-6** **IO points:** Controller, Module, Point, Form, Pins, Label, Wired to (followed through link arrows).
+- **SC-6** **IO points:** Controller, Module, Point, Form, Pins, Label, Wired to (followed through link arrows). With no controller it says *No controller yet (Design → Controller)*.
 - **SC-7** **Plant points:** Device, Description, Point, Form, Pins, Wired to.
 - **SC-8** **Bill of materials:** GA sheet, Item, Maker, Part number, Qty, Unit, Tags. It's counted from the GA sheets only: devices by the device picked (or their generic size), terminals each, label plates, and DIN rail and trunking by length. A schematic part never placed on a GA isn't on it (CK-41). *(v0.5: A71. Also as a table placed on a GA sheet)*
 - **SC-9** **Export PDF** saves first, then downloads every sheet as one A4 landscape PDF on white, with osifont embedded.
@@ -742,7 +743,7 @@ Design's findings appear only once a project uses Design.
 
 ## 14. Project settings (PR)
 
-- **PR-1** *Project…* sets the project's details: Project, Panel name, Client, Job no., Drawing ref., Drawn by, Drawn date, Checked by, Checked date. They fill every sheet's title block (Client excepted in this build: A1); sheet titles are set per sheet.
+- **PR-1** *Project…* sets the project's details: Project, Panel name, Client, Job no., Drawing ref., Drawn by, Drawn date (a new project's is the day it's made), Checked by, Checked date. They fill every sheet's title block (Client excepted in this build: A1); sheet titles are set per sheet.
 - **PR-2** **Logo:** chosen, dropped in, or pasted (`Ctrl+V`) while the window is open; *Remove* clears it. It prints in every title block.
 - **PR-3** ~~**Numbering scheme:** Position or Sequential (NU-3, NU-11).~~ *(v0.5: A50)*
 - **PR-4** ~~**Terminal strips:** One (X1) or By section (NU-12).~~ *(v0.5: A51)*

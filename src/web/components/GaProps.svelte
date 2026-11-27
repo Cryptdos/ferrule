@@ -582,6 +582,7 @@
   }
   .pane {
     display: flex;
+    flex-wrap: wrap;
     gap: 3px;
     align-items: center;
     margin: 2px 0;
@@ -603,6 +604,7 @@
   }
   .buttons {
     display: flex;
+    flex-wrap: wrap;
     gap: 6px;
   }
   .danger {

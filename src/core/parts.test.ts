@@ -79,9 +79,16 @@ describe("isolators", () => {
     // A breaker set to a rotary handle before still draws no handle.
     const b = add("isolator", 40, 10, { function: "breaker", operator: "turn" });
     const turn = localGeometry(add("isolator", 50, 10, { function: "isolator", operator: "turn" }), "").prims.length;
-    const none = localGeometry(add("isolator", 60, 10, { function: "isolator", operator: "none" }), "").prims.length;
-    expect(turn).toBeGreaterThan(none);
     expect(localGeometry(b, "").prims.filter((x) => x.t === "line").length).toBeLessThan(turn);
+  });
+
+  test("A47: an isolator's operator can't be none; one that says none is drawn with a rotary handle", () => {
+    const { add } = sheet();
+    const op = requireSymbol("isolator").params.find((x) => x.key === "operator")!;
+    expect(op.options!.map((o) => o.value)).toEqual(["turn", "door", "key"]);
+    const turn = localGeometry(add("isolator", 50, 10, { function: "isolator", operator: "turn" }), "").prims;
+    const none = localGeometry(add("isolator", 60, 10, { function: "isolator", operator: "none" }), "").prims;
+    expect(none.length).toBe(turn.length);
   });
 
   test("a contactor's auxiliaries follow its coil, NC opening", () => {

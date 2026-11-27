@@ -509,7 +509,7 @@ export function tagPlan(project: Project, tags: string[], copies: number, step: 
 function copyRows(
   project: Project,
   source: PlantItem[],
-  opts: { copies: number; step: number; first: number; system?: string; after?: string; at?: TagStep },
+  opts: { copies: number; step: number; first: number; system?: string; after?: string; at?: TagStep; blank?: boolean },
 ): { plant: PlantItem[]; untagged: number } {
   const copies = Math.max(1, Math.min(200, Math.floor(opts.copies)));
   const plan = tagPlan(project, source.map((p) => p.tag), copies, opts.step, opts.first, opts.at);
@@ -526,6 +526,8 @@ function copyRows(
     source.forEach((src, i) => {
       const { module: _m, ...rest } = plain(src);
       const it: PlantItem = { ...rest, id: ids.get(src.id)! };
+      // A duplicate is always something else, so its description starts empty, ready to type (A74).
+      if (opts.blank) it.description = "";
       const t = plan[k]![i]!;
       it.tag = t.taken ? "" : t.tag;
       if (src.tag && !it.tag && opts.at !== "blank") untagged++;
@@ -577,7 +579,7 @@ function rowsOf(project: Project, ids: string[]): PlantItem[] {
  */
 export function duplicatePlant(project: Project, ids: string[], copies = 1, step = 1, at: TagStep = "last"): { plant: PlantItem[]; untagged: number } {
   const rows = rowsOf(project, ids);
-  return copyRows(project, rows, { copies, step, first: 1, after: rows[rows.length - 1]!.id, at });
+  return copyRows(project, rows, { copies, step, first: 1, after: rows[rows.length - 1]!.id, at, blank: true });
 }
 
 /** Save picked rows as a Design template: copies, with no module, channels or system. */
