@@ -314,9 +314,9 @@ export class Editor {
   }
 
   /**
-   * Put a window in a tile (design-v0.3 §7): dropped on an edge it splits
-   * that tile, in the middle it replaces what's there. The last sheet tile
-   * is never replaced: the window goes beside it instead.
+   * Put a window in a tile (design-v0.3 §7): dropped close to an edge it
+   * splits that tile on that side (v0.5 A64: there's no dropping in the
+   * middle to replace what's there).
    */
   dockWindow(name: string, target: string, zone: DropZone): void {
     let tree = this.syncedTiles();
@@ -325,20 +325,9 @@ export class Editor {
     if (already) tree = removeLeaf(tree, already);
     const at = findLeaf(tree, target);
     if (!at) return;
-    const sheets = leaves(tree).filter((l) => l.content.type === "sheet");
-    let z = zone;
-    if (z === "middle" && at.content.type === "sheet" && sheets.length <= 1) z = "right";
-    // A window replaced by this one closes.
-    if (z === "middle" && at.content.type === "window") this.open[at.content.name] = false;
-    tree = dropOn(tree, target, z, { kind: "leaf", id: tileId(), content: { type: "window", name } });
+    tree = dropOn(tree, target, zone, { kind: "leaf", id: tileId(), content: { type: "window", name } });
     this.tiles = tree;
     this.open[name] = true;
-    if (z === "middle" && target === this.activeTile) {
-      const next = leaves(tree).find((l) => l.content.type === "sheet")!;
-      this.activeTile = next.id;
-      this.selection = [];
-      this.setPage(next.content.type === "sheet" ? next.content.pageId : this.pageId);
-    }
   }
 
   /** Take a window out of its tile: it floats again. */

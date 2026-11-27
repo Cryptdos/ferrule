@@ -24,7 +24,7 @@ export interface TileSplit {
 }
 export type TileNode = TileLeaf | TileSplit;
 /** Where something dropped on a tile goes: one of its edges (splitting it) or its middle (replacing it). */
-export type DropZone = "left" | "right" | "top" | "bottom" | "middle";
+export type DropZone = "left" | "right" | "top" | "bottom";
 
 let counter = 0;
 export const tileId = (): string => `t${Date.now().toString(36)}${(counter++).toString(36)}`;
@@ -59,11 +59,8 @@ export function splitLeaf(root: TileNode, id: string, dir: "row" | "col", leaf: 
   return replace(root, id, split);
 }
 
-/** Drop a leaf onto a tile: an edge splits it, the middle replaces what's there. */
+/** Drop a leaf onto an edge of a tile: it splits the tile on that side. */
 export function dropOn(root: TileNode, targetId: string, zone: DropZone, leaf: TileLeaf): TileNode {
-  if (zone === "middle") {
-    return findLeaf(root, targetId) ? replace(root, targetId, leaf) : root;
-  }
   const dir = zone === "left" || zone === "right" ? "row" : "col";
   return splitLeaf(root, targetId, dir, leaf, zone === "left" || zone === "top");
 }
@@ -96,16 +93,21 @@ export function setContent(root: TileNode, id: string, content: TileContent): Ti
   return at ? replace(root, id, { ...at, content }) : root;
 }
 
-/** The zone of a tile a point falls in: the outer quarter of each side is an edge, the rest the middle. */
-export function zoneAt(rect: { left: number; top: number; width: number; height: number }, x: number, y: number): DropZone {
-  const fx = (x - rect.left) / Math.max(1, rect.width);
-  const fy = (y - rect.top) / Math.max(1, rect.height);
-  const edges: [DropZone, number][] = [
-    ["left", fx],
-    ["right", 1 - fx],
-    ["top", fy],
-    ["bottom", 1 - fy],
+/** How close to a tile's edge a window has to be to dock there: a band 80 px deep, or a quarter of a small tile. */
+export const DOCK_BAND = 80;
+
+/**
+ * The edge of a tile a point is close to, where a window dropped would dock
+ * (v0.5 A64), or null: anywhere else the window just moves.
+ */
+export function zoneAt(rect: { left: number; top: number; width: number; height: number }, x: number, y: number): DropZone | null {
+  const edges: [DropZone, number, number][] = [
+    ["left", x - rect.left, rect.width],
+    ["right", rect.left + rect.width - x, rect.width],
+    ["top", y - rect.top, rect.height],
+    ["bottom", rect.top + rect.height - y, rect.height],
   ];
-  const [zone, d] = edges.reduce((m, e) => (e[1] < m[1] ? e : m));
-  return d < 0.25 ? zone : "middle";
+  const near = edges.filter(([, d, size]) => d >= 0 && d < Math.min(DOCK_BAND, size / 4));
+  if (!near.length) return null;
+  return near.reduce((m, e) => (e[1] < m[1] ? e : m))[0];
 }
