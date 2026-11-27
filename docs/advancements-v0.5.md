@@ -78,7 +78,7 @@ Decided in discussion. The aim: Ferrule runs the same way on a desk or on one ce
   - Known limits on a central machine: Claude's view of a sheet needs Chrome or Chromium installed there, and its PDF export writes into that machine's `exports` folder.
   - The endpoint is as open as the page: whoever can reach the server can edit drawings through it. Accepted for a server on the home network or VPN.
 
-- [ ] **A11. Linux build.** *Missing. ST-1.* The build script already has a Linux target; CI publishes only the Windows exe. Publish `ferrule-linux` as well, test it end to end, and add a short note on running it as a service (`--host`, `--no-open`).
+- [x] **A11. Linux build.** *Built: PR 120.* *Missing. ST-1.* The build script already has a Linux target; CI publishes only the Windows exe. Publish `ferrule-linux` as well, test it end to end, and add a short note on running it as a service (`--host`, `--no-open`).
 
 - [ ] **A12. Rolling backups.** *Missing. PR-1 to PR-7, ST-8.* Set under *Project…*, per project: **how often** a copy is taken and **how many** are kept. Ferrule keeps dated copies of the project as it's worked on, the oldest going when the count is reached.
   - The copies go in a `Backups` folder beside the project's file. For a project in the projects folder that's `projects\Backups`, next to `Deleted`; for a project kept elsewhere it's beside that file, so the copies follow the project and are picked up by whatever backs up that folder.
@@ -137,7 +137,7 @@ Decided in discussion. The aim: Ferrule runs the same way on a desk or on one ce
 
 ## How builds are delivered (25 Nov 2026)
 
-- [ ] **A22. Builds published automatically.** *Missing. Confirmed 25 Nov 2026.* Each build should be somewhere to pick up, Windows and Linux, with no need to send it at the end of a chat.
+- [x] **A22. Builds published automatically.** *Built: PR 120.* *Missing. Confirmed 25 Nov 2026.* Each build should be somewhere to pick up, Windows and Linux, with no need to send it at the end of a chat.
   - CI puts each build on GitHub's download page for the repo, one entry per version, holding `ferrule-windows-v<version>.zip` and `ferrule-linux-v<version>`. A build is then at `…/releases/tag/v<version>`, and all of them are listed at `…/releases`. Nothing to send.
   - These are **test builds, not releases**. GitHub calls the page *Releases*, but every build goes up marked *pre-release*. A version is only the release when you call it that, and it's then marked as such by hand.
   - Builds are kept, not pruned: old versions stay downloadable, which is what stands in for file compatibility before 1.0.
