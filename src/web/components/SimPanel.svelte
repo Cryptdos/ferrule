@@ -7,6 +7,7 @@
   import type { Editor } from "../editor.svelte";
   import type { Simulator } from "../sim.svelte";
   import { loadText, supplyLoads, usesLoads } from "../../core/supplyload";
+  import { interlockStatus } from "../../core/interlocks";
 
   let { editor, sim, onexpectations }: { editor: Editor; sim: Simulator; onexpectations?: () => void } = $props();
 
@@ -56,6 +57,11 @@
   const loadsOn = $derived(usesLoads(editor.project) ? supplyLoads(editor.project, sim.circuit, s) : null);
   const supplyAt = (id: string) => byId.get(id) ?? viewOf(id);
   const neverBroken = $derived(exps.filter((e) => e.kind === "never" && judged.get(e.id) === "bad"));
+  /** The interlocks, as proved on entering Simulate (v0.5 A75). */
+  const proofs = $derived.by(() => {
+    const st = [...interlockStatus(editor.project, editor.proofs).values()];
+    return { total: st.length, proved: st.filter((x) => x.kind === "proved").length, fails: st.filter((x) => x.kind === "fails").length };
+  });
 </script>
 
 <div class="sim">
@@ -73,6 +79,11 @@
   {#if s.short}<div class="fault">Short circuit: the supply is shorted to 0V through closed contacts.</div>{/if}
   {#if s.unstable}<div class="fault">The circuit doesn't settle: relays chatter.</div>{/if}
   {#each neverBroken as e (e.id)}<div class="fault">{describeExpectation(editor.project, e, list)}: it's happened.</div>{/each}
+  {#if editor.proving}
+    <p class="hint">Proving interlocks: {editor.proving.done + 1} of {editor.proving.total}… <button class="small" onclick={() => editor.cancelProving()}>Cancel</button></p>
+  {:else if proofs.total}
+    <p class="hint" class:bad={!!proofs.fails}>Interlocks: {proofs.proved} of {proofs.total} proved{proofs.fails ? `, ${proofs.fails} fail${proofs.fails === 1 ? "s" : ""} (see Design → To draw)` : ""}.</p>
+  {/if}
   <p class="hint">
     Click switches, selectors and plant outputs on the drawing (outlined in orange). A push button is held while the mouse is
     down (Shift+click holds it until clicked again). Plant inputs turn green when they see what's expected, red when they
@@ -91,7 +102,7 @@
         {#if x.ratingVa}<span class="where">of {loadText(x.ratingVa, x.gives)}</span>{/if}
       </div>
     {/each}
-    {#if loadsOn.undrawn}<p class="hint">{loadsOn.undrawn} part{loadsOn.undrawn === 1 ? " has" : "s have"} no draw set, so count{loadsOn.undrawn === 1 ? "s" : ""} as nothing.</p>{/if}
+    {#if loadsOn.undrawn}<p class="hint">{loadsOn.undrawn} load{loadsOn.undrawn === 1 ? " has" : "s have"} no device, or a device with no draw, so count{loadsOn.undrawn === 1 ? "s" : ""} as nothing.</p>{/if}
   {/if}
 
   {#if devices.length}

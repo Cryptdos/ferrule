@@ -306,7 +306,7 @@ From the notes written into the QA copy of the specification (`v0.4.0-pre Notes\
 - [x] **A64. A window docks only at an edge.** *Built: PR 121.* *Tweak. WN-18. Build 0.4.5.* Found on the build: dragging a window across the middle of the screen lights the whole tile up, as it's ready to be dropped there, when all that was wanted was to move it. Docking becomes splitting only: a window docks when it's dragged close to an edge of a tile, and anywhere else it just moves.
   - Dropping in the middle to replace what's in a tile is given up. On this build it splits the tile anyway, which isn't what WN-18 says.
 
-- [ ] **A65. A new network asks what kind it is.** *Tweak. DE-59, DE-66. Build 0.4.5.* Found on the build: *+ Network* makes a LAN with a switch straight away, when a bus off the controller was wanted, and it had to be deleted and made again. Proposed: it asks the kind first, or the kind is plainly the first thing to set. Also noted: *Place as sheet* adds a sheet at one click, easily pressed by mistake.
+- [x] **A65. A new network asks what kind it is.** *Built: PR 139.* *Tweak. DE-59, DE-66. Build 0.4.5.* Found on the build: *+ Network* makes a LAN with a switch straight away, when a bus off the controller was wanted, and it had to be deleted and made again. Proposed: it asks the kind first, or the kind is plainly the first thing to set. Also noted: *Place as sheet* adds a sheet at one click, easily pressed by mistake.
 
 - [x] **A66. A plant's mark: a picture, or letters you type.** *Built: PR 136.* *Tweak. DE-16. Build 0.4.5. Ruled 27 Nov 2026.* A mark in a plant's view tells you at a glance what kind of thing it is. Today it's a fixed list of nine, and four of those are only a letter in a circle (T, P, H, ΔP), so a CO2 or air quality sensor has nothing to pick.
   - **The list holds pictures only:** None, Fan, Pump, Valve, Damper, Meter, Power supply, Battery. Fan and pump are new, taken from the motor part's pictures; the fan is the one with small blades. Meter stays, as kWh in a box.
@@ -348,7 +348,7 @@ Checks whose intended behaviour was already ruled, where the code shows the buil
 
 - [x] **A74. Copies from *Duplicate ×n* start with no description.** *Built: PR 119.* *Tweak. DE-30. Build 0.4.5. Ruled 26 Nov 2026.* Copies keep the description as it is, so three copies of *Supply fan 1* are all *Supply fan 1*. A copy's description comes out empty, ready to type, since it's always different. Everything else about a copy is as now.
 
-- [ ] **A75. Interlocks are proved on entering Simulate.** *Tweak. DE-74, DE-79, DE-80. Build 0.4.5. Direction ruled 26 Nov 2026.* Proving is a button to remember. It happens by itself when Simulate is entered, for any interlock whose proof is out of date, as long as it doesn't hold Simulate up.
+- [x] **A75. Interlocks are proved on entering Simulate.** *Built: PR 139.* *Tweak. DE-74, DE-79, DE-80. Build 0.4.5. Direction ruled 26 Nov 2026.* Proving is a button to remember. It happens by itself when Simulate is entered, for any interlock whose proof is out of date, as long as it doesn't hold Simulate up.
   - Time *Prove all* on the BMS fixture first. If it's quick, it runs on entering Simulate, and only when the drawing has changed since the last proof. If it's slow, Simulate says which interlocks are stale and proving stays a choice.
   - Only an electrical change (a wire, a part, a link) makes a proof stale. Dragging a label or adding a note doesn't. If the build drops a proof for those, that's fixed here.
   - *Prove* and *Prove all* stay.

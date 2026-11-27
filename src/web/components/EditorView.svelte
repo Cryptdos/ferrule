@@ -31,6 +31,7 @@
   import PlantDialog from "./PlantDialog.svelte";
   import TerminalsDialog from "./TerminalsDialog.svelte";
   import AddModuleMenu from "./AddModuleMenu.svelte";
+  import AddNetworkMenu from "./AddNetworkMenu.svelte";
   import DistributionDialog from "./DistributionDialog.svelte";
   import ExpectationsDialog from "./ExpectationsDialog.svelte";
   import ChecksDialog from "./ChecksDialog.svelte";
@@ -43,7 +44,7 @@
   import DesignTemplatesDialog from "./DesignTemplatesDialog.svelte";
   import SuggestDialog from "./SuggestDialog.svelte";
   import { addDesignPlant, addDesignPoint, addSystem, allocate } from "../../core/design";
-  import { addNetwork, placeNetworkSheet } from "../../core/network";
+  import { placeNetworkSheet } from "../../core/network";
   import { POINTS_COLS, pointsSchedule, toCsv } from "../../core/schedules";
   import Tiles from "./Tiles.svelte";
   import { canvases } from "../canvases";
@@ -138,6 +139,8 @@
       editor.placeSymbol = null;
       editor.selection = [];
       sim = new Simulator($state.snapshot(editor.project) as typeof editor.project);
+      // Interlocks whose proofs are out of date are proved, in the background (v0.5 A75).
+      editor.proveStale();
     }
   }
   $effect(() => () => sim?.stop());
@@ -560,7 +563,7 @@
         <span class="sep"></span>
         {#if editor.designView === "network"}
           <button class="primary" onclick={placeNetwork} title="The network as a sheet at the end of the set, redrawn from the data as networks change">Place as sheet</button>
-          <button onclick={() => editor.apply((p) => void addNetwork(p, "lan"))} title="A network comms plant can be on: a LAN off a switch, or a bus off the controller">+ Network</button>
+          <AddNetworkMenu {editor} />
         {:else if editor.designView === "todraw"}
           <span class="hint">Pick a line and place it: Draft opens with it ready to drop on the sheet.</span>
         {:else if editor.designView === "devices"}

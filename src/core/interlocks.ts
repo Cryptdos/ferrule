@@ -7,7 +7,7 @@
  * expectations are never touched. Simulate proves them as it proves any
  * expectation.
  */
-import { newId, type Condition, type Expectation, type Interlock, type PlantItem, type Project } from "./model";
+import { newId, type Condition, type Element, type Expectation, type Interlock, type IoPoint, type PlantItem, type Project, type Segment } from "./model";
 import { type Circuit, compile, initialState, search, type SimState } from "./sim";
 
 /** The point's ref, as conditions name it. */
@@ -95,12 +95,24 @@ function pointDrawn(project: Project, c: string): string | undefined {
   return shown ? undefined : `${plant.tag || `${plant.prefix || "U"}?`} ${point.name}`;
 }
 
+/** Params that only say how a part is drawn or described: changing one doesn't change the circuit. */
+const DRAWN_ONLY = new Set(["pdesc", "pinfo", "pmark", "pmarkt", "rating", "code", "colour", "align", "width", "show", "terms"]);
+
 /**
- * The drawing as Simulate sees it, as a short key: proofs are for one
- * drawing, and any change to it means proving again.
+ * The circuit as Simulate sees it, as a short key: proofs are for one
+ * circuit, and an electrical change (a wire, a part, a link, a point, an
+ * interlock) means proving again (v0.5 A75). Moving a part or its label,
+ * retagging it, a wire's route or number, a note: none of them do.
  */
 export function circuitKey(project: Project): string {
-  const s = JSON.stringify([project.pages.map((pg) => [pg.elements, pg.segments]), project.plant.map((p) => [p.id, p.terminals, p.points, p.interlocks]), project.conductors, project.distributions]);
+  const part = (e: Element) => [e.id, e.symbol, e.zone, e.links, Object.entries(e.params).filter(([k]) => !DRAWN_ONLY.has(k)).sort(([a], [b]) => a.localeCompare(b))];
+  const wire = (s: Segment) => [s.from, s.to];
+  const point = (q: IoPoint) => [q.name, q.form, q.pins, q.follows, q.join, q.delay];
+  const s = JSON.stringify([
+    project.pages.map((pg) => [pg.elements.map(part), pg.segments.map(wire)]),
+    project.plant.map((p) => [p.id, p.terminals, (p.points ?? []).map(point), p.interlocks, p.module?.commons, p.powerByOthers]),
+    project.distributions.map((d) => [d.id, d.kind]),
+  ]);
   let h = 0x811c9dc5;
   for (let i = 0; i < s.length; i++) {
     h ^= s.charCodeAt(i);
