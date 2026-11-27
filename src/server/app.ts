@@ -80,10 +80,11 @@ export function createApp({ storage, library, designs, devices, assets, version 
 
   app.get("/api/projects", async (c) => c.json(await storage.list()));
 
+  // A new project is made from a file name, and nothing else (v0.5 A17).
   app.post("/api/projects", async (c) => {
     const body = await c.req.json().catch(() => ({}));
-    const title = typeof body?.title === "string" ? body.title : "Untitled project";
-    return c.json(await storage.create(title, { useDeviceLibrary: body?.useDeviceLibrary !== false }), 201);
+    const name = typeof body?.name === "string" ? body.name : "";
+    return c.json(await storage.create(name, { useDeviceLibrary: body?.useDeviceLibrary !== false }), 201);
   });
 
   // Files anywhere: open, save as, duplicate, delete, and a folder browser for picking them.
@@ -97,7 +98,11 @@ export function createApp({ storage, library, designs, devices, assets, version 
     if (typeof body?.path !== "string") return c.json({ error: "No path given" }, 400);
     return c.json({ id: await storage.saveAs(c.req.param("id"), body.path, body.overwrite === true) });
   });
-  app.post("/api/projects/:id/duplicate", async (c) => c.json({ id: await storage.duplicate(c.req.param("id")) }, 201));
+  // A copy asks for its name (v0.5 A8).
+  app.post("/api/projects/:id/duplicate", async (c) => {
+    const body = await c.req.json().catch(() => ({}));
+    return c.json({ id: await storage.duplicate(c.req.param("id"), typeof body?.name === "string" ? body.name : "") }, 201);
+  });
   app.delete("/api/projects/:id", async (c) => {
     await storage.remove(c.req.param("id"), c.req.query("file") === "1");
     return c.json({ ok: true });
@@ -105,7 +110,8 @@ export function createApp({ storage, library, designs, devices, assets, version 
   app.get("/api/projects/:id/file", async (c) => {
     const id = c.req.param("id");
     const project = await storage.load(id);
-    const name = fileName(project.project.title || id) + ".ferrule";
+    // Downloaded under its own file name (v0.5 A17).
+    const name = storage.fileName(id) + ".ferrule";
     return new Response(JSON.stringify(stampSaved(project), null, 1), {
       headers: { "content-type": "application/json", "content-disposition": `attachment; filename="${name}"`, "cache-control": "no-store" },
     });
@@ -116,6 +122,7 @@ export function createApp({ storage, library, designs, devices, assets, version 
     const id = c.req.param("id");
     const project = await storage.load(id);
     c.header("x-ferrule-version", storage.version(id));
+    c.header("x-ferrule-file", encodeURIComponent(storage.fileName(id)));
     return c.json(project);
   });
 
@@ -161,7 +168,7 @@ export function createApp({ storage, library, designs, devices, assets, version 
     const project = await storage.load(id);
     if (!pdf || !selfUrl) throw new PdfError("PDF export isn't available on this server");
     const bytes = await pdf.render(`${selfUrl()}/print/${encodeURIComponent(id)}`);
-    const name = fileName(project.project.drawingNo || project.project.title || id) + ".pdf";
+    const name = fileName(project.project.drawingNo || project.project.title || storage.fileName(id)) + ".pdf";
     return new Response(new Blob([bytes as Uint8Array<ArrayBuffer>]), {
       headers: {
         "content-type": "application/pdf",
@@ -178,10 +185,8 @@ export function createApp({ storage, library, designs, devices, assets, version 
       const make = examples[c.req.param("name")];
       if (!make) return c.json({ error: "No such example" }, 404);
       const project = await make();
-      const created = await storage.create(project.project.title);
-      project.id = created.id;
-      await storage.save(created.id, project);
-      return c.json({ id: created.id }, 201);
+      // Under its own name, so adding it a second time is refused as any taken name is (v0.5 A8).
+      return c.json({ id: await storage.add(c.req.param("name").toUpperCase(), project) }, 201);
     });
   }
 

@@ -518,7 +518,8 @@
   <header>
     <div class="row one">
       <button class="icon" onclick={onclose} title="Back to the project list"><Icon name="projects" /></button>
-      <strong class="title" title={editor.project.project.title}>{editor.project.project.title}</strong>
+      <!-- The file's name, with the title beside it once there is one (v0.5 A17). -->
+      <strong class="title" title={[editor.fileName, editor.project.project.title].filter(Boolean).join(": ")}>{editor.fileName || editor.project.project.title}{#if editor.fileName && editor.project.project.title}<span class="sub"> {editor.project.project.title}</span>{/if}</strong>
       <div class="workbench" role="group" aria-label="Workbench">
         <LabelButton icon="design" label="Design" active={editor.mode === "design"} onclick={() => setMode("design")}
           title="What the panel has: systems, plant and points, the controller. Nothing is drawn here" />
@@ -689,7 +690,7 @@
 {#if savingAs}
   <FileBrowser
     mode="save"
-    initialName={editor.project.project.title}
+    initialName={editor.fileName || editor.project.project.title}
     onpick={(path, replace) => void saveAs(path, replace)}
     onclose={() => (savingAs = false)}
   />
@@ -954,5 +955,9 @@
     border-radius: 4px;
     font-size: 13px;
     z-index: 30;
+  }
+  .title .sub {
+    font-weight: normal;
+    color: #667;
   }
 </style>

@@ -68,7 +68,7 @@ Decided in discussion. The aim: Ferrule runs the same way on a desk or on one ce
 
 - ~~**A7. The file is named after the project.**~~ *Withdrawn 25 Nov 2026.* The file keeps the name it's given today: the project's name made safe for a file name (lower case, hyphens, 48 characters at most), set when the project is created.
 
-- [ ] **A8. No second project by the same name.** *Tweak. ST-5, ST-8. Build 0.4.5.* Creating a project whose file name is already in the projects folder isn't done: *A file by that name already exists*. Today the second file is quietly numbered (`-2`).
+- [x] **A8. No second project by the same name.** *Built: PR 141.* *Tweak. ST-5, ST-8. Build 0.4.5.* Creating a project whose file name is already in the projects folder isn't done: *A file by that name already exists*. Today the second file is quietly numbered (`-2`).
   - Names are compared as file names, so `LSP 01` and `lsp-01` are the same.
   - It follows that adding the LSP-01 example a second time is refused the same way.
   - *Duplicate* asks for the copy's name. A copy is made for a reason, and its name says what that is. Today it makes `<name> copy` without asking.
@@ -97,7 +97,7 @@ Decided in discussion. The aim: Ferrule runs the same way on a desk or on one ce
   - It's on the list, not under *Project…*: those settings are what's inside the file, and the file's name isn't. Renaming from the list also avoids renaming a file out from under the editor that has it open.
   - The project's backups (A12) are renamed with it, so they aren't left behind.
 
-- [ ] **A17. A project is created from a file name.** *Tweak. ST-5. Build 0.4.5.* Today *Create project* asks for a title, and the file's name is worked out from it behind the scenes. Instead it asks for the **file name**, and that's all it needs. The project's title, with the rest of its details, is entered under *Project…* once it exists. What you type is the file you get, as *Save as…*, *Duplicate* (A8) and *Restore* (A16) already work or will.
+- [x] **A17. A project is created from a file name.** *Built: PR 141.* *Tweak. ST-5. Build 0.4.5.* Today *Create project* asks for a title, and the file's name is worked out from it behind the scenes. Instead it asks for the **file name**, and that's all it needs. The project's title, with the rest of its details, is entered under *Project…* once it exists. What you type is the file you get, as *Save as…*, *Duplicate* (A8) and *Restore* (A16) already work or will.
   - What follows: a new project has no title, so the project list and the top bar show the file name, with the title beside it once there is one. The title block's *Project* cell is empty until it's filled in.
   - Any legal file name is allowed and kept exactly as typed, capitals and spaces included, as in any other program. A name that isn't legal is refused with the reason, not quietly changed.
   - This replaces today's lower-case-and-hyphens naming for new files. Existing files keep their names.

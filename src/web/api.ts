@@ -10,6 +10,8 @@ export interface LibraryEntry {
 
 export interface ProjectSummary {
   id: string;
+  /** Its file's name, as typed (v0.5 A17). */
+  name: string;
   title: string;
   pages: number;
   modified: string;
@@ -77,11 +79,12 @@ export const api = {
   open: (path: string) => call<{ id: string }>("/api/projects/open", { method: "POST", body: JSON.stringify({ path }) }),
   saveAs: (id: string, path: string, overwrite = false) =>
     call<{ id: string }>(`/api/projects/${encodeURIComponent(id)}/save-as`, { method: "POST", body: JSON.stringify({ path, overwrite }) }),
-  duplicate: (id: string) => call<{ id: string }>(`/api/projects/${encodeURIComponent(id)}/duplicate`, { method: "POST" }),
+  duplicate: (id: string, name: string) => call<{ id: string }>(`/api/projects/${encodeURIComponent(id)}/duplicate`, { method: "POST", body: JSON.stringify({ name }) }),
   /** Delete moves the file to the Deleted folder; without `file`, a file from elsewhere just leaves the list. */
   remove: (id: string, file: boolean) => call<{ ok: true }>(`/api/projects/${encodeURIComponent(id)}${file ? "?file=1" : ""}`, { method: "DELETE" }),
-  create: (title: string, useDeviceLibrary = true) =>
-    call<Project>("/api/projects", { method: "POST", body: JSON.stringify({ title, useDeviceLibrary }) }),
+  /** A new project from a file name (v0.5 A17). */
+  create: (name: string, useDeviceLibrary = true) =>
+    call<Project>("/api/projects", { method: "POST", body: JSON.stringify({ name, useDeviceLibrary }) }),
   devices: {
     list: () => call<DeviceEntry[]>("/api/devices"),
     add: (d: Partial<DeviceEntry>) => call<DeviceEntry>("/api/devices", { method: "POST", body: JSON.stringify(d) }),
@@ -102,13 +105,13 @@ export const api = {
       call<DeviceEntry>(`/api/devices/${encodeURIComponent(id)}/files/${encodeURIComponent(name)}`, { method: "DELETE" }),
     fileUrl: (id: string, name: string) => `/api/devices/${encodeURIComponent(id)}/files/${encodeURIComponent(name)}`,
   },
-  load: async (id: string): Promise<{ project: Project; version: string }> => {
+  load: async (id: string): Promise<{ project: Project; version: string; file: string }> => {
     const res = await fetch(`/api/projects/${encodeURIComponent(id)}`);
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
       throw new Error(body.error ?? `${res.status} ${res.statusText}`);
     }
-    return { project: await res.json(), version: res.headers.get("x-ferrule-version") ?? "" };
+    return { project: await res.json(), version: res.headers.get("x-ferrule-version") ?? "", file: decodeURIComponent(res.headers.get("x-ferrule-file") ?? "") };
   },
   /** Save; `version` is what we last loaded or saved. Throws ConflictError if someone else saved since. */
   save: async (project: Project, version: string): Promise<string> => {

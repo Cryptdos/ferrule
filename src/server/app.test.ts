@@ -20,21 +20,27 @@ const json = (body: unknown) => ({ method: "POST", body: JSON.stringify(body), h
 
 describe("project API", () => {
   test("create, list, load, save", async () => {
-    const created = await (await app.request("/api/projects", json({ title: "Fan Panel" }))).json();
+    const created = await (await app.request("/api/projects", json({ name: "Fan Panel" }))).json();
     expect(created.id).toBe("fan-panel");
 
-    const again = await (await app.request("/api/projects", json({ title: "Fan Panel" }))).json();
-    expect(again.id).toBe("fan-panel-2");
+    // A name already taken is refused, compared as file names (v0.5 A8).
+    const again = await app.request("/api/projects", json({ name: "fan-panel" }));
+    expect(again.status).toBe(409);
+    expect((await again.json()).error).toMatch(/A file by that name already exists/);
+    expect((await app.request("/api/projects", json({ name: "Fan: Panel" }))).status).toBe(400);
+    await app.request("/api/projects", json({ name: "Fan Panel 2" }));
 
     const list = await (await app.request("/api/projects")).json();
     expect(list.map((p: { id: string }) => p.id).sort()).toEqual(["fan-panel", "fan-panel-2"]);
+    expect(list.map((p: { name: string }) => p.name).sort()).toEqual(["Fan Panel", "Fan Panel 2"]);
+    expect(await readdir(dir)).toContain("Fan Panel.ferrule");
 
     created.project.client = "ACME";
     const put = await app.request("/api/projects/fan-panel", { method: "PUT", body: JSON.stringify(created) });
     expect(put.status).toBe(200);
     const loaded = await (await app.request("/api/projects/fan-panel")).json();
     expect(loaded.project.client).toBe("ACME");
-    expect(await readdir(dir)).toContain("fan-panel.ferrule.bak");
+    expect(await readdir(dir)).toContain("Fan Panel.ferrule.bak");
   });
 
   test("rejects bad ids, bad data and mismatched ids", async () => {
@@ -127,7 +133,7 @@ describe("project files anywhere", () => {
   test("save as, open, list, duplicate, delete, browse", async () => {
     const elsewhere = await mkdtemp(join(tmpdir(), "ferrule-elsewhere-"));
     try {
-      const created = await (await app.request("/api/projects", json({ title: "Kitchen Panel" }))).json();
+      const created = await (await app.request("/api/projects", json({ name: "Kitchen Panel" }))).json();
       // Save As puts a copy somewhere else and gives it its own id.
       const saved = await (await app.request(`/api/projects/${created.id}/save-as`, json({ path: join(elsewhere, "Kitchen") }))).json();
       expect(saved.id).toMatch(/^kitchen-[0-9a-f]{6}$/);
@@ -145,7 +151,12 @@ describe("project files anywhere", () => {
       const listing = await (await app.request(`/api/browse?path=${encodeURIComponent(elsewhere)}`)).json();
       expect(listing.files.map((f: { name: string }) => f.name)).toEqual(["Kitchen.ferrule"]);
       // Duplicate, then delete: the file moves to Deleted, not destroyed.
-      const dup = await (await app.request(`/api/projects/${created.id}/duplicate`, { method: "POST" })).json();
+      // Duplicate asks for the copy's name (v0.5 A8): none, or one taken, is refused.
+      expect((await app.request(`/api/projects/${created.id}/duplicate`, { method: "POST" })).status).toBe(400);
+      expect((await app.request(`/api/projects/${created.id}/duplicate`, json({ name: "kitchen panel" }))).status).toBe(409);
+      const dup = await (await app.request(`/api/projects/${created.id}/duplicate`, json({ name: "Kitchen Panel, rev B" }))).json();
+      expect(dup.id).toBe("kitchen-panel-rev-b");
+      expect(await readdir(dir)).toContain("Kitchen Panel, rev B.ferrule");
       expect((await app.request(`/api/projects/${dup.id}?file=1`, { method: "DELETE" })).status).toBe(200);
       expect((await readdir(join(dir, "Deleted"))).filter((f) => f.endsWith(".ferrule"))).toHaveLength(1);
       // Removing one from elsewhere from the list leaves its file alone.
@@ -194,7 +205,7 @@ describe("device library", () => {
   });
 
   test("a new project can leave the library out", async () => {
-    const created = await (await app.request("/api/projects", json({ title: "No lib", useDeviceLibrary: false }))).json();
+    const created = await (await app.request("/api/projects", json({ name: "No lib", useDeviceLibrary: false }))).json();
     expect(created.useDeviceLibrary).toBe(false);
   });
 });
@@ -202,7 +213,7 @@ describe("device library", () => {
 describe("save as", () => {
   test("refuses to replace a file unless asked, and keeps the old one as .bak", async () => {
     const { existsSync } = await import("node:fs");
-    const p = await (await app.request("/api/projects", json({ title: "Save as test" }))).json();
+    const p = await (await app.request("/api/projects", json({ name: "Save as test" }))).json();
     const target = join(dir, "elsewhere", "copy.ferrule");
     const post = (overwrite?: boolean) => app.request(`/api/projects/${p.id}/save-as`, json({ path: target, ...(overwrite ? { overwrite } : {}) }));
     expect((await post()).status).toBe(200);
@@ -220,9 +231,9 @@ describe("v0.5 step 1: the project list", () => {
       await storage.init();
       const p = await storage.create("Pump room");
       await storage.save(p.id, p);
-      expect(await readdir(d)).toContain(`${p.id}.ferrule.bak`);
+      expect(await readdir(d)).toContain("Pump room.ferrule.bak");
       await storage.remove(p.id, true);
-      expect((await readdir(d)).filter((f) => f.startsWith(p.id))).toEqual([]);
+      expect((await readdir(d)).filter((f) => f.startsWith("Pump room"))).toEqual([]);
       const bin = await readdir(join(d, "Deleted"));
       expect(bin.filter((f) => f.endsWith(".ferrule"))).toHaveLength(1);
       expect(bin.filter((f) => f.endsWith(".ferrule.bak"))).toEqual([`${bin.find((f) => f.endsWith(".ferrule"))}.bak`]);

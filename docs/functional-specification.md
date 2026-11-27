@@ -84,12 +84,12 @@ IDs are kept when the document is revised: a withdrawn statement is struck throu
   | `library/design` | Design templates |
   | `exports` (beside `projects`) | PDFs exported by Claude over MCP |
 
-- **ST-5** ~~*Create project* with a title makes a project and opens it.~~ *(v0.5: A17)* A new project is bare: one empty schematic sheet titled *Sheet 1*, revision A *First issue*, position numbering, no distributions, plant, controller or templates. It's dated the day it's made: its *Drawn date* and revision A's date.
+- **ST-5** *Create project* asks for the project's **file name**, and nothing else, makes the project and opens it. The name is kept exactly as typed, capitals and spaces included, as the file `<name>.ferrule` in the projects folder. A name that isn't legal is refused with the reason, not changed: Windows' rules apply on every machine, so none of `\ / : * ? " < > |`, no ending in a space or full stop, and not a name Windows keeps (CON, NUL, COM1…). A name already in the projects folder is refused: *A file by that name already exists*. Names are compared as file names, by letters and digits whatever their case, so `LSP 01` and `lsp-01` are the same. A new project is bare: one empty schematic sheet titled *Sheet 1*, revision A *First issue*, position numbering, no distributions, plant, controller or templates. It's dated the day it's made: its *Drawn date* and revision A's date. It has no title: that, with the rest of its details, is entered under *Project…*, and the title block's *Project* cell is empty until then.
 - **ST-6** *Use the shared device library for GA sheets* (ticked by default) decides whether the new project's device table offers library devices. It can be changed later under *Project…*.
 - **ST-7** *Open file…* browses folders and lists `.ferrule` files; clicking one opens it. The file stays where it is and is remembered on the project list, shown with its path.
-- **ST-8** Each project on the list shows its title, sheet count and when it was saved, with ~~*Duplicate* (a copy beside it)~~ *(v0.5: A8)*, *Download* (the `.ferrule` file) and *Delete* (the file moves to `projects/Deleted`, its `.bak` with it). A file opened from elsewhere also has *Remove from list*, which leaves the file alone.
+- **ST-8** Each project on the list shows its file name, with its title beside it once there is one, its sheet count and when it was saved, with *Duplicate…* (asks for the copy's file name, taken and illegal names refused as in ST-5, and makes the copy in the projects folder), *Download* (the `.ferrule` file, under its own name) and *Delete* (the file moves to `projects/Deleted`, its `.bak` with it). A file opened from elsewhere also has *Remove from list*, which leaves the file alone.
 - **ST-9** A project file that can't be read is listed with its error; the rest of the list still loads.
-- **ST-10** *add the LSP-01 example* adds a life safety panel, drawn with Ferrule's own tools, to the list.
+- **ST-10** *add the LSP-01 example* adds a life safety panel, drawn with Ferrule's own tools, to the list, as `LSP-01.ferrule`. Adding it again is refused as a taken name is.
 - **ST-11** A project opens in Draft, on one tile.
 - **ST-12** Saving is automatic. After a change the status at the top right reads *Unsaved changes*, then *Saving…*, then *Saved*, within about a second. *Save failed* shows in red if it can't be written.
 - **ST-13** Nothing needs saving by hand on any workbench. `Ctrl+S` also saves at once in Design, Draft and Annotate; nothing depends on it.
@@ -101,6 +101,7 @@ IDs are kept when the document is revised: a withdrawn statement is struck throu
 - **ST-19** Undo and redo cover the last 200 changes in the open session. An align or distribute, a Renumber *Apply* and a Suggest *Accept ticked* are each one step.
 - **ST-20** Builds are on the repository's releases page, one entry for each, named `v<version>` and marked pre-release, holding `ferrule-windows-v<version>.zip` and `ferrule-linux-v<version>`. A build is made only when asked for, by running *Publish a build* by hand; nothing is published on a merge, and a version already published is refused. Old builds stay there.
 - **ST-21** `ferrule-linux` is the same program for Linux. Started with `--host 0.0.0.0 --no-open`, it serves Ferrule to any browser that can reach the machine, with no browser of its own.
+- **ST-22** An open project's top bar shows its file name, with its title beside it once there is one. *Save as…* starts from the file name. Claude's *create_project* takes the file name the same way.
 
 ---
 

@@ -35,7 +35,7 @@ An open editor tab follows changes Claude makes: it reloads the project and says
 
 | Tool | What it does |
 |---|---|
-| `list_projects`, `create_project`, `project_info`, `update_project_info` | Projects, title block fields, numbering scheme |
+| `list_projects`, `create_project`, `project_info`, `update_project_info` | Projects (`create_project` takes the file name, kept as given; a taken name is refused), title block fields, numbering scheme |
 | `list_symbols` | Symbol ids, settings and terminal names |
 | `get_page` | Everything on a sheet, with terminal positions and wire numbers |
 | `view_page` | A PNG of a sheet as it prints (needs Edge or Chrome) |

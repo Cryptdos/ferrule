@@ -8,7 +8,10 @@
   let projects: ProjectSummary[] = $state([]);
   let loading = $state(true);
   let error = $state("");
-  let title = $state("");
+  /** The new project's file name (v0.5 A17). */
+  let name = $state("");
+  /** A row asking for a name: a copy's (A8). */
+  let asking: { id: string; kind: "duplicate"; value: string } | null = $state(null);
   let browsing = $state(false);
 
   async function openFile(path: string) {
@@ -23,8 +26,8 @@
   async function del(p: ProjectSummary) {
     const what =
       p.where === "projects"
-        ? `Delete "${p.title}"? Its file moves to the Deleted folder inside the projects folder, so it can be got back.`
-        : `Delete the file for "${p.title}"?\n${p.path}\nIt moves to the Deleted folder inside the projects folder.`;
+        ? `Delete "${p.name}"? Its file moves to the Deleted folder inside the projects folder, so it can be got back.`
+        : `Delete the file for "${p.name}"?\n${p.path}\nIt moves to the Deleted folder inside the projects folder.`;
     if (!confirm(what)) return;
     try {
       await api.remove(p.id, true);
@@ -43,12 +46,20 @@
     }
   }
 
-  async function duplicate(p: ProjectSummary) {
+  /** A copy asks for its name: a copy is made for a reason, and its name says what (A8). */
+  function duplicate(p: ProjectSummary) {
+    asking = { id: p.id, kind: "duplicate", value: `${p.name} copy` };
+  }
+  async function answer(e: SubmitEvent) {
+    e.preventDefault();
+    const a = asking;
+    if (!a) return;
     try {
-      await api.duplicate(p.id);
+      if (a.kind === "duplicate") await api.duplicate(a.id, a.value.trim());
+      asking = null;
       await refresh();
-    } catch (e) {
-      error = (e as Error).message;
+    } catch (err) {
+      error = (err as Error).message;
     }
   }
 
@@ -81,7 +92,7 @@
   async function create(e: SubmitEvent) {
     e.preventDefault();
     try {
-      const p = await api.create(title.trim() || "Untitled project", useLibrary);
+      const p = await api.create(name.trim(), useLibrary);
       onopen(p.id);
     } catch (err) {
       error = (err as Error).message;
@@ -92,8 +103,8 @@
 <div class="picker">
   <h1><img src={logo} alt="" width="40" height="40" /> Ferrule</h1>
   <form onsubmit={create}>
-    <input bind:value={title} placeholder="New project title" />
-    <button type="submit">Create project</button>
+    <input bind:value={name} placeholder="New project's file name" title="What you type is the file you get, capitals and spaces included (none of \ / : * ? &quot; < > |). Its title and the rest of the title block go in Project… once it's made" />
+    <button type="submit" disabled={!name.trim()}>Create project</button>
     <button type="button" onclick={() => (browsing = true)} title="Open a .ferrule file from any folder">Open file…</button>
   </form>
   <label class="uselib" title="GA sheets can take device sizes, datasheets and pictures from the shared device library. Untick to start this project's device table from scratch.">
@@ -114,20 +125,27 @@
         <li>
           {#if p.error}
             <div class="open refused" title={p.path}>
-              <strong>{p.title}</strong>
+              <strong>{p.name}</strong>
               <span>{p.error}</span>
               <span class="path">{p.path}</span>
             </div>
           {:else}
             <button class="open" onclick={() => onopen(p.id)} title={p.path}>
-              <strong>{p.title}</strong>
+              <strong>{p.name}{#if p.title}<span class="ttl">{p.title}</span>{/if}</strong>
               <span>{p.pages} {p.pages === 1 ? "sheet" : "sheets"} · saved {new Date(p.modified).toLocaleString()}</span>
               <span class="path">{p.path}</span>
             </button>
           {/if}
+          {#if asking?.id === p.id}
+            <form class="ask" onsubmit={answer}>
+              <input bind:value={asking.value} aria-label="The copy's file name" />
+              <button type="submit" class="primary">Make the copy</button>
+              <button type="button" onclick={() => (asking = null)}>Cancel</button>
+            </form>
+          {/if}
           <div class="actions">
             {#if !p.error}
-              <button onclick={() => duplicate(p)} title="Make a copy beside it">Duplicate</button>
+              <button onclick={() => duplicate(p)} title="A copy in the projects folder, under a name you give it">Duplicate…</button>
               <a class="button" href={`/api/projects/${encodeURIComponent(p.id)}/file`} download title="Download the .ferrule file">Download</a>
             {/if}
             {#if p.where === "elsewhere"}
@@ -145,6 +163,25 @@
 {/if}
 
 <style>
+  .ttl {
+    margin-left: 0.6em;
+    font-weight: normal;
+    color: #667;
+  }
+  .ask {
+    display: flex;
+    flex-basis: 100%;
+    order: 3;
+    gap: 6px;
+    align-items: center;
+    margin: 0 0 4px;
+  }
+  .ask input {
+    flex: 1;
+  }
+  .ask input {
+    flex: 1;
+  }
   .refused {
     opacity: 0.6;
     cursor: default;
@@ -206,6 +243,7 @@
   }
   li {
     display: flex;
+    flex-wrap: wrap;
     gap: 6px;
     align-items: stretch;
   }
