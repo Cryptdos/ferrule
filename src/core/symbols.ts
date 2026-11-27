@@ -89,6 +89,8 @@ export interface ParamDef {
   when?: (el: Element, project?: Project) => boolean;
   /** Not shown at all when it doesn't apply (v0.5 A36, A37), rather than greyed out. */
   hideOff?: boolean;
+  /** The choices that are valid for this element as it's set (v0.5 A41); `options` holds them all. */
+  optionsFor?: (el: Element) => { value: string; label: string }[];
   /** What it reads as when it doesn't apply. */
   fixed?: string;
   /** An example of the format to follow, shown greyed in an empty box. */
@@ -331,14 +333,56 @@ function timingMark(mid: Vec, ax: number, fn: string): Prim[] {
  * poles closed in 0; a changeover (11 common) makes 11–12 in one position
  * and 11–14 in another (0 and I on a 2 position switch, I and II on a 3).
  */
-const SELECTOR_POLE_OPTIONS = [
-  { value: "I", label: "NO, closed in I" },
-  { value: "II", label: "NO, closed in II (3 position)" },
-  { value: "I+II", label: "NO, closed in I and II (3 position)" },
-  { value: "nc-I", label: "NC, opened in I" },
-  { value: "nc-II", label: "NC, opened in II (3 position)" },
-  { value: "co", label: "Changeover (2 position: 12 in 0, 14 in I; 3 position: 2–3 in I, open in 0, 2–1 in II)" },
-];
+/** How many positions a selector has (v0.5 A46): 2 (0–I), 3 (I–0–II) or 4 (1–2–3–4, no off). */
+export type SelectorPositions = "2" | "3" | "4";
+export function selectorPositions(el: Element): SelectorPositions {
+  const v = el.params.positions;
+  return v === "3" || v === "4" ? v : "2";
+}
+/** Each pole's choices, only those that fit the positions (v0.5 A41). Changeover is a setting of the whole switch (A43). */
+const POLE_CHOICES: Record<SelectorPositions, { value: string; label: string }[]> = {
+  "2": [
+    { value: "I", label: "NO, closed in I" },
+    { value: "nc-I", label: "NC, opened in I" },
+  ],
+  "3": [
+    { value: "I", label: "NO, closed in I" },
+    { value: "II", label: "NO, closed in II" },
+    { value: "I+II", label: "NO, closed in I and II" },
+    { value: "nc-I", label: "NC, opened in I" },
+    { value: "nc-II", label: "NC, opened in II" },
+  ],
+  // Closed in exactly one position: a pole closed in two would defeat the switch (A46).
+  "4": [
+    { value: "p1", label: "Closed in 1" },
+    { value: "p2", label: "Closed in 2" },
+    { value: "p3", label: "Closed in 3" },
+    { value: "p4", label: "Closed in 4" },
+  ],
+};
+const SELECTOR_POLE_OPTIONS = [...POLE_CHOICES["3"], ...POLE_CHOICES["4"]];
+/** A pole's choice when it has none that fits: closed in I (II for pole 2 of a 3 position), or in position k on a 4. */
+function poleDefault(pos: SelectorPositions, k: number): string {
+  return pos === "4" ? `p${k}` : pos === "3" && k === 2 ? "II" : "I";
+}
+/** Every pole a changeover (v0.5 A43): ticked on the whole switch, never on a 4 position. */
+export function selectorChangeover(el: Element): boolean {
+  return el.params.changeover === true && selectorPositions(el) !== "4";
+}
+/**
+ * A selector's settings tidied after a change (v0.5 A41): a pole on a
+ * choice its positions don't have goes back to the default, and a 4
+ * position selector isn't a changeover.
+ */
+export function tidySelector(params: Record<string, ParamValue>): void {
+  const pos: SelectorPositions = params.positions === "3" || params.positions === "4" ? params.positions : "2";
+  if (pos === "4") delete params.changeover;
+  for (let k = 1; k <= 4; k++) {
+    const v = params[`pole${k}`];
+    if (v !== undefined && !POLE_CHOICES[pos].some((o) => o.value === v)) delete params[`pole${k}`];
+  }
+}
+
 
 /**
  * A changeover pole's terminals (v0.2.1 note 23). On a 2-position switch,
@@ -353,10 +397,16 @@ export function changeoverTerms(k: number, three: boolean): { com: string; first
   return { com: String(b + 2), first: String(b + 3), second: String(b + 1) };
 }
 
-/** A selector's position names in the order they're drawn: I, 0, II on a 3-position switch; 0, I on a 2. */
+/**
+ * A selector's position names in the order they're drawn, with the index
+ * Simulate uses for each: I, 0, II on a 3-position switch; 0, I on a 2;
+ * 1, 2, 3, 4 on a 4 (indexes 0 to 3, named by pos1 to pos4).
+ */
 export function selectorNames(el: Element): { pos: number; name: string }[] {
-  const three = el.params.positions === "3";
+  const pos = selectorPositions(el);
+  const three = pos === "3";
   const nm = (i: number, d: string) => String(el.params[`pos${i}`] ?? "").trim() || d;
+  if (pos === "4") return [1, 2, 3, 4].map((n) => ({ pos: n - 1, name: nm(n, String(n)) }));
   return three
     ? [
         { pos: 1, name: nm(1, "I") },
@@ -371,7 +421,7 @@ export function selectorNames(el: Element): { pos: number; name: string }[] {
 
 export interface SelectorPole {
   kind: "no" | "nc" | "co";
-  /** Positions (0, 1 = I, 2 = II) in which it's closed; for a changeover, those making 11–14. */
+  /** Positions (0, 1 = I, 2 = II; on a 4 position, 0 to 3 for 1 to 4) in which it's closed; for a changeover, those making 11–14. */
   closed: number[];
   /** A changeover's positions making 11–12. */
   closed12?: number[];
@@ -379,17 +429,23 @@ export interface SelectorPole {
 
 /** A selector's poles, as set up. */
 export function selectorPoles(el: Element): SelectorPole[] {
-  const three = el.params.positions === "3";
+  const pos = selectorPositions(el);
+  const three = pos === "3";
+  const co = selectorChangeover(el);
   const n = Math.max(1, Math.min(4, typeof el.params.poles === "number" ? el.params.poles : 1));
   const out: SelectorPole[] = [];
   for (let i = 1; i <= n; i++) {
-    const v = String(el.params[`pole${i}`] ?? (i === 2 ? "II" : "I"));
-    const usable = three || !v.includes("II") ? v : v === "nc-II" ? "nc-I" : "I";
-    if (usable === "co") out.push(three ? { kind: "co", closed: [2], closed12: [1] } : { kind: "co", closed: [1], closed12: [0] });
-    else if (usable === "nc-I") out.push({ kind: "nc", closed: three ? [0, 2] : [0] });
-    else if (usable === "nc-II") out.push({ kind: "nc", closed: [0, 1] });
-    else if (usable === "II") out.push({ kind: "no", closed: [2] });
-    else if (usable === "I+II") out.push({ kind: "no", closed: [1, 2] });
+    if (co) {
+      out.push(three ? { kind: "co", closed: [2], closed12: [1] } : { kind: "co", closed: [1], closed12: [0] });
+      continue;
+    }
+    const set = String(el.params[`pole${i}`] ?? "");
+    const v = POLE_CHOICES[pos].some((o) => o.value === set) ? set : poleDefault(pos, i);
+    if (pos === "4") out.push({ kind: "no", closed: [Number(v.slice(1)) - 1] });
+    else if (v === "nc-I") out.push({ kind: "nc", closed: three ? [0, 2] : [0] });
+    else if (v === "nc-II") out.push({ kind: "nc", closed: [0, 1] });
+    else if (v === "II") out.push({ kind: "no", closed: [2] });
+    else if (v === "I+II") out.push({ kind: "no", closed: [1, 2] });
     else out.push({ kind: "no", closed: [1] });
   }
   return out;
@@ -642,7 +698,7 @@ const SYMBOLS: SymbolDef[] = [
   },
   {
     id: "selector",
-    name: "Selector / keyswitch",
+    name: "Selector",
     group: "Operators",
     palette: true,
     noRotate: true,
@@ -654,18 +710,22 @@ const SYMBOLS: SymbolDef[] = [
         options: [
           { value: "2", label: "2 position (0–I)" },
           { value: "3", label: "3 position (I–0–II)" },
+          { value: "4", label: "4 position (1–2–3–4)" },
         ],
         default: "2",
       },
       { key: "poles", label: "Poles", type: "number", min: 1, max: 4, default: 1 },
+      // Every pole a changeover, numbered as makers do (A43): a setting of the whole switch.
+      { key: "changeover", label: "Changeover", type: "bool", default: false, when: (el) => selectorPositions(el) !== "4", fixed: "Not on a 4 position selector" },
       {
         key: "pole1",
         label: "Pole 1",
         type: "select",
         default: "I",
         options: SELECTOR_POLE_OPTIONS,
-        when: (el) => num(el, "poles", 1, 1, 4) >= 1,
-        fixed: "–",
+        optionsFor: (el) => POLE_CHOICES[selectorPositions(el)],
+        when: (el) => num(el, "poles", 1, 1, 4) >= 1 && !selectorChangeover(el),
+        hideOff: true,
       },
       {
         key: "pole2",
@@ -673,8 +733,9 @@ const SYMBOLS: SymbolDef[] = [
         type: "select",
         default: "II",
         options: SELECTOR_POLE_OPTIONS,
-        when: (el) => num(el, "poles", 1, 1, 4) >= 2,
-        fixed: "–",
+        optionsFor: (el) => POLE_CHOICES[selectorPositions(el)],
+        when: (el) => num(el, "poles", 1, 1, 4) >= 2 && !selectorChangeover(el),
+        hideOff: true,
       },
       {
         key: "pole3",
@@ -682,8 +743,9 @@ const SYMBOLS: SymbolDef[] = [
         type: "select",
         default: "I",
         options: SELECTOR_POLE_OPTIONS,
-        when: (el) => num(el, "poles", 1, 1, 4) >= 3,
-        fixed: "–",
+        optionsFor: (el) => POLE_CHOICES[selectorPositions(el)],
+        when: (el) => num(el, "poles", 1, 1, 4) >= 3 && !selectorChangeover(el),
+        hideOff: true,
       },
       {
         key: "pole4",
@@ -691,22 +753,25 @@ const SYMBOLS: SymbolDef[] = [
         type: "select",
         default: "I",
         options: SELECTOR_POLE_OPTIONS,
-        when: (el) => num(el, "poles", 1, 1, 4) >= 4,
-        fixed: "–",
+        optionsFor: (el) => POLE_CHOICES[selectorPositions(el)],
+        when: (el) => num(el, "poles", 1, 1, 4) >= 4 && !selectorChangeover(el),
+        hideOff: true,
       },
       { key: "key", label: "Key operated", type: "bool", default: false },
       // What each position is called, drawn as the legend under the head (v0.2.1 note 23).
       { key: "pos1", label: "Position 1 (I)", type: "text", default: "", placeholder: "e.g. SUPPLY 1" },
-      { key: "pos0", label: "Off / mid position (0)", type: "text", default: "", placeholder: "e.g. OFF" },
-      { key: "pos2", label: "Position 2 (II)", type: "text", default: "", placeholder: "e.g. SUPPLY 2", when: (el) => el.params.positions === "3", fixed: "3 position only" },
+      { key: "pos0", label: "Off / mid position (0)", type: "text", default: "", placeholder: "e.g. OFF", when: (el) => selectorPositions(el) !== "4", hideOff: true },
+      { key: "pos2", label: "Position 2 (II)", type: "text", default: "", placeholder: "e.g. SUPPLY 2", when: (el) => selectorPositions(el) !== "2", hideOff: true },
+      { key: "pos3", label: "Position 3", type: "text", default: "", when: (el) => selectorPositions(el) === "4", hideOff: true },
+      { key: "pos4", label: "Position 4", type: "text", default: "", when: (el) => selectorPositions(el) === "4", hideOff: true },
     ],
     kind: () => "selector",
     draw(el) {
       const key = bool(el, "key", false);
-      const three = str(el, "positions", "2") === "3";
-      const op = opOf(el);
-      // In Simulate: the position it's in.
+      const three = selectorPositions(el) === "3";
+      // In Simulate: the position it's in. Each pole is drawn from the positions it's set to (A42).
       const at = typeof el.params.__pos === "number" ? el.params.__pos : null;
+      const closedNow = (p: SelectorPole) => at !== null && p.closed.includes(at);
       const poles = selectorPoles(el);
       const prims: Prim[] = [];
       const terminals: TerminalDef[] = [];
@@ -740,7 +805,7 @@ const SYMBOLS: SymbolDef[] = [
             line([x, -3], [x, -1.5]),
             line([x - 2, -3], [x - 2, -1.5], [x - 0.9, -1.5]),
             line([x, 1.5], [x, 3]),
-            op ? line([x, 1.5], [x - 0.25, -1.5]) : line([x, 1.5], [x - 1.1, -1.7]),
+            closedNow(p) ? line([x, 1.5], [x - 0.25, -1.5]) : line([x, 1.5], [x - 1.1, -1.7]),
             term(x + 0.45, -2.2, `${k}4`),
             term(x - 2.45, -2.2, `${k}2`, "end"),
             term(x + 0.45, 2.9, `${k}1`),
@@ -752,11 +817,12 @@ const SYMBOLS: SymbolDef[] = [
           );
           lastMid = [x - 0.55, -0.1];
         } else if (p.kind === "nc") {
-          prims.push(...ncContact(x, op), term(x + 0.45, -2.2, `${k}1`), term(x + 0.45, 2.9, `${k}2`));
+          // Drawn closed at rest; open in the positions that open it.
+          prims.push(...ncContact(x, at !== null && !closedNow(p)), term(x + 0.45, -2.2, `${k}1`), term(x + 0.45, 2.9, `${k}2`));
           terminals.push({ name: `${k}1`, at: [x, -3], dir: "up" }, { name: `${k}2`, at: [x, 3], dir: "down" });
           lastMid = [x + NC_MID[0], 0];
         } else {
-          prims.push(...noContact(x, op), term(x + 0.45, -2.2, `${k}3`), term(x + 0.45, 2.9, `${k}4`));
+          prims.push(...noContact(x, closedNow(p)), term(x + 0.45, -2.2, `${k}3`), term(x + 0.45, 2.9, `${k}4`));
           terminals.push({ name: `${k}3`, at: [x, -3], dir: "up" }, { name: `${k}4`, at: [x, 3], dir: "down" });
           lastMid = [x + NO_MID[0], 0];
         }

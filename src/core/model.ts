@@ -11,8 +11,9 @@ export const FORMAT = "ferrule";
  * file of any other number isn't opened, and says which Ferrule it needs.
  * 4: v0.5 step 0, the test-build mapping dropped.
  * 5: v0.5 step 4a, one Contact and one Coil (contact-no, -nc, -co and timer-coil gone).
+ * 6: v0.5 step 4b, a selector's changeover on the whole switch, 4 positions.
  */
-export const FORMAT_VERSION = 5;
+export const FORMAT_VERSION = 6;
 
 export type ParamValue = string | number | boolean;
 

@@ -325,7 +325,7 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
   const frEn = add("contact", 16, 13);
   const ffEn = add("contact", 10, 24, { params: { contact: "nc" } });
   // Flipped, its common on top (a selector doesn't turn, v0.5 A39): 14 straight down to SF1's relay, 12 to SF2's on its left.
-  const sDuty = add("selector", 20, 35, { label: "DUTY\nSELECTOR", params: { pole1: "co", key: true, pos0: "1", pos1: "2" } });
+  const sDuty = add("selector", 20, 35, { label: "DUTY\nSELECTOR", params: { changeover: true, key: true, pos0: "1", pos1: "2" } });
   flipElements(p, page.id, [sDuty.id]);
   const er1 = add("coil", 20, 56, { label: `${tag(SF1.id)}\nENABLE` });
   const er2 = add("coil", 10, 56, { label: `${tag(SF2.id)}\nENABLE` });

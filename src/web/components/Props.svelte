@@ -326,7 +326,7 @@
           </span>
           {#if p.type === "select"}
             <select value={String(v)} onchange={(e) => setParam(p.key, e.currentTarget.value)}>
-              {#each p.options ?? [] as o (o.value)}
+              {#each p.optionsFor?.(one) ?? p.options ?? [] as o (o.value)}
                 <option value={o.value}>{o.label}</option>
               {/each}
             </select>

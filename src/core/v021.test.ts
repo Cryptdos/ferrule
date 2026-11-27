@@ -93,7 +93,7 @@ describe("step 2b: Markdown, push buttons, selectors", () => {
     const { controlBusbars } = await import("./testing");
     const { p, pg } = sheet();
     const { cct, ov } = controlBusbars(p, pg);
-    const s = addElement(p, pg, "selector", [40, 40], { params: { positions: "3", pole1: "co", pos1: "SUPPLY 1", pos0: "OFF", pos2: "SUPPLY 2" } });
+    const s = addElement(p, pg, "selector", [40, 40], { params: { positions: "3", changeover: true, pos1: "SUPPLY 1", pos0: "OFF", pos2: "SUPPLY 2" } });
     const g = localGeometry(s, "S1");
     expect(g.terminals.map((t) => t.name).sort()).toEqual(["1", "2", "3"]);
     expect(g.prims.filter((x) => x.t === "text").map((x) => (x.t === "text" ? x.text : ""))).toEqual(expect.arrayContaining(["SUPPLY 1", "OFF", "SUPPLY 2"]));

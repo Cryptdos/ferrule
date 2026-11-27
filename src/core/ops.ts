@@ -33,7 +33,7 @@ import {
   type TerminalRef,
   newId,
 } from "./model";
-import { benchOf, canRotate, defaultParams, isBar, formatPoints, getSymbol, partPoints, plantViewLayout, poleMates, requireSymbol, terminalPoint, viewSides, type ViewSide } from "./symbols";
+import { benchOf, canRotate, tidySelector, defaultParams, isBar, formatPoints, getSymbol, partPoints, plantViewLayout, poleMates, requireSymbol, terminalPoint, viewSides, type ViewSide } from "./symbols";
 import { moduleType, moduleTypeName } from "./modules";
 import { channelLabel, renamePointDesign, tidyDesign } from "./design";
 import { cleanPoints, formatQuickEntry, mergePoints, isInputForm, missingRefs, parseQuickEntry, pointOfPin, printedPin } from "./points";
@@ -71,6 +71,8 @@ function normaliseParams(symbol: string, params: Record<string, ParamValue>): Re
   // A selector's legend as it was written before its positions had names (v0.2.1 note 23).
   if (symbol === "selector" && typeof params.legend === "string") Object.assign(params, legendToPositions(params.legend, params.positions === "3"));
   if (symbol === "selector") delete params.legend;
+  // Pole choices that fit its positions only (A41); changeover on the whole switch (A43).
+  if (symbol === "selector") tidySelector(params);
   // A push button's contact as it was set before poles (v0.2.1 note 24): NO, NC, or both.
   if (symbol === "pushbutton" && typeof params.contact === "string") {
     const c = params.contact;

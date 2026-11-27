@@ -101,15 +101,14 @@ describe("selector (33, 35, 75)", () => {
     s = toggle(c, s, s3.id); // back to 0
     expect([s.lamps[h1.id], s.lamps[h2.id]]).toEqual([false, false]);
     expect(c.inputs.find((i) => i.el === s3.id)?.positions).toEqual(["0", "I", "II"]);
-    // An NC pole numbers 11-12; a changeover 11, 12, 14; up to four poles.
-    expect(terminalNames(add("selector", 80, 30, { poles: 4, pole1: "nc-I", pole2: "co", pole3: "I", pole4: "I" }))).toEqual([
-      "11", "12", "22", "24", "21", "33", "34", "43", "44",
-    ]);
+    // An NC pole numbers 11-12, an NO 13-14; up to four poles. Changeover is the whole switch (v0.5 A43): k1, k2, k4 on every pole.
+    expect(terminalNames(add("selector", 80, 30, { poles: 4, pole1: "nc-I", pole2: "I", pole3: "I", pole4: "I" }))).toEqual(["11", "12", "23", "24", "33", "34", "43", "44"]);
+    expect(terminalNames(add("selector", 100, 30, { poles: 2, changeover: true }))).toEqual(["12", "14", "11", "22", "24", "21"]);
   });
 
   test("the legend sits under the head, clear of the terminal numbers (34)", () => {
     const { add } = ladder();
-    const s = add("selector", 20, 30, { positions: "3", pole1: "co" });
+    const s = add("selector", 20, 30, { positions: "3", changeover: true });
     const g = localGeometry(s, "S1");
     // The legend is the position names, I – 0 – II; a 3-position changeover is numbered 3, 2 (common), 1.
     const legend = g.prims.find((x) => x.t === "text" && x.text === "II");
