@@ -142,23 +142,6 @@
                 {/if}
               </div>
             {/if}
-            {#if pt.form === "supply-out"}
-              <div class="dists">
-                {#each pt.pins as t (t)}
-                  <label>
-                    {printedPin(t, pt.name)} feeds
-                    <select
-                      value={pt.dists?.[t] ?? ""}
-                      onchange={(e) => point(pt.name, { dists: { ...(pt.dists ?? {}), [t]: e.currentTarget.value } })}
-                    >
-                      <option value="">Nothing (wired only)</option>
-                      {#each editor.project.distributions as d (d.id)}<option value={d.id}>{d.name}</option>{/each}
-                    </select>
-                  </label>
-                {/each}
-                {#if !editor.project.distributions.length}<p class="hint">Add distributions (Distribution) for it to feed.</p>{/if}
-              </div>
-            {/if}
             {#if isInputForm(pt.form)}
               <div class="exp">
                 {#each expectationsOf(pt) as e (e.id)}<div>{describeExpectation(editor.project, e, list)}</div>{/each}
@@ -233,15 +216,13 @@
     color: #667;
   }
   .sim,
-  .dists,
   .exp {
     font-size: 12px;
     display: flex;
     flex-direction: column;
     gap: 3px;
   }
-  .sim label,
-  .dists label {
+  .sim label {
     display: flex;
     gap: 4px;
     align-items: center;

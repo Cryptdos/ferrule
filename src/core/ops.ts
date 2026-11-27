@@ -1105,7 +1105,6 @@ export function updatePoint(
     if (patch.delay > 0) p.delay = patch.delay;
     else delete p.delay;
   }
-  if (patch.dists !== undefined) p.dists = patch.dists;
   if (patch.label !== undefined) {
     if (patch.label.trim()) p.label = patch.label.trim();
     else delete p.label;
@@ -1176,10 +1175,6 @@ function renamePin(project: Project, item: PlantItem, from: string, to: string):
   item.terminals = item.terminals.map((t) => (t === from ? to : t));
   for (const p of item.points ?? []) {
     p.pins = p.pins.map((t) => (t === from ? to : t));
-    if (p.dists?.[from]) {
-      p.dists[to] = p.dists[from]!;
-      delete p.dists[from];
-    }
   }
   if (item.pins?.[from]) {
     item.pins[to] = item.pins[from]!;
@@ -2146,18 +2141,16 @@ export function setGaItemDevice(project: Project, pageId: string, itemId: string
 // ---------------------------------------------------------------------------
 // Distributions (design-v0.2 §2)
 
-/** The params on an element that name a distribution: a busbar's or arrow's `dist`, an incoming supply's `dist_<terminal>`. */
+/** The params on an element that name a distribution: a block's or rail's `dist`. */
 export function distParamKeys(el: Element): string[] {
-  // A link arrow can't be set to a supply (design-wire-numbering §3): only blocks and rails.
-  if (isBar(el)) return ["dist"];
-  if (el.symbol === "supply") return Object.keys(el.params).filter((k) => k.startsWith("dist_"));
-  return [];
+  // Only blocks and rails pick a supply: a link arrow can't (design-wire-numbering §3), nor an
+  // incoming supply or a plant's supply out, which are wired to their block (v0.5 A57).
+  return isBar(el) ? ["dist"] : [];
 }
 
-/** The distribution an element (or one supply terminal) is on, if any. */
-export function distributionOf(project: Project, el: Element, terminal?: string): Distribution | undefined {
-  const key = el.symbol === "supply" ? `dist_${terminal ?? ""}` : "dist";
-  const id = el.params[key];
+/** The distribution a block or rail is on, if any. */
+export function distributionOf(project: Project, el: Element): Distribution | undefined {
+  const id = isBar(el) ? el.params.dist : undefined;
   return typeof id === "string" && id ? project.distributions.find((d) => d.id === id) : undefined;
 }
 

@@ -1,7 +1,9 @@
 /** v0.5 step 6: wire numbers by supply (design-wire-numbering.md). */
 import { describe, expect, test } from "bun:test";
 import { newProject, voltageBand } from "./model";
-import { addDistribution, addElement, addGaItem, addGaPage, addProjectDevice, connect, setGaItemDevice, updateDistribution, updateProjectDevice } from "./ops";
+import { addDistribution, addElement, addGaItem, addGaPage, addPlant, addProjectDevice, connect, placePlantView, setGaItemDevice, updateDistribution, updatePoint, updateProjectDevice } from "./ops";
+import { compile, initialState, toggle } from "./sim";
+import { pointRef } from "./points";
 import { renumber } from "./renumber";
 import { checkProject } from "./checks";
 import { billOfMaterials, wireMarkers } from "./schedules";
@@ -181,5 +183,57 @@ describe("step 6b: blocks and rails", () => {
     connect(p, pg, [f.id, "2"], [bl3.id, "0"]);
     renumber(p);
     expect(joins().length).toBe(2);
+  });
+});
+
+describe("step 6c: a supply is joined only by its wires (A57)", () => {
+  test("with no Incoming supply, a distribution a plant's supply out reaches by wire is that plant's, not stood in for by its blocks", () => {
+    const { p, pg } = sheet();
+    const L = addDistribution(p, { name: "L", kind: "line", voltage: "230 V" });
+    const N = addDistribution(p, { name: "N", kind: "neutral", voltage: "230 V" });
+    const V24 = addDistribution(p, { name: "24DC", kind: "dc+", voltage: "24 V DC" });
+    const V0 = addDistribution(p, { name: "0V", kind: "dc0", voltage: "0 V" });
+    const psu = addPlant(p, "", "Power supply", ["L", "N", "+", "-"], {
+      prefix: "G",
+      points: [
+        { name: "Mains", form: "supply-in", pins: ["L", "N"] },
+        { name: "Output", form: "supply-out", pins: ["+", "-"] },
+      ],
+    });
+    updatePoint(p, psu.id, "Output", { follows: [{ ref: pointRef(psu.id, "Mains"), on: true }] });
+    const bL = addElement(p, pg, "busbar", [4, 6], { params: { dist: L.id, length: 60 } });
+    const bN = addElement(p, pg, "busbar", [4, 9], { params: { dist: N.id, length: 60 } });
+    const q = addElement(p, pg, "isolator", [20, 16], { params: { function: "breaker", poles: 2 } });
+    connect(p, pg, [bL.id, "16"], [q.id, "1"]);
+    connect(p, pg, [bN.id, "19"], [q.id, "3"]);
+    const v = placePlantView(p, pg, psu.id, [20, 30]);
+    connect(p, pg, [q.id, "2"], [v.id, "L"]);
+    connect(p, pg, [q.id, "4"], [v.id, "N"]);
+    const r24 = addElement(p, pg, "rail", [4, 60], { params: { dist: V24.id, length: 100 } });
+    const r0 = addElement(p, pg, "rail", [4, 80], { params: { dist: V0.id, length: 100 } });
+    // Through a fuse on the +: still reached by wire.
+    const f = addElement(p, pg, "fuse", [60, 50]);
+    connect(p, pg, [v.id, "+"], [f.id, "1"]);
+    connect(p, pg, [f.id, "2"], [r24.id, "56"]);
+    connect(p, pg, [v.id, "-"], [r0.id, "40"]);
+    const h = addElement(p, pg, "lamp", [90, 70]);
+    connect(p, pg, [r24.id, "86"], [h.id, "+V"]);
+    connect(p, pg, [h.id, "-V"], [r0.id, "86"]);
+    expect(requireSymbol("supply").params.some((x) => x.key.startsWith("dist"))).toBe(false);
+    const c = compile(p);
+    expect(c.supplies.find((x) => x.el === pointRef(psu.id, "Output"))?.dist).toBe(V24.id);
+    let s = initialState(c);
+    expect(s.lamps[h.id]).toBe(true);
+    // Switch the power supply's mains off: its rails go down with it.
+    s = toggle(c, s, q.id);
+    expect(s.lamps[h.id]).toBe(false);
+  });
+
+  test("a point has no distributions to pick, and Check's bypass warning has gone", async () => {
+    const checks = await import("./checks");
+    expect("supplyBypasses" in checks).toBe(false);
+    const { p } = sheet();
+    const psu = addPlant(p, "", "Power supply", ["+", "-"], { points: [{ name: "Output", form: "supply-out", pins: ["+", "-"] }] });
+    expect(Object.keys(psu.points![0]!)).not.toContain("dists");
   });
 });

@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { newProject } from "./model";
-import { addDistribution, addElement, addPage, connect, deleteDistribution } from "./ops";
+import { addDistribution, addElement, addPage, connect, deleteDistribution, distParamKeys } from "./ops";
 import { renumber } from "./renumber";
 import { compile, initialState, toggle } from "./sim";
-import { localGeometry } from "./symbols";
+import { localGeometry, requireSymbol } from "./symbols";
 import { elementTexts, displayTag } from "./tags";
 import { importTemplate, saveSheetTemplate, stampTemplate } from "./templates";
 
@@ -41,10 +41,11 @@ describe("distributions (design-v0.2 §2)", () => {
     const { p, pg } = project();
     const L = addDistribution(p, { name: "L (grid)", kind: "line" });
     const N = addDistribution(p, { name: "N (grid)", kind: "neutral" });
-    const sup = addElement(p, pg, "supply", [10, 4], { params: { system: "1ph-n", dist_L: L.id, dist_N: N.id } });
-    void sup;
+    const sup = addElement(p, pg, "supply", [10, 4], { params: { system: "1ph-n" } });
     const busL = addElement(p, pg, "busbar", [4, 20], { params: { dist: L.id, length: 60 } });
     const busN = addElement(p, pg, "busbar", [4, 80], { params: { dist: N.id, length: 60 } });
+    connect(p, pg, [sup.id, "L"], [busL.id, "6"]);
+    connect(p, pg, [sup.id, "N"], [busN.id, "9"]);
     // The changeover's output: a local busbar fed through Q1.
     const q1 = addElement(p, pg, "isolator", [20, 30], { params: { poles: 1, aux: 0 } });
     const la = addElement(p, pg, "busbar", [4, 40], { params: { name: "La", length: 60 } });
@@ -62,7 +63,7 @@ describe("distributions (design-v0.2 §2)", () => {
     connect(p, pg2, [h2.id, "-V"], [n2.id, "36"]);
     const c = compile(p);
     let s = initialState(c);
-    // The supply feeds its distributions with no wire drawn from it.
+    // The supply feeds its distributions through the wires to their blocks, on every sheet.
     expect(s.lamps[h1.id]).toBe(true);
     expect(s.lamps[h2.id]).toBe(false);
     s = toggle(c, s, q1.id);
@@ -73,9 +74,13 @@ describe("distributions (design-v0.2 §2)", () => {
     const { p, pg } = project();
     const L = addDistribution(p, { name: "L", kind: "line" });
     const N = addDistribution(p, { name: "N", kind: "neutral" });
-    addElement(p, pg, "supply", [10, 4], { params: { system: "1ph-n", dist_L: L.id, dist_N: N.id } });
+    const sup = addElement(p, pg, "supply", [10, 4], { params: { system: "1ph-n" } });
     const gen = addElement(p, pg, "supply", [40, 4], { params: { system: "1ph-n" } });
     const bus = addElement(p, pg, "busbar", [4, 20], { params: { dist: L.id, length: 60 } });
+    const bus2 = addElement(p, pg, "busbar", [4, 60], { params: { dist: L.id, length: 60 } });
+    const busN = addElement(p, pg, "busbar", [4, 80], { params: { dist: N.id, length: 60 } });
+    connect(p, pg, [sup.id, "L"], [bus2.id, "6"]);
+    connect(p, pg, [sup.id, "N"], [busN.id, "6"]);
     connect(p, pg, [gen.id, "L"], [bus.id, "36"]);
     expect(initialState(compile(p)).short).toBe(true);
   });
@@ -161,19 +166,32 @@ describe("simulating without an Incoming supply", () => {
   });
 });
 
-describe("a supply that bypasses its own isolator", () => {
-  test("Check warns when the supply feeds a distribution its wiring also reaches", async () => {
-    const { supplyBypasses } = await import("./checks");
+describe("an incoming supply is joined only by its wires (v0.5 A57)", () => {
+  test("it has no distribution to pick: an isolator between it and its blocks switches them", () => {
     const { p, pg } = project();
     const L = addDistribution(p, { name: "L1", kind: "line" });
-    const sup = addElement(p, pg, "supply", [10, 4], { params: { system: "1ph-n", dist_L: L.id } });
-    const q = addElement(p, pg, "isolator", [10, 20], { params: { poles: 1, aux: 0 } });
-    const bus = addElement(p, pg, "busbar", [4, 40], { params: { dist: L.id, length: 60 } });
+    const N = addDistribution(p, { name: "N", kind: "neutral" });
+    const sup = addElement(p, pg, "supply", [10, 4], { params: { system: "1ph-n" } });
+    const q = addElement(p, pg, "isolator", [10, 20], { params: { poles: 2, aux: 0 } });
+    const busL = addElement(p, pg, "busbar", [4, 40], { params: { dist: L.id, length: 60 } });
+    const busN = addElement(p, pg, "busbar", [4, 44], { params: { dist: N.id, length: 60 } });
     connect(p, pg, [sup.id, "L"], [q.id, "1"]);
-    connect(p, pg, [q.id, "2"], [bus.id, "6"]);
-    expect(supplyBypasses(p).map((f) => f.ids)).toEqual([[sup.id]]);
-    // Left empty, nothing to warn about.
-    delete sup.params.dist_L;
-    expect(supplyBypasses(p)).toEqual([]);
+    connect(p, pg, [sup.id, "N"], [q.id, "3"]);
+    connect(p, pg, [q.id, "2"], [busL.id, "6"]);
+    connect(p, pg, [q.id, "4"], [busN.id, "9"]);
+    // A lamp on another block of each, on another sheet.
+    const pg2 = addPage(p, "Two").id;
+    const l2 = addElement(p, pg2, "busbar", [4, 10], { params: { dist: L.id, length: 60 } });
+    const n2 = addElement(p, pg2, "busbar", [4, 80], { params: { dist: N.id, length: 60 } });
+    const h = addElement(p, pg2, "lamp", [40, 40]);
+    connect(p, pg2, [l2.id, "36"], [h.id, "+V"]);
+    connect(p, pg2, [h.id, "-V"], [n2.id, "36"]);
+    expect(distParamKeys(sup)).toEqual([]);
+    expect(requireSymbol("supply").params.some((x) => x.key.startsWith("dist"))).toBe(false);
+    const c = compile(p);
+    let s = initialState(c);
+    expect(s.lamps[h.id]).toBe(true);
+    s = toggle(c, s, q.id);
+    expect(s.lamps[h.id]).toBe(false);
   });
 });

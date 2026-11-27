@@ -344,9 +344,6 @@ function parsePoints(points: unknown, pins: unknown): { points?: IoPoint[]; pins
     .filter((p) => typeof p.name === "string" && p.name)
     .map((p) => {
       const follows = parseConditions(p.follows);
-      const dists = isObj(p.dists)
-        ? (Object.fromEntries(Object.entries(p.dists).filter(([, d]) => typeof d === "string" && d)) as Record<string, string>)
-        : undefined;
       const q: IoPoint = {
         name: p.name as string,
         form: FORMS.has(p.form as PointForm) ? (p.form as PointForm) : "contact",
@@ -354,7 +351,6 @@ function parsePoints(points: unknown, pins: unknown): { points?: IoPoint[]; pins
         ...(follows.length ? { follows } : {}),
         ...(follows.length > 1 && (p.join === "or" || p.join === "and") ? { join: p.join } : {}),
         ...(typeof p.delay === "number" && p.delay > 0 ? { delay: p.delay } : {}),
-        ...(dists && Object.keys(dists).length ? { dists } : {}),
         ...(typeof p.label === "string" && p.label.trim() ? { label: p.label.trim() } : {}),
         ...(text(p.signal) ? { signal: text(p.signal) } : {}),
         ...(isSupplyType(p.gives) ? { gives: { v: p.gives.v, ac: p.gives.ac } } : {}),

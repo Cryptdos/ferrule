@@ -16,8 +16,9 @@ export const FORMAT = "ferrule";
  * 8: v0.5 step 5, no numbering settings (position only; strips follow on).
  * 9: v0.5 step 6a, a supply's tag; a link arrow has no distribution or typed reference.
  * 10: v0.5 step 6b, a device's ways (distribution blocks).
+ * 11: v0.5 step 6c, no distributions on an incoming supply or a plant's supply out.
  */
-export const FORMAT_VERSION = 10;
+export const FORMAT_VERSION = 11;
 
 export type ParamValue = string | number | boolean;
 
@@ -483,8 +484,6 @@ export interface IoPoint {
   join?: "and" | "or";
   /** Seconds it takes to follow. */
   delay?: number;
-  /** Supply out: the distribution each pin feeds, by pin number. */
-  dists?: Record<string, string>;
   /** Supply out or powered out: what it gives (v0.4.x M11). Unset: not stated. */
   gives?: SupplyType;
   /** Supply in or powered in: what it accepts, any of these (v0.4.x M11). Unset: not stated. */

@@ -291,6 +291,9 @@ Judgement calls made while building, by step, with the reason.
 - **Blocks and rails on different supplies joined by a wire is a warning, not an error**, and it follows the wire through terminals (a terminal doesn't end a wire; a part does). A drawing may bond the controls' 0 V to an earth bar on purpose, which this reports; it can't be told from a mistake.
 - **A device's ways moved the file format to 10.**
 - Placeholders and test data in the device table that named a real maker and part number are now generic.
+- **A57: "reaches by wire" follows every switch and fuse, whichever way it's set.** A power supply's output through a fuse, or a rail switched from it by a contact, is still that supply's: standing its blocks in would keep the rail live with the supply off, which is what the entry's note warns of. A part that isn't a switch (a coil, a lamp, a transformer) ends the reach.
+- **A supply out's distribution for the short check is the first one its wiring reaches**, in place of the one it was set to, so a battery and the UPS output it backs, both wired to one bus, still aren't a short.
+- **Removing the pickers moved the file format to 11.** CK-20 keeps its ID, saying there's no such check now.
 
 ## 7. After the build
 

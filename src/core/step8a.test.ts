@@ -202,13 +202,13 @@ describe("simulating points", () => {
       points: [
         { name: "Mains", form: "supply-in", pins: ["L", "N"] },
         { name: "Battery", form: "powered-in", pins: ["BAT+", "BAT-"] },
-        { name: "Output", form: "supply-out", pins: ["+V", "-V"], dists: { "+V": dc.id, "-V": ov.id } },
+        { name: "Output", form: "supply-out", pins: ["+V", "-V"] },
         { name: "AC fail", form: "contact", pins: ["11", "14", "12"] },
       ],
     });
     const bat = addPlant(p, "", "Battery", ["+", "-"], {
       prefix: "GB",
-      points: [{ name: "Charge", form: "supply-out", pins: ["+", "-"], dists: { "+": dc.id } }],
+      points: [{ name: "Charge", form: "supply-out", pins: ["+", "-"] }],
     });
     updatePoint(p, ups.id, "Output", { follows: [{ ref: pointRef(ups.id, "Mains"), on: true }, { ref: pointRef(ups.id, "Battery"), on: true }], join: "or" });
     updatePoint(p, ups.id, "AC fail", { follows: [{ ref: pointRef(ups.id, "Mains"), on: false }] });
@@ -223,6 +223,10 @@ describe("simulating points", () => {
     // A load on the 24 V DC bus, drawn as busbars on the UPS's distributions.
     const plus = addElement(p, pg, "rail", [0, 30], { params: { dist: dc.id, length: 60 } });
     const minus = addElement(p, pg, "rail", [0, 70], { params: { dist: ov.id, length: 60 } });
+    // The UPS output wired to them, and the battery's + to the bus too (v0.5 A57: wired, not picked).
+    connect(p, pg, [uv.id, "+V"], [plus.id, "50"]);
+    connect(p, pg, [uv.id, "-V"], [minus.id, "50"]);
+    connect(p, pg, [bv.id, "+"], [plus.id, "56"]);
     const h = addElement(p, pg, "lamp", [30, 50]);
     connect(p, pg, [plus.id, "30"], [h.id, "+V"]);
     connect(p, pg, [h.id, "-V"], [minus.id, "30"]);

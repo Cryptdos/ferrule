@@ -237,7 +237,6 @@ export function buildBms01(avoid: Avoid | null): Bms01 {
     V0: addDistribution(p, { name: "0V", kind: "dc0", voltage: "0 V", colour: "Wh", function: "0V" }),
   };
   PSU.points![1]!.follows = [{ ref: pointRef(PSU.id, "Mains"), on: true }];
-  PSU.points![1]!.dists = { "+": D.V24.id, "-": D.V0.id };
   PSU.points![2]!.follows = [{ ref: pointRef(PSU.id, "Mains"), on: true }];
   // What the supplies give and the loads take (M11).
   PSU.points![0]!.accepts = [{ v: 230, ac: true }];

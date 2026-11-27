@@ -156,12 +156,6 @@ export function refreshConductors(project: Project): void {
 }
 
 /**
- * Joins beyond the conductors (design-v0.2 §2): every wire on a busbar is on
- * the same net, and so is everything on the same distribution (busbars,
- * link arrows and incoming supply terminals that pick it). Each join is two
- * terminal refs and the element that makes it.
- */
-/**
  * The supply a wire is on (v0.5 A23): a block or rail it lands on is
  * assigned one with a tag. Every wire on it carries that number.
  */
@@ -179,6 +173,12 @@ export function supplyOf(project: Project, c: Conductor): Distribution | undefin
   return undefined;
 }
 
+/**
+ * Joins beyond the conductors (design-v0.2 §2): every wire on a block or rail
+ * is on the same net, and so is everything on the same distribution (the
+ * blocks and rails that pick it). Each join is two terminal refs and the
+ * element that makes it.
+ */
 export function netJoins(project: Project): { a: TerminalRef; b: TerminalRef; el: string }[] {
   const out: { a: TerminalRef; b: TerminalRef; el: string }[] = [];
   const firstOn = new Map<string, TerminalRef>(); // distribution id → a terminal on it
@@ -197,17 +197,10 @@ export function netJoins(project: Project): { a: TerminalRef; b: TerminalRef; el
         );
         for (let i = 1; i < taps.length; i++) out.push({ a: [el.id, taps[0]!], b: [el.id, taps[i]!], el: el.id });
         if (taps.length) onDist(el.params.dist, [el.id, taps[0]!], el.id);
-      } else if (el.symbol === "supply") {
-        for (const [k, v] of Object.entries(el.params)) if (k.startsWith("dist_")) onDist(v, [el.id, k.slice(5)], el.id);
       }
     }
   }
-  // A plant supply out feeds its distributions from the device's own pin (sim.ts pinNode), drawn or not.
-  for (const item of project.plant) {
-    for (const p of item.points ?? []) {
-      if (p.form !== "supply-out") continue;
-      for (const [pin, d] of Object.entries(p.dists ?? {})) onDist(d, [`pin:${item.id}`, pin], `plant:${item.id}`);
-    }
-  }
+  // Only blocks and rails join a distribution: an incoming supply or a plant's supply out
+  // is wired to its block like anything else (v0.5 A57).
   return out;
 }
