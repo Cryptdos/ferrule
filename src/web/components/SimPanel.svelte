@@ -76,7 +76,7 @@
   <p class="hint">
     Click switches, selectors and plant outputs on the drawing (outlined in orange). A push button is held while the mouse is
     down (Shift+click holds it until clicked again). Plant inputs turn green when they see what's expected, red when they
-    don't. Double-click a contact or link arrow to follow it.
+    don't. Double-click a contact or link end to follow it.
   </p>
 
   {#if loadsOn}

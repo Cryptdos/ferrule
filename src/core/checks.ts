@@ -85,17 +85,17 @@ export function checkProject(project: Project, opts: { proofs?: Proofs | null } 
       if (isMaster(el) && slavesOf(project, el).length === 0) {
         out.push({ level: "warning", message: `Sheet ${page.number}: coil ${tag} has no contacts`, pageId: page.id, ids: [el.id] });
       }
-      if (el.symbol === "offpage" && !partnerOf(project, el)) {
-        out.push({ level: "warning", message: `Sheet ${page.number}: off-page arrow isn't paired with another`, pageId: page.id, ids: [el.id] });
+      if (el.symbol === "link" && !partnerOf(project, el)) {
+        out.push({ level: "warning", message: `Sheet ${page.number}: a link end isn't linked to another (struck through until it is)`, pageId: page.id, ids: [el.id] });
       }
-      if (el.symbol === "offpage") {
+      if (el.symbol === "link") {
         const other = partnerOf(project, el);
         const src = (e: typeof el) => e.params.source !== false;
         // Report each mismatched pair once, from the first-numbered end.
         if (other && src(el) === src(other.el) && el.id < other.el.id) {
           out.push({
             level: "warning",
-            message: `Sheet ${page.number}: linked arrows are both ${src(el) ? "sources" : "destinations"}; one should be the source`,
+            message: `Sheet ${page.number}: linked link ends are both ${src(el) ? "sources" : "destinations"}; one should be the source`,
             pageId: page.id,
             ids: [el.id],
           });
@@ -518,7 +518,7 @@ export function usesDesign(project: Project): boolean {
 }
 
 /** Parts that are wiring or drawing furniture, not equipment: never "field plant not in the table". */
-const NOT_EQUIPMENT = new Set(["terminal", "plant-view", "junction", "offpage", "busbar", "rail", "isolator", "supply"]);
+const NOT_EQUIPMENT = new Set(["terminal", "plant-view", "junction", "link", "busbar", "rail", "isolator", "supply"]);
 
 /**
  * Design's checks (design-v0.4 §5): a point that should have a channel and

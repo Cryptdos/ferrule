@@ -9,7 +9,7 @@ import { newId, type Network, type Page, type PlantItem, type Project } from "./
 import { OpError, addElement, addPage, getPlant, portGroups } from "./ops";
 import type { NetworkData } from "./networkdraw";
 import { controllerTag } from "./modules";
-import { requireSymbol, terminalPoint } from "./symbols";
+import { requireSymbol } from "./symbols";
 
 const tagOf = (p: PlantItem) => p.tag || `${p.prefix || "U"}?`;
 
@@ -63,7 +63,6 @@ export function networkChain(project: Project, net: Network): { drawn: boolean; 
         if (el?.symbol === "plant-view" && el.params.plant === owner.id && startPins.includes(t)) drawn = true;
       }
     }
-    const at = new Map<string, string[]>();
     for (const el of pg.elements) {
       if (el.symbol === "plant-view") {
         const plant = String(el.params.plant);
@@ -72,22 +71,12 @@ export function networkChain(project: Project, net: Network): { drawn: boolean; 
           join(termKey(el.id, t), pinKey(plant, t));
         }
       }
-      if (el.symbol === "offpage") {
+      if (el.symbol === "link") {
         for (const other of el.links) join(termKey(el.id, "1"), termKey(other, "1"));
         continue;
       }
       const sym = requireSymbol(el.symbol);
       for (const g of sym.bridged?.(el) ?? []) for (const n of g.slice(1)) join(termKey(el.id, g[0]!), termKey(el.id, n));
-      for (const t of sym.draw(el).terminals) {
-        const pt = terminalPoint(el, t.name);
-        if (pt) at.set(`${pt[0]},${pt[1]}`, [...(at.get(`${pt[0]},${pt[1]}`) ?? []), termKey(el.id, t.name)]);
-      }
-    }
-    // An arrow dropped straight onto a pin is on it, as for conductors.
-    for (const a of pg.elements) {
-      if (a.symbol !== "offpage") continue;
-      const pt = terminalPoint(a, "1");
-      for (const k of (pt && at.get(`${pt[0]},${pt[1]}`)) || []) join(termKey(a.id, "1"), k);
     }
   }
   if (!drawn) return none;

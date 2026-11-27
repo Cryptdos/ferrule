@@ -4,6 +4,7 @@ import { voltageBand, type Element, type Project } from "./model";
 import { isBar, requireSymbol, type GeometryText } from "./symbols";
 import { isTimed, masterOf, relayPinMarks, xrefText } from "./xref";
 import { resolveFields } from "./fields";
+import { labelOnLinkEnd, routeOf, wireLabelOf } from "./wires";
 import { controllerMapEntries, moduleTitle } from "./modules";
 import { legendEntries, revisionRows } from "./annotations";
 
@@ -52,23 +53,27 @@ export function elementTexts(el: Element, project: Project): GeometryText {
   if (el.symbol === "netmap") t.network = networkData(project);
   if (el.symbol === "revtable") t.rows = revisionRows(project);
   else if (el.symbol === "legend") t.legend = legendEntries(project);
-  else if (isBar(el) || el.symbol === "offpage") {
+  else if (isBar(el)) {
     // On a supply: a block or rail is named after it, with its tag (CCT 4, design-wire-numbering §2).
-    const d = isBar(el) && typeof el.params.dist === "string" && el.params.dist ? project.distributions.find((x) => x.id === el.params.dist) : undefined;
-    if (isBar(el)) t.name = d ? [d.name, d.tag].filter((x) => x !== undefined && x !== "").join(" ") : String(el.params.name ?? "");
+    const d = typeof el.params.dist === "string" && el.params.dist ? project.distributions.find((x) => x.id === el.params.dist) : undefined;
+    t.name = d ? [d.name, d.tag].filter((x) => x !== undefined && x !== "").join(" ") : String(el.params.name ?? "");
     // A power rail is drawn by its supply's voltage (design-wire-numbering §4b).
     if (el.symbol === "rail" && d) {
       const band = voltageBand(d);
       if (band) t.band = band;
     }
-    else {
-      // A linked destination says what its source says, unless told not to (70).
-      if (el.params.source === false && el.params.sameLabel !== false && el.links[0]) {
-        const src = project.pages.flatMap((pg) => pg.elements).find((e) => e.id === el.links[0]);
-        if (src?.label) t.label = resolveFields(src.label, project);
-      }
-      const c = project.conductors.find((x) => x.terminals.some(([id]) => id === el.id));
-      if (c?.number) t.wire = c.number;
+  } else if (el.symbol === "link") {
+    // A linked destination says what its source says, unless told not to (70).
+    if (el.params.source === false && el.params.sameLabel !== false && el.links[0]) {
+      const src = project.pages.flatMap((pg) => pg.elements).find((e) => e.id === el.links[0]);
+      if (src?.label) t.label = resolveFields(src.label, project);
+    }
+    // Its wire's label, when the wire is too short to carry it (A27).
+    const page = project.pages.find((pg) => pg.elements.includes(el)) ?? project.pages.find((pg) => pg.elements.some((e) => e.id === el.id));
+    const seg = page?.segments.find((s) => s.from[0] === el.id || s.to[0] === el.id);
+    if (page && seg) {
+      const label = wireLabelOf(project, page, seg);
+      if (labelOnLinkEnd(page, seg, routeOf(page, seg), label)) t.wireLabel = label;
     }
   }
   return t;

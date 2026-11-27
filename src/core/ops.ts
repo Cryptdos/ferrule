@@ -192,6 +192,7 @@ export function deleteElements(project: Project, pageId: string, ids: string[]):
   page.segments = page.segments.filter((s) => !gone.has(s.from[0]) && !gone.has(s.to[0]));
   for (const pg of project.pages) for (const el of pg.elements) el.links = el.links.filter((l) => !gone.has(l));
   dropOrphanJunctions(page);
+  dropOrphanLinkEnds(project, page);
   refreshConductors(project);
   pruneAssets(project);
 }
@@ -275,7 +276,7 @@ export function updateElement(project: Project, pageId: string, id: string, patc
   // A terminal's number changed: the block fits its numbers at once, not at the next route (F8).
   if (el.symbol === "terminal") fitBlock(getPage(project, pageId));
   // A linked arrow's partner is always the other way round: one source, one destination.
-  if (el.symbol === "offpage" && patch.params && "source" in patch.params) {
+  if (el.symbol === "link" && patch.params && "source" in patch.params) {
     for (const other of el.links) {
       const o = project.pages.flatMap((p) => p.elements).find((e) => e.id === other);
       if (o) o.params.source = el.params.source === false;
@@ -329,6 +330,12 @@ export function connect(project: Project, pageId: string, from: TerminalRef, to:
   if (page.segments.some((s) => (sameRef(s.from, from) && sameRef(s.to, to)) || (sameRef(s.from, to) && sameRef(s.to, from)))) {
     throw new OpError("Those terminals are already wired together");
   }
+  // A link end is the end of one wire (A27): a second goes to the wire, as a tee.
+  for (const ref of [from, to]) {
+    if (getElement(page, ref[0]).symbol === "link" && page.segments.some((s) => s.from[0] === ref[0] || s.to[0] === ref[0])) {
+      throw new OpError("A link end is the end of one wire: tee into the wire instead");
+    }
+  }
   const seg: Segment = { id: newId("w"), conductor: "", from: [...from], to: [...to], route: "auto", points: [] };
   page.segments.push(seg);
   refreshConductors(project);
@@ -373,6 +380,7 @@ export function deleteSegments(project: Project, pageId: string, ids: string[]):
   const gone = new Set(ids);
   page.segments = page.segments.filter((s) => !gone.has(s.id));
   dropOrphanJunctions(page);
+  dropOrphanLinkEnds(project, page);
   refreshConductors(project);
 }
 
@@ -556,8 +564,20 @@ function dropOrphanJunctions(page: Page): void {
   }
 }
 
-/** One end of a wire being drawn: a terminal, or a point on an existing wire. */
-export type WireEnd = { terminal: TerminalRef } | { wire: string; at: Vec };
+/** A link end left with no wire goes too (A27): a link end is always the end of a wire. */
+function dropOrphanLinkEnds(project: Project, page: Page): void {
+  const gone = new Set(page.elements.filter((e) => e.symbol === "link" && !page.segments.some((s) => s.from[0] === e.id || s.to[0] === e.id)).map((e) => e.id));
+  if (!gone.size) return;
+  page.elements = page.elements.filter((e) => !gone.has(e.id));
+  for (const pg of project.pages) for (const el of pg.elements) el.links = el.links.filter((l) => !gone.has(l));
+}
+
+/**
+ * One end of a wire being drawn: a terminal, a point on an existing wire, or
+ * bare paper, where the wire ends in a link end (A27). A free end may be linked
+ * at once to another link end, and given a label.
+ */
+export type WireEnd = { terminal: TerminalRef } | { wire: string; at: Vec } | { free: Vec; linkTo?: string; label?: string };
 
 function segmentAt(page: Page, at: Vec, prefer: string): Segment | undefined {
   const onRoute = (s: Segment) => {
@@ -580,8 +600,20 @@ function segmentAt(page: Page, at: Vec, prefer: string): Segment | undefined {
 /** Draw a wire between two ends, teeing into existing wires where an end is on one. */
 export function wire(project: Project, pageId: string, a: WireEnd, b: WireEnd): Segment {
   const page = getPage(project, pageId);
+  if ("free" in a && "free" in b) throw new OpError("Finish the wire on a terminal or another wire");
+  // Bare paper at one end: a link end there (design-wire-labels-and-links §3). Drawn out to
+  // it, it's a source; drawn from it, a destination. It points along the wire.
+  let made: { el: Element; end: Extract<WireEnd, { free: Vec }> } | null = null;
   const resolve = (end: WireEnd): TerminalRef => {
     if ("terminal" in end) return end.terminal;
+    if ("free" in end) {
+      const at = clampToArea(snapVec(end.free));
+      const other = end === a ? b : a;
+      const there = "terminal" in other ? terminalPoint(getElement(page, other.terminal[0]), other.terminal[1]) : "wire" in other ? snapVec(other.at) : null;
+      const el = addElement(project, pageId, "link", at, { rot: linkEndTurn(at, there ?? at), params: { source: end === b }, label: end.label ?? "" });
+      made = { el, end };
+      return [el.id, "1"];
+    }
     const at = snapVec(end.at);
     const existing = page.elements.find((e) => e.symbol === "junction" && e.pos[0] === at[0] && e.pos[1] === at[1]);
     if (existing) return [existing.id, "j"];
@@ -591,7 +623,23 @@ export function wire(project: Project, pageId: string, a: WireEnd, b: WireEnd): 
   };
   const from = resolve(a);
   const to = resolve(b);
-  return connect(project, pageId, from, to);
+  const seg = connect(project, pageId, from, to);
+  const m = made as { el: Element; end: Extract<WireEnd, { free: Vec }> } | null;
+  if (m?.end.linkTo) {
+    // Carried on in one move from a source (Link…): already linked, the arriving end of the pair.
+    if (m.el.params.source !== false) throw new OpError("A wire carried on from a link end starts here and goes to a terminal");
+    linkFromSource(project, m.end.linkTo, m.el.id);
+  }
+  return seg;
+}
+
+/** Which way a link end at `at` points: away from its wire, which comes from `other`. */
+function linkEndTurn(at: Vec, other: Vec): Rotation {
+  const dx = other[0] - at[0];
+  const dy = other[1] - at[1];
+  // Its shape runs along +y when level, with its wire arriving from above.
+  if (Math.abs(dx) > Math.abs(dy)) return dx < 0 ? 270 : 90;
+  return dy > 0 ? 180 : 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -765,14 +813,14 @@ export function linkContact(project: Project, contactId: string, coilId: string 
   c.el.tag = "";
 }
 
-/** Pair two off-page arrows (or unpair, with null). Their wires become one conductor. */
-export function linkOffpage(project: Project, aId: string, bId: string | null): void {
+/** Pair two link ends (or unpair, with null). Their wires become one conductor. */
+export function pairLinkEnds(project: Project, aId: string, bId: string | null): void {
   const a = locate(project, aId);
-  if (!a || a.el.symbol !== "offpage") throw new OpError("That isn't an off-page arrow");
+  if (!a || a.el.symbol !== "link") throw new OpError("That isn't a link end");
   unlinkAll(project, a.el, () => false);
   if (bId) {
     const b = locate(project, bId);
-    if (!b || b.el.symbol !== "offpage" || b.el.id === a.el.id) throw new OpError("Pick another off-page arrow");
+    if (!b || b.el.symbol !== "link" || b.el.id === a.el.id) throw new OpError("Pick another link end");
     unlinkAll(project, b.el, () => false);
     a.el.links.push(b.el.id);
     b.el.links.push(a.el.id);
@@ -784,29 +832,13 @@ export function linkOffpage(project: Project, aId: string, bId: string | null): 
 }
 
 /**
- * Pair a link arrow with another (Link… in its properties): the first is the
+ * Pair a link end with another (Link… in its properties): the first is the
  * source, the one clicked becomes its destination (controller.md §5).
  */
-export function linkArrows(project: Project, sourceId: string, targetId: string): void {
-  linkOffpage(project, sourceId, targetId);
+export function linkFromSource(project: Project, sourceId: string, targetId: string): void {
+  pairLinkEnds(project, sourceId, targetId);
   locate(project, sourceId)!.el.params.source = true;
   locate(project, targetId)!.el.params.source = false;
-}
-
-/**
- * Link to a new arrow: a destination dropped at `at` on a sheet, already
- * paired with the source, pointing back into a wire that carries on the
- * same way. Returns the new arrow.
- */
-export function linkToNewArrow(project: Project, sourceId: string, pageId: string, at: Vec): Element {
-  const a = locate(project, sourceId);
-  if (!a || a.el.symbol !== "offpage") throw new OpError("That isn't an off-page arrow");
-  const rot = ((a.el.rot + 180) % 360) as Element["rot"];
-  const params: Record<string, ParamValue> = { source: false };
-  if (a.el.params.dist) params.dist = a.el.params.dist;
-  const b = addElement(project, pageId, "offpage", at, { rot, params });
-  linkArrows(project, a.el.id, b.id);
-  return b;
 }
 
 /** Set a wire number by hand. Locked numbers survive renumbering. */

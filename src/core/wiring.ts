@@ -8,7 +8,7 @@
  *  - anything else is to review, and confirmed by hand.
  *
  * "Reaches" uses the conductors Ferrule already works out (wires, terminals
- * passed straight through, link arrows) and plant views joined to their
+ * passed straight through, link ends) and plant views joined to their
  * device's pins. Supply rails (busbars and distributions) don't count, and
  * nor does a pin shared with another point (an input's common), so a point
  * isn't passed because it shares 0 V with its channel. It may ask for a

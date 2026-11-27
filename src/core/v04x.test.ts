@@ -1108,11 +1108,11 @@ describe("step 13: stamp links, Duplicate's step, label plate text (T6, T8, T12)
     expect(r2.kept).toEqual([]);
     expect(r2.relink).toHaveLength(5);
     // An arrow with no partner in the stamp is listed too.
-    const arrow = addElement(p, src.id, "offpage", [140, 30]);
+    const arrow = addElement(p, src.id, "link", [140, 30]);
     const r3 = stampTemplate(p, saveSheetTemplate(p, src.id, "Drives 2").id, {});
     expect(r3.relink).toHaveLength(1);
-    expect(r3.page.elements.find((e) => e.id === r3.relink[0])!.symbol).toBe("offpage");
-    expect(arrow.symbol).toBe("offpage");
+    expect(r3.page.elements.find((e) => e.id === r3.relink[0])!.symbol).toBe("link");
+    expect(arrow.symbol).toBe("link");
   });
 
   test("Duplicate steps the last number, the first, or leaves tags blank for Renumber", () => {

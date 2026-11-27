@@ -18,8 +18,9 @@ export const FORMAT = "ferrule";
  * 10: v0.5 step 6b, a device's ways (distribution blocks).
  * 11: v0.5 step 6c, no distributions on an incoming supply or a plant's supply out.
  * 12: v0.5 step 7a, a wire's label is placed as one (labelAt).
+ * 13: v0.5 step 7b, link ends in place of link arrows (symbol link).
  */
-export const FORMAT_VERSION = 12;
+export const FORMAT_VERSION = 13;
 
 export type ParamValue = string | number | boolean;
 
@@ -598,9 +599,9 @@ export interface Template {
 }
 
 /**
- * A supply the project distributes (design-v0.2 §2): busbars, link arrows
- * and the incoming supply pick one by identity. Busbars on the same
- * distribution are one net on every sheet.
+ * A supply the project distributes (design-v0.2 §2): distribution blocks
+ * and power rails pick one by identity, and those on the same distribution
+ * are one net on every sheet.
  */
 export interface Distribution {
   id: string;
@@ -660,7 +661,7 @@ export interface Project {
   systems?: string[];
   /** Networks comms plant is on (design-v0.4 §7). */
   networks?: Network[];
-  /** Supplies busbars, link arrows and the incoming supply pick from. Starts empty. */
+  /** Supplies distribution blocks and power rails pick from. Starts empty. */
   distributions: Distribution[];
   /**
    * Wire colour by function (v0.4.x M3): function → core colour code. A

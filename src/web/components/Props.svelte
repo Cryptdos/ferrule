@@ -7,7 +7,7 @@
     deleteElements,
     deleteSegments,
     linkContact,
-    linkOffpage,
+    pairLinkEnds,
     setPlantViewTerminals,
     updateSection,
     deleteSections,
@@ -84,7 +84,7 @@
   const arrows = $derived(
     editor.project.pages.flatMap((pg) =>
       pg.elements
-        .filter((e) => e.symbol === "offpage" && e.id !== one?.id)
+        .filter((e) => e.symbol === "link" && e.id !== one?.id)
         .map((el) => ({ el, label: `${address(pg, el.pos)}${el.label ? " " + resolveFields(el.label, editor.project) : ""}` })),
     ),
   );
@@ -144,7 +144,7 @@
         </button>
       {/each}
     {/if}
-    {#if one.symbol === "offpage"}
+    {#if one.symbol === "link"}
       {@const partner = partnerOf(editor.project, one)}
       <label>
         Continues at
@@ -153,7 +153,7 @@
           onchange={(e) => {
             const v = e.currentTarget.value || null;
             const id = one.id;
-            editor.apply((p) => linkOffpage(p, id, v));
+            editor.apply((p) => pairLinkEnds(p, id, v));
           }}
         >
           <option value="">Not linked</option>
@@ -165,10 +165,13 @@
       {#if partner}
         <button class="link-btn" onclick={() => editor.goTo(partner.el.id)}>Go to {address(partner.page, partner.el.pos)} →</button>
       {/if}
-      <!-- Quicker linking (controller.md §5): click the partner on any sheet, or drop a new one. -->
+      <!-- Quicker linking (controller.md §5): click the partner on any sheet, or, from a source,
+           bare paper to carry the wire on there (A27). -->
       <div class="buttons">
-        <button onclick={() => (editor.linking = { from: one.id, address: address(editor.page, one.pos), mode: "pick" })}>Link…</button>
-        <button onclick={() => (editor.linking = { from: one.id, address: address(editor.page, one.pos), mode: "new" })}>Link to a new arrow</button>
+        <button
+          onclick={() => (editor.linking = { from: one.id, address: address(editor.page, one.pos) })}
+          title="Click the link end to link to, on any sheet; or bare paper, to carry the wire on from there to a terminal">Link…</button
+        >
       </div>
       {#if one.params.source === false && partner && one.params.sameLabel !== false && partner.el.label}
         <p class="hint">Shows its source's label. Untick <em>Same label as its source</em> to give it its own.</p>

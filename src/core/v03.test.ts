@@ -215,48 +215,40 @@ describe("terminals drive wire numbers (v0.3 §2, 33)", () => {
   });
 });
 
-describe("link arrows: wire number and bracketed reference (v0.3 §2)", () => {
-  test("an arrow shows the wire number it carries and its partner in brackets", async () => {
-    const { addPage, linkOffpage } = await import("./ops");
+describe("link ends: bracketed reference (v0.3 §2, v0.5 A27)", () => {
+  test("a link end shows its partner in brackets; unlinked, none", async () => {
+    const { addPage, pairLinkEnds, wire } = await import("./ops");
     const { p, pg } = project();
     const k = addElement(p, pg, "coil", [20, 20]);
-    const out = addElement(p, pg, "offpage", [20, 40]);
-    connect(p, pg, [k.id, "A2"], [out.id, "1"]);
+    const out = wire(p, pg, { terminal: [k.id, "A2"] }, { free: [20, 40] });
+    const outEnd = p.pages[0]!.elements.find((e) => e.symbol === "link")!;
+    expect(out.to[0]).toBe(outEnd.id);
     const pg2 = addPage(p, "two");
-    const inn = addElement(p, pg2.id, "offpage", [30, 20], { rot: 180 });
     const h = addElement(p, pg2.id, "lamp", [30, 40]);
-    connect(p, pg2.id, [inn.id, "1"], [h.id, "+V"]);
-    linkOffpage(p, out.id, inn.id);
+    wire(p, pg2.id, { free: [30, 20] }, { terminal: [h.id, "+V"] });
+    const inn = pg2.elements.find((e) => e.symbol === "link")!;
+    pairLinkEnds(p, outEnd.id, inn.id);
     renumber(p);
-    const t = elementTexts(out, p);
-    const n = p.conductors.find((c) => c.terminals.some(([id]) => id === out.id))!.number;
-    expect(n).not.toBe("");
-    expect(t.wire).toBe(n);
-    expect(elementTexts(inn, p).wire).toBe(n);
-    expect(t.xref).toMatch(/^\(2-\d+\)$/);
-    // Drawn horizontal, at the tag size.
-    const prim = localGeometry(out, t).prims.find((x) => x.t === "text" && x.text === n);
-    expect(prim && prim.t === "text" && !prim.vertical).toBe(true);
-    // A typed reference is bracketed too, never twice.
-    // An unlinked arrow carries no typed reference (v0.5 A23): there's nothing to set by hand.
-    const lone = addElement(p, pg, "offpage", [60, 40]);
-    expect(elementTexts(lone, p).xref).toBe("");
+    expect(elementTexts(outEnd, p).xref).toMatch(/^\(2-\d+\)$/);
+    // One wire across the pair: one conductor.
+    const n = p.conductors.find((c) => c.terminals.some(([id]) => id === outEnd.id))!;
+    expect(n.terminals.some(([id]) => id === inn.id)).toBe(true);
+    // An unlinked end carries no reference (v0.5 A23): there's nothing to set by hand.
+    pairLinkEnds(p, outEnd.id, null);
+    expect(elementTexts(outEnd, p).xref).toBe("");
   });
 
-  test("an arrow dropped straight onto a pin is on that pin's conductor and shows its number (32)", async () => {
+  test("a link end isn't joined to a pin it sits on: only its wire joins it (A27)", async () => {
     const { terminalPoint } = await import("./symbols");
     const { p, pg } = project();
     const k = addElement(p, pg, "coil", [20, 20]);
     const k2 = addElement(p, pg, "coil", [40, 20]);
     connect(p, pg, [k.id, "A2"], [k2.id, "A2"]);
-    // The arrow's terminal (2 up from its origin) right on the coil's A2.
     const a2 = terminalPoint(k, "A2")!;
-    const arrow = addElement(p, pg, "offpage", [a2[0], a2[1] + 2]);
-    expect(terminalPoint(arrow, "1")).toEqual(a2);
+    const end = addElement(p, pg, "link", a2);
     renumber(p);
     const c = p.conductors.find((x) => x.terminals.some(([id]) => id === k.id))!;
-    expect(c.terminals.some(([id]) => id === arrow.id)).toBe(true);
-    expect(elementTexts(arrow, p).wire).toBe(c.number);
+    expect(c.terminals.some(([id]) => id === end.id)).toBe(false);
   });
 });
 

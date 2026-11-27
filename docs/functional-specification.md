@@ -61,7 +61,7 @@ IDs are kept when the document is revised: a withdrawn statement is struck throu
 | Point | One signal of a plant item or one channel of a module (a fault contact, an enable input) |
 | View | One drawing of a plant item or module on a sheet, showing the terminals ticked for that sheet |
 | Controller | The panel's outstation or PLC: its modules in rail order. One per panel |
-| Distribution | A named supply (L1, N, CCT, 0V) that blocks, rails, link arrows and supplies pick, joined on every sheet |
+| Distribution | A named supply (L1, N, CCT, 0V) that blocks and rails pick, joined on every sheet |
 | GA | General arrangement: a Layout sheet drawn to scale |
 | Window | A floating panel opened from a menu button (Plant, Check, Schedules…) |
 | Tile | One pane of the drawing area, showing a sheet or a docked window |
@@ -377,23 +377,21 @@ The electrical drawing: parts, wires, rails, plant views, numbering and links. I
 
 - **DR-34** Selecting a contact and picking its coil under *Driven by coil* (listed by tag and description) links it: it takes the coil's tag and the next pole number (13/14, 23/24, 31/32…).
 - **DR-35** A linked coil gets a **contact table** to its right, with the coil's tag above it, listing each contact, its type and where it is. Dragging moves the table; *Put the contact table back beside the coil* undoes it; clicking a row jumps to that contact.
-- **DR-36** Double-clicking a contact jumps to its coil; a coil, to its first contact; ~~a link arrow, to its partner~~ *(v0.5: A27)*. Where you land is highlighted until something else is selected.
+- **DR-36** Double-clicking a contact jumps to its coil; a coil, to its first contact; a link end, to its partner. Where you land is highlighted until something else is selected.
 - **DR-37** References are always in full (`11-06`), on the same sheet too.
 - **DR-38** A contact linked to a timer coil is timed by it: it draws the delay mark for the timer's function and takes 17-18 (NO), 15-16 (NC) or 15-16/18 (changeover). *Instantaneous* keeps it a plain contact switching with the coil. Unlinking returns it to a plain contact.
 - **DR-39** ~~A coil placed as a device with *Relay pins* (LA-33) prints that base's terminal numbers on the coil, its contacts and its contact table, in place of A1/A2 and 11/12/14.~~ *(v0.5: A70)*
 
-### Link arrows
+### Link ends
 
-*The link arrow is replaced by link ends in v0.5 (A27), so this whole section is crossed through.*
-
-- **DR-40** ~~Arrows pair under *Continues at*, or with *Link…* then a click on the partner on any sheet, or *Link to a new arrow* then a click where it goes. A bar across the top says what's being linked; `Esc` cancels.~~ *(v0.5: A27)*
-- **DR-41** ~~*Source* marks the arrow the wire comes from; its partner becomes the destination, drawn filled.~~ *(v0.5: A27)*
-- **DR-42** ~~The wire keeps its number across the pair.~~ *(v0.5: A27)*
-- **DR-43** ~~An arrow shows the wire number it carries, horizontal and in line with it, and its partner's reference in brackets after its label, `(4-24)`. Brackets always mean a place; a bare number always a wire.~~ *(v0.5: A27)*
-- **DR-44** ~~A destination shows its source's label unless *Same label as its source* is unticked.~~ *(v0.5: A27)*
-- **DR-45** ~~An arrow dropped straight onto a part's pin is on that pin's wire and shows its number.~~ *(v0.5: A27)*
-- **DR-46** An unlinked arrow carries no reference: there's nothing to type, and *Check* reports it as unpaired. *(v0.5: A27. The link arrow part goes)*
-- **DR-47** An arrow can't pick a distribution: a wire reaches a supply only by being drawn onto its block or rail. *(v0.5: A27. The link arrow part goes)*
+- **DR-40** A wire carries on to another sheet from a **link end**, the end of a wire on bare paper. A wire drawn from a terminal and finished on bare paper ends in a **source** (it leaves the sheet there); one started on bare paper and finished on a terminal begins at a **destination** (it arrives there). It points along its wire. A link end isn't a part: it's not in the parts list, can't be placed or dropped on a terminal, is the end of one wire only, and goes when its wire does.
+- **DR-41** A link end is selected by itself. Its properties: its label, *Continues at* (its partner, from a list), *Link…*, *Go to* the partner, *Source*, and *Same label as its source*. Ticking or unticking *Source* swaps the pair, so one drawn backwards is put right.
+- **DR-42** *Link…* then a click on another link end, on any sheet, pairs them: the one linked from is the source and the one clicked its destination. *Link…* from a source then a click on bare paper carries the wire on in one move: it starts the arriving wire there, already linked, to be finished on a terminal. A bar across the top says what's being linked; `Esc` cancels.
+- **DR-43** A source is the outline of an arrowhead pointing away from its wire; a destination the outline of an arrow's tail, notched at the back, pointing into its wire. One not linked yet is struck through, on paper as on screen, and has no place in brackets.
+- **DR-44** A link end prints its label, then its partner's place in brackets, `(9-18)`: past its far end, on the wire's line. A destination shows its source's label unless *Same label as its source* is unticked. Brackets always mean a place; a bare number always a wire.
+- **DR-45** The wire keeps its number and colour across the pair: it's one wire. A wire too short for its own label (DR-24) prints none, and its link end prints it: number then colour, above a horizontal end, left of a vertical one.
+- **DR-46** An unlinked link end carries no reference: there's nothing to type, and *Check* reports it (CK-4).
+- **DR-47** A link end can't pick a distribution: a wire reaches a supply only by being drawn onto its block or rail.
 
 ### Distribution blocks, rails and distributions
 
@@ -403,7 +401,7 @@ The electrical drawing: parts, wires, rails, plant views, numbering and links. I
 - **DR-51** A block or rail on no distribution is *local* and joins nothing else. Deleting a distribution makes its blocks and rails local.
 - **DR-52** A block or rail's name sits at its left end beside its tag; on a supply it's the supply's name and number (`CCT 4`). *Name at both ends* prints it at both.
 - **DR-53** Length is 2 to 150 units. Colour and function come from the distribution unless set on the part.
-- **DR-90** A distribution block's **ways** are counted from the drawing: each wire drawn onto it needs one, a wire to a link arrow or a rail included. Nothing is typed in and there's no setting for spares; Properties shows *5 wires: needs at least 5 ways*. Each drawn block is its own part with its own ways, and a block doesn't span sheets.
+- **DR-90** A distribution block's **ways** are counted from the drawing: each wire drawn onto it needs one, a wire to a link end or a rail included. Nothing is typed in and there's no setting for spares; Properties shows *5 wires: needs at least 5 ways*. Each drawn block is its own part with its own ways, and a block doesn't span sheets.
 
 ### The panel boundary and terminals
 
@@ -442,8 +440,8 @@ The electrical drawing: parts, wires, rails, plant views, numbering and links. I
 - **DR-77** *Templates* saves the current sheet (*Save this sheet*), or a selected section box and what's in it (*Save selected section*), under a name.
 - **DR-78** *Stamp…* makes a copy for other plant: for each plant in the template, pick existing plant, *The same plant*, or *New plant item…* with a tag. The copy gets fresh tags.
 - **DR-79** A sheet template goes in as a new sheet (with a *New sheet title*); a section template goes where you click.
-- **DR-80** A contact on a coil outside the template stays on that coil. ~~Arrows' links out of the stamp are dropped.~~ *(v0.5: A27)*
-- **DR-81** After a stamp, *Links out of the stamp* lists the links kept and the arrows and contacts to link again; each is a click to select.
+- **DR-80** A contact on a coil outside the template stays on that coil. A link end's link out of the stamp is dropped, and the stamped link ends are listed to link again.
+- **DR-81** After a stamp, *Links out of the stamp* lists the links kept and the link ends and contacts to link again; each is a click to select.
 - **DR-82** Stamped copies don't change when the template does.
 - **DR-83** *To library* saves a copy in the `library` folder; *Import into project* brings one in from it.
 
@@ -481,7 +479,7 @@ Tag prefixes follow IEC 81346-2 as applied in `docs/designations.md`. Untagged p
 | **PT-15** | Distribution block | W | See DR-48 to DR-53 | |
 | **PT-16** | Power rail | none | As the block | Drawn by its supply's voltage (DR-49) |
 | **PT-17** | Earth | none | *Type*: earth, protective (PE), functional (FE), chassis, equipotential | The IEC 60417 symbol for the type |
-| **PT-18** | ~~Link arrow~~ | ~~none~~ | ~~See DR-40 to DR-47~~ | *(v0.5: A27)* |
+| **PT-18** | Link end | none | Not a part: the end of a wire on bare paper. See DR-40 to DR-47 | |
 | **PT-19** | Terminal strip line | none | *Terminal strip*; length | See DR-62 |
 | **PT-20** | Cable screen | none | *Width across the cores* 1–60 units; *Dashed* | No tag; its drain wire attaches at either end |
 | **PT-21** | Incoming supply | none | *System*: 3-phase + N, 3-phase, single phase, DC; *Gives*; ~~*Rating (VA)*~~ *(v0.5: A72)* | Where the simulator's power comes from. It picks no distribution: it's wired to its blocks (DR-50) |
@@ -660,8 +658,8 @@ The same sheets, live. Editing is off. Entering Simulate starts from everything 
 | **CK-1** | warning | A wire crosses the panel boundary without a terminal |
 | **CK-2** | warning | A contact isn't driven by a coil |
 | **CK-3** | warning | A coil has no contacts |
-| **CK-4** | ~~warning~~ | ~~A link arrow isn't paired with another~~ *(v0.5: A27)* |
-| **CK-5** | ~~warning~~ | ~~Linked arrows are both sources, or both destinations~~ *(v0.5: A27)* |
+| **CK-4** | warning | A link end isn't linked to another |
+| **CK-5** | warning | Linked link ends are both sources, or both destinations |
 | **CK-6** | warning | A part isn't connected, or has terminals not connected |
 | **CK-7** | warning | A tag is used more than once (with the sheets) |
 | **CK-8** | warning | A plant or module terminal isn't shown on any sheet |
@@ -741,7 +739,7 @@ Design's findings appear only once a project uses Design.
 - **SC-3** **Terminals:** Strip, Terminal, Sheet-col, Wire, Internal, External. A terminal is listed as `X1:3-13`.
 - **SC-4** **Field cables:** Plant, Description, Plant terminal, Wire, Panel terminal, Sheet-col; and below, **cores per device** (how many cores each field device needs and on which terminals), with its own CSV.
 - **SC-5** ~~**Markers:** two on every wire.~~ *(v0.5: A28)* A panel wire on a supply says the supply's number; any other panel wire says the terminal it lands on, or its own number when it reaches none. A field core's say the terminal at the panel end and the device's tag at the field end. *Group duplicates* gives each marker once with a count. Renumber first.
-- **SC-6** **IO points:** Controller, Module, Point, Form, Pins, Label, Wired to (followed through link arrows). With no controller it says *No controller yet (Design → Controller)*.
+- **SC-6** **IO points:** Controller, Module, Point, Form, Pins, Label, Wired to (followed through link ends). With no controller it says *No controller yet (Design → Controller)*.
 - **SC-7** **Plant points:** Device, Description, Point, Form, Pins, Wired to.
 - **SC-8** **Bill of materials:** GA sheet, Item, Maker, Part number, Qty, Unit, Tags. It's counted from the GA sheets only: devices by the device picked (or their generic size), each distribution block on a line of its own saying the ways it needs (*needs at least 5 ways*), terminals each, label plates, and DIN rail and trunking by length. A schematic part never placed on a GA isn't on it (CK-41). *(v0.5: A71. Also as a table placed on a GA sheet)*
 - **SC-9** **Export PDF** saves first, then downloads every sheet as one A4 landscape PDF on white, with osifont embedded.
@@ -803,7 +801,7 @@ Design's findings appear only once a project uses Design.
 | `Shift`/`Ctrl`+click | Add to the selection |
 | Drag on a part | Move |
 | Drag on empty paper | Box-select |
-| Double-click a contact, coil ~~or link arrow~~ *(v0.5: A27)* | Jump to its partner |
+| Double-click a contact, coil or link end | Jump to its partner |
 | Scroll | Zoom; in a number box, step the value (`Shift`: ten steps) |
 | Middle-drag | Pan |
 | `Shift`+click a push button (Simulate) | Latch it |

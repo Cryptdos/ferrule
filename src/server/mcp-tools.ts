@@ -339,7 +339,7 @@ export const TOOLS: Tool[] = [
     inputSchema: obj({}),
     run: async () =>
       listSymbols()
-        .filter((s) => s.id !== "junction")
+        .filter((s) => s.id !== "junction" && s.id !== "link")
         .map((s) => {
           const el: Element = {
             id: "x",
@@ -461,6 +461,7 @@ export const TOOLS: Tool[] = [
     run: async (a, ctx) =>
       edit(ctx, str(a, "project"), (p) => {
         const page = pageByNumber(p, a.sheet);
+        if (str(a, "symbol") === "link") throw new ArgError("A link end isn't placed: it's the end of a wire. Use connect with {x, y} on bare paper for that end");
         const el = op.addElement(p, page.id, str(a, "symbol"), [num(a, "x"), num(a, "y")], {
           rot: [0, 90, 180, 270].includes(a.rot as number) ? (a.rot as 0) : 0,
           label: str(a, "label", false),
@@ -545,13 +546,13 @@ export const TOOLS: Tool[] = [
   {
     name: "connect",
     description:
-      "Wire two ends together on a sheet. Each end is {element, terminal} (distribution blocks and power rails: terminal is the tap offset along the bar, e.g. '30') or {wire, x, y} to tee into an existing wire at that grid point. Routing is automatic.",
+      "Wire two ends together on a sheet. Each end is {element, terminal} (distribution blocks and power rails: terminal is the tap offset along the bar, e.g. '30'), {wire, x, y} to tee into an existing wire at that grid point, or {x, y} on bare paper: a link end, where the wire carries on to another sheet. A 'to' end on bare paper is a source (the wire leaves here); a 'from' end a destination (it arrives here). A bare end can take a label, and link (a source link end's id, for a destination drawn to carry it on). Pair link ends afterwards with link. Routing is automatic; the result names any link end made.",
     inputSchema: obj(
       {
         project,
         sheet,
-        from: { type: "object", description: "{element, terminal} or {wire, x, y}" },
-        to: { type: "object", description: "{element, terminal} or {wire, x, y}" },
+        from: { type: "object", description: "{element, terminal}, {wire, x, y}, or {x, y, label?, link?} on bare paper (a destination link end)" },
+        to: { type: "object", description: "{element, terminal}, {wire, x, y}, or {x, y, label?} on bare paper (a source link end)" },
       },
       ["project", "sheet", "from", "to"],
     ),
@@ -562,10 +563,13 @@ export const TOOLS: Tool[] = [
           const o = (v ?? {}) as Record<string, unknown>;
           if (typeof o.element === "string") return { terminal: [o.element, String(o.terminal ?? "")] };
           if (typeof o.wire === "string") return { wire: o.wire, at: [num(o, "x"), num(o, "y")] };
-          throw new ArgError("Each end needs {element, terminal} or {wire, x, y}");
+          if (typeof o.x === "number" && typeof o.y === "number")
+            return { free: [o.x, o.y], ...(typeof o.label === "string" ? { label: o.label } : {}), ...(typeof o.link === "string" ? { linkTo: o.link } : {}) };
+          throw new ArgError("Each end needs {element, terminal}, {wire, x, y} or {x, y}");
         };
         const seg = op.wire(p, page.id, end(a.from), end(a.to));
-        return { wire: seg.id, conductor: seg.conductor };
+        const made = [seg.from, seg.to].map(([id]) => page.elements.find((e) => e.id === id)).find((e) => e?.symbol === "link");
+        return { wire: seg.id, conductor: seg.conductor, ...(made ? { linkEnd: made.id } : {}) };
       }),
   },
   {
@@ -585,13 +589,13 @@ export const TOOLS: Tool[] = [
   {
     name: "link",
     description:
-      "Link a contact (NO/NC/changeover/timer contact, or contactor main contacts) to the coil that drives it, or pair two off-page arrows. coil/other null unlinks.",
+      "Link a contact (NO/NC/changeover/timer contact, or contactor main contacts) to the coil that drives it, or pair two link ends (the bare ends of wires that carry on to another sheet: link_end and other). coil/other null unlinks. A link end's partner becomes the other of the pair: one source, one destination.",
     inputSchema: obj(
       {
         project,
         contact: { type: "string" },
         coil: { type: ["string", "null"] },
-        arrow: { type: "string" },
+        link_end: { type: "string" },
         other: { type: ["string", "null"] },
       },
       ["project"],
@@ -599,8 +603,8 @@ export const TOOLS: Tool[] = [
     run: async (a, ctx) =>
       edit(ctx, str(a, "project"), (p) => {
         if (typeof a.contact === "string") op.linkContact(p, a.contact, typeof a.coil === "string" ? a.coil : null);
-        else if (typeof a.arrow === "string") op.linkOffpage(p, a.arrow, typeof a.other === "string" ? a.other : null);
-        else throw new ArgError("Give contact (+ coil) or arrow (+ other)");
+        else if (typeof a.link_end === "string") op.pairLinkEnds(p, a.link_end, typeof a.other === "string" ? a.other : null);
+        else throw new ArgError("Give contact (+ coil) or link_end (+ other)");
         return { ok: true };
       }),
   },
@@ -937,7 +941,7 @@ export const TOOLS: Tool[] = [
   {
     name: "check",
     description:
-      "Rule checks: boundary crossings, loose contacts, coils without contacts, duplicate tags, unpaired arrows, unconnected terminals, plant terminals shown nowhere or twice.",
+      "Rule checks: boundary crossings, loose contacts, coils without contacts, duplicate tags, unlinked link ends, unconnected terminals, plant terminals shown nowhere or twice.",
     inputSchema: obj({ project }, ["project"]),
     run: async (a, ctx) => {
       const p = await ctx.storage.load(str(a, "project"));
@@ -1139,7 +1143,7 @@ export const INSTRUCTIONS = `Ferrule drafts control panel schematics on A4 lands
 
 Coordinates are grid units: x 0–${AREA_UNITS.w} across (${AREA_UNITS.w / 2} columns, 2 units each), y 0–${AREA_UNITS.h} down. Every terminal sits on a whole unit. Symbols are vertical by default (current flows top to bottom), so a ladder rung is a column of symbols between a CCT power rail (symbol 'rail') at the top and a 0V rail at the bottom, each on its distribution: wire terminal to terminal down the column. Power busbars are distribution blocks (symbol 'busbar', tagged W, placed on the GA, needing a way for each wire drawn onto them); power rails are the common of a drawing, with no tag, drawn heavier on a low-voltage supply than an extra-low one.
 
-Typical flow: create_project or pick one from list_projects → add_distribution (CCT, 0V…) → add_element (distribution blocks and power rails with params.dist, contacts, coils, lamps, terminals) → connect → link contacts to their coils → add_plant / place_plant_view for field equipment below a panel boundary (update_page boundaryY), with terminals on the boundary → controller / add_module for an outstation or PLC, its module views placed at the top of a sheet and every one of a module's connections wired there (outputs that switch panel circuits go out through link arrows) → renumber → check → view_page to look at the result → export_pdf.
+Typical flow: create_project or pick one from list_projects → add_distribution (CCT, 0V…) → add_element (distribution blocks and power rails with params.dist, contacts, coils, lamps, terminals) → connect → link contacts to their coils → add_plant / place_plant_view for field equipment below a panel boundary (update_page boundaryY), with terminals on the boundary → controller / add_module for an outstation or PLC, its module views placed at the top of a sheet and every one of a module's connections wired there (outputs that switch panel circuits go out through link ends: a wire connected to bare paper {x, y}, paired with the link end where it carries on) → renumber → check → view_page to look at the result → export_pdf.
 
 Never type tags or wire numbers: renumber generates them from position (e.g. K3-16 = sheet 3, column 16). Labels can use fields such as {plant:SF-01.tag} so they follow the plant. Use templates (save_template / apply_template) for repeated sheets such as one starter per fan.`;
 

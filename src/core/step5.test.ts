@@ -123,11 +123,11 @@ describe("terminals", () => {
   });
 });
 
-describe("link arrows", () => {
-  test("label at the tip, reference after it: right of a vertical wire, under a horizontal one (71)", () => {
+describe("link ends", () => {
+  test("label at the far end, reference after it: right of a vertical wire, past the end of a horizontal one (71)", () => {
     const { localGeometry } = require("./symbols") as typeof import("./symbols");
     const { p, pg } = project();
-    const a = addElement(p, pg, "offpage", [20, 20], { label: "TO PUMP" });
+    const a = addElement(p, pg, "link", [20, 20], { label: "TO PUMP" });
     const g = localGeometry(a, { tag: "", label: "TO PUMP", xref: "2-14" });
     const lab = g.prims.find((x) => x.t === "text" && x.role === "label") as any;
     const ref = g.prims.find((x) => x.t === "text" && x.role === "xref") as any;
@@ -137,27 +137,26 @@ describe("link arrows", () => {
     a.rot = 270;
     const h = localGeometry(a, { tag: "", label: "TO PUMP", xref: "2-14" });
     const hl = h.prims.find((x) => x.t === "text" && x.role === "label") as any;
-    expect(hl.at[1]).toBeGreaterThan(0.6);
+    const hr = h.prims.find((x) => x.t === "text" && x.role === "xref") as any;
+    // On the wire's line, past its tip, the place after the label.
+    expect(hl.at[0]).toBeGreaterThan(1.8);
+    expect(hr.at[0]).toBeGreaterThan(hl.at[0]);
+    expect(hr.at[1]).toBe(hl.at[1]);
   });
 
-  test("Link… makes the clicked arrow the destination; it shows its source's label (70); or link to a new arrow", () => {
-    const { linkArrows, linkToNewArrow } = require("./ops") as typeof import("./ops");
+  test("Link… makes the clicked end the destination; it shows its source's label (70)", () => {
+    const { linkFromSource } = require("./ops") as typeof import("./ops");
     const { elementTexts } = require("./tags") as typeof import("./tags");
     const { p, pg } = project();
-    const a = addElement(p, pg, "offpage", [20, 20], { label: "FAN RUN" });
-    const b = addElement(p, pg, "offpage", [80, 20]);
-    linkArrows(p, a.id, b.id);
+    const a = addElement(p, pg, "link", [20, 20], { label: "FAN RUN" });
+    const b = addElement(p, pg, "link", [80, 20]);
+    linkFromSource(p, a.id, b.id);
     expect(a.params.source).toBe(true);
     expect(b.params.source).toBe(false);
     expect(elementTexts(b, p).label).toBe("FAN RUN");
     b.params.sameLabel = false;
     b.label = "OWN";
     expect(elementTexts(b, p).label).toBe("OWN");
-    const c = linkToNewArrow(p, a.id, pg, [100, 40]);
-    expect(c.links).toEqual([a.id]);
-    expect(a.links).toEqual([c.id]);
-    expect(b.links).toEqual([]);
-    expect(c.rot).toBe(180);
   });
 });
 

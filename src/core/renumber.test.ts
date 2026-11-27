@@ -1,7 +1,7 @@
 import { controlBusbars } from "./testing";
 import { describe, expect, test } from "bun:test";
 import { newProject } from "./model";
-import { addElement, addPage, connect, linkContact, linkOffpage, setConductorNumber, updateElement } from "./ops";
+import { addElement, addPage, connect, linkContact, pairLinkEnds, setConductorNumber, updateElement } from "./ops";
 import { renumber } from "./renumber";
 import { displayTag, elementTexts } from "./tags";
 import { contactTable } from "./xref";
@@ -101,12 +101,12 @@ describe("cross-references", () => {
   test("off-page arrows pair up, point at each other and carry the wire number across", () => {
     const { p, pg, s1 } = rung();
     const pg2 = addPage(p, "Next").id;
-    const out = addElement(p, pg, "offpage", [50, 30]);
-    const inn = addElement(p, pg2, "offpage", [20, 20], { rot: 180 });
+    const out = addElement(p, pg, "link", [50, 30]);
+    const inn = addElement(p, pg2, "link", [20, 20], { rot: 180 });
     const h = addElement(p, pg2, "lamp", [20, 40]);
     connect(p, pg, [s1.id, "14"], [out.id, "1"]);
     connect(p, pg2, [inn.id, "1"], [h.id, "+V"]);
-    linkOffpage(p, out.id, inn.id);
+    pairLinkEnds(p, out.id, inn.id);
     renumber(p);
     expect(elementTexts(out, p).xref).toBe("(2-11)");
     expect(elementTexts(inn, p).xref).toBe("(1-26)");

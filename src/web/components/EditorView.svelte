@@ -579,7 +579,7 @@
         <LabelButton icon="renumber" label="Renumber" active={!!open.renumber} onclick={() => toggle("renumber")} title="See what Renumber would change to tags, terminal and wire numbers, then apply" />
         <LabelButton icon="templates" label="Templates" active={!!open.templates} onclick={() => toggle("templates")} title="Save and stamp sheet and section templates" />
         <LabelButton icon="plant" label="Plant" active={!!open.plant} onclick={() => toggle("plant")} title="Field equipment: define plant and place views" />
-        <LabelButton icon="distribution" label="Distribution" active={!!open.distribution} onclick={() => toggle("distribution")} title="The supplies busbars, link arrows and the incoming supply pick from" />
+        <LabelButton icon="distribution" label="Distribution" active={!!open.distribution} onclick={() => toggle("distribution")} title="The supplies blocks and rails pick from" />
         <LabelButton icon="table" label="Table" active={!!open.table} onclick={() => toggle("table")} title="Table: every element in the project, to filter, edit and find-and-replace" />
       {:else if editor.mode === "ga"}
         <span class="sep"></span>
@@ -624,9 +624,8 @@
     {/if}
     {#if editor.linking}
       <div class="linkbar">
-        {editor.linking.mode === "new"
-          ? `New arrow linked from ${editor.linking.address}: click where it goes, on any sheet.`
-          : `Linking from ${editor.linking.address}: click the arrow to link to, on any sheet.`}
+        Linking from {editor.linking.address}: click the link end to link to, or bare paper to carry the wire on there, on
+        any sheet.
         Esc cancels.
         <button onclick={() => (editor.linking = null)}>Cancel</button>
       </div>
