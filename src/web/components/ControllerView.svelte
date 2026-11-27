@@ -13,6 +13,7 @@
   import DesignProps from "./DesignProps.svelte";
   import { controllerTag, moduleTypeName, modulesOf, slotAddress } from "../../core/modules";
   import { plantLabel } from "../../core/ops";
+  import { printedPin } from "../../core/points";
   import type { Editor } from "../editor.svelte";
   import TypeBadge from "./TypeBadge.svelte";
 
@@ -186,7 +187,7 @@
               <div class="mhead" class:picked={modulePicked(m.id)} onclick={() => (editor.designPick = { plant: [m.id] })} onkeydown={() => {}} role="button" tabindex="-1"><span><strong>{plantLabel(m)}</strong> {moduleTypeName(m.module!)}</span><span class="dim">{(m.points ?? []).length} point{(m.points ?? []).length === 1 ? "" : "s"}</span></div>
               {#each m.points ?? [] as q (q.name)}
                 <div class="ch" class:picked={editor.designPick.plant[0] === m.id && editor.designPick.point === q.name} role="button" tabindex="-1" onclick={() => (editor.designPick = { plant: [m.id], point: q.name })} onkeydown={() => {}}>
-                  <span class="cname">{q.name}</span><span></span><span class="dim">{q.form === "none" ? "no form yet" : q.form.replace("-", " ")}</span>
+                  <span class="cname">{q.name}</span><span></span><span class="dim">{q.form === "none" ? "no form yet" : q.form.replace("-", " ")}{q.pins.length ? ` · ${q.pins.map((t) => printedPin(t, q.name)).join(" ")}` : ""}</span>
                 </div>
               {:else}
                 <p class="hint pad">{(m.terminals ?? []).length ? `${(m.terminals ?? []).length} terminals, no points: Terminals… in its Properties groups them.` : "No terminals yet: Terminals… in its Properties."}</p>

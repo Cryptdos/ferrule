@@ -5,8 +5,9 @@
  * here decides anything for the engineer: allocation is by hand, and a
  * reference to something that's gone is let go, never guessed.
  */
+import { moduleType } from "./modules";
 import { parseSupplies, parseSupply } from "./supplies";
-import { newId, type ChannelRef, type Condition, type DesignTemplate, type Interlock, type IoPoint, type PlantItem, type PlantMark, type PointForm, type Project } from "./model";
+import { markLetters, newId, type ChannelRef, type Condition, type DesignTemplate, type Interlock, type IoPoint, type PlantItem, type PlantMark, type PointForm, type Project } from "./model";
 import { OpError, getPlant, renamePointRefs, syncPlantViews } from "./ops";
 import { MAX_CONDITIONS, newInterlock, syncInterlocks } from "./interlocks";
 
@@ -44,9 +45,11 @@ export const needsChannel = (p: IoPoint): boolean => !!pointType(p.form) && goes
 /**
  * What a module's channel is, from the controller's side: a module input
  * (a DI channel) takes a plant contact, and so on. A universal channel
- * takes any of the four.
+ * takes any of the four. A module whose type has no channels (a host, a
+ * power supply, an adapter) has none, whatever its points' forms (v0.5 A68).
  */
 export function channelTypes(module: PlantItem, channel: IoPoint): IoType[] {
+  if (module.module && !moduleType(module.module.type).channels) return [];
   if (module.module?.type === "uio") return ["DI", "DO", "AI", "AO"];
   switch (channel.form) {
     case "dry-in":
@@ -275,6 +278,8 @@ export interface PlantDesign {
   inPanel?: boolean;
   /** The picture inside its view (v0.4.x M1); empty clears it. */
   mark?: PlantMark | "";
+  /** With *Other*: up to four letters (v0.5 A66). */
+  markText?: string;
 }
 
 /** Set a plant item's Design fields; an empty value clears one. */
@@ -290,9 +295,14 @@ export function setPlantDesign(project: Project, id: string, patch: PlantDesign)
     if (patch.connects === "hardwired") delete it.connects;
     else it.connects = patch.connects;
   }
-  if (patch.mark !== undefined) {
-    if (patch.mark) it.mark = patch.mark;
-    else delete it.mark;
+  if (patch.mark !== undefined || patch.markText !== undefined) {
+    if (patch.mark !== undefined) {
+      if (patch.mark) it.mark = patch.mark;
+      else delete it.mark;
+    }
+    const letters = markLetters(patch.markText ?? it.markText ?? "");
+    if (it.mark === "other" && letters) it.markText = letters;
+    else delete it.markText;
     syncPlantViews(project);
   }
   if (patch.inPanel !== undefined) {

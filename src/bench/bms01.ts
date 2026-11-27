@@ -24,7 +24,7 @@ import { addController, addModule, placeModulesOnGa } from "../core/controllers"
 import { addInterlock, addInterlockCondition, addSystem, allocate, setPlantDesign, updateInterlock } from "../core/design";
 import { ENCL, fitScale, gaCandidates } from "../core/ga";
 import type { Vec } from "../core/geometry";
-import { type Distribution, type Element, type IoPoint, type Page, type ParamValue, type PlantItem, type Project, newProject } from "../core/model";
+import { type Distribution, type Element, type IoPoint, type Page, type ParamValue, type PlantItem, type PlantMark, type Project, newProject } from "../core/model";
 import { addNetwork, placeNetworkSheet, putOnNetwork } from "../core/network";
 import {
   addDistribution,
@@ -154,6 +154,14 @@ export function buildBms01(avoid: Avoid | null): Bms01 {
     }),
     AHU,
   );
+
+  // Marks (v0.5 A66): a picture, or letters typed.
+  for (const [it, mark, markText] of [
+    [DMP1, "damper"], [DMP2, "damper"], [VLV, "valve"],
+    [TT1, "other", "T"], [TT2, "other", "T"], [TT3, "other", "T"], [HT1, "other", "RH"],
+    [DPS1, "other", "ΔP"], [DPS2, "other", "ΔP"], [FLT, "other", "ΔP"],
+  ] as [PlantItem, PlantMark, string?][])
+    setPlantDesign(p, it.id, { mark, markText });
 
   // Comms only: meters on their own bus. No pins.
   const meter = (tag: string, desc: string) => {

@@ -806,13 +806,14 @@ describe("step 9b: RCD, connector, plant marks (M1); door devices with no schema
     const { project: p, plant } = fresh();
     const v = viewsOf(p, plant.TT1!.id)[0]!.el;
     const before = localGeometry(v, elementTexts(v, p));
-    setPlantDesign(p, plant.TT1!.id, { mark: "temperature" });
-    expect(v.params.pmark).toBe("temperature");
+    setPlantDesign(p, plant.TT1!.id, { mark: "other", markText: "T" });
+    expect(v.params.pmark).toBe("other");
     const after = localGeometry(v, elementTexts(v, p));
     expect(after.prims.some((x) => x.t === "text" && x.text === "T")).toBe(true);
     expect(after.terminals).toEqual(before.terminals);
     const back = parseProject(JSON.parse(JSON.stringify(p)));
-    expect(back.plant.find((x) => x.id === plant.TT1!.id)!.mark).toBe("temperature");
+    expect(back.plant.find((x) => x.id === plant.TT1!.id)!.mark).toBe("other");
+    expect(back.plant.find((x) => x.id === plant.TT1!.id)!.markText).toBe("T");
   });
 
   test("M5: a door device with no schematic part prints its tag and is on the bill of materials", () => {

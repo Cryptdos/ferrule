@@ -58,3 +58,55 @@ describe("step 8b: the Terminals window (A67)", () => {
     expect(gap.points.map((q) => q.pins)).toEqual([["1", "3"], ["4", "6"]]);
   });
 });
+
+describe("step 8c: adapters and marks (A68, A66)", () => {
+  test("an adapter is a module with no channels, added empty, its terminals entered by hand", async () => {
+    const { addModule, addController } = await import("./controllers");
+    const { addPin, updatePin } = await import("./ops");
+    const { channelsOf } = await import("./design");
+    const { moduleTypeName } = await import("./modules");
+    const { moduleGaSize } = await import("./ga");
+    const p = newProject("t");
+    const c = addController(p);
+    const a = addModule(p, c.id, { type: "adapter", pattern: null });
+    expect(a.terminals).toEqual([]);
+    expect(moduleTypeName(a.module!)).toBe("Adapter");
+    for (const t of ["1", "2", "3", "4"]) addPin(p, a.id, t);
+    updatePin(p, a.id, "1", { point: "Supply in" });
+    updatePin(p, a.id, "3", { point: "Supply out" });
+    expect(a.points!.map((q) => q.form)).toEqual(["none", "none"]);
+    // Whatever a point's form, a module with no channels has none.
+    updateDesignPoint(p, a.id, "Supply out", { form: "contact" });
+    expect(channelsOf(p).some((ch) => ch.module.id === a.id)).toBe(false);
+    expect(moduleGaSize(p, a)).toEqual({ w: 22.5, h: 90 });
+    const back = parseProject(JSON.parse(JSON.stringify(p)));
+    expect(back.plant.find((x) => x.id === a.id)!.module!.type).toBe("adapter");
+  });
+
+  test("a mark is a picture, or Other with up to four letters: a circle for two, a lozenge for three or four", async () => {
+    const { setPlantDesign } = await import("./design");
+    const { addPlant } = await import("./ops");
+    const { markPrims, markWidth } = await import("./symbols");
+    const p = newProject("t");
+    const it = addPlant(p, "", "CO2 sensor", ["1", "2"]);
+    setPlantDesign(p, it.id, { mark: "other", markText: "  CO2x9 " });
+    expect(it.markText).toBe("CO2x");
+    setPlantDesign(p, it.id, { markText: "CO2" });
+    expect(it.markText).toBe("CO2");
+    // Two letters: a circle 4 mm across; three: wider, the same height.
+    expect(markWidth("other", "RH")).toBeCloseTo(2.2);
+    expect(markWidth("other", "CO2")).toBeGreaterThan(2.2);
+    expect(markPrims("other", 0, 0, "RH").some((x) => x.t === "circle")).toBe(true);
+    expect(markPrims("other", 0, 0, "IAQ").filter((x) => x.t === "arc")).toHaveLength(2);
+    expect(markPrims("other", 0, 0, "")).toEqual([]);
+    // A picture clears the letters.
+    setPlantDesign(p, it.id, { mark: "fan" });
+    expect(it.markText).toBeUndefined();
+    expect(markPrims("fan", 0, 0).filter((x) => x.t === "ellipse")).toHaveLength(2);
+    expect(markPrims("pump", 0, 0).some((x) => x.t === "line")).toBe(true);
+    // The letter-only marks are gone: a file with one opens without it.
+    const json = JSON.parse(JSON.stringify(p));
+    json.plant.find((x: { id: string }) => x.id === it.id).mark = "temperature";
+    expect(parseProject(json).plant.find((x) => x.id === it.id)!.mark).toBeUndefined();
+  });
+});

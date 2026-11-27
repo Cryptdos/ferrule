@@ -44,7 +44,7 @@
     const c = ctrl.id;
     const n = channels;
     let id = "";
-    if (editor.apply((p) => (id = addModule(p, c, { type, channels: n, pattern: type === "host" ? null : undefined }).id))) pickNew(id);
+    if (editor.apply((p) => (id = addModule(p, c, { type, channels: n, pattern: type === "host" || type === "adapter" ? null : undefined }).id))) pickNew(id);
   }
   function addSaved(value: string) {
     if (!ctrl) return;

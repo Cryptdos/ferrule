@@ -5,6 +5,7 @@
  */
 
 import type { IoPoint, ModuleType, PinInfo } from "./model";
+import { MODULE_TYPES as TYPES } from "./modules";
 
 /**
  * A controller module's model as entered from its datasheet (controller.md
@@ -19,7 +20,7 @@ export interface ModuleTemplate {
   points?: IoPoint[];
 }
 
-const MODULE_TYPES = new Set(["psu", "host", "di", "do", "uio", "ai", "ao"]);
+const MODULE_TYPES = new Set<string>(TYPES.map((t) => t.value));
 const FORM_SET = new Set(["contact", "powered-out", "dry-in", "powered-in", "analogue-in", "analogue-out", "supply-in", "supply-out", "comms"]);
 
 export function parseModuleTemplate(v: unknown): ModuleTemplate | undefined {
