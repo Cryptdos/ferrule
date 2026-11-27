@@ -28,7 +28,7 @@ describe("v0.5 step 1", () => {
 
   test("A40: flipped, the symbol turns over and the tag stays above the label", () => {
     const { p, pg } = sheet();
-    for (const sym of ["contact-no", "coil", "lamp", "isolator", "pushbutton", "fuse"]) {
+    for (const sym of ["contact", "coil", "lamp", "isolator", "pushbutton", "fuse"]) {
       const el = addElement(p, pg, sym, [20, 20], { label: "RUN" });
       const at = (role: string) => {
         const g = localGeometry(el, { tag: "K1", label: "RUN" });

@@ -113,10 +113,10 @@ describe("simulating points", () => {
     });
     const v = placePlantView(p, pg, item.id, [60, 90]);
     // A volt-free contact across the dry input, and a switched 24 V across the powered one.
-    const k = addElement(p, pg, "contact-no", [60, 40]);
+    const k = addElement(p, pg, "contact", [60, 40]);
     connect(p, pg, [v.id, "1"], [k.id, "13"]);
     connect(p, pg, [k.id, "14"], [v.id, "2"]);
-    const sw = addElement(p, pg, "contact-no", [80, 30]);
+    const sw = addElement(p, pg, "contact", [80, 30]);
     connect(p, pg, [cct.id, "80"], [sw.id, "13"]);
     connect(p, pg, [sw.id, "14"], [v.id, "3"]);
     connect(p, pg, [v.id, "4"], [ov.id, "82"]);
@@ -141,11 +141,11 @@ describe("simulating points", () => {
     const fv = placePlantView(p, pg, fan.id, [40, 90]);
     const dv = placePlantView(p, pg, dps.id, [80, 90]);
     const k = addElement(p, pg, "coil", [20, 60]);
-    const sw = addElement(p, pg, "contact-no", [20, 30]);
+    const sw = addElement(p, pg, "contact", [20, 30]);
     connect(p, pg, [cct.id, "20"], [sw.id, "13"]);
     connect(p, pg, [sw.id, "14"], [k.id, "A1"]);
     connect(p, pg, [k.id, "A2"], [ov.id, "20"]);
-    const kc = addElement(p, pg, "contact-no", [40, 30]);
+    const kc = addElement(p, pg, "contact", [40, 30]);
     linkContact(p, kc.id, k.id);
     connect(p, pg, [cct.id, "40"], [kc.id, "13"]);
     connect(p, pg, [kc.id, "14"], [fv.id, "1"]);
@@ -249,7 +249,7 @@ describe("simulating points", () => {
     const { p, pg } = project();
     const { cct, ov } = controlBusbars(p, pg);
     const coil = (x: number) => {
-      const sw = addElement(p, pg, "contact-no", [x, 30]);
+      const sw = addElement(p, pg, "contact", [x, 30]);
       const k = addElement(p, pg, "coil", [x, 60]);
       connect(p, pg, [cct.id, String(x)], [sw.id, "13"]);
       connect(p, pg, [sw.id, "14"], [k.id, "A1"]);

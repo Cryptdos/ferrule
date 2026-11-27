@@ -23,7 +23,7 @@
 import type { Condition, Element, Expectation, Project } from "./model";
 import { contactPins, isAnalogueForm, pointRef, signalPins } from "./points";
 import { pointLabel, viewsOf } from "./modules";
-import { changeoverTerms, isolatorAux, pushPoles, selectorPoles } from "./symbols";
+import { changeoverTerms, contactKind, isolatorAux, isTimerCoil, pushPoles, selectorPoles } from "./symbols";
 import { masterOf } from "./xref";
 import { netJoins } from "./conductors";
 import { displayTag } from "./tags";
@@ -186,18 +186,19 @@ export function compile(project: Project): Circuit {
       const operated = (s: SimState): boolean => {
         if (master) {
           // A contact on a timer coil follows the timer's function, unless it's one of its plain contacts.
-          if (master.symbol === "timer-coil" && el.params.instant !== true) return !!s.timed[master.id];
+          if (isTimerCoil(master) && el.params.instant !== true) return !!s.timed[master.id];
           return !!s.energised[master.id];
         }
         return (s.inputs[el.id] ?? 0) === 1;
       };
       const manual = !master;
       const press = (s: SimState) => (s.inputs[el.id] ?? 0) === 1;
-      if (["contact-no", "contact-nc", "contact-co"].includes(el.symbol)) ops.set(el.id, operated);
+      if (el.symbol === "contact") ops.set(el.id, operated);
       if (el.symbol === "pushbutton") ops.set(el.id, press);
       // A selector is drawn turned whenever it's out of position 0.
       if (el.symbol === "selector") ops.set(el.id, (s) => (s.inputs[el.id] ?? 0) !== 0);
-      switch (el.symbol) {
+      // One Contact part (v0.5 A36): its kind picks how it switches.
+      switch (el.symbol === "contact" ? `contact-${contactKind(el)}` : el.symbol === "coil" && isTimerCoil(el) ? "timer-coil" : el.symbol) {
         case "busbar":
         case "rail": {
           const conds = project.conductors.filter((c) => c.terminals.some(([id]) => id === el.id)).map((c) => c.id);
@@ -370,7 +371,7 @@ export function compile(project: Project): Circuit {
   for (const [id, fn] of ops) {
     const el = byId.get(id);
     if (!el) continue;
-    if (el.symbol === "contact-nc") states.set(id, (s) => !fn(s));
+    if (el.symbol === "contact" && contactKind(el) === "nc") states.set(id, (s) => !fn(s));
     else states.set(id, fn);
   }
   for (const l of loads) {

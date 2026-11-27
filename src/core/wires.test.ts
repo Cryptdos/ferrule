@@ -54,7 +54,7 @@ describe("wiring", () => {
   test("a straight rung routes straight", () => {
     const { p, pg, page } = setup();
     const rail = addElement(p, pg, "busbar", [0, 10], { params: { length: 100 } });
-    const s = addElement(p, pg, "contact-no", [20, 20]);
+    const s = addElement(p, pg, "contact", [20, 20]);
     const k = addElement(p, pg, "coil", [20, 30]);
     connect(p, pg, [rail.id, "20"], [s.id, "13"]);
     connect(p, pg, [s.id, "14"], [k.id, "A1"]);
@@ -67,9 +67,9 @@ describe("wiring", () => {
 
   test("a cable screen is drawn over the cores: wires go straight through it", () => {
     const { p, pg, page } = setup();
-    const a = addElement(p, pg, "contact-no", [20, 20]);
+    const a = addElement(p, pg, "contact", [20, 20]);
     const b = addElement(p, pg, "coil", [20, 40]);
-    const c = addElement(p, pg, "contact-no", [23, 20]);
+    const c = addElement(p, pg, "contact", [23, 20]);
     const d = addElement(p, pg, "coil", [23, 40]);
     addElement(p, pg, "screen", [20, 30], { params: { span: 3 } });
     connect(p, pg, [a.id, "14"], [b.id, "A1"]);
@@ -169,7 +169,7 @@ describe("tees and conductors", () => {
     const { p, pg } = setup();
     const rail = addElement(p, pg, "busbar", [0, 10], { params: { length: 100 } });
     const x1 = addElement(p, pg, "terminal", [20, 15]);
-    const s = addElement(p, pg, "contact-no", [20, 25]);
+    const s = addElement(p, pg, "contact", [20, 25]);
     const h = addElement(p, pg, "lamp", [40, 25]);
     connect(p, pg, [rail.id, "20"], [x1.id, "1"]);
     connect(p, pg, [x1.id, "2"], [s.id, "13"]);

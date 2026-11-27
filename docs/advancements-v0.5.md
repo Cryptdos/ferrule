@@ -205,11 +205,11 @@ From the notes written into the QA copy of the specification (`v0.4.0-pre Notes\
   - *Layout* is greyed out on a spare sheet.
   - To settle: *Layout* on a schematic sheet. Today it's allowed, and the browser offers *New GA sheet* there (LA-1); with A33 that button has another home.
 
-- [ ] **A36. One Contact part.** *Tweak. PT-1. Build 0.4.5.* Normally open, normally closed and changeover are three parts in the list. They become one, **Contact**, with the kind picked in its properties, as a push button's and a selector's poles already are.
+- [x] **A36. One Contact part.** *Built: PR 123.* *Tweak. PT-1. Build 0.4.5.* Normally open, normally closed and changeover are three parts in the list. They become one, **Contact**, with the kind picked in its properties, as a push button's and a selector's poles already are.
   - ***Belongs to* is removed.** It chooses Relay, Contactor or Timer, but a contact takes that from the coil it's linked to, and once linked the choice can't be made anyway. Unlinked, a contact is K.
   - **The greyed-out *Instantaneous* is removed.** It shows on every contact and can't be used until the contact is on a timer coil, where it becomes a tick box. Only the tick box stays, and only on a timer's contact.
 
-- [ ] **A37. One Coil part.** *Tweak. PT-6, PT-7. Build 0.4.5.* *Relay / contactor coil* and *Timer coil* are two parts. They become one, **Coil**, with *Type*: Relay, Contactor or Timer. The symbol changes with the type, as it does on other parts.
+- [x] **A37. One Coil part.** *Built: PR 123.* *Tweak. PT-6, PT-7. Build 0.4.5.* *Relay / contactor coil* and *Timer coil* are two parts. They become one, **Coil**, with *Type*: Relay, Contactor or Timer. The symbol changes with the type, as it does on other parts.
   - The timer's settings (function, time, maker's function code) show only when the type is Timer.
   - Tags follow the type: K for a relay and a timer, Q for a contactor.
   - Contacts linked to it follow: change a coil to Timer and its contacts are timed, since that already comes from the link.
@@ -219,7 +219,7 @@ From the notes written into the QA copy of the specification (`v0.4.0-pre Notes\
   - A thing with no device has neither supply nor draw, which is the truth, and Check says so (A31).
   - Settled 27 Nov 2026: the Incoming supply isn't a device, so it keeps *Gives* and loses *Rating (VA)* (A72). A transformer's go to its device like the rest.
 
-- [ ] **A39. Rotate comes off parts that sit in a drop.** *Tweak. DR-3, DR-8, PT-11. Build 0.4.5.* Rotating a contact or a coil puts its tag and label over each other, and a part turned on its side goes against how a sheet is laid out. Rotate is removed from: contacts, coils, push buttons, selectors, isolators and breakers, fuses, lamps, the transformer, the motor and the connector block. Flip stays on all of them.
+- [x] **A39. Rotate comes off parts that sit in a drop.** *Built: PR 123.* *Tweak. DR-3, DR-8, PT-11. Build 0.4.5.* Rotating a contact or a coil puts its tag and label over each other, and a part turned on its side goes against how a sheet is laid out. Rotate is removed from: contacts, coils, push buttons, selectors, isolators and breakers, fuses, lamps, the transformer, the motor and the connector block. Flip stays on all of them.
   - Rotate stays on the earth and the cable screen.
   - To settle: the parts not ruled on. Terminal, socket outlet, connector (plug and socket), incoming supply, blocks and rails, terminal strip line, and plant and module views (which choose a side for their terminals instead).
 

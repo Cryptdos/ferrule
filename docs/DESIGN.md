@@ -144,16 +144,16 @@ Keep to around 20. Protective devices are drawn as plain switches and the tag gi
 
 Draft list:
 
-1. Switch / contact, normally open
-2. Contact, normally closed
-3. Changeover contact
+1. Contact: normally open, normally closed or changeover (one part since v0.5)
+2. (Contact, normally closed: now a kind of 1)
+3. (Changeover contact: now a kind of 1)
 4. Push button, NO
 5. Push button, NC
 6. Selector / keyswitch (2 and 3 position)
 7. Multi-pole switch: isolator (hand operated), contactor main contacts (coil operated) or circuit breaker, with NO and NC auxiliary poles numbered 13/14, 21/22…
 8. Fuse
-9. Relay / contactor coil
-10. Timer coil: on-delay, off-delay, on- and off-delay, interval, cyclic ON-first and OFF-first, with the maker's function code (e.g. "C") printed beside it
+9. Coil: relay, contactor or timer (one part since v0.5)
+10. (Timer coil: now a type of 9) on-delay, off-delay, on- and off-delay, interval, cyclic ON-first and OFF-first, with the maker's function code (e.g. "C") printed beside it
 11. Timer contact
 12. Indicator lamp: +V / -V terminals (they're often 24 V DC), optional lamp-test terminal LT beside +V, two-letter IEC 60757 colour code written Rd, Ye, Am, Gn, Bu, Wh, Cl
 13. Terminal
@@ -381,6 +381,7 @@ Reference drawings from other companies are proprietary. They are never committe
 | Builds, v0.5 step 2 (2026-11-27) | A11: CI builds `ferrule-linux` beside `ferrule.exe`, and `scripts/smoke-test.ts` runs each end to end (start on a scratch folder, create and open a project, add the example, print a sheet). A22: `publish.yml`, run by hand (D5), builds and smoke-tests both at the commit picked and publishes `v<version>` as a pre-release holding `ferrule-windows-v<version>.zip` and `ferrule-linux-v<version>`; a version already published is refused; *dry run* publishes nothing. Making one the release is done by hand on GitHub. The README's download link goes to the list of builds (D4) and it says how to run Ferrule as a service |
 | Windows, v0.5 step 3a (2026-11-27) | A32: `DOCKABLE` holds every window, by the test of a window (opened from a button, closed only by closing it): Place parts…, Project…, Settings and help join the eight, help as a window of its own (`HelpDialog.svelte`). Prompts and the two panels (Properties, the Simulation panel) float. A64: `zoneAt` gives an edge within 80 px (or a quarter of a small tile) or nothing, and `dropOn` only splits: nothing is dropped in the middle to replace a tile. A73: window and box places are kept in memory for the session (`places.ts`), not in the browser's storage |
 | Row two and sheets, v0.5 step 3b (2026-11-27) | A34: row two runs undo and redo, Fit and Split, align and distribute, Select, then the workbench's own, Check, Expectations…, Schedules first (D8). A35: Draft greyed on spare and GA sheets, Layout on any sheet that isn't a GA (D7), each with a tip; the workbench follows the sheet. A33: *GA sheet…* in the sheets' `▾` menu opens `NewGaSheetDialog`, the form Layout's browser had; `setGaSettings` lets an empty sheet change to and from Detail (scale 1) and refuses otherwise with the reason |
+| One Contact, one Coil, v0.5 step 4a (2026-11-27) | A36: `contact-no`, `contact-nc` and `contact-co` are one `contact`, its kind in `params.contact` (`contactKind()`); *Belongs to* is gone (unlinked it's K); *Instantaneous* shows only on a timer's contact. A37: `coil` and `timer-coil` are one `coil`, `params.type` relay, contactor or timer (`coilType()`, `isTimerCoil()`), the timer's settings shown only on a timer. `ParamDef.when` takes the project and `hideOff` hides a setting that doesn't apply. A39: `SymbolDef.noRotate` on contacts, coils, push buttons, selectors, isolators, fuses, lamps, the transformer, the motor and the connector block: `rotateElements` skips them (refusing when nothing else turns), placing ignores `R`, Properties offers no Rotate (D9: the rest still turn). File format 5; the examples are rebuilt by their scripts |
 
 ## 16. Open questions
 

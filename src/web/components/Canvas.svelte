@@ -43,7 +43,7 @@
     type WireEnd,
   } from "../../core/ops";
   import { settings } from "../settings.svelte";
-  import { benchOf, isBar, labelBlockRect, localGeometry, defaultParams, formatPoints, partPoints, plantViewLayout, type Geometry } from "../../core/symbols";
+  import { benchOf, isBar, isTimerCoil, labelBlockRect, localGeometry, defaultParams, formatPoints, partPoints, plantViewLayout, type Geometry } from "../../core/symbols";
   import { isInputForm, parsePointRef, pointRef } from "../../core/points";
   import {
     GA_ORIGIN,
@@ -1828,7 +1828,7 @@
       {/if}
       {#if sim}
         {#each page.elements as el (el.id)}
-          {#if el.symbol === "timer-coil"}
+          {#if isTimerCoil(el)}
             {@const left = sim.remaining(el.id)}
             {#if left !== null}
               <!-- A timer that's timing shows its count down above it. -->

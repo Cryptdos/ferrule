@@ -99,7 +99,7 @@ const meet = (a: Set<string>, b: Set<string>) => [...a].some((x) => b.has(x));
 function viaOneRelay(nets: Nets, from: Set<string>, to: Set<string>): { relay: string; coil: string } | undefined {
   for (const pg of nets.project.pages) {
     for (const coil of pg.elements) {
-      if (!isMaster(coil) || (coil.symbol !== "coil" && coil.symbol !== "timer-coil")) continue;
+      if (!isMaster(coil) || coil.symbol !== "coil") continue;
       const coilNets = new Set(terminalNames(coil).map((t) => nets.find(nets.term(coil.id, t))));
       for (const [a, b] of [
         [from, to],

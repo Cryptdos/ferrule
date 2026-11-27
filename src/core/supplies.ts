@@ -43,7 +43,7 @@ const same = (a: SupplyType, b: SupplyType) => a.v === b.v && a.ac === b.ac;
 /** Parts whose param `gives` is what they give. */
 const GIVERS = new Set(["supply", "transformer"]);
 /** Parts whose param `accepts` is what they take. */
-const TAKERS = new Set(["coil", "timer-coil", "lamp"]);
+const TAKERS = new Set(["coil", "lamp"]);
 
 /** What a placed part gives, if it's a supply and says. */
 export function elementGives(el: Element): SupplyType | undefined {

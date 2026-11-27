@@ -444,7 +444,7 @@ describe("step 6: movable labels (T14, T7, T13)", () => {
     const p = newProject("l");
     const pg = p.pages[0]!.id;
     const k = addElement(p, pg, "coil", [20, 30], { label: "PUMP RUN" });
-    const c = addElement(p, pg, "contact-no", [40, 30]);
+    const c = addElement(p, pg, "contact", [40, 30]);
     linkContact(p, c.id, k.id);
     renumber(p);
     const before = localGeometry(k, elementTexts(k, p)).prims.filter((x) => x.t === "text");
@@ -698,11 +698,9 @@ describe("step 9a: connector block, socket, motors (M9, T17, M8)", () => {
     expect(at("3").at[1] - at("1").at[1]).toBe(2);
     const g2 = localGeometry(addElement(p, pg, "connector-block", [60, 30], { params: { terminals: 2 } }), "");
     expect(g.body.h).toBeGreaterThan(g2.body.h);
-    // Turned a quarter: a wide block, its terminals top and bottom, its text upright.
-    rotateElements(p, pg, [b.id]);
-    const r = localGeometry(b, elementTexts(b, p));
-    expect(new Set(r.terminals.filter((t) => /^\d+$/.test(t.name)).map((t) => t.dir))).toEqual(new Set(["up", "down"]));
-    expect(r.prims.filter((x) => x.t === "text").every((x) => x.t === "text" && !x.vertical)).toBe(true);
+    // It doesn't turn (v0.5 A39): a block is drawn the way the sheet runs.
+    expect(() => rotateElements(p, pg, [b.id])).toThrow("doesn't turn");
+    expect(b.rot).toBe(0);
     // One conductor through every terminal.
     const k = addElement(p, pg, "coil", [20, 20]);
     const e = addElement(p, pg, "earth", [80, 40]);
@@ -792,7 +790,7 @@ describe("step 9b: RCD, connector, plant marks (M1); door devices with no schema
     expect(terminalNames(x)).toEqual(["S1", "P1", "S2", "P2", "S3", "P3"]);
     const k = addElement(p, pg, "coil", [20, 40]);
     connect(p, pg, [x.id, "P1"], [k.id, "A1"]);
-    const sw = addElement(p, pg, "contact-no", [20, 5]);
+    const sw = addElement(p, pg, "contact", [20, 5]);
     connect(p, pg, [sw.id, "14"], [x.id, "S1"]);
     refreshConductors(p);
     const cond = p.conductors.find((cd) => cd.terminals.some(([id]) => id === k.id))!;
@@ -1154,7 +1152,7 @@ describe("step 14: supply load in Simulate (M12)", () => {
   const setup = () => {
     const f = fresh();
     const { project: p } = f;
-    const loads = p.pages.flatMap((pg) => pg.elements.filter((e) => e.symbol === "coil" || e.symbol === "timer-coil" || e.symbol === "lamp"));
+    const loads = p.pages.flatMap((pg) => pg.elements.filter((e) => e.symbol === "coil" || e.symbol === "lamp"));
     for (const e of loads) e.params.va = 1.5;
     return { ...f, loads };
   };
@@ -1293,9 +1291,9 @@ describe("§13 tests to add: timed contacts", () => {
   test("NC and changeover contacts on a timer print 15-16 and 15-16/18 with the delay mark, the coil's table matching; unlinked they're plain again", () => {
     const p = newProject("t");
     const pg = p.pages[0]!.id;
-    const t = addElement(p, pg, "timer-coil", [20, 70], { params: { mode: "off", time: "5s" } });
-    const nc = addElement(p, pg, "contact-nc", [40, 30]);
-    const co = addElement(p, pg, "contact-co", [60, 30]);
+    const t = addElement(p, pg, "coil", [20, 70], { params: { type: "timer", mode: "off", time: "5s" } });
+    const nc = addElement(p, pg, "contact", [40, 30], { params: { contact: "nc" } });
+    const co = addElement(p, pg, "contact", [60, 30], { params: { contact: "co" } });
     linkContact(p, nc.id, t.id);
     linkContact(p, co.id, t.id);
     const marks = (el: Element) => localGeometry(el, elementTexts(el, p)).prims.flatMap((x) => (x.t === "text" ? [x.text] : []));

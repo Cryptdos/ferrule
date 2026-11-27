@@ -240,6 +240,17 @@ Judgement calls made while building, by step, with the reason.
 - **D7 and D8 built to the recommended answer:** Layout greyed on a schematic sheet, with a tip to add a GA sheet from `▾`, and its own *New GA sheet* gone; Draft's row puts *Check, Expectations…, Schedules* first in its own group.
 - **Leaving a sheet a workbench can't work on:** in Layout, moving to a schematic sheet goes to Draft and to a spare sheet goes to Annotate, as moving to a GA sheet in Draft already went to Layout.
 
+### Step 4a
+
+- **The Contact's setting is called *Contact*** (normally open, normally closed, changeover), each choice with its terminal numbers in brackets, as a push button's and a selector's poles already pick NO or NC. It's stored as `params.contact`, a key the legend already reads as a kind.
+- ***Instantaneous* isn't shown at all** off a timer's contact, rather than greyed: a setting can now hide when it doesn't apply (`hideOff`), and the timer's own settings on a Coil use the same.
+- **A part that doesn't turn:** *Rotate* isn't offered in its Properties, `R` while placing it says it doesn't turn, and `R` on a selection turns what turns and leaves the rest. With nothing that turns, it says why. A hand-written file's turn on such a part is read as upright.
+- **The connector block doesn't turn**, though v0.4.x made it rotatable: A39 names it, so the list wins. A48's *Columns* (step 4c) gives the wide layout rotation was for.
+- **LSP-01's duty selector** was placed turned half round, which a selector can't be now. It's redrawn flipped, its common on top, at column 20, and the two enable relays swap columns so its wires don't cross (their tags swap with them). Every other sheet of both examples prints as before, checked sheet by sheet against 0.4.5.
+- **The legend** names the kinds *Contact NO*, *Contact NC*, *Changeover contact*, *Relay coil*, *Contactor coil* and *Timer coil: <function>*, and keeps them in that order. The rest of A55 is step 4c.
+- **D9 built to the recommended answer:** Rotate stays on every part A39 doesn't name.
+- **File format 5.**
+
 ## 7. After the build
 
 What QA on v0.5 starts from:

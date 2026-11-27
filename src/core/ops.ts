@@ -33,7 +33,7 @@ import {
   type TerminalRef,
   newId,
 } from "./model";
-import { benchOf, defaultParams, isBar, formatPoints, getSymbol, partPoints, plantViewLayout, poleMates, requireSymbol, terminalPoint, viewSides, type ViewSide } from "./symbols";
+import { benchOf, canRotate, defaultParams, isBar, formatPoints, getSymbol, partPoints, plantViewLayout, poleMates, requireSymbol, terminalPoint, viewSides, type ViewSide } from "./symbols";
 import { moduleType, moduleTypeName } from "./modules";
 import { channelLabel, renamePointDesign, tidyDesign } from "./design";
 import { cleanPoints, formatQuickEntry, mergePoints, isInputForm, missingRefs, parseQuickEntry, pointOfPin, printedPin } from "./points";
@@ -98,7 +98,7 @@ export function addElement(
     tag: opts.tag ?? "",
     label: symbol === "text" ? (opts.label ?? "Text") : (opts.label ?? "").replace(/\s*\n\s*/g, " "),
     pos: clampToArea(snapVec(pos)),
-    rot: opts.rot ?? 0,
+    rot: canRotate({ symbol }) ? (opts.rot ?? 0) : 0,
     zone: opts.zone ?? "internal",
     params: normaliseParams(symbol, { ...defaultParams(symbol), ...opts.params }),
     links: [],
@@ -133,8 +133,14 @@ export function moveElements(project: Project, pageId: string, ids: string[], de
 /** Rotate elements 90° clockwise about their own origins. */
 export function rotateElements(project: Project, pageId: string, ids: string[]): void {
   const page = getPage(project, pageId);
+  const els = ids.map((id) => getElement(page, id));
+  if (els.length && els.every((el) => !canRotate(el))) {
+    throw new OpError(`${els.length === 1 ? `A ${requireSymbol(els[0]!.symbol).name.toLowerCase()} doesn't` : "These don't"} turn: it's drawn the way the sheet runs. F flips it`);
+  }
   for (const id of ids) {
     const el = getElement(page, id);
+    // A part that sits in a drop doesn't turn (A39): flip it instead.
+    if (!canRotate(el)) continue;
     // Arrows and polygons turn their points, so their handles stay where they're drawn.
     const pts = partPoints(el);
     if (pts) {

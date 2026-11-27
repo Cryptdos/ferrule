@@ -20,7 +20,7 @@ describe("relay logic", () => {
     const { p, add, w, top, bottom } = ladder();
     const stop = add("pushbutton", 20, 20, { contact: "nc" });
     const start = add("pushbutton", 20, 35);
-    const hold = add("contact-no", 30, 35);
+    const hold = add("contact", 30, 35);
     const k = add("coil", 20, 70);
     w(top(20), [stop.id, "11"]);
     w([stop.id, "12"], [start.id, "13"]);
@@ -29,7 +29,7 @@ describe("relay logic", () => {
     w([stop.id, "12"], [hold.id, "13"]);
     w([hold.id, "14"], [k.id, "A1"]);
     linkContact(p, hold.id, k.id);
-    const kl = add("contact-no", 50, 30);
+    const kl = add("contact", 50, 30);
     const lamp = add("lamp", 50, 60);
     w(top(50), [kl.id, "13"]);
     w([kl.id, "14"], [lamp.id, "+V"]);
@@ -50,11 +50,11 @@ describe("relay logic", () => {
   test("on-delay timer closes its contact after the delay", () => {
     const { p, add, w, top, bottom } = ladder();
     const sw = add("selector", 20, 30);
-    const t = add("timer-coil", 20, 70, { time: "10s", mode: "on" });
+    const t = add("coil", 20, 70, { type: "timer", time: "10s", mode: "on" });
     w(top(20), [sw.id, "13"]);
     w([sw.id, "14"], [t.id, "A1"]);
     w([t.id, "A2"], bottom(20));
-    const tc = add("contact-no", 40, 30);
+    const tc = add("contact", 40, 30);
     const lamp = add("lamp", 40, 60);
     w(top(40), [tc.id, "13"]);
     w([tc.id, "14"], [lamp.id, "+V"]);
@@ -104,8 +104,8 @@ function ats(interlocked: boolean) {
   w(top(20), [s1.id, "13"]);
   w(top(60), [s2.id, "13"]);
   if (interlocked) {
-    const i1 = add("contact-nc", 20, 40);
-    const i2 = add("contact-nc", 60, 40);
+    const i1 = add("contact", 20, 40, { contact: "nc" });
+    const i2 = add("contact", 60, 40, { contact: "nc" });
     w([s1.id, "14"], [i1.id, "21"]);
     w([i1.id, "22"], [q1.id, "A1"]);
     w([s2.id, "14"], [i2.id, "21"]);

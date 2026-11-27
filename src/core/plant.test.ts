@@ -75,7 +75,7 @@ describe("panel boundary and checks", () => {
   test("elements below the boundary are external; crossings need a terminal", () => {
     const { p, pg, sf } = fan();
     setBoundary(p, pg, 80);
-    const k = addElement(p, pg, "contact-no", [40, 60]);
+    const k = addElement(p, pg, "contact", [40, 60]);
     const v = placePlantView(p, pg, sf.id, [40, 95], ["1", "2"]);
     expect(k.zone).toBe("internal");
     expect(v.zone).toBe("external");
@@ -85,7 +85,7 @@ describe("panel boundary and checks", () => {
     // Through a terminal on the boundary is fine.
     const p2 = fan();
     setBoundary(p2.p, p2.pg, 80);
-    const k2 = addElement(p2.p, p2.pg, "contact-no", [40, 60]);
+    const k2 = addElement(p2.p, p2.pg, "contact", [40, 60]);
     const x = addElement(p2.p, p2.pg, "terminal", [40, 80]);
     const v2 = placePlantView(p2.p, p2.pg, p2.sf.id, [40, 95], ["1", "2"]);
     connect(p2.p, p2.pg, [k2.id, "14"], [x.id, "1"]);
@@ -106,7 +106,7 @@ describe("panel boundary and checks", () => {
   test("coils without contacts, loose contacts and duplicate tags are flagged", () => {
     const { p, pg } = fan();
     const k = addElement(p, pg, "coil", [20, 20], { tag: "K1" });
-    const c = addElement(p, pg, "contact-no", [40, 20]);
+    const c = addElement(p, pg, "contact", [40, 20]);
     addElement(p, pg, "lamp", [60, 20], { tag: "K1" });
     let msgs = checkProject(p).map((f) => f.message);
     expect(msgs.some((m) => m.includes("coil K1 has no contacts"))).toBe(true);
@@ -130,7 +130,7 @@ describe("sections and schedules", () => {
   test("terminal and cable schedules", () => {
     const { p, pg, sf } = fan();
     setBoundary(p, pg, 80);
-    const k = addElement(p, pg, "contact-no", [40, 60]);
+    const k = addElement(p, pg, "contact", [40, 60]);
     const x = addElement(p, pg, "terminal", [40, 80]);
     const v = placePlantView(p, pg, sf.id, [40, 95], ["1", "2"]);
     connect(p, pg, [k.id, "14"], [x.id, "1"]);

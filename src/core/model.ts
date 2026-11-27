@@ -10,8 +10,9 @@ export const FORMAT = "ferrule";
  * What a file must hold. Moved on by any build that changes it (v0.5 A30): a
  * file of any other number isn't opened, and says which Ferrule it needs.
  * 4: v0.5 step 0, the test-build mapping dropped.
+ * 5: v0.5 step 4a, one Contact and one Coil (contact-no, -nc, -co and timer-coil gone).
  */
-export const FORMAT_VERSION = 4;
+export const FORMAT_VERSION = 5;
 
 export type ParamValue = string | number | boolean;
 

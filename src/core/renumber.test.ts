@@ -86,8 +86,8 @@ describe("cross-references", () => {
   test("contacts take the coil's tag, get pole numbers, and show in its contact table", () => {
     const { p, pg, k1 } = rung();
     const pg2 = addPage(p, "Controls").id;
-    const a = addElement(p, pg, "contact-no", [80, 30]);
-    const b = addElement(p, pg2, "contact-nc", [40, 30]);
+    const a = addElement(p, pg, "contact", [80, 30]);
+    const b = addElement(p, pg2, "contact", [40, 30], { params: { contact: "nc" } });
     linkContact(p, a.id, k1.id);
     linkContact(p, b.id, k1.id);
     renumber(p);
