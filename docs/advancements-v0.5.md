@@ -183,7 +183,7 @@ Decided while going through the specification's window and sheet sections.
 
 Findings from testing the v0.4.x builds go here, in the order they're found.
 
-- [ ] **A24. Colour through a controller's relay output.** *Missing. DR-27. Build 0.4.5.* A new wire takes the colour of the wire on the other side of a fuse, contact, isolator pole, push button, selector or terminal. A controller module isn't on that list, nor is plant: a wire drawn from a relay output's normally open terminal doesn't take the colour of the wire on its common, though it's switched power in the same way (`design-wire-numbering.md` §2a). Carry the colour between the pins of one on/off point.
+- [x] **A24. Colour through a controller's relay output.** *Built: PR 125.* *Missing. DR-27. Build 0.4.5.* A new wire takes the colour of the wire on the other side of a fuse, contact, isolator pole, push button, selector or terminal. A controller module isn't on that list, nor is plant: a wire drawn from a relay output's normally open terminal doesn't take the colour of the wire on its common, though it's switched power in the same way (`design-wire-numbering.md` §2a). Carry the colour between the pins of one on/off point.
   - Found by reading the code, 26 Nov 2026. Whoever builds it confirms the cause on the BMS fixture first.
 
 - [x] **A25. Colour through a push button's other poles.** *Built: PR 119.* *Fix. DR-27, PT-2. Build 0.4.5.* A push button carries a wire's colour through only between 13 and 14, and between 21 and 22. A first pole set normally closed (11, 12), a second pole set normally open (23, 24), and a third or fourth pole (33, 34 and 41, 42) carry nothing through.
@@ -253,7 +253,7 @@ From the notes written into the QA copy of the specification (`v0.4.0-pre Notes\
 
 - [x] **A47. An isolator's operator can't be *None*.** *Built: PR 119.* *Tweak. PT-4. Build 0.4.5.* *Operator* offers rotary handle, door handle, key and *none (worked by something else)*. Nothing in Ferrule works one isolator from another, so *none* gives a switch that nothing operates, and on this build it can still be clicked in Simulate. *None* comes off the list.
 
-- [ ] **A48. Connector block: columns.** *Tweak. PT-11. Build 0.4.5.* The block always lays its terminals out in two columns. It gets a *Columns* setting beside *Terminals*, and sizes itself from the two. *Terminals* is the total: four terminals in two columns is two rows. Two columns stays the default.
+- [x] **A48. Connector block: columns.** *Built: PR 125.* *Tweak. PT-11. Build 0.4.5.* The block always lays its terminals out in two columns. It gets a *Columns* setting beside *Terminals*, and sizes itself from the two. *Terminals* is the total: four terminals in two columns is two rows. Two columns stays the default.
 
 - [x] **A49. A new project is dated.** *Built: PR 119.* *Missing. ST-5, PR-1, PR-7. Build 0.4.5.* A new project's *Drawn date* and the date of revision A, *First issue*, are empty. Both are filled with the day the project is made.
   - *Add revision* dates a new revision with the current date in the same way (ruled 26 Nov 2026). It does already (from the code, 27 Nov 2026), so there's nothing to build for it.
@@ -272,12 +272,12 @@ From the notes written into the QA copy of the specification (`v0.4.0-pre Notes\
 - [x] **A54. Align to the last one clicked.** *Built: PR 119.* *Tweak. WN-2. Build 0.4.5.* Aligning lines everything up with the first thing clicked. It feels more natural to line up with the last. Things selected by dragging a box have no click order and align as they do now.
   - The specification doesn't say what align lines up with. It's added when this is built.
 
-- [ ] **A55. The symbol legend.** *Fix and tweak. AN-15. Build 0.4.5.* Three things, found on the build:
+- [x] **A55. The symbol legend.** *Built: PR 125.* *Fix and tweak. AN-15. Build 0.4.5.* Three things, found on the build:
   - **One entry for each kind used.** With a motor and a pump on the sheet the legend shows only one of them. A part whose setting changes its symbol gets an entry for each kind in use, under its own name: motor, fan and pump; the earth types; the terminal types; and the coil and contact kinds once A36 and A37 are built.
   - **Parts that stretch are drawn at a fixed length.** A terminal strip line is drawn in the legend as long as the one on the sheet. In the legend it's about 10 units, whatever is drawn. The same for blocks, rails and the cable screen.
   - **Large symbols are drawn smaller.** The motor is far bigger than its importance. Nothing connects to a symbol in the legend, so one over a set size is scaled down to fit its cell. On the sheet it stays as it is, so it still lines up under a contactor.
 
-- [ ] **A56. A motor is named for what it is.** *Tweak. PT-14. Build 0.4.5.* A motor's *Picture* setting chooses motor, fan or pump, but the part is called Motor whichever is picked. The setting is renamed *Type*, as on the coil (A37), and the name follows it: a pump reads Pump in its properties and in the legend.
+- [x] **A56. A motor is named for what it is.** *Built: PR 125.* *Tweak. PT-14. Build 0.4.5.* A motor's *Picture* setting chooses motor, fan or pump, but the part is called Motor whichever is picked. The setting is renamed *Type*, as on the coil (A37), and the name follows it: a pump reads Pump in its properties and in the legend.
 
 - [ ] **A57. An incoming supply is joined only by its wires.** *Tweak. PT-21, DR-50, CK-20, SM-16. Build 0.4.5.* Each terminal of an incoming supply can pick a distribution, which joins it to every block and rail on that distribution with no wire drawn. That's a connection nothing on the drawing shows, the same thing removed from link arrows (A23, A27), and it can bypass an isolator drawn in between. The pickers are removed: the supply is wired to its block like anything else.
   - Check's warning about the bypass (CK-20) has nothing left to find and goes with them.
