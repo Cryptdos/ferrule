@@ -1194,10 +1194,8 @@ describe("step 14: supply load in Simulate (M12)", () => {
     for (const x of changes) expect(x.liveVa!).toBeLessThanOrEqual(x.worstVa + 1e-9);
     // A coil with no draw of its own takes its device's.
     const coil = loads.find((e) => e.symbol === "coil")!;
-    const item = p.pages.flatMap((pg) => pg.gaItems ?? []).find((it) => it.refs?.includes(coil.id))!;
-    expect(item).toBeDefined();
     p.devices = [{ id: "dev1", name: "Relay", maker: "", part: "", kind: "", w: 16, h: 80, d: 0, library: false, va: 0.6 }];
-    item.device = "dev1";
+    coil.device = "dev1";
     const w0 = fig(p).by(/24V out/).worstVa;
     coil.params.va = 0;
     expect(fig(p).by(/24V out/).worstVa).toBeCloseTo(w0 - 1.5 + 0.6, 6);
@@ -1260,7 +1258,6 @@ describe("step 15: wire colour by function, relay pins from the part (M3, M4)", 
   test("a relay whose device has a pin map prints its own numbers on its coil, its contacts and its contact table", () => {
     const { project: p } = fresh();
     const coil = p.pages.flatMap((pg) => pg.elements).find((e) => e.symbol === "coil" && slavesOf(p, e).length === 4)!;
-    const item = p.pages.flatMap((pg) => pg.gaItems ?? []).find((it) => it.refs?.includes(coil.id))!;
     const iec = contactTable(p, coil).map((r) => r[1]);
     expect(iec).toEqual(["13-14", "23-24", "33-34", "43-44"]);
     expect(relayPinMarks(p, coil)).toBeUndefined();
@@ -1268,7 +1265,7 @@ describe("step 15: wire colour by function, relay pins from the part (M3, M4)", 
     expect(formatRelayPins(pins)).toBe("13 14 | 9 1 5 | 10 2 6 | 11 3 7 | 12 4 8");
     expect(() => parseRelayPins("A1 | 11 12 14")).toThrow(/coil/);
     p.devices = [{ id: "rly", name: "Relay 4CO", maker: "", part: "", kind: "relay", w: 27, h: 80, d: 0, library: false, relayPins: pins }];
-    item.device = "rly";
+    coil.device = "rly";
     expect(elementTexts(coil, p).pins).toEqual({ A1: "13", A2: "14" });
     expect(contactTable(p, coil).map((r) => r[1])).toEqual(["9-5", "10-6", "11-7", "12-8"]);
     // Drawn on the coil and the contact in place of A1/A2 and 13/14; terminal names unchanged.
@@ -1281,7 +1278,7 @@ describe("step 15: wire colour by function, relay pins from the part (M3, M4)", 
     // Saved and read back.
     expect(parseProject(JSON.parse(JSON.stringify(p))).devices![0]!.relayPins).toEqual(pins);
     // No map: IEC as before.
-    item.device = undefined;
+    coil.device = undefined;
     expect(contactTable(p, coil).map((r) => r[1])).toEqual(iec);
   });
 });

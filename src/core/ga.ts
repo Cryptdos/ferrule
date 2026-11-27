@@ -11,6 +11,7 @@
  */
 import { AREA_UNITS, UNIT_MM, type Vec } from "./geometry";
 import type { DoorColumn, DoorLeaf, Element, GaDimPoint, GaItem, GaSettings, GaView, Page, PlantItem, Project, TextPlace } from "./model";
+import type { ProjectDevice } from "./devices";
 import { getSymbol, isTimerCoil } from "./symbols";
 import { controllerName, modulesOf, viewsOf } from "./modules";
 import { isSlave, slavesOf } from "./xref";
@@ -354,7 +355,7 @@ export const GA_SIZES: Record<string, GaSize> = {
 /** A controller module's size on the GA: its device from the table, else a generic one by type and channels. */
 export function moduleGaSize(project: Project, item: PlantItem): { w: number; h: number } {
   const m = item.module;
-  const dev = m?.device ? project.devices?.find((d) => d.id === m.device) : undefined;
+  const dev = deviceById(project, item.device);
   if (dev) return { w: dev.w, h: dev.h };
   const sizes = gaSizes(project);
   // Plant in the panel (v0.4.x T3): one size for all, until a device is picked.
@@ -434,7 +435,35 @@ export const SUITS: { key: string; label: string }[] = [
   { key: "pushbutton", label: "Push button" },
   { key: "selector", label: "Selector / keyswitch" },
   { key: "module", label: "Controller module" },
+  { key: "plant", label: "Plant (a drive, sensor, actuator, supply…)" },
 ];
+
+// ---------------------------------------------------------------------------
+// Which device a thing is (v0.5 A70): picked in Design for a drawn part, a
+// terminal strip or a plant item. What's placed on a GA is what was picked.
+
+/** A device in the project's table, by id. */
+export const deviceById = (project: Project, id: string | undefined): ProjectDevice | undefined => (id ? project.devices?.find((d) => d.id === id) : undefined);
+
+/** A drawn part's device; a terminal's is its strip's. */
+export function elementDevice(project: Project, el: Element): ProjectDevice | undefined {
+  if (el.symbol === "terminal") return deviceById(project, project.stripDevices?.[String(el.params.strip ?? "X1")]);
+  return deviceById(project, el.device);
+}
+
+/** The device of what a GA item places: its part, its strip, or its plant item. A door handle has none. */
+export function gaItemDevice(project: Project, it: GaItem): ProjectDevice | undefined {
+  if (it.kind !== "device" || it.part) return undefined;
+  if (it.module) return deviceById(project, project.plant.find((x) => x.id === it.module)?.device);
+  const strip = itemStrip(project, it);
+  if (strip) return deviceById(project, project.stripDevices?.[strip]);
+  const id = it.refs?.[0];
+  for (const pg of project.pages) {
+    const el = id ? pg.elements.find((e) => e.id === id) : undefined;
+    if (el) return deviceById(project, el.device);
+  }
+  return undefined;
+}
 
 /** Which entry of SUITS a schematic part is, or "" if it isn't a panel device. */
 export function suitsKey(project: Project, el: Element): string {
@@ -449,6 +478,8 @@ export function suitsKey(project: Project, el: Element): string {
 
 /** A device's size on the GA, mm. */
 export function deviceSize(project: Project, el: Element): { w: number; h: number } {
+  const dev = el.symbol === "terminal" ? undefined : deviceById(project, el.device);
+  if (dev) return { w: dev.w, h: dev.h };
   const k = sizeKey(project, el);
   const sizes = gaSizes(project);
   if (!k) return { w: 20, h: 40 };
@@ -482,7 +513,7 @@ export interface GaCandidate {
   /** One element, or a whole terminal strip on a sheet. */
   refs: string[];
   /** A controller: its modules still to place, in rail order, each with its size. */
-  modules?: { id: string; w: number; h: number; device?: string }[];
+  modules?: { id: string; w: number; h: number }[];
   /** Its door handle rather than its body. */
   part?: "handle";
   label: string;
@@ -540,7 +571,7 @@ export function gaCandidates(project: Project, tagOf: (el: Element) => string): 
   for (const c of project.controllers ?? []) {
     const mods = modulesOf(project, c).filter((m) => !placed.has(m.id));
     if (!mods.length) continue;
-    const sized = mods.map((m) => ({ id: m.id, ...moduleGaSize(project, m), ...(m.module.device ? { device: m.module.device } : {}) }));
+    const sized = mods.map((m) => ({ id: m.id, ...moduleGaSize(project, m) }));
     const sheet = Math.min(...mods.map((m) => viewsOf(project, m.id)[0]?.page.number ?? Infinity));
     out.push({
       refs: [],
@@ -555,10 +586,17 @@ export function gaCandidates(project: Project, tagOf: (el: Element) => string): 
   return out.sort((a, b) => a.sheet - b.sheet || a.label.localeCompare(b.label, undefined, { numeric: true }));
 }
 
-/** A strip's length on the rail: each terminal's width (fused and disconnect ones are wider), and its tallest. */
+/**
+ * A strip's length on the rail: each terminal's width (fused and disconnect
+ * ones are wider), and its tallest. With a device picked for the strip
+ * (v0.5 A70), each terminal is that device.
+ */
 export function stripSize(project: Project, refs: string[]): { w: number; h: number } {
   const sizes = gaSizes(project);
   const byId = new Map(project.pages.flatMap((pg) => pg.elements.map((e) => [e.id, e])));
+  const first = refs.map((r) => byId.get(r)).find((e) => !!e);
+  const dev = first ? elementDevice(project, first) : undefined;
+  if (dev) return { w: Math.round(dev.w * refs.length * 10) / 10, h: dev.h };
   let w = 0;
   let h = 0;
   for (const id of refs) {
@@ -598,7 +636,7 @@ export function itemStrip(project: Project, it: GaItem): string | null {
 /**
  * Bring every placed terminal strip up to date: terminals added to the
  * strip in the schematic join it (and the strip grows on the GA), deleted
- * or moved ones leave it. Its length follows unless a real device sets it.
+ * or moved ones leave it. Its length follows, by its device's width when it has one.
  * Returns whether anything changed.
  */
 export function syncGaStrips(project: Project): boolean {
@@ -660,7 +698,7 @@ export function syncGaStrips(project: Project): boolean {
     const turned = Math.abs(it.h - was) < Math.abs(it.w - was);
     it.refs = refs;
     changed = true;
-    if (!it.device && refs.length) {
+    if (refs.length) {
       const { w } = stripSize(project, refs);
       if (turned) it.h = w;
       else it.w = w;

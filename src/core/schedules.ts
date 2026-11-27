@@ -6,7 +6,7 @@ import { channelLabel, goesTo, pointType, systemGroups } from "./design";
 import { Nets, wiringOf } from "./wiring";
 import { displayTag, elementTexts } from "./tags";
 import { address, partnerOf } from "./xref";
-import { gaSizes, sizeKey } from "./ga";
+import { gaItemDevice, gaSizes, sizeKey } from "./ga";
 import { controllerName, controllerOfModule, controllersInOrder, moduleTypeName, pointLabel, viewsOf } from "./modules";
 import { formLabel, printedPin } from "./points";
 import { isBar } from "./symbols";
@@ -269,7 +269,7 @@ export function billOfMaterials(project: Project): BomRow[] {
         const modTag = it.module ? (project.plant.find((x) => x.id === it.module)?.tag ?? "") : "";
         const tags = it.module ? [modTag] : strip ? [`${it.strip ?? first.params.strip ?? "X1"}`] : refs.map((e) => displayTag(e, project) + (it.part === "handle" ? " handle" : ""));
         const qty = strip ? refs.length : 1;
-        const dev = it.device ? project.devices?.find((d) => d.id === it.device) : undefined;
+        const dev = gaItemDevice(project, it);
         // A distribution block is a line of its own, saying the ways it needs (v0.5 A23).
         const block = first?.symbol === "busbar" ? waysNeeded(blockWays(project, first)) : "";
         if (dev) {

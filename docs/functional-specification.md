@@ -113,10 +113,10 @@ IDs are kept when the document is revised: a withdrawn statement is struck throu
 
   | Workbench | Row two after undo/redo |
   |---|---|
-  | Design | Views *Plant, Controller, Network, To draw* *(v0.5: A70. Devices comes after Controller)*; *Check*; *Export points schedule*; then the view's own buttons (§5) |
+  | Design | Views *Plant, Controller, Devices, Network, To draw*; *Check*; *Export points schedule*; then the view's own buttons (§5) |
   | Draft | Fit, Split, Colour check; align/distribute; Select, Wire; *Check, Expectations…, Schedules, Renumber, Templates, Plant, Distribution, Table* |
   | Annotate | Fit, Split; align/distribute; Select |
-  | Layout | Fit, Split; Select; align/distribute; *Check, Schedules, Place parts…* (*Place detail…* on a detail sheet), *Device table…* |
+  | Layout | Fit, Split; Select; align/distribute; *Check, Schedules, Place parts…* (*Place detail…* on a detail sheet). There's no *Device table…*: a device is picked and edited in Design (DE-86) |
   | Simulate | Fit, Split; a note that editing is off; *Expectations…* (no undo/redo) |
 
 - **WN-3** Hovering any icon shows its name. A menu's button opens its window; clicked again, it closes it.
@@ -190,7 +190,7 @@ IDs are kept when the document is revised: a withdrawn statement is struck throu
 
 ## 5. Design (DE)
 
-Design lists what the panel has before anything is drawn: systems, plant and points in the Plant view, the controller and its allocation, and the networks. Its views run Plant, Controller, Network, To draw. Nothing is drawn here. A project with no plant and no controller works in Draft alone, and Design shows an empty table.
+Design lists what the panel has before anything is drawn: systems, plant and points in the Plant view, the controller and its allocation, and the networks. Its views run Plant, Controller, Devices, Network, To draw. Nothing is drawn here. A project with no plant and no controller works in Draft alone, and Design shows an empty table.
 
 ### The Plant view
 
@@ -209,7 +209,7 @@ Design lists what the panel has before anything is drawn: systems, plant and poi
 
 ### A plant item's Properties
 
-- **DE-12** Fields: *Tag*; *Description*; *Prefix*; *System*; *Connects by* (Hardwired, Comms, Hardwired and comms); *Mark*; *Information* (printed under its box on the drawing); *In the panel*; *Power by others*. Buttons: *Terminals…*, *Duplicate ×n…*, *Save as template…*, *Delete plant*. Its points aren't listed here: each is picked in its own row (DE-19).
+- **DE-12** Fields: *Tag*; *Description*; *Prefix*; *System*; *Connects by* (Hardwired, Comms, Hardwired and comms); *Mark*; *Information* (printed under its box on the drawing); *In the panel*; *Power by others*. Shown, not set: its device, with *Devices →* to its row (DE-86). Buttons: *Terminals…*, *Duplicate ×n…*, *Save as template…*, *Delete plant*. Its points aren't listed here: each is picked in its own row (DE-19).
 - **DE-13** With the tag left empty, Renumber tags the plant from its prefix and where its first view is drawn (prefix `P` at sheet 3, column 12: `P3-12`; default prefix `U`). A typed tag is kept.
 - **DE-14** Choosing *Comms* or *Hardwired and comms* adds *Protocol* (free text) and *Network*.
 - **DE-15** *In the panel* (a power supply, UPS or battery) lists the plant under Panel, draws it above the boundary with solid, numbered wiring, and lets it be placed on a GA sheet like any panel part.
@@ -275,7 +275,7 @@ Design lists what the panel has before anything is drawn: systems, plant and poi
 - **DE-47** `+ Module ▾` on Design's row adds one at the end of the rail: a type with a channel count, an adapter, a module saved before as a device, or a spare slot, left for later. A host and an adapter are added with no terminals; a power supply with its supply in.
 - **DE-48** A slot's bus address follows rail order unless set by hand in the module's Properties (to match DIP switches). Clearing a hand-set address returns it to rail order.
 - **DE-49** *Generate* fills an IO module's terminals from a pattern, at the top of its Terminals window (on IO modules only, not plant, a host, a power supply or an adapter): channels; one channel's terminal ids (`VO RET CO`, `IO C`, `Y ⊥`), a dash using up a number without making a terminal; the first terminal number; the form; names with `#` for the channel (`AO#` → AO1, AO2…); counting from; a shared terminal and how many channels it serves. It says what it will make first (*Makes 16 channels and 4 shared terminals, numbered 1 to 36*), replaces the list, and asks first if any of its terminals are wired.
-- **DE-50** A module picked shows in Properties: *Type*, *Channels*, *Address*, its device (shown, not set), *Commons linked inside*, where it's drawn, and *Terminals…*, *Save as device*, *← Move*, *Move →* and *Delete module*. A channel picked shows the point on it with *Unallocate*, or, spare, its label typed by hand; a module's other point (a supply in, a serial port) its name, form and how it simulates. Both show their terminals with *Terminals…*.
+- **DE-50** A module picked shows in Properties: *Type*, *Channels*, *Address*, its device (shown, not set, with *Devices →* to its row), *Commons linked inside*, where it's drawn, and *Terminals…*, *Save as device*, *← Move*, *Move →* and *Delete module*. A channel picked shows the point on it with *Unallocate*, or, spare, its label typed by hand; a module's other point (a supply in, a serial port) its name, form and how it simulates. Both show their terminals with *Terminals…*.
 - **DE-51** *Commons linked* joins the module's commons (C, RET, 0 V) inside it: one return serves them all in Simulate and in the wiring check, and the view shows the link.
 - **DE-52** ~~*Draw (VA)* on a module is counted on the controller's power supply module in Simulate.~~ *(v0.5: A38)*
 - **DE-53** *Save as device* in a module's Properties keeps it, its type, channels, terminals and points, in the device table (and from there the shared library), so the next one is added whole from `+ Module`.
@@ -287,6 +287,15 @@ Design lists what the panel has before anything is drawn: systems, plant and poi
 - **DE-56** *Suggest…* proposes a channel for each point still to allocate, in table order: the first free channel of its type in rail order, a module of the point's own type before a universal one.
 - **DE-57** Each line can be unticked or given another channel. *Accept ticked* allocates only the ticked lines, as one undo step. *Throw away* changes nothing.
 - **DE-58** It never runs by itself, and points already on channels aren't moved. A point with no room reads *no free channel of its type*.
+
+### Devices view
+
+- **DE-86** The Devices view lists everything in the job that needs a real device, one row each: each drawn part once it's added in Draft (a relay's coil, not its contacts), each terminal strip (not each terminal), each controller module, and each plant item, in the field or the panel, drawn or not. A row shows its tag, what it is (*Coil, relay · Supply fan run*; *48 terminals*; *DI-16*; *Supply air temperature sensor · field*) and its device.
+- **DE-87** Rows are grouped: Coils; Breakers, isolators and fuses; Lamps, push buttons and selectors; Blocks, transformers and sockets; Terminal strips; Controller (in rail order); Plant. Groups fold. The heading counts what's left (*3 left of 25*), and each group its own. Devices no row has are listed last, under *Devices not used yet*, to be picked and edited.
+- **DE-88** A row's device is picked from its drop-down: the project's devices that suit it (made for that kind of part, or for anything), or *none yet*. Ticking rows, or a group's box for all of it, and choosing from *Set n picked to…* on Design's row gives them all one device (or *No device*); it offers only the devices that suit every ticked row. A device that doesn't suit a thing is refused.
+- **DE-89** A row picked shows its device in Properties, which is where a device is edited: name, maker, part number, what it suits, width × height × depth, *Draw (VA)*, *Ways* for a distribution block, *Relay pins* for a coil, and for a device from the shared library its notes and its datasheets and pictures (*Add files…*). With none, Properties says so. *To library* puts one of the project's own devices in the shared library; *Delete device* takes a device out of the project, and what had it has none.
+- **DE-90** `+ Device` makes a device in this project, suited to the picked row and the size it has now, and gives it to that row if it had none; *From the library…* lists the shared library to bring one in (*Use in this project*) or delete one from the library.
+- **DE-91** What's placed on a GA is what's been picked: a part placed takes its device's size, a strip its device's width for each terminal, and a device picked or resized later resizes what's placed (LA-34).
 
 ### Network view
 
@@ -561,7 +570,7 @@ General arrangement (GA) sheets drawn to scale. Positions and sizes are in milli
 - **LA-16** **Label plates** are at true size; text may have a second line; *Engraved text height* in mm; the text sits in the middle or at any of eight places round the edge.
 - **LA-17** **Dimensions**: click each point (snapping to edges and middles), then double-click where the line goes. *Chain* gives the gaps along a run; *Baseline* each distance from the first point. A dimension follows the items it's on when they move.
 - **LA-18** Dragging moves an item in 5 mm steps (`Shift`: 1 mm). Arrow keys nudge 5 mm, `Shift`+arrow 1 mm. `R` rotates. `Del` removes it from the GA (not from the schematic).
-- **LA-19** An item's Properties gives X, Y, width, height, *Rotate*, *Delete*, a link to the schematic part on its sheet, ~~and its *Device*~~ *(v0.5: A70: shown there, set in Design)*.
+- **LA-19** An item's Properties gives X, Y, width, height, *Rotate*, *Delete*, a link to the schematic part on its sheet, and its device, shown, not set, with *In Design →* to its row in Design's Devices view (DE-86).
 - **LA-20** Labels sit in the middle of each device, across or along it, whichever is longer. On very small devices the text shrinks, but stays readable on an A4 print.
 - **LA-21** A selected rail shows its fill: *n of m mm (x%), k devices*, with overlaps and overhangs counted.
 - **LA-22** A placed terminal strip keeps up with the schematic: add a terminal to X1 and the strip on the GA grows.
@@ -581,12 +590,12 @@ General arrangement (GA) sheets drawn to scale. Positions and sizes are in milli
 
 ### Device table
 
-- **LA-33** *Device table…* holds real devices: name, maker, part number, the part each suits, width × height × depth, ~~*Relay pins* (`A1 A2 | 11 12 14 | 21 22 24`),~~ *Draw (VA)*, *Ways* for a distribution block, and notes. *(v0.5: A70. The device table is reached from Design's Devices view, gains what a device takes and gives, and has a count of poles in place of Relay pins)*
-- **LA-34** Sizes are generic per kind of part until a device is picked under *Device* in a part's properties. *Generic sizes…* in the sheet's settings sets them for the project; parts already placed keep their size. *(v0.5: A70. A device is picked in Design)*
-- **LA-35** Devices in the **shared library** can be used by any project and hold datasheets (PDF) and pictures, added with *Add files…* or dropped on the device.
-- **LA-36** A project keeps a copy of each library device it uses, so it opens anywhere. When the library entry changes, *Update* takes the new details.
-- **LA-37** A part sized by hand keeps its size; Properties shows the table's size and *Back to the table size*.
-- **LA-38** *To library* puts a project device in the shared library. *Remove* takes one out of the project; parts that are that device keep their size.
+- **LA-33** The device table is the project's devices, kept in the project and edited in Design's Devices view (DE-89): name, maker, part number, the part each suits, width × height × depth, ~~*Relay pins* (`A1 A2 | 11 12 14 | 21 22 24`),~~ *Draw (VA)*, *Ways* for a distribution block, and notes. There's no *Device table…* window in Layout. *(v0.5: A70. A device gains what it takes and gives, and a count of poles in place of Relay pins)*
+- **LA-34** Sizes are generic per kind of part until a device is picked for it in Design (DE-88): then a part placed, or placed later, takes its device's size, a strip its device's width for each terminal; with its device taken off, it's back to its generic size. *Generic sizes…* in the sheet's settings sets the generic ones for the project; parts already placed keep their size.
+- **LA-35** Devices in the **shared library** can be used by any project and hold datasheets (PDF) and pictures, added with *Add files…* in the device's Properties in Design.
+- **LA-36** A project keeps a copy of each library device it uses, so it opens anywhere. A library device edited in its Properties changes the library's entry, and the copy follows; when the library's entry says something else, *Take the library's* brings the copy up to date.
+- **LA-37** A part sized by hand keeps its size when its device changes; its Properties show its device's size and *Back to its device's size*.
+- **LA-38** *To library* puts a project device in the shared library, and what had it has the library's. *Delete device* takes one out of the project; what had it has none, and parts placed keep their size.
 - **LA-39** With the shared library switched off for the project, only the project's own devices are offered; devices already in use stay.
 - **LA-40** A GA sheet's *View* is changed in its settings. An empty sheet changes to any view, *Detail* included; one holding things the new view can't take is refused, and the message says why (*Only an empty sheet changes to a detail sheet: delete what's on it first*; a door back without its door: *pick its sheet*).
 

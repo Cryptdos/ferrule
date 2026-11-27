@@ -112,12 +112,7 @@ export function isTimed(project: Project, el: Element): boolean {
 export function relayPinMarks(project: Project, el: Element): Record<string, string> | undefined {
   const coil = isMaster(el) ? el : masterOf(project, el)?.el;
   if (!coil) return undefined;
-  let map: RelayPins | undefined;
-  for (const pg of project.pages)
-    for (const it of pg.gaItems ?? []) {
-      if (map || !it.device || it.part || !it.refs?.includes(coil.id)) continue;
-      map = project.devices?.find((d) => d.id === it.device)?.relayPins;
-    }
+  const map: RelayPins | undefined = coil.device ? project.devices?.find((d) => d.id === coil.device)?.relayPins : undefined;
   if (!map) return undefined;
   if (el === coil) return { A1: map.coil[0], A2: map.coil[1] };
   const pole = typeof el.params.pole === "number" ? map.poles[el.params.pole - 1] : undefined;

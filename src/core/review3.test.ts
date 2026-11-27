@@ -12,13 +12,14 @@ import {
   connect,
   removeProjectDevice,
   rotateGaItems,
-  setGaItemDevice,
+  setDevices,
   setPageSpare,
   updateGaItem,
   updateProjectDevice,
   useLibraryDevice,
 } from "./ops";
 import { localGeometry } from "./symbols";
+import { deviceSize } from "./ga";
 import { elementTexts } from "./tags";
 import { textWidth } from "./textwidth";
 import { parseProject } from "./validate";
@@ -121,9 +122,9 @@ describe("GA device table", () => {
     const a = addGaItem(p, ga.id, { kind: "device", x: 100, y: 100, w: 16, h: 80, refs: [k1.id] });
     const b = addGaItem(p, ga.id, { kind: "device", x: 200, y: 100, w: 16, h: 80, refs: [k2.id] });
     const dev = useLibraryDevice(p, relay);
-    setGaItemDevice(p, ga.id, a.id, dev.id);
-    setGaItemDevice(p, ga.id, b.id, dev.id);
-    expect([a.w, a.h, a.device]).toEqual([30.6, 101.8, "relay-4co"]);
+    // Picked for the parts (in Design, v0.5 A70): what's placed takes its size.
+    setDevices(p, [`el:${k1.id}`, `el:${k2.id}`], dev.id);
+    expect([a.w, a.h, k1.device]).toEqual([30.6, 101.8, "relay-4co"]);
     // b turned on its side, a sized by hand.
     rotateGaItems(p, ga.id, [b.id]);
     updateGaItem(p, ga.id, a.id, { w: 40 });
@@ -133,8 +134,9 @@ describe("GA device table", () => {
     expect([b.w, b.h]).toEqual([90, 27]);
     expect(a.w).toBe(40);
     // Back to the generic size.
-    setGaItemDevice(p, ga.id, a.id, null, { w: 16, h: 80 });
-    expect([a.w, a.h, a.device]).toEqual([16, 80, undefined]);
+    setDevices(p, [`el:${k1.id}`], null);
+    const g = deviceSize(p, k1);
+    expect([a.w, a.h, k1.device]).toEqual([g.w, g.h, undefined]);
   });
 
   test("a project's own devices, and removing one leaves its parts sized", () => {
@@ -142,16 +144,16 @@ describe("GA device table", () => {
     const k = addElement(p, pg, "coil", [20, 60]);
     const ga = addGaPage(p, "", { scale: 5, enclosure: { w: 600, h: 800 }, view: "backplate" });
     const it = addGaItem(p, ga.id, { kind: "device", x: 100, y: 100, w: 16, h: 80, refs: [k.id] });
-    const d = addProjectDevice(p, { name: "Timer", maker: "", part: "", kind: "timer", w: 22.5, h: 90, d: 0 });
+    const d = addProjectDevice(p, { name: "Relay", maker: "", part: "", kind: "relay", w: 22.5, h: 90, d: 0 });
     expect(d.library).toBe(false);
-    setGaItemDevice(p, ga.id, it.id, d.id);
+    setDevices(p, [`el:${k.id}`], d.id);
     updateProjectDevice(p, d.id, { w: 17.5 });
     expect(it.w).toBe(17.5);
     const back = parseProject(JSON.parse(JSON.stringify(p)));
-    expect(back.devices?.[0]?.name).toBe("Timer");
-    expect(back.pages[1]!.gaItems![0]!.device).toBe(d.id);
+    expect(back.devices?.[0]?.name).toBe("Relay");
+    expect(back.pages[0]!.elements.find((e) => e.id === k.id)!.device).toBe(d.id);
     removeProjectDevice(p, d.id);
-    expect(it.device).toBeUndefined();
+    expect(k.device).toBeUndefined();
     expect(it.w).toBe(17.5);
   });
 

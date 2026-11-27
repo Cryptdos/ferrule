@@ -41,9 +41,25 @@ export class Editor {
   /** Workbench: Design (what the panel has, design-v0.4), drafting the electrics, annotating, the panel layout (GA), or simulating. */
   mode: "design" | "draft" | "annotate" | "ga" | "simulate" = $state("draft");
   /** Which of Design's views is showing. */
-  designView: "plant" | "controller" | "network" | "todraw" = $state("plant");
-  /** What's picked in Design: plant (ids, in the order picked), a point of the first, a system by name; in the Controller view, the controller itself or a spare slot. */
-  designPick: { plant: string[]; point?: string; system?: string; controller?: string; slot?: number } = $state({ plant: [] });
+  designView: "plant" | "controller" | "devices" | "network" | "todraw" = $state("plant");
+  /**
+   * What's picked in Design: plant (ids, in the order picked), a point of the
+   * first, a system by name; in the Controller view, the controller itself or
+   * a spare slot; in the Devices view, a row (its key) or a device by itself.
+   */
+  designPick: { plant: string[]; point?: string; system?: string; controller?: string; slot?: number; row?: string; device?: string } = $state({ plant: [] });
+  /** Rows ticked in the Devices view (their keys), for *Set picked to…*. Not saved. */
+  deviceTicks: string[] = $state([]);
+  /** Go to a thing's row in Design's Devices view (v0.5 A70): from Layout, or a plant's or module's Properties. */
+  showDevice(key: string): void {
+    this.tool = "select";
+    this.placeSymbol = null;
+    this.gaPlace = null;
+    this.selection = [];
+    this.mode = "design";
+    this.designView = "devices";
+    this.designPick = { plant: [], row: key };
+  }
   /** Systems folded in Design's table (by name; "" is the unnamed group). Not saved. */
   designFolded: string[] = $state([]);
   /** Interlocks proved (design-v0.4 §6), by Check logic or Prove, for the drawing as it was then. Not saved. */

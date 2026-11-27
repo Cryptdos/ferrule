@@ -21,8 +21,9 @@ export const FORMAT = "ferrule";
  * 13: v0.5 step 7b, link ends in place of link arrows (symbol link).
  * 14: v0.5 step 8a, a point's form can be none yet; plant has no Enabled by or Source.
  * 15: v0.5 step 8c, a module can be an adapter; a plant's mark is a picture or Other with letters.
+ * 16: v0.5 step 8d, a device is picked for a part, a strip or a plant item, not for what's placed on a GA.
  */
-export const FORMAT_VERSION = 15;
+export const FORMAT_VERSION = 16;
 
 export type ParamValue = string | number | boolean;
 
@@ -58,6 +59,8 @@ export interface Element {
   params: Record<string, ParamValue>;
   /** Linked elements (coil ↔ contacts). Filled in by milestone 4. */
   links: string[];
+  /** The real device it is, from the project's device table (v0.5 A70): picked in Design's Devices view. A terminal's is its strip's. */
+  device?: string;
 }
 
 /** A terminal on an element: [element id, terminal name]. */
@@ -213,8 +216,6 @@ export interface GaItem {
   text?: string;
   /** A door device with no schematic part (v0.4.x M5): its tag, printed on it and on the bill of materials. */
   tag?: string;
-  /** The device from the project's device table it is (its size came from there). */
-  device?: string;
   /** A terminal strip: its name. The strip keeps up with the schematic (refs and length follow it). */
   strip?: string;
   /** A strip's terminals when its GA sheet was last open: Check reports a strip that has changed since. */
@@ -285,6 +286,8 @@ export interface PlantItem {
   terminals: string[];
   /** Its power supply isn't on these drawings: a break on the left, marked POWER BY OTHERS. */
   powerByOthers?: boolean;
+  /** The real device it is, from the project's device table (v0.5 A70): a module's model, a drive, a sensor. Picked in Design's Devices view. */
+  device?: string;
   /** A small picture inside its view's box (v0.4.x M1): what kind of device it is. *Other* draws `markText` instead (v0.5 A66). */
   mark?: PlantMark;
   /** With the mark *Other*: up to four letters (T, RH, ΔP, CO2), in a circle, or a lozenge for three or four. */
@@ -377,8 +380,6 @@ export interface ModuleInfo {
   model?: string;
   /** Its position on the controller's bus, set by hand to match its DIP switches. Unset: from rail order. */
   address?: number;
-  /** The model it is from the device table (its size on the GA, its pins as entered from the datasheet). */
-  device?: string;
   /**
    * Pins joined inside the module (v0.4.x M6): its commons, RET or 0 V, one
    * list per set that's linked. Set: *Commons are linked inside the module*.
@@ -691,6 +692,8 @@ export interface Project {
   gaSizes?: Record<string, { w?: number; h?: number }>;
   /** Devices from the device table this project uses (copies of library entries, or its own). */
   devices?: ProjectDevice[];
+  /** Each terminal strip's device, by the strip's name (v0.5 A70): one kind of terminal along it. */
+  stripDevices?: Record<string, string>;
   /** Offer the shared device library in this project. Off: only the project's own devices. */
   useDeviceLibrary?: boolean;
 }

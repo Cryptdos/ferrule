@@ -48,6 +48,7 @@ An open editor tab follows changes Claude makes: it reloads the project and says
 | `add_plant`, `place_plant_view` | Field equipment (prefix or fixed tag, pins and points by quick entry or in full: forms, what outputs follow, pin ids and groups; information lines, power by others) and its views |
 | `add_section` | Labelled section boxes |
 | `controller`, `add_module` | Controllers: list them (each module's tag, type, points as `A3-23:DI2` and where it's drawn), add, rename or delete one; add modules by type and channel count with their pins generated from a pattern (ids, first pin, names, shared commons), set each point's job label, add spare slots, move, readdress or delete modules. Module views are placed with `place_plant_view`; `saveModel` keeps a module as a model in the device table and `device` adds one from it |
+| `devices` | Design's Devices view: each drawn part, terminal strip, module and plant item with the device it has, and the project's device table; `add` makes a device, `set` gives things (part tags, strip names, plant tags) a device, and what's placed on a GA takes its size |
 | `place_controller` | Lay a controller's modules out on a GA sheet, side by side in rail order, onto a DIN rail; `update_page` type `ga` makes an empty sheet a GA |
 | `schedules` | Terminal, field cable, IO (controllers' points), plant points and bill of materials schedules |
 | `save_template`, `apply_template` | Templates and stamping for other plant |

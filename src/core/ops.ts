@@ -8,6 +8,7 @@ import { fitBlock, freeCellX, spreadBlock } from "./blocks";
 import { projectCopy, type DeviceEntry, type ProjectDevice } from "./devices";
 import { resolveFields } from "./fields";
 import { textWidth } from "./textwidth";
+import { displayTag } from "./tags";
 import { AREA_UNITS, textUnits, type Rotation, type Vec, clampToArea, rotate, snapVec } from "./geometry";
 import { refreshConductors } from "./conductors";
 import {
@@ -40,7 +41,7 @@ import { cleanPoints, formatQuickEntry, mergePoints, isInputForm, missingRefs, p
 import { isOrthogonal, routeOf, simplifyRoute } from "./wires";
 import { isMaster, isSlave, locate } from "./xref";
 import { colourCode, knownColour, lampColour } from "./wirecolours";
-import { DETAIL_ZOOMS, MAX_COLUMNS, MAX_DOORS, PLATE_MARGIN, allDetails, detailOf, detailSpace, doorColumns, doorOwner, doorPanes, paneName, platesOf, plateDoor, fitScale, fitZoom, frameOf, itemStrip, stripSize, nextDetailLetter, sheetTakes, syncDetailFrames, viewTakes } from "./ga";
+import { DETAIL_ZOOMS, MAX_COLUMNS, MAX_DOORS, PLATE_MARGIN, allDetails, detailOf, detailSpace, doorColumns, doorOwner, doorPanes, paneName, platesOf, plateDoor, fitScale, fitZoom, frameOf, itemStrip, stripSize, nextDetailLetter, sheetTakes, syncDetailFrames, viewTakes, gaItemDevice, moduleGaSize, deviceSize, suitsKey } from "./ga";
 
 export class OpError extends Error {}
 
@@ -2019,14 +2020,12 @@ export function splitGaStrip(project: Project, pageId: string, id: string, at: s
   const part: GaItem = { ...structuredClone(it), id: newId("g"), refs: tail, seen: [...tail] };
   it.refs = head;
   it.seen = [...head];
-  if (!it.device) {
-    if (upright) {
-      it.h = size(head);
-      part.h = size(tail);
-    } else {
-      it.w = size(head);
-      part.w = size(tail);
-    }
+  if (upright) {
+    it.h = size(head);
+    part.h = size(tail);
+  } else {
+    it.w = size(head);
+    part.w = size(tail);
   }
   if (upright) part.x = it.x + it.w + 10;
   else {
@@ -2139,18 +2138,33 @@ export function updateProjectDevice(project: Project, id: string, patch: Partial
   if (old.w !== dev.w || old.h !== dev.h) resizeDeviceItems(project, id, old, dev);
 }
 
-/** Take a device out of the project's table. GA items that were it keep their size. */
+/**
+ * Take a device out of the project's table: the parts, strips and plant that
+ * were it have none. What's placed on a GA keeps its size.
+ */
 export function removeProjectDevice(project: Project, id: string): void {
   project.devices = devicesOf(project).filter((d) => d.id !== id);
-  for (const page of project.pages) for (const it of page.gaItems ?? []) if (it.device === id) delete it.device;
-  for (const it of project.plant) if (it.module?.device === id) delete it.module.device;
+  for (const page of project.pages) for (const el of page.elements) if (el.device === id) delete el.device;
+  for (const [s, d] of Object.entries(project.stripDevices ?? {})) if (d === id) delete project.stripDevices![s];
+  for (const it of project.plant) if (it.device === id) delete it.device;
 }
 
-/** Items of a device that had its old size (not sized by hand) get the new one, turned the same way. */
+/** A device's id changed (an own device put in the library): everything that was it is the new one. */
+export function renameDevice(project: Project, from: string, to: string): void {
+  for (const page of project.pages) for (const el of page.elements) if (el.device === from) el.device = to;
+  for (const [s, d] of Object.entries(project.stripDevices ?? {})) if (d === from) project.stripDevices![s] = to;
+  for (const it of project.plant) if (it.device === from) it.device = to;
+}
+
+/** Items of a device that had its old size (not sized by hand) get the new one, turned the same way. A strip follows its terminals. */
 function resizeDeviceItems(project: Project, id: string, old: { w: number; h: number }, now: { w: number; h: number }): void {
   for (const page of project.pages) {
     for (const it of page.gaItems ?? []) {
-      if (it.device !== id) continue;
+      if (gaItemDevice(project, it)?.id !== id) continue;
+      if (itemStrip(project, it)) {
+        fitGaItem(project, it);
+        continue;
+      }
       const turned = it.w === old.h && it.h === old.w && old.w !== old.h;
       if ((it.w === old.w && it.h === old.h) || turned) {
         it.w = turned ? now.h : now.w;
@@ -2161,23 +2175,101 @@ function resizeDeviceItems(project: Project, id: string, old: { w: number; h: nu
 }
 
 /**
- * Make a GA device one from the device table (its size comes from there,
- * turned the way the item is), or back to a generic size (null).
+ * A placed item takes the size of what it places (v0.5 A70): its device's,
+ * or the generic one; a strip, its terminals'. It keeps the way it's turned
+ * and its middle along the rail.
  */
-export function setGaItemDevice(project: Project, pageId: string, itemId: string, deviceId: string | null, generic?: { w: number; h: number }): void {
-  const it = gaPage(project, pageId).gaItems.find((x) => x.id === itemId);
-  if (!it) throw new OpError(`No GA item "${itemId}"`);
-  const size = deviceId ? devicesOf(project).find((d) => d.id === deviceId) : generic;
-  if (!size) throw new OpError(deviceId ? `No device "${deviceId}" in this project` : "No size given");
-  // Keep the item turned the way it is: on its side stays on its side.
+function fitGaItem(project: Project, it: GaItem): void {
+  if (it.kind !== "device" || it.part) return;
+  let size: { w: number; h: number } | undefined;
+  if (itemStrip(project, it)) size = stripSize(project, it.refs ?? []);
+  else if (it.module) {
+    const item = project.plant.find((x) => x.id === it.module);
+    if (item) size = moduleGaSize(project, item);
+  } else {
+    const el = it.refs?.length ? project.pages.flatMap((pg) => pg.elements).find((e) => e.id === it.refs![0]) : undefined;
+    if (el) size = deviceSize(project, el);
+  }
+  if (!size) return;
+  // On its side stays on its side.
   const onSide = it.w > it.h && size.h > size.w;
   const cx = it.x + it.w / 2;
   it.w = onSide ? size.h : size.w;
   it.h = onSide ? size.w : size.h;
   // Grows about its middle along a rail; the top stays on the rail.
   it.x = Math.round((cx - it.w / 2) * 2) / 2;
-  if (deviceId) it.device = deviceId;
-  else delete it.device;
+}
+
+/**
+ * Give things their device (v0.5 A70), or none (null): drawn parts, terminal
+ * strips and plant items, by their Devices-view keys (`el:<id>`,
+ * `strip:<name>`, `plant:<id>`). A device that doesn't suit one of them is
+ * refused. What's already placed on a GA takes the device's size.
+ */
+export function setDevices(project: Project, keys: string[], deviceId: string | null): void {
+  const dev = deviceId ? devicesOf(project).find((d) => d.id === deviceId) : undefined;
+  if (deviceId && !dev) throw new OpError(`No device "${deviceId}" in this project`);
+  const els = new Map(project.pages.flatMap((pg) => pg.elements.map((e) => [e.id, e] as const)));
+  const touched = new Set<string>();
+  // Every one checked first: a device that doesn't suit one changes none.
+  for (const key of keys) {
+    const suits = deviceKeySuits(project, key);
+    if (!suits) throw new OpError(`Nothing needs a device as "${key}"`);
+    if (dev && dev.kind && !suits.includes(dev.kind)) throw new OpError(`${dev.name} doesn't suit ${deviceKeyName(project, key)}`);
+  }
+  for (const key of keys) {
+    const [kind, ...rest] = key.split(":");
+    const id = rest.join(":");
+    if (kind === "el") {
+      const el = els.get(id)!;
+      if (deviceId) el.device = deviceId;
+      else delete el.device;
+      touched.add(id);
+    } else if (kind === "strip") {
+      project.stripDevices ??= {};
+      if (deviceId) project.stripDevices[id] = deviceId;
+      else delete project.stripDevices[id];
+      if (!Object.keys(project.stripDevices).length) delete project.stripDevices;
+      for (const e of els.values()) if (e.symbol === "terminal" && String(e.params.strip ?? "X1") === id) touched.add(e.id);
+    } else {
+      const it = getPlant(project, id);
+      if (deviceId) it.device = deviceId;
+      else delete it.device;
+      touched.add(id);
+    }
+  }
+  for (const page of project.pages)
+    for (const it of page.gaItems ?? []) if (it.kind === "device" && !it.part && ((it.module && touched.has(it.module)) || it.refs?.some((r) => touched.has(r)))) fitGaItem(project, it);
+}
+
+/** What a Devices-view key can take: the SUITS keys, or null when it names nothing that needs a device. */
+export function deviceKeySuits(project: Project, key: string): string[] | null {
+  const [kind, ...rest] = key.split(":");
+  const id = rest.join(":");
+  if (kind === "el") {
+    const el = project.pages.flatMap((pg) => pg.elements).find((e) => e.id === id);
+    const k = el && el.symbol !== "terminal" ? suitsKey(project, el) : "";
+    return k ? [k] : null;
+  }
+  if (kind === "strip") return project.pages.some((pg) => pg.elements.some((e) => e.symbol === "terminal" && e.zone !== "external" && String(e.params.strip ?? "X1") === id)) ? ["terminal", "fuseTerminal", "disconnectTerminal", "earthTerminal"] : null;
+  if (kind === "plant") {
+    const it = project.plant.find((x) => x.id === id);
+    return it ? [it.module ? "module" : "plant"] : null;
+  }
+  return null;
+}
+
+/** How a Devices-view key is spoken of: a part's tag, a strip's name, a plant item's tag. */
+export function deviceKeyName(project: Project, key: string): string {
+  const [kind, ...rest] = key.split(":");
+  const id = rest.join(":");
+  if (kind === "strip") return `strip ${id}`;
+  if (kind === "plant") {
+    const it = project.plant.find((x) => x.id === id);
+    return it ? plantLabel(it) : "that plant";
+  }
+  const el = project.pages.flatMap((pg) => pg.elements).find((e) => e.id === id);
+  return el ? displayTag(el, project) || getSymbol(el.symbol)?.name || "that part" : "that part";
 }
 
 // ---------------------------------------------------------------------------

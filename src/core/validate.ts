@@ -146,6 +146,11 @@ export function parseProject(input: unknown): Project {
   if (typeof input.logo === "string" && project.assets[input.logo]) project.logo = input.logo;
   const devices = parseProjectDevices(input.devices);
   if (devices.length) project.devices = devices;
+  // Each strip's device (v0.5 A70), where the device is in the project.
+  if (isObj(input.stripDevices)) {
+    const sd = Object.fromEntries(Object.entries(input.stripDevices).filter(([k, v]) => k && typeof v === "string" && devices.some((d) => d.id === v))) as Record<string, string>;
+    if (Object.keys(sd).length) project.stripDevices = sd;
+  }
   if (input.useDeviceLibrary === false) project.useDeviceLibrary = false;
   project.conductors = parseConductors(input.conductors);
   if (isObj(input.wireColours)) {
@@ -233,6 +238,7 @@ export function parsePlant(v: unknown): Project["plant"] {
       ...(pl.inPanel === true ? { inPanel: true } : {}),
       ...(typeof pl.mark === "string" && PLANT_MARKS.some((m) => m.value === pl.mark) ? { mark: pl.mark as PlantItem["mark"] } : {}),
       ...(pl.mark === "other" && typeof pl.markText === "string" && markLetters(pl.markText) ? { markText: markLetters(pl.markText) } : {}),
+      ...(typeof pl.device === "string" && pl.device ? { device: pl.device } : {}),
       description: strOr(pl.description),
       terminals: arr(pl.terminals).filter((t): t is string => typeof t === "string"),
       ...parsePoints(pl.points, pl.pins),
@@ -295,7 +301,6 @@ function parseModule(v: unknown): { module?: ModuleInfo } {
       ...(typeof v.maker === "string" && v.maker ? { maker: v.maker } : {}),
       ...(typeof v.model === "string" && v.model ? { model: v.model } : {}),
       ...(address ? { address } : {}),
-      ...(typeof v.device === "string" && v.device ? { device: v.device } : {}),
       ...(commons.length ? { commons } : {}),
       ...(typeof v.va === "number" && Number.isFinite(v.va) && v.va > 0 ? { va: v.va } : {}),
     },
@@ -432,6 +437,7 @@ function parsePage(pg: Record<string, unknown>, i: number): Project["pages"][num
           ) as Record<string, string | number | boolean>)
         : {},
       links: arr(e.links).filter((l): l is string => typeof l === "string"),
+      ...(typeof e.device === "string" && e.device ? { device: e.device } : {}),
     };
   });
   const segments = arr(pg.segments)
@@ -538,7 +544,6 @@ function parsePage(pg: Record<string, unknown>, i: number): Project["pages"][num
       ...(it.part === "handle" ? { part: "handle" as const } : {}),
       ...(typeof it.text === "string" ? { text: it.text } : {}),
       ...(typeof it.tag === "string" && it.tag.trim() ? { tag: it.tag.trim() } : {}),
-      ...(typeof it.device === "string" && it.device ? { device: it.device } : {}),
       ...(typeof it.strip === "string" && it.strip ? { strip: it.strip } : {}),
       ...(Array.isArray(it.seen) ? { seen: it.seen.filter((r): r is string => typeof r === "string") } : {}),
       ...(typeof it.cutout === "string" && it.cutout.trim() ? { cutout: it.cutout.trim() } : {}),

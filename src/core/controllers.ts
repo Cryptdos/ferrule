@@ -6,7 +6,7 @@
  */
 import type { Controller, ModuleInfo, ModuleType, PlantItem, Project } from "./model";
 import { newId } from "./model";
-import { OpError, addGaItem, addPlant, addProjectDevice, deletePlant, getPlant, syncPlantViews, useLibraryDevice } from "./ops";
+import { OpError, addGaItem, addPlant, addProjectDevice, deletePlant, getPlant, setDevices, syncPlantViews, useLibraryDevice } from "./ops";
 import type { DeviceEntry, ModuleTemplate, ProjectDevice } from "./devices";
 import { moduleGaSize, snapToRail } from "./ga";
 import type { GaItem } from "./model";
@@ -246,7 +246,7 @@ export function saveModuleDevice(project: Project, plantId: string, size?: { w: 
   const s = size ?? moduleGaSize(project, item);
   const name = [m.maker, m.model].filter(Boolean).join(" ") || `${moduleType(m.type).label} module`;
   const dev = addProjectDevice(project, { name, maker: m.maker ?? "", part: m.model ?? "", kind: "module", w: s.w, h: s.h, d: 0, module: moduleTemplate(item) });
-  m.device = dev.id;
+  setDevices(project, [`plant:${item.id}`], dev.id);
   return dev;
 }
 
@@ -263,29 +263,9 @@ export function addModuleFromDevice(project: Project, controllerId: string, devi
   item.terminals = [...t.terminals];
   if (t.pins) item.pins = structuredClone(t.pins);
   if (t.points?.length) item.points = cleanPoints(structuredClone(t.points), item.terminals);
-  item.module!.device = dev.id;
+  item.device = dev.id;
   syncPlantViews(project);
   return item;
-}
-
-/** Which model from the device table a module is (null: none). */
-export function setModuleDevice(project: Project, plantId: string, deviceId: string | null): void {
-  const item = getPlant(project, plantId);
-  if (!item.module) throw new OpError(`${item.tag || "That"} isn't a controller's module`);
-  if (deviceId) {
-    if (!project.devices?.some((d) => d.id === deviceId)) throw new OpError(`No device "${deviceId}" in this project`);
-    item.module.device = deviceId;
-  } else delete item.module.device;
-  // On the GA it takes that size.
-  const s = moduleGaSize(project, item);
-  for (const pg of project.pages)
-    for (const it of pg.gaItems ?? []) {
-      if (it.module !== item.id) continue;
-      it.w = s.w;
-      it.h = s.h;
-      if (deviceId) it.device = deviceId;
-      else delete it.device;
-    }
 }
 
 /**
@@ -304,7 +284,7 @@ export function placeModulesOnGa(project: Project, pageId: string, moduleIds: st
     const s = sizes[i]!;
     // Lined up by their middles on the rail.
     const y = (railY ?? at[1]) + (h - s.h) / 2;
-    const g = addGaItem(project, pageId, { kind: "device", x, y, w: s.w, h: s.h, module: it.id, ...(it.module?.device ? { device: it.module.device } : {}) });
+    const g = addGaItem(project, pageId, { kind: "device", x, y, w: s.w, h: s.h, module: it.id });
     x += s.w;
     return g;
   });

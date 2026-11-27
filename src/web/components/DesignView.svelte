@@ -8,6 +8,7 @@
   import DesignTable from "./DesignTable.svelte";
   import NeedsLine from "./NeedsLine.svelte";
   import ControllerView from "./ControllerView.svelte";
+  import DevicesView from "./DevicesView.svelte";
   import ToDrawView from "./ToDrawView.svelte";
   import NetworkView from "./NetworkView.svelte";
 
@@ -17,6 +18,8 @@
 <div class="design">
   {#if editor.designView === "controller"}
     <div class="views one"><ControllerView {editor} /></div>
+  {:else if editor.designView === "devices"}
+    <div class="views one"><DevicesView {editor} /></div>
   {:else if editor.designView === "network"}
     <div class="views one"><NetworkView {editor} /></div>
   {:else if editor.designView === "todraw"}

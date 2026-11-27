@@ -442,25 +442,23 @@ export function supplyJoinChecks(project: Project): Finding[] {
 
 /**
  * A distribution block needs a way for each wire drawn onto it (v0.5 A23): a
- * device picked for it on a GA with fewer ways is too small.
+ * device picked for it with fewer ways is too small.
  */
 export function blockWaysChecks(project: Project): Finding[] {
   const out: Finding[] = [];
-  const byId = new Map(project.pages.flatMap((pg) => pg.elements.map((e) => [e.id, e] as const)));
   for (const page of project.pages) {
-    if (!page.ga) continue;
-    for (const it of page.gaItems ?? []) {
-      if (it.kind !== "device" || !it.device) continue;
-      const el = byId.get(it.refs?.[0] ?? "");
-      const dev = project.devices?.find((d) => d.id === it.device);
-      if (el?.symbol !== "busbar" || !dev?.ways) continue;
+    if (page.ga) continue;
+    for (const el of page.elements) {
+      if (el.symbol !== "busbar" || !el.device) continue;
+      const dev = project.devices?.find((d) => d.id === el.device);
+      if (!dev?.ways) continue;
       const n = blockWays(project, el);
       if (n > dev.ways)
         out.push({
           level: "warning",
           message: `Sheet ${page.number}: distribution block ${displayTag(el, project)} has ${n} wires and its device, ${dev.name}, has ${dev.ways} ways`,
           pageId: page.id,
-          ids: [it.id],
+          ids: [el.id],
         });
     }
   }
