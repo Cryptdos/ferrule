@@ -307,6 +307,8 @@ Judgement calls made while building, by step, with the reason.
 - **Carrying on in one move** (*Link…* from a source, then bare paper) starts the wire tool there with the arriving end already linked. Clicking a link end instead pairs as before. *Link to a new arrow* is gone.
 - **When the link end prints its wire's label:** when the wire ends at it and the label is longer than the wire's longest run, unless the label has been dragged by hand. It prints above a horizontal end and left of a vertical one, reading left to right.
 - **The legend** shows a link end in each of its two shapes, linked.
+- **A28: a marker goes at each real end of a connection,** where a wire lands on a terminal or a part, never at a tee or a link end. LSP-01's schedule loses 48 rows, one for each of its link ends. A field core whose panel side runs through a link end still has its panel-end marker at the terminal and its field-end one at the device.
+- **README pictures:** the drafting, simulating, notes, terminal block and printed sheet pictures are retaken here, having fallen behind the interface since v0.4.x. Design, Controller, Network and Layout's are retaken in steps 8 to 11, which rework those views.
 - **Link ends moved the file format to 13.** Claude's `connect` takes `{x, y}` for a bare end (with a label, and `link` to carry a source on); `link` pairs two link ends; `add_element` refuses one.
 
 ### Title block (ruled 27 Nov 2026, before step 7)

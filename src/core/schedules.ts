@@ -155,14 +155,16 @@ export interface MarkerRow {
 }
 
 /**
- * Wire and core markers for a marker supplier (v0.4.x M10), one per wire
- * end. A panel wire has two, each the number of the terminal it lands on
- * (the first along the strip, if it lands on two), or with none, its own
- * number. A field core has two: at the panel end the terminal it goes into
- * (or its own number), at the field end the device's tag. A terminal's
- * number is read from the terminal itself, so a wire numbered by hand still
- * gets the terminal's. An end on a junction isn't a place a marker goes, so
- * it has none.
+ * Wire and core markers for a marker supplier (v0.4.x M10), one at each
+ * real end of a connection (v0.5 A28): where it lands on a terminal or a
+ * part. A tee (a junction) or a link end isn't a place a marker goes, so a
+ * wire carried across two sheets has two markers, not four. A panel wire's
+ * say the supply's number when it's on one (A23), else the terminal it lands
+ * on (the first along the strip, if it lands on two), or with none, its own
+ * number. A field core's say at the panel end the terminal it goes into (or
+ * its own number), at the field end the device's tag. A terminal's number is
+ * read from the terminal itself, so a wire numbered by hand still gets the
+ * terminal's.
  */
 export function wireMarkers(project: Project): MarkerRow[] {
   const rows: MarkerRow[] = [];
@@ -181,10 +183,11 @@ export function wireMarkers(project: Project): MarkerRow[] {
       const supply = !field && cond ? supplyOf(project, cond) : undefined;
       const panelText = supply ? String(supply.tag) : terms[0] ? displayTag(terms[0].el, project) || own : own;
       // A field core's field end: a device out in the field, not the terminal.
-      const fieldEnd = field ? (ends.find((e) => e.el!.zone === "external" && e.el!.symbol !== "terminal") ?? ends.find((e) => e.el!.symbol !== "terminal")) : undefined;
+      const real = (e: (typeof ends)[number]) => e.el!.symbol !== "junction" && e.el!.symbol !== "link";
+      const fieldEnd = field ? (ends.find((e) => real(e) && e.el!.zone === "external" && e.el!.symbol !== "terminal") ?? ends.find((e) => real(e) && e.el!.symbol !== "terminal")) : undefined;
       for (const e of ends) {
         const el = e.el!;
-        if (el.symbol === "junction") continue;
+        if (!real(e)) continue;
         const where = address(page, el.pos);
         if (field && e === fieldEnd) {
           const item = el.symbol === "plant-view" ? project.plant.find((p) => p.id === el.params.plant) : undefined;
