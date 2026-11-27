@@ -93,6 +93,27 @@ describe("MCP tools", () => {
     const r2 = await call("add_element", { project: "mcp-panel", sheet: 1, symbol: "warp-drive", x: 1, y: 1 });
     expect(r2.error).toBe(true);
     expect(r2.data).toContain("Unknown symbol");
+    // A link end isn't placed (A27): it's the end of a wire.
+    const r3 = await call("add_element", { project: "mcp-panel", sheet: 1, symbol: "link", x: 1, y: 1 });
+    expect(r3.error).toBe(true);
+    expect(r3.data).toContain("connect with {x, y}");
+  });
+
+  test("a wire to bare paper ends in a link end, and two pair up (A27)", async () => {
+    const project = "mcp-panel";
+    const k = (await call("add_element", { project, sheet: 1, symbol: "contact", x: 90, y: 20 })).data;
+    const out = (await call("connect", { project, sheet: 1, from: { element: k.id, terminal: "14" }, to: { x: 90, y: 40, label: "FAN RUN" } })).data;
+    expect(out.linkEnd).toBeTruthy();
+    const h = (await call("add_element", { project, sheet: 1, symbol: "lamp", x: 110, y: 40 })).data;
+    const inn = (await call("connect", { project, sheet: 1, from: { x: 110, y: 25, link: out.linkEnd }, to: { element: h.id, terminal: "+V" } })).data;
+    const saved = await storage.load(project);
+    const ends = saved.pages[0]!.elements.filter((e) => e.symbol === "link");
+    expect(ends.map((e) => [e.id, e.params.source, e.links])).toEqual([
+      [out.linkEnd, true, [inn.linkEnd]],
+      [inn.linkEnd, false, [out.linkEnd]],
+    ]);
+    const symbols = (await call("list_symbols", {})).data as { id: string }[];
+    expect(symbols.some((x) => x.id === "link")).toBe(false);
   });
 
   test("plant, templates and stamping", async () => {

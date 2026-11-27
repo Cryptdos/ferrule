@@ -1,7 +1,7 @@
 <script lang="ts">
   /**
    * After a stamp (v0.4.x T6): the contacts that kept their link to a coil
-   * outside it, and the arrows (or contacts) left to link again. Each is a
+   * outside it, and the link ends (or contacts) left to link again. Each is a
    * click to select it.
    */
   import { displayTag } from "../../core/tags";
@@ -18,9 +18,9 @@
   function name(id: string): string {
     const l = locate(editor.project, id);
     if (!l) return "(gone)";
-    return displayTag(l.el, editor.project) || (l.el.symbol === "offpage" ? "Arrow" : "Contact");
+    return displayTag(l.el, editor.project) || (l.el.symbol === "link" ? "Link end" : "Contact");
   }
-  const isArrow = (id: string) => locate(editor.project, id)?.el.symbol === "offpage";
+  const isArrow = (id: string) => locate(editor.project, id)?.el.symbol === "link";
 </script>
 
 <div class="stamplinks">
@@ -37,7 +37,7 @@
   {#if links.relink.length}
     <div class="sub">To link again</div>
     {#each links.relink as id (id)}
-      <button class="row" onclick={() => editor.goTo(id)}>{isArrow(id) ? "Arrow" : "Contact"} at {where(id)}{isArrow(id) ? ": link it to its partner" : ": its coil isn't in this project"}</button>
+      <button class="row" onclick={() => editor.goTo(id)}>{isArrow(id) ? "Link end" : "Contact"} at {where(id)}{isArrow(id) ? ": link it to its partner" : ": its coil isn't in this project"}</button>
     {/each}
   {/if}
 </div>

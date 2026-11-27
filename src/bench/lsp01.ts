@@ -30,7 +30,7 @@ import {
   addSection,
   connect,
   linkContact,
-  linkOffpage,
+  pairLinkEnds,
   setBoundary,
   updateProjectInfo,
   updateRevision,
@@ -123,8 +123,14 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
     add("busbar", x, y, { label, params: { dist: d?.id ?? "", length } });
   const ctl = (d: Distribution | null, x: number, y: number, length: number, name = "") =>
     add("rail", x, y, { params: { dist: d?.id ?? "", name, length, bothEnds: true } });
-  const arrowOut = (x: number, y: number, label = "") => add("offpage", x, y, { label });
-  const arrowIn = (x: number, y: number, label = "") => add("offpage", x, y, { rot: 180, label, params: { source: false } });
+  // Link ends (A27): a wire drawn out to bare paper leaves the sheet there; one drawn from
+  // bare paper arrives there. Each points along its wire.
+  const endOf = (seg: { from: [string, string]; to: [string, string] }) =>
+    page.elements.find((e) => e.symbol === "link" && (e.id === seg.from[0] || e.id === seg.to[0]))!;
+  const linkOut = (from: End, x: number, y: number, label = "") =>
+    endOf(wire(p, page.id, { terminal: [from[0].id, from[1]] }, { free: [x, y], label }));
+  const linkIn = (x: number, y: number, to: End, label = "") =>
+    endOf(wire(p, page.id, { free: [x, y], label }, { terminal: [to[0].id, to[1]] }));
   // Text sizes are Markdown headings (# Title, ## Heading); body text is Note.
   const text = (x: number, y: number, s: string, size = "note", align = "start") => {
     const mark = size === "title" ? "# " : size === "heading" ? "## " : "";
@@ -199,21 +205,17 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
     w([qLocal, b], [fan, ["U", "V", "W"][i]!]);
   }
   // Control circuit, through the isolator's auxiliary poles.
-  const cctIn = arrowIn(28, 16);
-  const ovIn = arrowIn(31, 19);
-  w([cctIn, "1"], [qFan, "13"]);
-  w([ovIn, "1"], [qFan, "23"]);
+  linkIn(28, 18, [qFan, "13"]);
+  linkIn(31, 21, [qFan, "23"]);
   // After the isolator's auxiliary poles: this starter's own control busbars.
   const cctLocal = add("rail", 36, 30, { params: { length: 50 } });
   const ovLocal = add("rail", 36, 58, { params: { length: 50 } });
   w([qFan, "14"], tap(cctLocal, 36));
   w([qFan, "24"], tap(ovLocal, 36));
-  // Destinations show their source's label, so the starter's arrows say whose they are.
-  const enOut = arrowOut(46, 33, `${tag(SF1.id)}\nENABLE`);
-  const enIn = arrowIn(46, 40, "ENABLE");
+  // Destinations show their source's label, so the starter's link ends say whose they are.
   const kmCoil = add("coil", 46, 50, { label: `${tag(SF1.id)}\nCONTACTOR`, params: { type: "contactor" } });
-  w(tap(cctLocal, 46), [enOut, "1"]);
-  w([enIn, "1"], [kmCoil, "A1"]);
+  linkOut(tap(cctLocal, 46), 46, 31, `${tag(SF1.id)}\nENABLE`);
+  linkIn(46, 42, [kmCoil, "A1"], "ENABLE");
   w([kmCoil, "A2"], tap(ovLocal, 46));
   linkContact(p, km.id, kmCoil.id);
   const kmRun = add("contact", 62, 35);
@@ -223,9 +225,8 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
   w([hRun, "-V"], tap(ovLocal, 62));
   linkContact(p, kmRun.id, kmCoil.id);
   const kmSig = add("contact", 78, 35);
-  const runOut = arrowOut(78, 45, `${tag(SF1.id)}\nRUN`);
   w(tap(cctLocal, 78), [kmSig, "13"]);
-  w([kmSig, "14"], [runOut, "1"]);
+  linkOut([kmSig, "14"], 78, 43, `${tag(SF1.id)}\nRUN`);
   linkContact(p, kmSig.id, kmCoil.id);
   const starterSheet = page;
   const starter = saveSheetTemplate(p, page.id, "Fan starter section");
@@ -294,17 +295,9 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
   w(tap(lt, 96), [hFire, "LT"]);
   w([hFire, "LT"], [hHealthy, "LT"]);
   // CCT and 0V out to the four starters and the two controls sheets.
-  // Eight units apart: each arrow has its wire number to the left and its reference to the right.
-  const cctOuts = [102, 110, 118, 126, 134, 142].map((x) => {
-    const a = arrowOut(x, 51);
-    w(tap(cct, x), [a, "1"]);
-    return a;
-  });
-  const ovOuts = [102, 110, 118, 126, 134, 142].map((x) => {
-    const a = arrowIn(x, 61);
-    w([a, "1"], tap(ov, x));
-    return a;
-  });
+  // Eight units apart: each link end has its wire's label to the left and its reference to the right.
+  const cctOuts = [102, 110, 118, 126, 134, 142].map((x) => linkOut(tap(cct, x), x, 49));
+  const ovOuts = [102, 110, 118, 126, 134, 142].map((x) => linkIn(x, 63, tap(ov, x)));
   text(106, 41, "CCT AND 0V TO SHEETS 3–6, 8 AND 9");
   const supplies = page;
 
@@ -315,10 +308,8 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
   addSection(p, page.id, `${tag(SF1.id)} / ${tag(SF2.id)} DUTY/STANDBY CONTROL`, [2, 1, 146, 65]);
   const c = ctl(D.CCT, 4, 6, 143);
   const o = ctl(D.OV, 4, 62, 143);
-  const cIn = arrowIn(147, 2);
-  const oIn = arrowOut(147, 66);
-  w([cIn, "1"], tap(c, 147));
-  w(tap(o, 147), [oIn, "1"]);
+  linkIn(147, 4, tap(c, 147));
+  linkOut(tap(o, 147), 147, 64);
   // Enable: AUTO/TEST (fire alarm or test), fans-fail latch, duty selector.
   const sAt = add("selector", 10, 13, { label: "AUTO/TEST", params: { key: true, pos0: "AUTO", pos1: "TEST" } });
   const frEn = add("contact", 16, 13);
@@ -339,20 +330,17 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
   w([er2, "A2"], tap(o, 10));
   // Enable loops out to the starters, one above the other.
   const enLoop = (y: number, er: Element, fanTag: string) => {
-    const a = arrowIn(28, y, `${fanTag}\nENABLE`);
     const k = add("contact", 28, y + 7);
-    const b = arrowOut(28, y + 14, `${fanTag}\nENABLE`);
-    w([a, "1"], [k, "13"]);
-    w([k, "14"], [b, "1"]);
+    linkIn(28, y + 2, [k, "13"], `${fanTag}\nENABLE`);
+    linkOut([k, "14"], 28, y + 12, `${fanTag}\nENABLE`);
     linkContact(p, k.id, er.id);
   };
   enLoop(11, er1, tag(SF1.id));
   enLoop(33, er2, tag(SF2.id));
   // Running relays, from each starter's run signal.
   const runRelay = (x: number, fanTag: string) => {
-    const a = arrowIn(x, 44, `${fanTag}\nRUN`);
     const k = add("coil", x, 56, { label: `${fanTag}\nRUNNING` });
-    w([a, "1"], [k, "A1"]);
+    linkIn(x, 46, [k, "A1"], `${fanTag}\nRUN`);
     w([k, "A2"], tap(o, x));
     return k;
   };
@@ -449,16 +437,16 @@ export function buildLsp01(avoid: Avoid | null): Lsp01 {
   const fed = [...starters.map((s) => s.page), controlsSheet, efSheet];
   fed.forEach((sh, i) => {
     const isStarter = i < 4;
-    linkOffpage(p, cctOuts[i]!.id, at(sh, "offpage", isStarter ? 28 : 147, isStarter ? 16 : 2).id);
-    linkOffpage(p, ovOuts[i]!.id, at(sh, "offpage", isStarter ? 31 : 147, isStarter ? 19 : 66).id);
+    pairLinkEnds(p, cctOuts[i]!.id, at(sh, "link", isStarter ? 28 : 147, isStarter ? 18 : 4).id);
+    pairLinkEnds(p, ovOuts[i]!.id, at(sh, "link", isStarter ? 31 : 147, isStarter ? 21 : 64).id);
   });
   // Enable loops and run signals between each starter and its controls sheet.
   starters.forEach((s, i) => {
     const sh = i < 2 ? controlsSheet : efSheet;
     const y = i % 2 === 0 ? 11 : 33;
-    linkOffpage(p, at(s.page, "offpage", 46, 33).id, at(sh, "offpage", 28, y).id);
-    linkOffpage(p, at(sh, "offpage", 28, y + 14).id, at(s.page, "offpage", 46, 40).id);
-    linkOffpage(p, at(s.page, "offpage", 78, 45).id, at(sh, "offpage", i % 2 === 0 ? 45 : 55, 44).id);
+    pairLinkEnds(p, at(s.page, "link", 46, 31).id, at(sh, "link", 28, y + 2).id);
+    pairLinkEnds(p, at(sh, "link", 28, y + 12).id, at(s.page, "link", 46, 42).id);
+    pairLinkEnds(p, at(s.page, "link", 78, 43).id, at(sh, "link", i % 2 === 0 ? 45 : 55, 46).id);
   });
   void starterSheet;
 

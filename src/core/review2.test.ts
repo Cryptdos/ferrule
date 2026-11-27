@@ -3,7 +3,7 @@ import { controlBusbars } from "./testing";
 import { netJoins } from "./conductors";
 import { describe, expect, test } from "bun:test";
 import { newProject } from "./model";
-import { addDistribution, addElement, addPage, addPlant, connect, linkContact, linkOffpage, placePlantView, updateElement } from "./ops";
+import { addDistribution, addElement, addPage, addPlant, connect, linkContact, pairLinkEnds, placePlantView, updateElement } from "./ops";
 import { renumber, renumberPreview } from "./renumber";
 import { slideRailTaps } from "./routing";
 import { localGeometry, terminalNames } from "./symbols";
@@ -40,9 +40,9 @@ describe("busbars across sheets", () => {
 describe("link arrows", () => {
   test("ticking Source on one makes its partner the destination", () => {
     const { p, pg } = project();
-    const a = addElement(p, pg, "offpage", [10, 10]);
-    const b = addElement(p, pg, "offpage", [50, 10]);
-    linkOffpage(p, a.id, b.id);
+    const a = addElement(p, pg, "link", [10, 10]);
+    const b = addElement(p, pg, "link", [50, 10]);
+    pairLinkEnds(p, a.id, b.id);
     expect([a.params.source, b.params.source]).toEqual([true, false]);
     updateElement(p, pg, b.id, { params: { source: true } });
     expect(a.params.source).toBe(false);
@@ -50,9 +50,9 @@ describe("link arrows", () => {
 
   test("on the same sheet too, a reference is the full sheet-column (21)", () => {
     const { p, pg } = project();
-    const a = addElement(p, pg, "offpage", [10, 10]);
-    const b = addElement(p, pg, "offpage", [50, 10]);
-    linkOffpage(p, a.id, b.id);
+    const a = addElement(p, pg, "link", [10, 10]);
+    const b = addElement(p, pg, "link", [50, 10]);
+    pairLinkEnds(p, a.id, b.id);
     expect(xrefText(p, a, "")).toBe("(1-26)");
   });
 

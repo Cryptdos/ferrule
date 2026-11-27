@@ -38,8 +38,7 @@
     updateSection,
     setPartPoints,
     wire,
-    linkArrows,
-    linkToNewArrow,
+    linkFromSource,
     type WireEnd,
   } from "../../core/ops";
   import { settings } from "../settings.svelte";
@@ -144,6 +143,8 @@
   /** A wire being drawn: where it starts. */
   type Pending = { end: WireEnd; at: Vec };
   let pending: Pending | null = $state(null);
+  /** The sheet a wire carried on from a link end starts on (Link…, then bare paper: A27). */
+  let carryPage = "";
 
   const page = $derived(tile ? (editor.project.pages.find((p) => p.id === editor.tilePage(tile)) ?? editor.page) : editor.page);
   /** What can be picked: drafting (parts, wires, rails…) or annotation (text, boxes, sections, clouds…). */
@@ -155,10 +156,14 @@
   const selected = $derived(new Set(isActive ? editor.selection : []));
 
   $effect(() => {
-    // Drop a half-drawn wire when the tool or page changes.
-    void editor.tool;
-    void page.id;
-    pending = null;
+    // Drop a half-drawn wire when the tool or page changes: not one just carried on from a
+    // link end, which starts the wire tool on its own sheet.
+    const tool = editor.tool;
+    const here = page.id;
+    untrack(() => {
+      const end = pending?.end;
+      if (!(end && "free" in end && end.linkTo && tool === "wire" && carryPage === here)) pending = null;
+    });
     polyDraft = [];
     dimDraft = [];
     dimThrough = null;
@@ -844,24 +849,25 @@
     }
 
     if (editor.linking) {
-      // Linking a link arrow (controller.md §5): click the arrow to pair with, or where the new one goes.
-      const { from, mode } = editor.linking;
-      if (mode === "new") {
-        let id = "";
-        if (editor.apply((p) => (id = linkToNewArrow(p, from, editor.pageId, clampToArea(snapVec(pt))).id))) {
-          editor.linking = null;
-          editor.selection = [id];
-        }
-        return;
-      }
+      // Linking a link end (controller.md §5): click the link end to pair with, or bare paper
+      // to carry the wire on there in one move, finished on a terminal (A27).
+      const { from } = editor.linking;
       const hit = hitElement(pt);
-      if (hit?.symbol === "offpage" && hit.id !== from) {
+      if (hit?.symbol === "link" && hit.id !== from) {
         const to = hit.id;
-        if (editor.apply((p) => linkArrows(p, from, to))) {
+        if (editor.apply((p) => linkFromSource(p, from, to))) {
           editor.linking = null;
           editor.selection = [to];
         }
-      } else editor.flash("Click the link arrow to link to (Esc cancels)");
+      } else if (!hit && !hitWire(pt, 0.8) && !hitTerminal(pt)) {
+        const at = clampToArea(snapVec(pt));
+        editor.linking = null;
+        carryPage = page.id;
+        pending = { end: { free: at, linkTo: from }, at };
+        editor.tool = "wire";
+        editor.selection = [];
+        editor.flash("Now click the terminal the wire goes to (Esc cancels)");
+      } else editor.flash("Click the link end to link to, or bare paper to carry the wire on there (Esc cancels)");
       return;
     }
 
@@ -922,13 +928,22 @@
     }
 
     if (editor.tool === "wire") {
-      const target = wireTarget(pt);
+      // Bare paper is a link end (A27): a wire started there arrives from another sheet, one
+      // finished there leaves for one. A part's body isn't bare paper.
+      const bare = !hitElement(pt);
+      const free: Vec = clampToArea(snapVec(pt));
+      const target = wireTarget(pt) ?? (bare ? { end: { free }, at: free } : null);
       if (!target) {
         pending = null;
         return;
       }
       if (!pending) {
+        carryPage = "";
         pending = target;
+        return;
+      }
+      if ("free" in pending.end && "free" in target.end) {
+        editor.flash("Finish the wire on a terminal or another wire");
         return;
       }
       const start = pending;

@@ -73,10 +73,10 @@ export function slavesOf(project: Project, el: Element): Located[] {
 
 /** The other arrow of an off-page pair. */
 export function partnerOf(project: Project, el: Element): Located | null {
-  if (el.symbol !== "offpage") return null;
+  if (el.symbol !== "link") return null;
   for (const id of el.links) {
     const p = locate(project, id);
-    if (p && p.el.symbol === "offpage") return p;
+    if (p && p.el.symbol === "link") return p;
   }
   return null;
 }
@@ -196,7 +196,7 @@ export function linkedTarget(project: Project, el: Element): string | null {
 /** The cross-reference shown under an element's tag. */
 export function xrefText(project: Project, el: Element, masterTag: string): string {
   const here = locate(project, el.id)?.page;
-  if (el.symbol === "offpage") {
+  if (el.symbol === "link") {
     // In brackets: brackets always mean a place, a bare number a wire (v0.3 §2).
     const p = partnerOf(project, el);
     // An arrow shows its partner's place; there's nothing to type (design-wire-numbering §3).

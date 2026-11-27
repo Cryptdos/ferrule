@@ -43,7 +43,7 @@ An open editor tab follows changes Claude makes: it reloads the project and says
 | `add_element`, `update_element`, `move_element`, `delete_element` | Symbols, text, boxes, plates (and deleting wires or sections by id) |
 | `connect`, `disconnect` | Wires: terminal to terminal, or tee into a wire |
 | `label_wire` | A wire's number, core colour (IEC 60757, e.g. Bu) and function (e.g. 0V), printed along it |
-| `link` | Contact → coil, or pair off-page arrows |
+| `link` | Contact → coil, or pair two link ends (a wire to bare paper in `connect` ends in one) |
 | `add_distribution` | The project's distributions (L1, N, CCT, 0V…), each with its tag, the number every wire on it carries: distribution blocks and power rails pick one with `params.dist`. An incoming supply or a plant's supply out is wired to its block or rail |
 | `add_plant`, `place_plant_view` | Field equipment (prefix or fixed tag, pins and points by quick entry or in full: forms, what outputs follow, pin ids and groups; information lines, power by others) and its views |
 | `add_section` | Labelled section boxes |

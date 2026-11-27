@@ -424,7 +424,8 @@ export function legendEntries(project: Project): LegendEntry[] {
     for (const el of page.elements) {
       const def = getSymbol(el.symbol);
       if (!def || def.bench === "annotate" || el.symbol === "junction" || el.symbol === "plant-view") continue;
-      const name = variantName(el);
+      // A link end in each of its two shapes, drawn linked (A27).
+      const name = el.symbol === "link" ? `Link end: ${el.params.source !== false ? "source" : "destination"}` : variantName(el);
       if (seen.has(name)) continue;
       const params = { ...el.params };
       delete params.xrefDx;
@@ -438,7 +439,7 @@ export function legendEntries(project: Project): LegendEntry[] {
       }
       if (el.symbol === "strip-line") params.length = 10;
       if (el.symbol === "screen") params.span = 10;
-      seen.set(name, { name, el: { ...el, tag: "", label: "", rot: 0, links: [], params } });
+      seen.set(name, { name, el: { ...el, tag: "", label: "", rot: 0, links: el.symbol === "link" ? [el.id] : [], params } });
     }
   }
   // In the palette's order (contacts, operators, coils, protection…), as an engineer reads them.

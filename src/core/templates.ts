@@ -255,7 +255,7 @@ export function stampTemplate(project: Project, templateId: string, opts: StampO
         } else relink.push(el.id);
       }
     }
-    if (el.symbol === "offpage" && !el.links.length) relink.push(el.id);
+    if (el.symbol === "link" && !el.links.length) relink.push(el.id);
     el.label = remapFields(el.label, plantMap);
     if (el.symbol === "plant-view" && typeof el.params.plant === "string") {
       el.params.plant = plantMap.get(el.params.plant) ?? el.params.plant;

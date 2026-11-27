@@ -301,6 +301,13 @@ Judgement calls made while building, by step, with the reason.
 - **A wire whose number prints on another of its runs** shows its colour alone on this one, as before.
 - **A29 confirmed from the code before building:** R stored a quarter turn on a Text and the text stayed level, its lines shuffled along one baseline. A text now has two ways, level and turned to read up the page (stored as 270), and R swaps them; a file or a placement asking for any other turn gets the nearest of the two. *Rotate (R)* reads *Read up the page (R)* or *Level (R)* for one text.
 - **Dragging the label moved the file format to 12:** a wire keeps one `labelAt` in place of the number's and the colour's.
+- **A27: a link end is kept as a small element of its own (`link`) at the wire's free end,** not as data on the wire. It behaves as the note says: it's made only by drawing a wire to or from bare paper, isn't in the parts list or Claude's symbols, takes one wire, goes when its wire does, and isn't joined to a pin it happens to sit on. Kept this way, conductors, simulation, cross-references and checks carry on working through it unchanged.
+- **Which way it points** is set when it's made, from where its wire's other end is, and R turns it like a part.
+- **Bare paper** is anywhere that isn't a terminal, a wire or a part's body. A wire started there and finished there too is refused: *finish on a terminal*.
+- **Carrying on in one move** (*Link…* from a source, then bare paper) starts the wire tool there with the arriving end already linked. Clicking a link end instead pairs as before. *Link to a new arrow* is gone.
+- **When the link end prints its wire's label:** when the wire ends at it and the label is longer than the wire's longest run, unless the label has been dragged by hand. It prints above a horizontal end and left of a vertical one, reading left to right.
+- **The legend** shows a link end in each of its two shapes, linked.
+- **Link ends moved the file format to 13.** Claude's `connect` takes `{x, y}` for a bare end (with a label, and `link` to carry a source on); `link` pairs two link ends; `add_element` refuses one.
 
 ### Title block (ruled 27 Nov 2026, before step 7)
 

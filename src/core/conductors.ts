@@ -14,7 +14,7 @@
  * shares with its old self), so numbers don't jump about while drawing.
  */
 import { type Conductor, type Distribution, type Project, type TerminalRef, newId } from "./model";
-import { isBar, requireSymbol, terminalPoint } from "./symbols";
+import { isBar, requireSymbol } from "./symbols";
 
 const key = (r: TerminalRef) => `${r[0]}\u0000${r[1]}`;
 const unkey = (k: string): TerminalRef => k.split("\u0000") as TerminalRef;
@@ -85,29 +85,10 @@ export function refreshConductors(project: Project): void {
     }
   }
 
-  // An arrow dropped straight onto a part's pin, with no wire between, is on that pin's conductor (v0.3 §2, 32).
-  for (const page of project.pages) {
-    const arrows = page.elements.filter((e) => e.symbol === "offpage");
-    if (!arrows.length) continue;
-    const at = new Map<string, TerminalRef[]>();
-    for (const el of page.elements) {
-      if (el.symbol === "offpage") continue;
-      for (const t of requireSymbol(el.symbol).draw(el).terminals) {
-        const pt = terminalPoint(el, t.name);
-        if (pt) at.set(`${pt[0]},${pt[1]}`, [...(at.get(`${pt[0]},${pt[1]}`) ?? []), [el.id, t.name]]);
-      }
-    }
-    for (const a of arrows) {
-      const pt = terminalPoint(a, "1");
-      const pins = pt ? at.get(`${pt[0]},${pt[1]}`) : undefined;
-      for (const pin of pins ?? []) uf.union(key([a.id, "1"]), key(pin));
-    }
-  }
-
-  // Linked off-page arrows carry the conductor onto the other page.
+  // Linked link ends carry the conductor onto the other page (A27).
   for (const page of project.pages) {
     for (const el of page.elements) {
-      if (el.symbol !== "offpage") continue;
+      if (el.symbol !== "link") continue;
       for (const other of el.links) {
         const a = key([el.id, "1"]);
         const b = key([other, "1"]);

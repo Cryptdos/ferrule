@@ -1540,12 +1540,15 @@ const SYMBOLS: SymbolDef[] = [
     },
   },
   {
-    id: "offpage",
-    name: "Link arrow",
+    // A link end (v0.5 A27, design-wire-labels-and-links §3): the free end of a wire that
+    // carries on to another sheet. It isn't a part: it's made by drawing a wire to or from
+    // bare paper, never placed from the list, and goes with its wire.
+    id: "link",
+    name: "Link end",
     group: "Connection",
-    palette: true,
+    palette: false,
     params: [
-      { key: "source", label: "Source (where the conductor comes from)", type: "bool", default: true },
+      { key: "source", label: "Source (the wire leaves this sheet here)", type: "bool", default: true },
       // A destination shows its source's label unless it has its own (70).
       {
         key: "sameLabel",
@@ -1553,64 +1556,67 @@ const SYMBOLS: SymbolDef[] = [
         type: "bool",
         default: true,
         when: (el) => el.params.source === false && el.links.length > 0,
-        fixed: "For a linked destination arrow",
+        fixed: "For a linked destination",
       },
-      // Picked from the project's distribution list (Props): the arrow carries that supply.
     ],
     kind: () => null,
     draw(el, t) {
       const source = el.params.source !== false;
       const label = t?.label ?? el.label;
-      // A slim isosceles triangle. The source points away along the wire
-      // (it goes on elsewhere); the destination points back into its wire
-      // (it comes from elsewhere) and is filled, so the two never get mixed up.
+      // Drawn along +y, away from its wire, in the footprint of the old arrow. A source is the
+      // outline of an arrowhead pointing away; a destination the outline of an arrow's tail,
+      // notched at the back, pointing into its wire: together one arrow cut in two.
       const w = 0.6;
       const h = 1.8;
-      const head: Prim = source
+      const k = 0.7;
+      const shape: Prim = source
         ? { t: "poly", pts: [[-w, 0], [w, 0], [0, h]], fill: false }
-        : { t: "poly", pts: [[-w, h], [w, h], [0, 0]], fill: true };
-      // The label at the arrow's tip, then its reference (71): to the right of
-      // the tip on a vertical wire, under the arrow on a horizontal one,
-      // running on the way the arrow points. Text stays upright.
+        : { t: "poly", pts: [[0, 0], [w, k], [w, h], [0, h - k], [-w, h], [-w, k]], fill: false };
+      const linked = el.links.length > 0;
+      // Not linked yet: struck through, on paper as on screen.
+      const strike: Prim[] = linked ? [] : [line([-1.1, h + 0.4], [1.1, -0.4])];
+      // Its label, then its partner's place in brackets, past the end of it and on the wire's
+      // line; on a vertical one, to the right of its far end. Text stays upright.
       const xref = t?.xref ?? "";
-      // The reference follows the label's first line.
       const lwidth = typeof el.params.labelWidth === "number" && el.params.labelWidth > 0 ? el.params.labelWidth : 0;
       const first = label ? (lwidth ? wrapText(label, TAG, lwidth) : label.split("\n"))[0]! : "";
       const lw = first ? textWidth(first, TAG) : 0;
       const gap = label && xref ? 0.8 : 0;
+      const xw = xref ? textWidth(xref, DETAIL) : 0;
       const cap = TAG * CAP_HEIGHT;
       const placed = (at: Vec, s: string, size: number, anchor: Anchor, role: TextRole): Prim => ({ t: "text", at, text: s, size, anchor, role, placed: true });
       const texts: Prim[] = [];
       const rot = el.rot;
-      // The wire number it carries, horizontal and in line with the arrow (v0.3 §2): on a
-      // vertical arrow, left of the head on the label's line (number, arrow, label); on a
-      // horizontal one, beyond its free end.
-      const wire = t?.wire ?? "";
-      if (wire) {
-        if (rot === 0) texts.push(placed([-w - 0.5, h - 0.2], wire, TAG, "end", "note"));
-        else if (rot === 180) texts.push(placed([-w - 0.5, -h + 0.2 + cap], wire, TAG, "end", "note"));
-        else if (rot === 270) texts.push(placed([h + 0.5, cap / 2], wire, TAG, "start", "note"));
-        else texts.push(placed([-h - 0.5, cap / 2], wire, TAG, "end", "note"));
-      }
       if (rot === 0 || rot === 180) {
         const y = rot === 0 ? h - 0.2 : -h + 0.2 + cap;
         if (label) texts.push(placed([1, y], "{label}", TAG, "start", "label"));
         texts.push(placed([1 + lw + gap, y], "{xref}", DETAIL, "start", "xref"));
+      } else if (rot === 270) {
+        // Pointing right: on past its tip.
+        if (label) texts.push(placed([h + 0.8, cap / 2], "{label}", TAG, "start", "label"));
+        texts.push(placed([h + 0.8 + lw + gap, cap / 2], "{xref}", DETAIL, "start", "xref"));
       } else {
-        // Pointing left (90) or right (270): under the arrow, from its middle on past the tip.
-        const y = w + 0.5 + cap;
-        const xw = xref ? textWidth(xref, DETAIL) : 0;
-        if (rot === 270) {
-          if (label) texts.push(placed([0, y], "{label}", TAG, "start", "label"));
-          texts.push(placed([lw + gap, y], "{xref}", DETAIL, "start", "xref"));
-        } else {
-          if (label) texts.push(placed([-xw - gap, y], "{label}", TAG, "end", "label"));
-          texts.push(placed([0, y], "{xref}", DETAIL, "end", "xref"));
-        }
+        // Pointing left: before it, the place nearest.
+        if (label) texts.push(placed([-h - 0.8 - xw - gap, cap / 2], "{label}", TAG, "end", "label"));
+        texts.push(placed([-h - 0.8, cap / 2], "{xref}", DETAIL, "end", "xref"));
+      }
+      // Its wire's label, number then colour, when the wire is too short to carry it (§6, 3):
+      // above a horizontal end, left of a vertical one, reading left to right.
+      const wl = t?.wireLabel;
+      if (wl && (wl.number || wl.colour)) {
+        const nw = wl.number ? textWidth(wl.number, TAG) : 0;
+        const cw = wl.colour ? textWidth(wl.colour, DETAIL) : 0;
+        const both = nw && cw ? 0.8 : 0;
+        const total = nw + both + cw;
+        const across = rot === 90 || rot === 270;
+        const y = across ? -w - 0.5 : rot === 0 ? h - 0.2 : -h + 0.2 + cap;
+        const x0 = across ? (rot === 270 ? h / 2 : -h / 2) - total / 2 : -w - 0.5 - total;
+        if (wl.number) texts.push(placed([x0, y], wl.number, TAG, "start", "note"));
+        if (wl.colour) texts.push(placed([x0 + nw + both, y], wl.colour, DETAIL, "start", "note"));
       }
       return {
-        prims: [line([0, -2], [0, 0]), head, ...texts],
-        terminals: [{ name: "1", at: [0, -2], dir: "up" }],
+        prims: [shape, ...strike, ...texts],
+        terminals: [{ name: "1", at: [0, 0], dir: "up" }],
         body: { x: -w, y: 0, w: 2 * w, h },
       };
     },
@@ -2752,8 +2758,8 @@ export interface GeometryText {
   xref?: string;
   /** Label with any fields filled in. Defaults to the element's label. */
   label?: string;
-  /** A link arrow: the number of the wire it carries (v0.3 §2). */
-  wire?: string;
+  /** A link end whose wire is too short for its label: that label, which it prints (A27). */
+  wireLabel?: { number?: string; colour?: string };
   /** A busbar's name: its distribution's, or its own when it's local. */
   name?: string;
   /** A power rail's supply's voltage band, which sets how heavy it's drawn (v0.5 A23). */

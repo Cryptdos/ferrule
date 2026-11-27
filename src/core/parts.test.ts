@@ -12,7 +12,7 @@ import {
   connect,
   formatTerminalSpec,
   linkContact,
-  linkOffpage,
+  pairLinkEnds,
   parseTerminalSpec,
   placePlantView,
   setConductorInfo,
@@ -168,19 +168,23 @@ describe("timer functions", () => {
   });
 });
 
-describe("off-page arrows", () => {
-  test("pairing turns the other one round so one goes and one comes", () => {
+describe("link ends", () => {
+  test("pairing turns the other one round so one goes and one comes; both are outlines, struck through until linked", () => {
     const { p, add } = sheet();
-    const a = add("offpage", 10, 10);
-    const b = add("offpage", 50, 10);
-    linkOffpage(p, a.id, b.id);
+    const a = add("link", 10, 10);
+    const b = add("link", 50, 10);
+    pairLinkEnds(p, a.id, b.id);
     expect(b.params.source).toBe(false);
     expect(linkedTarget(p, a)).toBe(b.id);
     expect(linkedTarget(p, b)).toBe(a.id);
-    // Coming and going are drawn differently.
-    const fills = (el: typeof a) => localGeometry(el, "").prims.filter((x) => x.t === "poly" && x.fill).length;
-    expect(fills(a)).toBe(0);
-    expect(fills(b)).toBe(1);
+    // Coming and going are drawn differently, both as outlines: a head of three corners, a notched tail of six.
+    const shape = (el: typeof a) => localGeometry(el, "").prims.find((x) => x.t === "poly") as { pts: unknown[]; fill: boolean };
+    expect([shape(a).pts.length, shape(a).fill]).toEqual([3, false]);
+    expect([shape(b).pts.length, shape(b).fill]).toEqual([6, false]);
+    const struck = (el: typeof a) => localGeometry(el, "").prims.some((x) => x.t === "line");
+    expect([struck(a), struck(b)]).toEqual([false, false]);
+    pairLinkEnds(p, a.id, null);
+    expect([struck(a), struck(b)]).toEqual([true, true]);
   });
 });
 

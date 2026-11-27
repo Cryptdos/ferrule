@@ -8,7 +8,7 @@ import { gaCandidates } from "./ga";
 import { billOfMaterials, ioSchedule, plantPointsSchedule } from "./schedules";
 import { newProject, type Project } from "./model";
 import { defaultPattern, generatePins, moduleTitle, moduleTypeName, slotAddress, controllerTag } from "./modules";
-import { addElement, addGaItem, addGaPage, addPlant, connect, addPage, linkContact, linkOffpage, placePlantView, setExpectation, updatePoint } from "./ops";
+import { addElement, addGaItem, addGaPage, addPlant, connect, addPage, linkContact, pairLinkEnds, placePlantView, setExpectation, updatePoint } from "./ops";
 import { describeExpectation, findThing, pointRef, things } from "./points";
 import { renumber } from "./renumber";
 import { compile, initialState, judge, toggle } from "./sim";
@@ -234,9 +234,9 @@ describe("8b2: controller map, schedules, GA, library models, checks", () => {
     connect(p, pg, [dv.id, sig!], [fv.id, "NO"]);
     connect(p, pg, [dv.id, com!], [fv.id, "C"]);
     // DO5 goes out through a link arrow.
-    const a1 = addElement(p, pg2, "offpage", [18, 50]);
-    const a2 = addElement(p, pg, "offpage", [80, 60]);
-    linkOffpage(p, a1.id, a2.id);
+    const a1 = addElement(p, pg2, "link", [18, 50]);
+    const a2 = addElement(p, pg, "link", [80, 60]);
+    pairLinkEnds(p, a1.id, a2.id);
     connect(p, pg2, [ov.id, dout.points![4]!.pins[1]!], [a1.id, "1"]);
     updatePoint(p, di.id, "DI1", { label: "SF-01 running" });
     renumber(p);

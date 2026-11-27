@@ -81,8 +81,8 @@ describe("step 6a: a supply's tag", () => {
     renumber(p);
     expect(numberAt(p, s1.id, "13")).toBe("1-16");
     expect(checkProject(p).filter((f) => /on no supply/.test(f.message)).map((f) => f.level)).toEqual(["info"]);
-    expect(requireSymbol("offpage").params.map((x) => x.key)).not.toContain("dist");
-    expect(requireSymbol("offpage").params.map((x) => x.key)).not.toContain("ref");
+    expect(requireSymbol("link").params.map((x) => x.key)).not.toContain("dist");
+    expect(requireSymbol("link").params.map((x) => x.key)).not.toContain("ref");
   });
 });
 

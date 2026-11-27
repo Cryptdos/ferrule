@@ -8,6 +8,7 @@ import { textUnits, type Vec } from "./geometry";
 import type { Element, Page, Project, Segment, TerminalRef } from "./model";
 import { isBar, terminalDir, terminalPoint } from "./symbols";
 import { textWidth } from "./textwidth";
+import { conductorLooks } from "./wirecolours";
 
 const eq = (a: Vec, b: Vec) => a[0] === b[0] && a[1] === b[1];
 
@@ -344,6 +345,37 @@ export function wireTexts(
 
 const labelLength = (parts: { text: string; role: WireText["role"] }[]) =>
   parts.reduce((s, p) => s + textLen(p.text, p.role), 0) + TEXT_GAP * (parts.length - 1);
+
+/** Does a label fit its wire: no longer than the wire's longest run? */
+export function labelFits(points: Vec[], label: { number?: string; colour?: string }): boolean {
+  const parts: { text: string; role: WireText["role"] }[] = [];
+  if (label.number) parts.push({ text: label.number, role: "number" });
+  if (label.colour) parts.push({ text: label.colour, role: "colour" });
+  if (!parts.length) return true;
+  let longest = 0;
+  for (let i = 0; i < points.length - 1; i++) longest = Math.max(longest, Math.abs(points[i]![0] - points[i + 1]![0]) + Math.abs(points[i]![1] - points[i + 1]![1]));
+  return labelLength(parts) <= longest;
+}
+
+/** The label a wire prints by the usual rules (A26): its number where it's numbered on this sheet, its colour unless hidden. */
+export function wireLabelOf(project: Project, page: Page, seg: Segment): { number?: string; colour?: string } {
+  const c = project.conductors.find((x) => x.id === seg.conductor);
+  if (!c) return {};
+  const numbered = numberedSegments(page, earthConductors(project), (s) => routeOf(page, s)).has(seg.id);
+  const colour = seg.showColour === false ? undefined : conductorLooks(project).get(c.id)?.colour;
+  return { ...(numbered && c.number ? { number: c.number } : {}), ...(colour ? { colour } : {}) };
+}
+
+/**
+ * A wire that ends in a link end and is too short for its label prints none of
+ * its own: the link end prints it (A27, design-wire-labels-and-links §6, 3).
+ * Not once the label has been dragged along the wire by hand.
+ */
+export function labelOnLinkEnd(page: Page, seg: Segment, points: Vec[], label: { number?: string; colour?: string }): boolean {
+  if (seg.labelAt !== undefined) return false;
+  const atLink = [seg.from, seg.to].some((r) => findElement(page, r[0])?.symbol === "link");
+  return atLink && !labelFits(points, label);
+}
 
 /** The label's pieces in reading order, centred on a point of the wire: left to right, or bottom up. */
 function labelAround(c: Vec, vertical: boolean, parts: { text: string; role: WireText["role"] }[]): WireText[] {

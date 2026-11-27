@@ -337,7 +337,7 @@ export interface PlantPointRow {
 
 /**
  * What a point's pins are wired to, by conductor: other devices' points
- * (with where they're drawn), link arrows (where they go), terminals and
+ * (with where they're drawn), link ends (where they go), terminals and
  * parts. Its own device's pins are left out.
  */
 export function wiredTo(project: Project, item: PlantItem, point: IoPoint): string {
@@ -367,7 +367,7 @@ export function wiredTo(project: Project, item: PlantItem, point: IoPoint): stri
           const pt = other?.points?.find((q) => q.pins.includes(t));
           const where = address(pg, e.pos);
           push(other && pt ? `${pointLabel(project, other, pt)}${other.module ? "" : ` (${where})`}` : `${other?.tag ?? "?"}:${t} (${where})`);
-        } else if (e.symbol === "offpage") {
+        } else if (e.symbol === "link") {
           const partner = partnerOf(project, e);
           push(`via link ${address(pg, e.pos)}${partner ? ` → ${address(partner.page, partner.el.pos)}` : ""}`);
         } else if (e.symbol === "terminal") {

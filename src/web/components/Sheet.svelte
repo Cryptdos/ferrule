@@ -4,7 +4,7 @@
   import type { Page, Project, Segment } from "../../core/model";
   import type { Vec } from "../../core/geometry";
   import { blockHalf } from "../../core/blocks";
-  import { BLOCK_INSET, blockLabels, connectionDots, earthConductors, isFieldWire, isScreenWire, numberedSegments, routeOf, wireTexts } from "../../core/wires";
+  import { BLOCK_INSET, blockLabels, connectionDots, earthConductors, isFieldWire, isScreenWire, labelOnLinkEnd, numberedSegments, routeOf, wireTexts } from "../../core/wires";
   import { resolveFields } from "../../core/fields";
   import { cloudsOn } from "../../core/ops";
   import { conductorLooks, coreCss } from "../../core/wirecolours";
@@ -163,10 +163,12 @@
       {/if}
       {#if c}
         {@const at = textAt?.(seg) ?? seg.labelAt}
-        {#each wireTexts(pts, {
-          // Shown by the usual rules, unless the wire says otherwise. The function doesn't print (A26).
-          number: numbered.has(seg.id) ? c.number : "",
-          colour: seg.showColour === false ? undefined : looks.get(c.id)?.colour,
+        <!-- Shown by the usual rules, unless the wire says otherwise. The function doesn't print (A26). -->
+        {@const label = { number: numbered.has(seg.id) ? c.number : "", colour: seg.showColour === false ? undefined : looks.get(c.id)?.colour }}
+        <!-- Too short for it, ending in a link end: the link end prints it (A27). -->
+        {@const carried = at === undefined && labelOnLinkEnd(page, seg, pts, label)}
+        {#each carried ? [] : wireTexts(pts, {
+          ...label,
           railFrom: onBusbar(seg.from),
           railTo: onBusbar(seg.to),
           ...(at !== undefined ? { labelAt: at } : {}),

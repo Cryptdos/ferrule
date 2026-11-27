@@ -109,7 +109,7 @@ export class Editor {
    * arrow, on any sheet, pairs it with this one; or, for "new", drops a
    * paired destination where you click. Esc cancels.
    */
-  linking: { from: string; address: string; mode: "pick" | "new" } | null = $state(null);
+  linking: { from: string; address: string } | null = $state(null);
 
   private undoStack: string[] = [];
   private redoStack: string[] = [];
