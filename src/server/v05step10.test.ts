@@ -56,3 +56,79 @@ describe("step 10a: a project is made from a file name (A17, A8, D2)", () => {
     expect((await app.request("/api/examples/lsp-01", { method: "POST" })).status).toBe(409);
   });
 });
+
+describe("step 10b: Rename, deleted projects, Upload (A21, A16, A9)", () => {
+  const names = async () => (await readdir(dir)).filter((n) => n.endsWith(".ferrule") || n.endsWith(".bak"));
+
+  test("Rename renames the file and its .bak where it is, refusing taken and illegal names", async () => {
+    const p = await (await app.request("/api/projects", json({ name: "Boiler House" }))).json();
+    // A save leaves a .bak beside it.
+    await storage.save(p.id, p);
+    expect(await names()).toContain("Boiler House.ferrule.bak");
+    expect((await app.request(`/api/projects/${p.id}/rename`, json({ name: "plant room 2" }))).status).toBe(409);
+    expect((await app.request(`/api/projects/${p.id}/rename`, json({ name: "Boiler:House" }))).status).toBe(400);
+    const res = await app.request(`/api/projects/${p.id}/rename`, json({ name: "Boiler House East" }));
+    expect(res.status).toBe(200);
+    const { id } = await res.json();
+    expect(id).toBe("boiler-house-east");
+    const now = await names();
+    expect(now).toContain("Boiler House East.ferrule");
+    expect(now).toContain("Boiler House East.ferrule.bak");
+    expect(now.some((n) => n.startsWith("Boiler House.ferrule"))).toBe(false);
+    // Capitals alone can change: it's the same file's name.
+    const again = await (await app.request(`/api/projects/${id}/rename`, json({ name: "BOILER HOUSE EAST" }))).json();
+    expect(again.id).toBe(id);
+    expect(await names()).toContain("BOILER HOUSE EAST.ferrule");
+    expect((await storage.load(id)).pages.length).toBe(1);
+  });
+
+  test("a project open in an editor isn't renamed out from under it", async () => {
+    const id = "boiler-house-east";
+    const off = storage.subscribe(id, () => {});
+    const res = await app.request(`/api/projects/${id}/rename`, json({ name: "Boiler House West" }));
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toMatch(/open in an editor/);
+    off();
+    expect((await app.request(`/api/projects/${id}/rename`, json({ name: "Boiler House West" }))).status).toBe(200);
+  });
+
+  test("deleted projects are listed by the name they had, restored under a name, or deleted for good", async () => {
+    const id = "boiler-house-west";
+    await storage.save(id, await storage.load(id));
+    expect((await app.request(`/api/projects/${id}?file=1`, { method: "DELETE" })).status).toBe(200);
+    const list = await (await app.request("/api/deleted")).json();
+    expect(list).toHaveLength(1);
+    expect(list[0]).toMatchObject({ name: "Boiler House West", pages: 1 });
+    expect(Date.now() - Date.parse(list[0].deleted)).toBeLessThan(60_000);
+    const file = list[0].file as string;
+    // A name that's taken is refused; one that isn't in the Deleted folder isn't found.
+    expect((await app.request("/api/deleted/restore", json({ file, name: "Plant Room 2" }))).status).toBe(409);
+    expect((await app.request("/api/deleted/restore", json({ file: "../Plant Room 2.ferrule", name: "x" }))).status).toBe(404);
+    const back = await app.request("/api/deleted/restore", json({ file, name: "Boiler House" }));
+    expect(back.status).toBe(201);
+    expect((await back.json()).id).toBe("boiler-house");
+    expect(await names()).toEqual(expect.arrayContaining(["Boiler House.ferrule", "Boiler House.ferrule.bak"]));
+    expect(await (await app.request("/api/deleted")).json()).toHaveLength(0);
+    // Deleted again, then for good: the file and its .bak are gone.
+    await app.request(`/api/projects/boiler-house?file=1`, { method: "DELETE" });
+    const [gone] = await (await app.request("/api/deleted")).json();
+    expect((await app.request("/api/deleted/purge", json({ file: gone.file }))).status).toBe(200);
+    expect(await readdir(join(dir, "Deleted"))).toEqual([]);
+  });
+
+  test("Upload adds a .ferrule file under its own name, checked as opening one is", async () => {
+    const text = JSON.stringify(newProject("whatever", "Uploaded"));
+    const up = (name: string, body: string) => app.request(`/api/projects/upload?name=${encodeURIComponent(name)}`, { method: "POST", body });
+    const res = await up("Chiller Plant.ferrule", text);
+    expect(res.status).toBe(201);
+    expect((await res.json()).id).toBe("chiller-plant");
+    expect((await storage.load("chiller-plant")).project.title).toBe("Uploaded");
+    expect((await up("chiller plant.ferrule", text)).status).toBe(409);
+    expect((await up("Notes.txt", text)).status).toBe(400);
+    expect((await up("Broken.ferrule", "{not json")).status).toBe(400);
+    const old = await up("Old.ferrule", JSON.stringify({ ...JSON.parse(text), version: 1 }));
+    expect(old.status).toBe(400);
+    expect((await old.json()).error).toMatch(/Not opened/);
+    expect(await names()).not.toContain("Old.ferrule");
+  });
+});
