@@ -52,6 +52,20 @@ export interface ProjectSummary {
   error?: string;
 }
 
+/** A project in the Deleted folder (v0.5 A16). */
+export interface DeletedProject {
+  /** Its file's name in the Deleted folder: what Restore and Delete permanently are given. */
+  file: string;
+  /** The name it had, which Restore starts from. */
+  name: string;
+  /** When it was deleted. */
+  deleted: string;
+  title: string;
+  pages: number;
+  /** Why it can't be opened, if it can't. */
+  error?: string;
+}
+
 export interface FolderListing {
   path: string;
   parent: string | null;
@@ -77,6 +91,16 @@ export const slugify = fileKey;
 
 const isProjectFile = (name: string) => name.endsWith(EXT);
 const stem = (name: string) => (name.endsWith(EXT) ? name.slice(0, -EXT.length) : name);
+/** A deleted file's name: `<name> <when>.ferrule`, the time with `:` and `.` made `-`. */
+const DELETED_RE = /^(.*) (\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})-(\d{3})Z\.ferrule$/;
+
+/** Move a file, copying when a rename can't (across drives). */
+async function move(from: string, to: string): Promise<void> {
+  await rename(from, to).catch(async () => {
+    await copyFile(from, to);
+    await rm(from);
+  });
+}
 
 export class Storage {
   private listeners = new Map<string, Set<(version: string) => void>>();
@@ -225,6 +249,11 @@ export class Storage {
     return this.folderFiles().some((n) => fileKey(stem(n)) === key) || this.recent.some((r) => r.id === key);
   }
 
+  /** Is a project open in an editor (something is listening for its changes)? */
+  isOpen(id: string): boolean {
+    return !!this.listeners.get(id)?.size;
+  }
+
   /** A name for a new file in the projects folder: legal (D2) and not taken (A8), or refused with the reason. */
   private newName(name: string): string {
     const n = name.trim();
@@ -368,6 +397,108 @@ export class Storage {
   }
 
   /**
+   * Rename a project's file where it is (v0.5 A21), its `.bak` and backups
+   * with it. The name must be legal (D2) and not taken (A8); a change of
+   * capitals alone is allowed. Refused while the project is open in an
+   * editor, so a file isn't renamed out from under it. Returns the new id.
+   */
+  async renameProject(id: string, name: string): Promise<string> {
+    const file = this.path(id);
+    if (!existsSync(file)) throw new StorageError(`No project "${id}"`, 404);
+    if (this.isOpen(id)) throw new StorageError("It's open in an editor. Close it there, then rename it.", 409);
+    const n = name.trim();
+    const bad = fileNameProblem(n);
+    if (bad) throw new StorageError(bad);
+    const old = stem(basename(file));
+    if (n === old) return id;
+    const dir = dirname(file);
+    const to = join(dir, n + EXT);
+    const same = fileKey(n) === fileKey(old);
+    if (!same) {
+      const clash = this.inProjectsFolder(file)
+        ? this.taken(n)
+        : readdirSync(dir).some((f) => isProjectFile(f) && fileKey(stem(f)) === fileKey(n));
+      if (clash) throw new StorageError(`A file by that name already exists: ${n}${EXT}`, 409);
+    }
+    await move(file, to);
+    if (existsSync(file + ".bak")) await move(file + ".bak", to + ".bak");
+    await this.renameBackups(dir, old, n);
+    if (this.inProjectsFolder(to)) return fileKey(n);
+    const newId = this.idFor(to);
+    this.recent = this.recent.map((r) => (r.id === id ? { ...r, id: newId, path: to } : r));
+    await this.saveRecent();
+    return newId;
+  }
+
+  /** Backups follow their project's file name (A12, A21): none yet. */
+  private async renameBackups(_dir: string, _from: string, _to: string): Promise<void> {}
+
+  /** Add a `.ferrule` file sent from the user's own machine (v0.5 A9): checked as opening one is, under its own name. Returns its id. */
+  async upload(fileName: string, text: string): Promise<string> {
+    const base = basename(fileName.replace(/\\/g, "/"));
+    if (!isProjectFile(base)) throw new StorageError("That isn't a Ferrule project (.ferrule) file");
+    let data: unknown;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      throw new StorageError("That file isn't a Ferrule project: it can't be read");
+    }
+    return this.add(stem(base), parseProject(data));
+  }
+
+  private get bin(): string {
+    return join(this.dir, "Deleted");
+  }
+
+  /** The projects in the Deleted folder (v0.5 A16), most recently deleted first. */
+  async deleted(): Promise<DeletedProject[]> {
+    if (!existsSync(this.bin)) return [];
+    const out: DeletedProject[] = [];
+    for (const file of (await readdir(this.bin)).filter(isProjectFile)) {
+      const full = join(this.bin, file);
+      const st = await stat(full).catch(() => null);
+      if (!st?.isFile()) continue;
+      const m = DELETED_RE.exec(file);
+      const name = m ? m[1]! : stem(file);
+      const deleted = m ? `${m[2]}T${m[3]}:${m[4]}:${m[5]}.${m[6]}Z` : st.mtime.toISOString();
+      try {
+        const p = parseProject(JSON.parse(await readFile(full, "utf8")));
+        out.push({ file, name, deleted, title: p.project.title, pages: p.pages.length });
+      } catch (e) {
+        out.push({ file, name, deleted, title: "", pages: 0, error: e instanceof ProjectFormatError ? e.message : "It can't be read" });
+      }
+    }
+    return out.sort((a, b) => b.deleted.localeCompare(a.deleted));
+  }
+
+  /** A file in the Deleted folder, by its name there: only one that's listed. */
+  private binFile(file: string): string {
+    const names = existsSync(this.bin) ? readdirSync(this.bin).filter(isProjectFile) : [];
+    if (!names.includes(file)) throw new StorageError("That project isn't in the Deleted folder", 404);
+    return join(this.bin, file);
+  }
+
+  /**
+   * Restore a deleted project into the projects folder (v0.5 A16) under the
+   * name asked for: legal and not taken. Returns its id.
+   */
+  async restore(file: string, name: string): Promise<string> {
+    const from = this.binFile(file);
+    const n = this.newName(name);
+    const to = join(this.dir, n + EXT);
+    await move(from, to);
+    if (existsSync(from + ".bak")) await move(from + ".bak", to + ".bak");
+    return fileKey(n);
+  }
+
+  /** Delete a deleted project for good (v0.5 A16), its `.bak` with it. */
+  async purge(file: string): Promise<void> {
+    const from = this.binFile(file);
+    await rm(from);
+    if (existsSync(from + ".bak")) await rm(from + ".bak");
+  }
+
+  /**
    * Forget a project. With `deleteFile`, its file is moved into a "Deleted"
    * folder inside the projects folder (nothing is destroyed); otherwise a
    * file opened from elsewhere is just taken off the recent list.
@@ -375,19 +506,12 @@ export class Storage {
   async remove(id: string, deleteFile: boolean): Promise<void> {
     const file = this.path(id);
     if (deleteFile && existsSync(file)) {
-      const bin = join(this.dir, "Deleted");
-      await mkdir(bin, { recursive: true });
+      await mkdir(this.bin, { recursive: true });
       const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-      const to = join(bin, `${stem(basename(file))} ${stamp}${EXT}`);
+      const to = join(this.bin, `${stem(basename(file))} ${stamp}${EXT}`);
       // The previous save goes with it (A45), so nothing of the project is left in its folder.
-      for (const [from, dest] of [[file, to], [file + ".bak", to + ".bak"]] as const) {
-        if (!existsSync(from)) continue;
-        await rename(from, dest).catch(async () => {
-          // Across drives a rename fails: copy, then remove by renaming over a temp.
-          await copyFile(from, dest);
-          await rename(from, from + ".deleted");
-        });
-      }
+      await move(file, to);
+      if (existsSync(file + ".bak")) await move(file + ".bak", to + ".bak");
     } else if (!this.recent.some((r) => r.id === id)) {
       throw new StorageError("A project in the projects folder can only be deleted, not removed from the list");
     }

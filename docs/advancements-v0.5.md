@@ -73,7 +73,7 @@ Decided in discussion. The aim: Ferrule runs the same way on a desk or on one ce
   - It follows that adding the LSP-01 example a second time is refused the same way.
   - *Duplicate* asks for the copy's name. A copy is made for a reason, and its name says what that is. Today it makes `<name> copy` without asking.
 
-- [ ] **A9. Upload.** *Missing. ST-8.* *Open file…* browses the machine Ferrule runs on. On a central Ferrule that isn't the machine you're sitting at, so the project list also gets *Upload*: pick a `.ferrule` file on your own machine and it's added to the projects folder. It's checked as a Ferrule project, as opening one is, and refused if a file by that name is there (A8). With *Download*, this is how files move on and off a central Ferrule.
+- [x] **A9. Upload.** *Built: PR 142.* *Missing. ST-8.* *Open file…* browses the machine Ferrule runs on. On a central Ferrule that isn't the machine you're sitting at, so the project list also gets *Upload*: pick a `.ferrule` file on your own machine and it's added to the projects folder. It's checked as a Ferrule project, as opening one is, and refused if a file by that name is there (A8). With *Download*, this is how files move on and off a central Ferrule.
 
 - [ ] **A10. Claude on a central Ferrule.** *Missing. MC-1, MC-2.* Claude works the same whether Ferrule is on this machine or another. `ferrule.exe --mcp` already relays Claude Desktop to a running Ferrule, but only on the same machine: let it be given the address of the Ferrule to relay to. Every tool stays, PDF export included.
   - Known limits on a central machine: Claude's view of a sheet needs Chrome or Chromium installed there, and its PDF export writes into that machine's `exports` folder.
@@ -88,12 +88,12 @@ Decided in discussion. The aim: Ferrule runs the same way on a desk or on one ce
   - To settle: a copy only when something has changed since the last; the starting values for a new project.
   - The single `.bak` of the previous save (ST-14) stays as it is: it's one save back, and guards against a save going wrong.
 
-- [ ] **A16. Deleted projects.** *Missing. ST-8.* *Delete* already moves a project's file into `Deleted` inside the projects folder, with the date and time in its name, but nothing in Ferrule shows them. The project list gets a button that opens the list of deleted projects, each with *Restore* and *Delete permanently*.
+- [x] **A16. Deleted projects.** *Built: PR 142.* *Missing. ST-8.* *Delete* already moves a project's file into `Deleted` inside the projects folder, with the date and time in its name, but nothing in Ferrule shows them. The project list gets a button that opens the list of deleted projects, each with *Restore* and *Delete permanently*.
   - *Delete permanently* asks first: it can't be undone.
   - *Restore* asks for the name to restore it as, starting from the name it had, and is refused if a file by that name is there (A8).
   - It's restored into the projects folder, whichever folder it was deleted from: where it came from isn't recorded.
 
-- [ ] **A21. Rename.** *Missing. ST-8.* With A17 the file's name is what a project is known by, and nothing in Ferrule renames a file. The project list gets *Rename* beside *Duplicate*, *Download* and *Delete*: it asks for the new name, which must be a legal file name (A17) and not already taken (A8).
+- [x] **A21. Rename.** *Built: PR 142.* *Missing. ST-8.* With A17 the file's name is what a project is known by, and nothing in Ferrule renames a file. The project list gets *Rename* beside *Duplicate*, *Download* and *Delete*: it asks for the new name, which must be a legal file name (A17) and not already taken (A8).
   - It's on the list, not under *Project…*: those settings are what's inside the file, and the file's name isn't. Renaming from the list also avoids renaming a file out from under the editor that has it open.
   - The project's backups (A12) are renamed with it, so they aren't left behind.
 

@@ -370,6 +370,12 @@ Judgement calls made while building, by step, with the reason.
 - **10a: a new project has no title,** so the title block's *Project* cell is empty until it's typed under *Project…*; the list and the top bar show the file name and the title beside it in grey.
 - **10a: *Duplicate…* asks for the name in its row,** starting from `<name> copy`, rather than in a separate prompt.
 - **10a: the LSP-01 example is added as `LSP-01.ferrule`.** A PDF with no drawing number or title is named after the file.
+- **10a: the smoke test** that CI runs on both builds now makes its project from a name.
+- **10b: *Rename…* is refused while the project is open in an editor,** as the entry's reason for putting it on the list suggests: an editor still holding the old name would otherwise save to a file of that name and bring it back. Ferrule tells an editor is open by its connection for live updates, which closes when the editor goes back to the list or its tab is closed. A tab left on the editor and navigated away keeps it open until the browser lets it go.
+- **10b: *Rename…* changes a file opened from elsewhere in its own folder,** refusing a name another `.ferrule` file there has; one in the projects folder is checked against the whole list as *Create project* is. A change of capitals alone is allowed.
+- **10b: *Deleted projects…* is a link under the project list,** opening a window. *Restore…* asks for the name in its row, as *Duplicate…* does. The sheet count is read from the file; a deleted file that can't be opened in this build is listed with the reason and can still be restored or deleted.
+- **10b: *Upload…* sits beside *Open file…*,** and a name that's taken is refused rather than asked again: *Rename…* on the one already there, or on the file before uploading, settles it.
+- **10b: *Delete* moves a file across drives by copying it and removing the original,** where it used to leave the original renamed `.deleted`, using the same move as *Rename…* and *Restore…*.
 
 ### Title block (ruled 27 Nov 2026, before step 7)
 

@@ -93,6 +93,11 @@ export function createApp({ storage, library, designs, devices, assets, version 
     if (typeof body?.path !== "string") return c.json({ error: "No path given" }, 400);
     return c.json({ id: await storage.open(body.path) });
   });
+  // A .ferrule file from the user's own machine (v0.5 A9): the body is the file, its name in `?name=`.
+  app.post("/api/projects/upload", async (c) => {
+    const name = c.req.query("name") ?? "";
+    return c.json({ id: await storage.upload(name, await c.req.text()) }, 201);
+  });
   app.post("/api/projects/:id/save-as", async (c) => {
     const body = await c.req.json().catch(() => ({}));
     if (typeof body?.path !== "string") return c.json({ error: "No path given" }, 400);
@@ -102,6 +107,24 @@ export function createApp({ storage, library, designs, devices, assets, version 
   app.post("/api/projects/:id/duplicate", async (c) => {
     const body = await c.req.json().catch(() => ({}));
     return c.json({ id: await storage.duplicate(c.req.param("id"), typeof body?.name === "string" ? body.name : "") }, 201);
+  });
+  // Rename a project's file where it is (v0.5 A21).
+  app.post("/api/projects/:id/rename", async (c) => {
+    const body = await c.req.json().catch(() => ({}));
+    return c.json({ id: await storage.renameProject(c.req.param("id"), typeof body?.name === "string" ? body.name : "") });
+  });
+  // The Deleted folder (v0.5 A16): its projects, Restore under a name, and Delete permanently.
+  app.get("/api/deleted", async (c) => c.json(await storage.deleted()));
+  app.post("/api/deleted/restore", async (c) => {
+    const body = await c.req.json().catch(() => ({}));
+    if (typeof body?.file !== "string") return c.json({ error: "No file given" }, 400);
+    return c.json({ id: await storage.restore(body.file, typeof body?.name === "string" ? body.name : "") }, 201);
+  });
+  app.post("/api/deleted/purge", async (c) => {
+    const body = await c.req.json().catch(() => ({}));
+    if (typeof body?.file !== "string") return c.json({ error: "No file given" }, 400);
+    await storage.purge(body.file);
+    return c.json({ ok: true });
   });
   app.delete("/api/projects/:id", async (c) => {
     await storage.remove(c.req.param("id"), c.req.query("file") === "1");
@@ -139,6 +162,11 @@ export function createApp({ storage, library, designs, devices, assets, version 
     let unsubscribe = () => {};
     let ping: ReturnType<typeof setInterval>;
     const enc = new TextEncoder();
+    // The editor's gone when its connection closes: stop listening at once, so the project no longer counts as open (A21).
+    c.req.raw.signal?.addEventListener("abort", () => {
+      unsubscribe();
+      clearInterval(ping);
+    });
     const stream = new ReadableStream({
       start(controller) {
         const send = (s: string) => {

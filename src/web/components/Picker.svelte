@@ -1,6 +1,7 @@
 <script lang="ts">
   import { api, type ProjectSummary } from "../api";
   import FileBrowser from "./FileBrowser.svelte";
+  import DeletedDialog from "./DeletedDialog.svelte";
   import logo from "../logo/ferrule.svg";
 
   let { onopen }: { onopen: (id: string) => void } = $props();
@@ -10,9 +11,24 @@
   let error = $state("");
   /** The new project's file name (v0.5 A17). */
   let name = $state("");
-  /** A row asking for a name: a copy's (A8). */
-  let asking: { id: string; kind: "duplicate"; value: string } | null = $state(null);
+  /** A row asking for a name: a copy's (A8), or a new one for its file (A21). */
+  let asking: { id: string; kind: "duplicate" | "rename"; value: string } | null = $state(null);
   let browsing = $state(false);
+  let showDeleted = $state(false);
+  let uploader: HTMLInputElement | undefined = $state();
+
+  /** A .ferrule file from this computer into the projects folder (A9). */
+  async function upload() {
+    const f = uploader?.files?.[0];
+    if (uploader) uploader.value = "";
+    if (!f) return;
+    try {
+      await api.upload(f.name, await f.text());
+      await refresh();
+    } catch (e) {
+      error = (e as Error).message;
+    }
+  }
 
   async function openFile(path: string) {
     browsing = false;
@@ -26,7 +42,7 @@
   async function del(p: ProjectSummary) {
     const what =
       p.where === "projects"
-        ? `Delete "${p.name}"? Its file moves to the Deleted folder inside the projects folder, so it can be got back.`
+        ? `Delete "${p.name}"? Its file moves to the Deleted folder inside the projects folder, and Deleted projects… can restore it.`
         : `Delete the file for "${p.name}"?\n${p.path}\nIt moves to the Deleted folder inside the projects folder.`;
     if (!confirm(what)) return;
     try {
@@ -50,12 +66,17 @@
   function duplicate(p: ProjectSummary) {
     asking = { id: p.id, kind: "duplicate", value: `${p.name} copy` };
   }
+  /** A new name for the file, where it is (A21). */
+  function rename(p: ProjectSummary) {
+    asking = { id: p.id, kind: "rename", value: p.name };
+  }
   async function answer(e: SubmitEvent) {
     e.preventDefault();
     const a = asking;
     if (!a) return;
     try {
       if (a.kind === "duplicate") await api.duplicate(a.id, a.value.trim());
+      else await api.rename(a.id, a.value.trim());
       asking = null;
       await refresh();
     } catch (err) {
@@ -105,7 +126,9 @@
   <form onsubmit={create}>
     <input bind:value={name} placeholder="New project's file name" title="What you type is the file you get, capitals and spaces included (none of \ / : * ? &quot; < > |). Its title and the rest of the title block go in Project… once it's made" />
     <button type="submit" disabled={!name.trim()}>Create project</button>
-    <button type="button" onclick={() => (browsing = true)} title="Open a .ferrule file from any folder">Open file…</button>
+    <button type="button" onclick={() => (browsing = true)} title="Open a .ferrule file from any folder on the machine Ferrule runs on">Open file…</button>
+    <button type="button" onclick={() => uploader?.click()} title="Add a .ferrule file from this computer to the projects folder">Upload…</button>
+    <input type="file" accept=".ferrule" hidden bind:this={uploader} onchange={upload} />
   </form>
   <label class="uselib" title="GA sheets can take device sizes, datasheets and pictures from the shared device library. Untick to start this project's device table from scratch.">
     <input type="checkbox" bind:checked={useLibrary} /> Use the shared device library for GA sheets
@@ -138,14 +161,15 @@
           {/if}
           {#if asking?.id === p.id}
             <form class="ask" onsubmit={answer}>
-              <input bind:value={asking.value} aria-label="The copy's file name" />
-              <button type="submit" class="primary">Make the copy</button>
+              <input bind:value={asking.value} aria-label={asking.kind === "duplicate" ? "The copy's file name" : "The new file name"} />
+              <button type="submit" class="primary">{asking.kind === "duplicate" ? "Make the copy" : "Rename"}</button>
               <button type="button" onclick={() => (asking = null)}>Cancel</button>
             </form>
           {/if}
           <div class="actions">
             {#if !p.error}
               <button onclick={() => duplicate(p)} title="A copy in the projects folder, under a name you give it">Duplicate…</button>
+              <button onclick={() => rename(p)} title="Rename the project's file where it is">Rename…</button>
               <a class="button" href={`/api/projects/${encodeURIComponent(p.id)}/file`} download title="Download the .ferrule file">Download</a>
             {/if}
             {#if p.where === "elsewhere"}
@@ -157,12 +181,19 @@
       {/each}
     </ul>
   {/if}
+  <p class="deleted-link"><button class="link" onclick={() => (showDeleted = true)} title="The projects that have been deleted, to restore or delete for good">Deleted projects…</button></p>
 </div>
+{#if showDeleted}
+  <DeletedDialog onrestored={() => void refresh()} onclose={() => (showDeleted = false)} />
+{/if}
 {#if browsing}
   <FileBrowser mode="open" onpick={(path) => void openFile(path)} onclose={() => (browsing = false)} />
 {/if}
 
 <style>
+  .deleted-link {
+    margin-top: 10px;
+  }
   .ttl {
     margin-left: 0.6em;
     font-weight: normal;

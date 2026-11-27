@@ -22,6 +22,16 @@ export interface ProjectSummary {
   error?: string;
 }
 
+/** A project in the Deleted folder (v0.5 A16). */
+export interface DeletedProject {
+  file: string;
+  name: string;
+  deleted: string;
+  title: string;
+  pages: number;
+  error?: string;
+}
+
 export interface FolderListing {
   path: string;
   parent: string | null;
@@ -79,6 +89,11 @@ export const api = {
   open: (path: string) => call<{ id: string }>("/api/projects/open", { method: "POST", body: JSON.stringify({ path }) }),
   saveAs: (id: string, path: string, overwrite = false) =>
     call<{ id: string }>(`/api/projects/${encodeURIComponent(id)}/save-as`, { method: "POST", body: JSON.stringify({ path, overwrite }) }),
+  rename: (id: string, name: string) => call<{ id: string }>(`/api/projects/${encodeURIComponent(id)}/rename`, { method: "POST", body: JSON.stringify({ name }) }),
+  upload: (name: string, text: string) => call<{ id: string }>(`/api/projects/upload?name=${encodeURIComponent(name)}`, { method: "POST", body: text }),
+  deleted: () => call<DeletedProject[]>("/api/deleted"),
+  restore: (file: string, name: string) => call<{ id: string }>("/api/deleted/restore", { method: "POST", body: JSON.stringify({ file, name }) }),
+  purge: (file: string) => call<{ ok: true }>("/api/deleted/purge", { method: "POST", body: JSON.stringify({ file }) }),
   duplicate: (id: string, name: string) => call<{ id: string }>(`/api/projects/${encodeURIComponent(id)}/duplicate`, { method: "POST", body: JSON.stringify({ name }) }),
   /** Delete moves the file to the Deleted folder; without `file`, a file from elsewhere just leaves the list. */
   remove: (id: string, file: boolean) => call<{ ok: true }>(`/api/projects/${encodeURIComponent(id)}${file ? "?file=1" : ""}`, { method: "DELETE" }),
