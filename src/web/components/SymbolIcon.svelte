@@ -40,6 +40,15 @@
       { t: "poly", pts: [[0.2, 0.2], [1.6, 0.2], [1.6, 1], [0.2, 1]], fill: false },
       line([-0.6, 0.6], [0.2, 0.6]),
     ],
+    // A ruled list with a heading row: a bill of materials.
+    bomtable: [
+      { t: "poly", pts: [[-3, -2.5], [3, -2.5], [3, 2.5], [-3, 2.5]], fill: false },
+      line([-3, -1.3], [3, -1.3]),
+      line([-3, 0], [3, 0]),
+      line([-3, 1.25], [3, 1.25]),
+      line([-1.6, -2.5], [-1.6, 2.5]),
+      line([1.8, -2.5], [1.8, 2.5]),
+    ],
     // Module boxes side by side, each with its circled address; the last dashed (a spare slot).
     ctrlmap: [
       { t: "poly", pts: [[-3, -2], [-1, -2], [-1, 2], [-3, 2]], fill: false },

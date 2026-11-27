@@ -527,27 +527,28 @@ export function buildBms01(avoid: Avoid | null): Bms01 {
   {
     const encl = { w: 800, h: 1200 };
     const back = addGaPage(p, "General arrangement: backplate", { scale: fitScale(encl.w, encl.h), enclosure: encl, view: "backplate" }, p.pages[p.pages.length - 1]!.id);
-    addGaItem(p, back.id, { kind: "trunking", x: 20, y: 20, w: 40, h: 1160 });
-    addGaItem(p, back.id, { kind: "trunking", x: 740, y: 20, w: 40, h: 1160 });
-    const rails = [160, 420, 680, 940];
+    // Laid out on the plate, 25 mm in from the enclosure: 750 × 1150, measured from its corner (v0.5 A58).
+    addGaItem(p, back.id, { kind: "trunking", x: 0, y: 0, w: 40, h: 1150 });
+    addGaItem(p, back.id, { kind: "trunking", x: 710, y: 0, w: 40, h: 1150 });
+    const rails = [135, 395, 655, 915];
     for (const y of rails) {
-      addGaItem(p, back.id, { kind: "rail", x: 80, y: y - 17.5, w: 640, h: 35 });
-      addGaItem(p, back.id, { kind: "trunking", x: 80, y: y + 70, w: 640, h: 60 });
+      addGaItem(p, back.id, { kind: "rail", x: 55, y: y - 17.5, w: 640, h: 35 });
+      addGaItem(p, back.id, { kind: "trunking", x: 55, y: y + 70, w: 640, h: 60 });
     }
     const cands = gaCandidates(p, () => "").filter((c) => !c.door && !c.modules);
     let r = 0;
-    let x = 90;
+    let x = 65;
     for (const c of cands) {
-      if (x + c.w > 710) {
+      if (x + c.w > 685) {
         r++;
-        x = 90;
+        x = 65;
       }
       if (r >= rails.length) break;
       addGaItem(p, back.id, { kind: "device", x, y: rails[r]! - c.h / 2, w: c.w, h: c.h, refs: c.refs });
       x += c.w + 5;
     }
     // The controller's modules on the last rail, in rail order.
-    placeModulesOnGa(p, back.id, Object.values(modules).map((m) => m.id), [90, rails[3]!]);
+    placeModulesOnGa(p, back.id, Object.values(modules).map((m) => m.id), [65, rails[3]!]);
     const front = addGaPage(
       p,
       "General arrangement: door front",

@@ -1756,9 +1756,10 @@ export function addPlatesForDoors(project: Project, frontId: string, margin = PL
   let after = [...project.pages].reverse().find((p) => p.ga && p.ga.view !== "detail")?.id ?? front.id;
   for (const pane of doorPanes(front)) {
     if (have.has(`${pane.col}:${pane.row}`)) continue;
-    const w = Math.max(50, pane.w - 2 * margin);
-    const h = Math.max(50, pane.h - 2 * margin);
-    const page = addGaPage(project, `Backplate: ${paneName(pane)}`, { scale: fitScale(w, h), enclosure: { w, h }, view: "backplate", behind: { sheet: front.id, pane: [pane.col, pane.row] } }, after);
+    // The door's opening is the enclosure; the plate is drawn inside it, the margin in (v0.5 A58).
+    const { w, h } = pane;
+    const plate = margin === PLATE_MARGIN ? {} : { plate: { w: Math.max(50, w - 2 * margin), h: Math.max(50, h - 2 * margin) } };
+    const page = addGaPage(project, `Backplate: ${paneName(pane)}`, { scale: fitScale(w, h), enclosure: { w, h }, ...plate, view: "backplate", behind: { sheet: front.id, pane: [pane.col, pane.row] } }, after);
     made.push(page);
     after = page.id;
   }
@@ -1779,18 +1780,20 @@ export function setPlateBehind(project: Project, pageId: string, behind: { sheet
   page.ga.behind = { sheet: front.id, pane: [behind.pane[0], behind.pane[1]] };
 }
 
-/** Size a backplate from its door again: the door's size less a margin all round. */
+/** Size a backplate from its door again: the door's opening is its enclosure, the plate a margin in all round. */
 export function sizePlateFromDoor(project: Project, pageId: string, margin = PLATE_MARGIN): void {
   const page = getPage(project, pageId);
   const d = page.ga ? plateDoor(project, page) : null;
   if (!d) throw new OpError("This backplate isn't behind a door");
-  page.ga!.enclosure = { w: Math.max(50, d.pane.w - 2 * margin), h: Math.max(50, d.pane.h - 2 * margin) };
+  page.ga!.enclosure = { w: d.pane.w, h: d.pane.h };
+  if (margin === PLATE_MARGIN) delete page.ga!.plate;
+  else page.ga!.plate = { w: Math.max(50, d.pane.w - 2 * margin), h: Math.max(50, d.pane.h - 2 * margin) };
 }
 
 export function setGaSettings(
   project: Project,
   pageId: string,
-  patch: Partial<Omit<GaSettings, "of" | "leaf" | "pane" | "columns">> & { of?: string | null; leaf?: 0 | 1 | null; pane?: [number, number] | null; columns?: DoorColumn[] | null },
+  patch: Partial<Omit<GaSettings, "of" | "leaf" | "pane" | "columns" | "plate">> & { of?: string | null; leaf?: 0 | 1 | null; pane?: [number, number] | null; columns?: DoorColumn[] | null; plate?: { w: number; h: number } | null },
 ): void {
   const page = getPage(project, pageId);
   if (!page.ga) throw new OpError("That isn't a GA sheet");
@@ -1813,6 +1816,7 @@ export function setGaSettings(
       delete ga.of;
       delete ga.leaf;
     }
+    if (ga.view !== "backplate") delete ga.plate;
     // A detail sheet has no scale of its own: each frame has one.
     if (ga.view === "detail") ga.scale = 1;
     if (ga.view !== "door-front") delete ga.leaves;
@@ -1835,10 +1839,23 @@ export function setGaSettings(
     if (!(w > 0 && h > 0)) throw new OpError("The enclosure needs a width and height");
     if (ga.of) throw new OpError("This sheet shows another sheet's door: change its size there");
     ga.enclosure = { w, h };
+    // A plate typed over that no longer fits goes back to 25 mm in.
+    if (ga.plate && (ga.plate.w > w || ga.plate.h > h)) delete ga.plate;
     if (ga.leaves) setLeaves(ga, ga.leaves);
     // Door views of this door take its size too.
     for (const p of project.pages) if (p.ga?.of === page.id) p.ga.enclosure = { w, h };
+  }  // A backplate's plate typed over (v0.5 A58); null: back to 25 mm in from each edge.
+  if (patch.plate !== undefined) {
+    if (ga.view !== "backplate") throw new OpError("Only a backplate sheet has a plate");
+    if (patch.plate === null) delete ga.plate;
+    else {
+      const { w, h } = patch.plate;
+      if (!(w > 0 && h > 0)) throw new OpError("The backplate needs a width and height");
+      if (w > ga.enclosure.w || h > ga.enclosure.h) throw new OpError(`The backplate can't be larger than its enclosure (${ga.enclosure.w} × ${ga.enclosure.h} mm)`);
+      ga.plate = { w, h };
+    }
   }
+
   if (patch.leaves) {
     if (ga.view !== "door-front" || ga.of) throw new OpError("Leaves are set on the door front that has the door");
     setLeaves(ga, patch.leaves);

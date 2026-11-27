@@ -32,11 +32,16 @@ describe("simulation", () => {
 });
 
 describe("GA sheets", () => {
-  test("Fit gives the smallest standard scale that fits (v0.4.x T10): never 1:9.5", () => {
-    expect(fitScale(1000, 1600)).toBe(20);
-    expect(fitScale(800, 1200)).toBe(10);
+  test("Fit gives the largest scale that fits, to one decimal place (v0.5 A60), never larger than 1:1", () => {
+    expect(fitScale(1000, 1600)).toBe(12.2);
+    expect(fitScale(800, 1200)).toBe(9.2);
     expect(fitScale(100, 100)).toBe(1);
-    expect(fitScale(400, 500)).toBe(5);
+    // What it gives fits; a tenth less wouldn't.
+    for (const [w, h] of [[1000, 1600], [800, 1200], [400, 500], [2400, 1000]] as const) {
+      const s = fitScale(w, h);
+      expect(Math.round(s * 10)).toBe(s * 10);
+      expect(fitScale(w / (s / (s - 0.1)), h / (s / (s - 0.1)))).toBeLessThanOrEqual(s - 0.1 + 1e-9);
+    }
     expect(scaleText(7.5)).toBe("1:7.5");
     expect(scaleText(12)).toBe("1:12");
   });

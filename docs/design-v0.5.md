@@ -355,6 +355,15 @@ Judgement calls made while building, by step, with the reason.
 - **8e: a proof's key is the circuit only:** each part's id, symbol, zone, links and params less those that only describe it (description, information, mark, printed rating, colour…); each wire's two ends; each plant item's terminals, points' forms, pins and what they follow, its interlocks and commons; each distribution's kind. On 0.4.5 the key was the whole drawing, so dragging a label, moving a part or a wire's route, or renumbering, dropped every proof: fixed here, as the entry asks.
 - **8e: `+ Network ▾` picks the new network** in the Network view, as `+ Module ▾` picks the new module. *Place as sheet* is left as it is (D10).
 
+### Step 9
+
+- **A58: the plate sits in the middle of its enclosure** when its size is typed over, so the margin is shared equally; typed larger than the enclosure, it's refused, and an enclosure made smaller than a typed plate puts it back to 25 mm in. The enclosure's outline is drawn thin and dashed, the plate as the panel's outline was, and the sheet's title gives both sizes.
+- **A58: a backplate behind a door takes the door's opening as its enclosure** and the plate 25 mm in, as the entry says *Add a backplate for each door* already took off. *Size from its door* does the same.
+- **A58: the fixtures' backplates are laid out again on their plates** (positions measured from the plate's corner), so nothing lies outside them. File format 18.
+- **A60: *Fit* never goes larger than 1:1.** A frame's *Fit* gives the largest of its scales (2:1, 1:1, 1:2, 1:5) that fits a detail sheet, as a new frame starts: a frame shares its sheet with others, so it isn't made to fill it.
+- **A71: the table has a *Size* and nothing else to set**, and lists every GA sheet's rows with the sheet in its first column, as the Schedules tab does. Its text starts at the detail size, since the list is long. It can be placed on any sheet, as the other tables can.
+- **SH-6 written out** with what a GA sheet's settings show for each view.
+
 ### Title block (ruled 27 Nov 2026, before step 7)
 
 - **A1 laid out again:** *Sheet*, *Job no.* and *Checked* in three equal cells (24 mm); *Drawing ref.* and *Drawn* in two (36 mm); *Client* across the row (72 mm). A long *Checked* name and date is squeezed to fit its cell, as every cell's value is.

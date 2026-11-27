@@ -11,7 +11,7 @@
 import { CAP_HEIGHT, textWidth, wrapText } from "./textwidth";
 import { BUSBAR_COLOUR_OPTIONS } from "./wirecolours";
 import { BLOCK_HALF } from "./blocks";
-import { legendTable, notesLayout, revisionTable, type LegendEntry } from "./annotations";
+import { bomTable, legendTable, notesLayout, revisionTable, type LegendEntry } from "./annotations";
 import { networkDiagram, type NetworkData } from "./networkdraw";
 import {
   type Dir,
@@ -1844,6 +1844,29 @@ const SYMBOLS: SymbolDef[] = [
     },
   },
   {
+    id: "bomtable",
+    bench: "annotate",
+    name: "Bill of materials",
+    group: "Tables",
+    palette: true,
+    params: [
+      {
+        key: "size",
+        label: "Size",
+        type: "select",
+        default: "detail",
+        options: TEXT_SIZE_OPTIONS,
+      },
+    ],
+    kind: () => null,
+    draw(el, t) {
+      // What's placed on the GA sheets, as the Schedules tab lists it (v0.5 A71); kept up to date like the other tables.
+      const size = TEXT_SIZES[str(el, "size", "detail")] ?? TEXT_SIZES.detail!;
+      const r = bomTable(t?.bom ?? [], size);
+      return { prims: r.prims, terminals: [], body: { x: 0, y: 0, w: r.w, h: r.h } };
+    },
+  },
+  {
     id: "legend",
     bench: "annotate",
     name: "Symbol legend",
@@ -2741,6 +2764,8 @@ export interface GeometryText {
   rows?: string[][];
   /** One of each part used (symbol legend). */
   legend?: LegendEntry[];
+  /** The bill of materials table's rows (v0.5 A71). */
+  bom?: string[][];
 }
 
 /**

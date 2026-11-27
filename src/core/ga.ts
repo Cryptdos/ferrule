@@ -41,7 +41,7 @@ export interface GaFrame {
   h: number;
 }
 
-/** A real position on the panel (mm from the enclosure's corner) to grid units on the sheet. */
+/** A real position on the panel (mm from the enclosure's corner, or a backplate's) to grid units on the sheet. */
 export function gaToSheet(ga: Pick<GaFrame, "scale"> & { x0?: number; y0?: number }, p: Vec): Vec {
   return [GA_ORIGIN[0] + mmToUnits(ga, p[0] - (ga.x0 ?? 0)), GA_ORIGIN[1] + mmToUnits(ga, p[1] - (ga.y0 ?? 0))];
 }
@@ -230,10 +230,29 @@ export function platesOf(project: Project, front: Page): Map<string, Page> {
   return out;
 }
 
-/** What the sheet shows: all of it, one leaf of a door, or one door of a modular door. */
+/**
+ * A backplate sheet's plate, in the enclosure's mm (v0.5 A58): typed over, or
+ * 25 mm in from each edge; in the middle of the enclosure either way.
+ */
+export function plateRect(ga: Pick<GaSettings, "enclosure" | "plate">): { x: number; y: number; w: number; h: number } {
+  const e = ga.enclosure;
+  const w = ga.plate?.w ?? Math.max(10, e.w - 2 * PLATE_MARGIN);
+  const h = ga.plate?.h ?? Math.max(10, e.h - 2 * PLATE_MARGIN);
+  return { x: (e.w - w) / 2, y: (e.h - h) / 2, w, h };
+}
+
+/**
+ * What the sheet shows: all of it, one leaf of a door, or one door of a
+ * modular door. A backplate sheet shows its enclosure, its positions measured
+ * from the plate's corner inside it (v0.5 A58).
+ */
 export function gaFrame(project: Project, page: Page): GaFrame {
   const ga = page.ga!;
   const size = gaSize(project, page);
+  if (ga.view === "backplate") {
+    const p = plateRect(ga);
+    return { scale: ga.scale, x0: -p.x, y0: -p.y, w: size.w, h: size.h };
+  }
   if (isDoorView(ga.view) && (ga.pane || ga.columns?.length || doorOwner(project, page)?.ga?.columns?.length)) {
     const p = shownPane(project, page);
     if (p) return { scale: ga.scale, x0: p.x, ...(p.y ? { y0: p.y } : {}), w: p.w, h: p.h };
@@ -299,18 +318,14 @@ export function drawnGaItems(project: Project, page: Page): DrawnGaItem[] {
 
 /**
  * The largest drawing of an enclosure that fits the sheet beside its
- * dimensions: any scale (1:7.5, 1:12…), to the next half step, so the layout
- * uses the page well. The usual scales stay as quick picks.
+ * dimensions (v0.5 A60): any scale, to one decimal place (1:5.5), never
+ * larger than 1:1. A sheet already made keeps its scale until *Fit* is pressed.
  */
-/** Standard drawing scales a fitted sheet chooses from (v0.4.x T10). */
-export const STANDARD_SCALES = [1, 2, 2.5, 5, 10, 20, 25, 50];
-
-/** The smallest standard scale (1:1, 1:2, 1:2.5, 1:5, 1:10…) at which an enclosure fits the sheet. A sheet already made keeps its scale. */
 export function fitScale(w: number, h: number): number {
   // Room to the right and below for the dimensions.
   const room = { w: (AREA_UNITS.w - GA_ORIGIN[0]) * UNIT_MM - 20, h: (AREA_UNITS.h - GA_ORIGIN[1]) * UNIT_MM - 18 };
   const need = Math.max(w / room.w, h / room.h);
-  return STANDARD_SCALES.find((s) => s >= need - 1e-9) ?? Math.ceil(need / 50) * 50;
+  return Math.max(1, Math.ceil(need * 10 - 1e-6) / 10);
 }
 
 /** A scale as it's written: 1:7.5, 1:12. */
@@ -809,6 +824,11 @@ export const paneRef = (p: Pick<Pane, "col" | "row">) => `@pane:${p.col}:${p.row
  * it; and, on a door view, each door's own rectangle by `paneRef`.
  */
 export function dimFrame(project: Project, page: Page): { size: { w: number; h: number; x0: number; y0: number }; panes: { id: string; x: number; y: number; w: number; h: number }[] } {
+  // A backplate is measured from its plate, never from the enclosure round it (v0.5 A58).
+  if (page.ga?.view === "backplate") {
+    const p = plateRect(page.ga);
+    return { size: { w: p.w, h: p.h, x0: 0, y0: 0 }, panes: [] };
+  }
   const f = gaFrame(project, page);
   const panes = sheetPanes(project, page);
   return {
@@ -1140,9 +1160,9 @@ export function frameView(project: Project, frame: GaItem): FrameView | null {
   if (!d?.page.ga) return null;
   const k = frame.zoom ?? 1;
   const src: Page = { ...d.page, ga: { ...d.page.ga, scale: 1 / k } };
-  const x0 = gaFrame(project, src).x0;
-  const qx = GA_ORIGIN[0] + ((d.it.x - x0) * k) / UNIT_MM;
-  const qy = GA_ORIGIN[1] + (d.it.y * k) / UNIT_MM;
+  const f = gaFrame(project, src);
+  const qx = GA_ORIGIN[0] + ((d.it.x - f.x0) * k) / UNIT_MM;
+  const qy = GA_ORIGIN[1] + ((d.it.y - (f.y0 ?? 0)) * k) / UNIT_MM;
   const fx = GA_ORIGIN[0] + frame.x / UNIT_MM;
   const fy = GA_ORIGIN[1] + frame.y / UNIT_MM;
   return { frame, det: d.it, page: d.page, src, k, dx: fx - qx, dy: fy - qy };

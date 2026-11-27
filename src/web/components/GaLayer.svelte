@@ -9,6 +9,7 @@
     drawnGaItems,
     gaFrame,
     gaSize,
+    plateRect,
     detailLabel,
     frameCaption,
     frameView,
@@ -128,6 +129,8 @@
     return { size: Math.max(SMALLEST, size), vertical, halo: size < SMALLEST };
   }
   const LENS: Record<string, string> = { Rd: "#e03131", Ye: "#fcc419", Gn: "#2f9e44", Bu: "#1c7ed6", Wh: "#ffffff", Cl: "#f1f3f5" };
+  /** A backplate sheet's plate, in its own mm (it's measured from its corner). */
+  const plate = $derived(ga.view === "backplate" && !inFrame ? { w: plateRect(ga).w, h: plateRect(ga).h } : null);
   const title = $derived.by(() => {
     const what = ga.view === "door-front" ? "DOOR FRONT" : ga.view === "door-back" ? "DOOR BACK, FROM INSIDE" : "BACKPLATE";
     const one = shownPane(project, page);
@@ -135,8 +138,10 @@
     const of = owner && owner !== page ? ` · DOOR ON SHEET ${owner.number}` : "";
     // A compartment's plate names its door (v0.4.x M13).
     const pd = ga.view === "backplate" ? plateDoor(project, page) : null;
-    if (pd) return `BACKPLATE BEHIND ${paneName(pd.pane).toUpperCase()}, DOOR ON SHEET ${pd.front.number}: ${frame.w} W × ${frame.h} H mm · SCALE ${scaleText(ga.scale)}`;
-    return `${what}${leaf}${of}: ${frame.w} W × ${frame.h} H mm · SCALE ${scaleText(ga.scale)}`;
+    const p = ga.view === "backplate" ? plateRect(ga) : null;
+    const sizes = p ? `${p.w} W × ${p.h} H mm IN AN ENCLOSURE ${frame.w} × ${frame.h} mm` : `${frame.w} W × ${frame.h} H mm`;
+    if (pd) return `BACKPLATE BEHIND ${paneName(pd.pane).toUpperCase()}, DOOR ON SHEET ${pd.front.number}: ${sizes} · SCALE ${scaleText(ga.scale)}`;
+    return `${what}${leaf}${of}: ${sizes} · SCALE ${scaleText(ga.scale)}`;
   });
 </script>
 
@@ -149,8 +154,12 @@
 </defs>
 <g class="ga">
   {#if !inFrame && !detailView}
-  <!-- The enclosure (or door), with its size. -->
-  <rect class="encl" x={GA_ORIGIN[0]} y={GA_ORIGIN[1]} width={W} height={H} />
+  <!-- The enclosure (or door), with its size. A backplate's enclosure is for reference: its plate inside is what's measured (v0.5 A58). -->
+  <rect class="encl" class:ref={!!plate} x={GA_ORIGIN[0]} y={GA_ORIGIN[1]} width={W} height={H} />
+  {#if plate}
+    <!-- Its size is in the title: nothing's written on it, where parts go. -->
+    <rect class="encl" x={X(0)} y={Y(0)} width={u(plate.w)} height={u(plate.h)} />
+  {/if}
   <text class="title" x={GA_ORIGIN[0]} y={GA_ORIGIN[1] - 5.5}>{title}</text>
   <line class="dim" x1={GA_ORIGIN[0]} y1={GA_ORIGIN[1] - 2} x2={GA_ORIGIN[0] + W} y2={GA_ORIGIN[1] - 2} />
   <line class="tick" x1={GA_ORIGIN[0]} y1={GA_ORIGIN[1] - 3} x2={GA_ORIGIN[0]} y2={GA_ORIGIN[1] - 1} />
@@ -385,6 +394,10 @@
     fill: none;
     stroke: #000;
     stroke-width: 0.35;
+  }
+  .encl.ref {
+    stroke-width: 0.18;
+    stroke-dasharray: 1.2 0.6;
   }
   .title {
     font-size: var(--tag);

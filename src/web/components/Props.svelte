@@ -186,11 +186,13 @@
           editor.apply((p) => updateElement(p, editor.pageId, id, { label: v }), { merge: `notes:${id}` });
         }}
       />
-    {:else if one.symbol === "revtable" || one.symbol === "legend"}
+    {:else if one.symbol === "revtable" || one.symbol === "legend" || one.symbol === "bomtable"}
       <p class="hint">
         {one.symbol === "revtable"
           ? "Lists the project's revisions: add and edit them under Project settings."
-          : "One of each part drawn in the project, by name. It keeps itself up to date."}
+          : one.symbol === "bomtable"
+            ? "Everything placed on the GA sheets, as the bill of materials in Schedules lists it: each device by the device picked for it in Design, terminals, label plates, DIN rail and trunking. It keeps itself up to date."
+            : "One of each part drawn in the project, by name. It keeps itself up to date."}
       </p>
     {:else if one.symbol === "image"}
       <!-- A picture is placed like any part; its file is chosen here (T2). -->
