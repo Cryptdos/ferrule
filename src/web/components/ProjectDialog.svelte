@@ -1,7 +1,8 @@
 <script lang="ts">
   import { addAsset, addRevision, deleteRevision, setLogo, updateProjectInfo, updateRevision } from "../../core/ops";
   import { readImage } from "../images";
-  import { dateText, type ProjectInfo, type Revision } from "../../core/model";
+  import { BACKUP_LIMITS, dateText, type ProjectInfo, type Revision } from "../../core/model";
+  import { parseBackups } from "../../core/validate";
   import type { Editor } from "../editor.svelte";
   import Modal from "./Modal.svelte";
 
@@ -113,6 +114,39 @@
       Use the shared device library (sizes, datasheets, pictures)
     </label>
     <p class="hint">Off: only this project's own devices are offered. Devices already in use stay.</p>
+    <h3>Backups</h3>
+    <div class="backups">
+      <label class="inline">
+        A copy at most every
+        <input
+          type="number"
+          min={BACKUP_LIMITS.every.min}
+          max={BACKUP_LIMITS.every.max}
+          value={editor.project.backups.every}
+          onchange={(e) => {
+            const every = parseBackups({ ...editor.project.backups, every: e.currentTarget.valueAsNumber }).every;
+            e.currentTarget.value = String(every);
+            editor.apply((p) => (p.backups = { ...p.backups, every }));
+          }}
+        />
+        minutes
+      </label>
+      <label class="inline">
+        keeping the latest
+        <input
+          type="number"
+          min={BACKUP_LIMITS.keep.min}
+          max={BACKUP_LIMITS.keep.max}
+          value={editor.project.backups.keep}
+          onchange={(e) => {
+            const keep = parseBackups({ ...editor.project.backups, keep: e.currentTarget.valueAsNumber }).keep;
+            e.currentTarget.value = String(keep);
+            editor.apply((p) => (p.backups = { ...p.backups, keep }));
+          }}
+        />
+      </label>
+    </div>
+    <p class="hint">Copies are taken while the project changes, into <code>Backups</code> beside its file, the oldest going first. Keep none for no copies. They're restored from the project list's <em>Backups…</em>, into a new project.</p>
     <h3>Revisions</h3>
     <table>
       <thead>
@@ -151,6 +185,19 @@
 </Modal>
 
 <style>
+  .backups {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+  }
+  .backups input {
+    width: 4.5em;
+  }
+  label.inline {
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+  }
   .logo {
     display: flex;
     align-items: center;

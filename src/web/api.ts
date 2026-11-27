@@ -22,6 +22,13 @@ export interface ProjectSummary {
   error?: string;
 }
 
+/** A project's backups (v0.5 A12), newest first, with its settings. */
+export interface BackupList {
+  every: number;
+  keep: number;
+  copies: { file: string; taken: string; pages: number; error?: string }[];
+}
+
 /** A project in the Deleted folder (v0.5 A16). */
 export interface DeletedProject {
   file: string;
@@ -91,6 +98,9 @@ export const api = {
     call<{ id: string }>(`/api/projects/${encodeURIComponent(id)}/save-as`, { method: "POST", body: JSON.stringify({ path, overwrite }) }),
   rename: (id: string, name: string) => call<{ id: string }>(`/api/projects/${encodeURIComponent(id)}/rename`, { method: "POST", body: JSON.stringify({ name }) }),
   upload: (name: string, text: string) => call<{ id: string }>(`/api/projects/upload?name=${encodeURIComponent(name)}`, { method: "POST", body: text }),
+  backups: (id: string) => call<BackupList>(`/api/projects/${encodeURIComponent(id)}/backups`),
+  restoreBackup: (id: string, file: string, name: string) =>
+    call<{ id: string }>(`/api/projects/${encodeURIComponent(id)}/backups/restore`, { method: "POST", body: JSON.stringify({ file, name }) }),
   deleted: () => call<DeletedProject[]>("/api/deleted"),
   restore: (file: string, name: string) => call<{ id: string }>("/api/deleted/restore", { method: "POST", body: JSON.stringify({ file, name }) }),
   purge: (file: string) => call<{ ok: true }>("/api/deleted/purge", { method: "POST", body: JSON.stringify({ file }) }),

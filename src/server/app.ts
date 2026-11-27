@@ -113,6 +113,13 @@ export function createApp({ storage, library, designs, devices, assets, version 
     const body = await c.req.json().catch(() => ({}));
     return c.json({ id: await storage.renameProject(c.req.param("id"), typeof body?.name === "string" ? body.name : "") });
   });
+  // A project's backups (v0.5 A12): the copies by date, and one restored into a new project under a name.
+  app.get("/api/projects/:id/backups", async (c) => c.json(await storage.backups(c.req.param("id"))));
+  app.post("/api/projects/:id/backups/restore", async (c) => {
+    const body = await c.req.json().catch(() => ({}));
+    if (typeof body?.file !== "string") return c.json({ error: "No backup given" }, 400);
+    return c.json({ id: await storage.restoreBackup(c.req.param("id"), body.file, typeof body?.name === "string" ? body.name : "") }, 201);
+  });
   // The Deleted folder (v0.5 A16): its projects, Restore under a name, and Delete permanently.
   app.get("/api/deleted", async (c) => c.json(await storage.deleted()));
   app.post("/api/deleted/restore", async (c) => {
