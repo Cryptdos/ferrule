@@ -365,7 +365,7 @@ The electrical drawing: parts, wires, rails, plant views, numbering and links. I
 - **DR-24** ~~Colour, number and function print together at the end the wire was drawn from; *Other end* flips them. On a wire too short for them, they're centred on it.~~ *(v0.5: A26)*
 - **DR-25** A wire's number prints once per sheet, on its longest run. Earth and field wires don't print theirs unless *Show number* is ticked.
 - **DR-26** ~~The number and colour can be dragged along their own wire. *Number and colour back to their place* undoes it.~~ *(v0.5: A26)*
-- **DR-27** A new wire takes its colour from the block or rail it leaves, or from the wire on the other side of the fuse, contact or terminal it's drawn from. A push button carries it between the two terminals of each pole, normally open or closed.
+- **DR-27** A new wire takes its colour from the block or rail it leaves, or from the wire on the other side of the fuse, contact or terminal it's drawn from. A push button carries it between the two terminals of each pole, normally open or closed; a plant or module view between the pins of a point that switches (a relay output's common and NO, a plant's fault contact).
 - **DR-28** A wire with no colour of its own takes its function's colour from *Wire colours by function* (PR-5); its function comes from its distribution when it's on one, else from the function set on the wire. Properties says where the colour came from.
 - **DR-29** A wire goes straight onto a terminal and keeps its number through it.
 - **DR-30** *Kind*: **Automatic** (by the panel boundary), **Panel wiring**, or **Field wire** (dashed).
@@ -473,10 +473,10 @@ Tag prefixes follow IEC 81346-2 as applied in `docs/designations.md`. Untagged p
 | **PT-8** | Indicator lamp | P | *Colour*: Rd, Ye, Gn, Bu, Wh; *Lamp test terminal (LT)*; ~~*Takes*; *Draw*~~ *(v0.5: A38)* | Terminals +V and −V; with lamp test, a third, LT. Every lamp has a colour (white covers a clear lens) |
 | **PT-9** | Terminal | (number only) | *Terminal strip* (default X1); *Type*; *Show the strip identifier beside it* | See DR-55 to DR-61 |
 | **PT-10** | Socket outlet | X | none | A box with L and N on top, 3 units apart to line up under an MCB, and E beside them |
-| **PT-11** | Connector block | X | *Terminals* 2–12 | A box of terminals all at one potential (an earth, 0 V or screen block); grows with each terminal; doesn't turn (DR-8) |
+| **PT-11** | Connector block | X | *Terminals* 2–12 (the total); *Columns* 1–12, default 2 | A box of terminals all at one potential (an earth, 0 V or screen block), sized from the two: two columns are a pair to a row, in on the left and out on the right; one column has every terminal on the left; three or more make a wide block of two rows, its terminals along the top and bottom (widening to fit, so 12 in 4 columns is drawn 6 across). Doesn't turn (DR-8) |
 | **PT-12** | Connector (plug and socket) | X | *Ways* 1–12 | Each way a plug pin and a socket contact, for flying leads |
 | **PT-13** | Transformer | T | *Earthed screen*; *Rating*; *Gives*; *Rating (VA)* | Terminals P1, P2, S1, S2 at switch pole pitch; a supply in Simulate once its primary is energised |
-| **PT-14** | Motor | M | *Rating*; *Phases*: three (U V W) or single (L N); *Picture*: motor, fan, pump | Terminals at pole pitch, so it wires straight down from the contactor above *(v0.5: A56. *Picture* becomes *Type*, and the name follows it)* |
+| **PT-14** | Motor | M | *Rating*; *Phases*: three (U V W) or single (L N); *Type*: motor, fan or pump | Terminals at pole pitch, so it wires straight down from the contactor above. The type changes the picture and the name: a pump reads *Pump* in its properties and in the legend |
 | **PT-15** | Distribution block | W | See DR-48 to DR-53 | |
 | **PT-16** | ~~Control rail~~ | ~~none~~ | ~~As the block~~ | *(v0.5: A23)* |
 | **PT-17** | Earth | none | *Type*: earth, protective (PE), functional (FE), chassis, equipotential | The IEC 60417 symbol for the type |
@@ -527,7 +527,7 @@ Text, boxes, pictures, sections and clouds that explain the drawing. In Annotate
 - **AN-12** **Picture**: placed like a part, then a file chosen in its properties; or pasted (`Ctrl+V`); or a PNG or JPEG dragged in from Explorer. Dragging the corner sizes it. Pictures are stored in the project, scaled to 2400 px at most; one over 25 MB is refused.
 - **AN-13** A Picture switched to *The project's logo* shows the logo set under Project….
 - **AN-14** **Revision list** fills itself from the project's revisions, with blank rows to spare (*Rows at least*).
-- **AN-15** **Symbol legend** draws one of each kind of part used in the project with its name, in 1 to 4 columns, and keeps itself up to date.
+- **AN-15** **Symbol legend** draws one of each kind of part used in the project with its name, in 1 to 4 columns, and keeps itself up to date. A part whose setting changes its symbol gets an entry for each kind in use, under its own name: contacts NO, NC and changeover; relay, contactor and timer coils (a timer by its function); motor, fan and pump; the earth and terminal types. A part that stretches (a block, rail, terminal strip line or cable screen) is drawn about 10 units long, and a symbol taller than a contact or wider than a four-pole isolator is drawn smaller to fit, its text at full size.
 - **AN-16** **Controller map**: the controller's modules in rail order, one box each with its tag, its bus address in a circle, maker, model, type and every sheet-column it's drawn at; spare slots dashed. It wraps onto more rows to fit its width and keeps up by itself.
 - **AN-17** **Network diagram**: Design's networks (DE-63), redrawn as they change; its width is set in its properties.
 

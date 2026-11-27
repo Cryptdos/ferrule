@@ -4,7 +4,7 @@
  */
 import { lineUnits, type Vec } from "./geometry";
 import type { Element, Project } from "./model";
-import { COIL_NAMES, CONTACT_NAMES, coilType, contactKind, getSymbol, isBar, listSymbols, localGeometry, timerFunction, type Prim } from "./symbols";
+import { COIL_NAMES, CONTACT_NAMES, coilType, contactKind, getSymbol, isBar, listSymbols, localGeometry, partName, timerFunction, type Prim } from "./symbols";
 import { CAP_HEIGHT, textWidth } from "./textwidth";
 
 const THIN = lineUnits("thin");
@@ -26,6 +26,31 @@ export function movePrim(p: Prim, dx: number, dy: number): Prim {
       return { ...p, at: m(p.at) };
   }
 }
+
+/** A primitive scaled about the origin; text keeps its size (nothing under 1.8 mm), only its place moves. */
+function scalePrim(p: Prim, k: number): Prim {
+  const m = (v: Vec): Vec => [v[0] * k, v[1] * k];
+  switch (p.t) {
+    case "line":
+    case "poly":
+      return { ...p, pts: p.pts.map(m) };
+    case "circle":
+      return { ...p, c: m(p.c), r: p.r * k };
+    case "ellipse":
+      return { ...p, c: m(p.c), rx: p.rx * k, ry: p.ry * k };
+    case "arc":
+      return { ...p, from: m(p.from), to: m(p.to), r: p.r * k };
+    case "text":
+      return { ...p, at: m(p.at) };
+  }
+}
+
+/**
+ * The most a symbol takes in the legend (A55): the height of a contact or a
+ * coil, and a four-pole isolator's width. A bigger one (a motor, a
+ * transformer) is drawn smaller to fit.
+ */
+const LEGEND_MAX = { w: 14, h: 6 };
 
 const txt = (x: number, y: number, s: string, size: number, bold = false, anchor: "start" | "middle" | "end" = "start"): Prim => ({
   t: "text",
@@ -376,6 +401,8 @@ function variantName(el: Element): string {
     if (!opt || /^(none|default|plain)$/i.test(String(opt.value))) continue;
     const variant = opt.label.split(/[(,]/)[0]!.trim();
     if (el.symbol === "contact") return CONTACT_NAMES[contactKind(el)];
+    // A part whose type is its name: a motor set to Pump is a Pump (A56).
+    if (def.nameFor) return partName(el);
     // A timer's function changes its mark: one entry for each in use, as the timer coil part had.
     if (el.symbol === "coil" && coilType(el) === "timer") return `${COIL_NAMES.timer}: ${timerFunction(el).label}`;
     // "Isolator / MCB / contactor: Circuit breaker" reads better as just "Circuit breaker".
@@ -403,12 +430,14 @@ export function legendEntries(project: Project): LegendEntry[] {
       delete params.xrefDx;
       delete params.xrefDy;
       delete params.onBlock;
-      // Rails and busbars are drawn short: the line is the symbol.
+      // Parts that stretch are drawn at a set length, about 10 units, whatever is drawn (A55).
       if (isBar(el)) {
         params.length = 10;
         delete params.name;
         delete params.dist;
       }
+      if (el.symbol === "strip-line") params.length = 10;
+      if (el.symbol === "screen") params.span = 10;
       seen.set(name, { name, el: { ...el, tag: "", label: "", rot: 0, links: [], params } });
     }
   }
@@ -423,9 +452,14 @@ export function legendTable(entries: LegendEntry[], cols: number, size: number):
   const prims: Prim[] = [];
   const nameW = Math.max(size * 8, ...entries.map((e) => textWidth(e.name.toUpperCase(), size))) + size;
   const drawn = entries.map((e) => {
-    const g = localGeometry(e.el, { tag: "", xref: "", label: "" });
+    const full = localGeometry(e.el, { tag: "", xref: "", label: "" });
+    // Nothing connects to a symbol in the legend, so a large one is scaled down to fit its cell (A55).
+    const k = Math.min(1, LEGEND_MAX.w / Math.max(full.bbox.w, 0.01), LEGEND_MAX.h / Math.max(full.bbox.h, 0.01));
+    const b = full.bbox;
+    const g = { ...full, bbox: { x: b.x * k, y: b.y * k, w: b.w * k, h: b.h * k } };
     // Just the symbol and its terminal numbers: no tag, label or cross-reference text.
-    const ps = g.prims.filter((p) => p.t !== "text" || p.role === "term");
+    // A motor's M and 3~ are its symbol, not a note about this one.
+    const ps = full.prims.filter((p) => p.t !== "text" || p.role === "term" || (e.el.symbol === "motor" && p.role === "note")).map((p) => (k < 1 ? scalePrim(p, k) : p));
     return { e, g, ps };
   });
   const symW = Math.max(6, ...drawn.map((d) => d.g.bbox.w)) + 2;

@@ -356,7 +356,7 @@ function inheritBusbarColour(project: Project, page: Page, seg: Segment): void {
   for (const ref of [seg.from, seg.to]) {
     const el = page.elements.find((e) => e.id === ref[0]);
     if (!el) continue;
-    for (const mate of poleMates(el, ref[1])) {
+    for (const mate of poleMates(el, ref[1], project)) {
       const other = project.conductors.find((x) => x.id !== c.id && x.colour && x.terminals.some((t) => t[0] === el.id && t[1] === mate));
       if (other) {
         c.colour = other.colour;

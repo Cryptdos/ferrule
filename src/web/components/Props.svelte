@@ -33,7 +33,7 @@
   import { controllerName, moduleTitle } from "../../core/modules";
   import { readImage } from "../images";
   import { address, contactMarks, relayPinMarks, contactType, isMaster, isSlave, masterOf, partnerOf, slavesOf } from "../../core/xref";
-  import { canRotate, isBar, paramApplies, parsePlantPins, plantViewLayout, requireSymbol, terminalNames, viewSides, type ViewSide } from "../../core/symbols";
+  import { canRotate, isBar, paramApplies, partName, parsePlantPins, plantViewLayout, requireSymbol, terminalNames, viewSides, type ViewSide } from "../../core/symbols";
   import { WIRE_FUNCTIONS, conductorLooks, functionRows } from "../../core/wirecolours";
   import ColourSelect from "./ColourSelect.svelte";
   import { displayTag, tagPrefix } from "../../core/tags";
@@ -93,7 +93,7 @@
 
 <div class="props">
   {#if one && def}
-    <h3>{def.name}</h3>
+    <h3>{partName(one)}</h3>
     <div class="pos">Sheet {page.number} · column {columnOf(one.pos[0])} · ({one.pos[0]}, {one.pos[1]})</div>
     {@const master = masterOf(editor.project, one)}
     {#if isSlave(one)}

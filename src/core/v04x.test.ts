@@ -731,14 +731,14 @@ describe("step 9a: connector block, socket, motors (M9, T17, M8)", () => {
     expect(checkProject(p).some((f) => /earth now enters from the top/.test(f.message))).toBe(false);
   });
 
-  test("M8: a single-phase motor has L and N; fan and pump change the picture only", () => {
+  test("M8: a single-phase motor has L and N; fan and pump change the picture (its Type, v0.5 A56)", () => {
     const p = newProject("m");
     const pg = p.pages[0]!.id;
     const m3 = addElement(p, pg, "motor", [20, 30]);
     const m1 = addElement(p, pg, "motor", [40, 30], { params: { phases: "1" } });
     expect(terminalNames(m3)).toEqual(["U", "V", "W"]);
     expect(terminalNames(m1)).toEqual(["L", "N"]);
-    const pics = ["motor", "fan", "pump"].map((picture) => localGeometry(addElement(p, pg, "motor", [60, 30], { params: { picture } }), ""));
+    const pics = ["motor", "fan", "pump"].map((type) => localGeometry(addElement(p, pg, "motor", [60, 30], { params: { type } }), ""));
     expect(new Set(pics.map((g) => JSON.stringify(g.prims))).size).toBe(3);
     expect(new Set(pics.map((g) => JSON.stringify(g.terminals))).size).toBe(1);
   });
