@@ -36,7 +36,7 @@ Found while writing the specification from the 0.4.5 source, and ruled on the sa
 
 - ~~**A2. `Ctrl+S`.**~~ *Withdrawn 25 Nov 2026.* It's already there and does no harm, so it's left as it is: it saves at once in Design, Draft and Annotate, and isn't handled in Layout or Simulate.
 
-- [ ] **A3. Clear lamp colour: README.** *Docs. PT-8. Build 0.4.5.* Clear has been removed as a lamp colour; the build offers Rd, Ye, Gn, Bu and Wh, with white for a clear lens. The README's editor guide still lists *Cl* among the colour codes. Take it out.
+- [x] **A3. Clear lamp colour: README.** *Built: PR 118.* *Docs. PT-8. Build 0.4.5.* Clear has been removed as a lamp colour; the build offers Rd, Ye, Gn, Bu and Wh, with white for a clear lens. The README's editor guide still lists *Cl* among the colour codes. Take it out.
 
 - [ ] **A4. IO schedule's empty message.** *Fix, text. SC-6. Build 0.4.5.* With no controller, Schedules → IO points reads *No controllers yet (Controllers… in Draft)*. The controller has been made in Design since v0.4, and a panel has one. Reword it to how it works now, for example *No controller yet (Design → Controller)*.
 
@@ -44,12 +44,12 @@ Found while writing the specification from the 0.4.5 source, and ruled on the sa
 
 - ~~**A15. The Controller… window in the singular.**~~ *Withdrawn 27 Nov 2026.* The window goes (A67). What's left of the point: wording in the Controller view speaks of one controller, as *Add the controller* already does.
 
-- [ ] **A18. README: status line.** *Docs. Build 0.4.5.* The download line near the top reads *Status: **0.1.0 preview**, for feature testing*; the build is 0.4.5.
+- [x] **A18. README: status line.** *Built: PR 118.* *Docs. Build 0.4.5.* The download line near the top reads *Status: **0.1.0 preview**, for feature testing*; the build is 0.4.5.
   - Proposed: take the number out of the sentence (*Status: preview, for feature testing*), so it can't go out of date again. The release page and Settings → Status give the version.
 
-- [ ] **A19. README: socket earth.** *Docs. PT-10. Build 0.4.5.* The editor guide's *Earth* line says the socket has *E out to the side*. Since v0.4.x the earth is at the top, beside L and N. Correct the line.
+- [x] **A19. README: socket earth.** *Built: PR 118.* *Docs. PT-10. Build 0.4.5.* The editor guide's *Earth* line says the socket has *E out to the side*. Since v0.4.x the earth is at the top, beside L and N. Correct the line.
 
-- [ ] **A20. Design record: 75 columns.** *Docs. SH-11. Build 0.4.5.* `docs/DESIGN.md` speaks of a *100-column* grid in two places (the summary near the top and §8, numbering). The page has 75 columns. Correct both.
+- [x] **A20. Design record: 75 columns.** *Built: PR 118.* *Docs. SH-11. Build 0.4.5.* `docs/DESIGN.md` speaks of a *100-column* grid in two places (the summary near the top and §8, numbering). The page has 75 columns. Correct both.
 
 A3, A18, A19 and A20 are all corrections to documents and can go in one PR.
 
@@ -126,7 +126,7 @@ Decided in discussion. The aim: Ferrule runs the same way on a desk or on one ce
 - [ ] **A29. Text that can be turned.** *Missing. AN-2, AN-3. Build 0.4.5.* A Text annotation can't be drawn turned, so a note can't run up the sheet beside a vertical wire. With the function no longer printed on wires (A26), a note is how a wire gets extra description, so text needs to turn in 90° steps like a part. Turned text reads bottom up.
   - From reading the code, 26 Nov 2026: pressing R stores a rotation on the text, but nothing draws the text turned. Whoever builds it confirms that first.
 
-- [ ] **A30. Drop the old-files rule.** *Docs, with a small fix. ST-18. Build 0.4.5.* The repo's working notes say old project files must open unchanged at every step, and keep a mapping for files from test builds. Both go: there's no backwards compatibility before release.
+- [x] **A30. Drop the old-files rule.** *Built: PR 118.* *Docs, with a small fix. ST-18. Build 0.4.5.* The repo's working notes say old project files must open unchanged at every step, and keep a mapping for files from test builds. Both go: there's no backwards compatibility before release.
   - The built-in examples (LSP-01, BMS-01) are made by scripts in the repo; a build that changes the file format reruns them.
   - **An older file that no longer fits isn't opened, and says what it needs:** *Not opened. This file needs Ferrule {the version it was last saved in}.* That version is in the file: since v0.4.x every save writes the Ferrule version that made it. Old versions stay downloadable, so the file can still be opened in the one named.
   - A file from before v0.4.x doesn't hold the version. It says the file is from an older Ferrule and can't be opened.
