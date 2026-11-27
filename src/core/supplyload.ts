@@ -166,7 +166,7 @@ export function supplyLoads(project: Project, c: Circuit, state?: SimState): { s
     const ratingVa = el ? positive(el.params.ratingVa) : positive(p?.pt.ratingVa);
     out.push({
       id: s.el,
-      name: s.el === "rails" ? "the control rails" : (c.names.get(s.el) ?? s.el),
+      name: s.el === "rails" ? "the power rails" : (c.names.get(s.el) ?? s.el),
       ...(gives ? { gives } : {}),
       ...(ratingVa ? { ratingVa } : {}),
       ...(live ? { liveVa: live.totals.get(s.el) ?? 0 } : {}),

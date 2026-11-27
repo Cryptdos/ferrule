@@ -1,6 +1,6 @@
 import { STANDARDS } from "./designations";
 import { networkData } from "./network";
-import type { Element, Project } from "./model";
+import { voltageBand, type Element, type Project } from "./model";
 import { isBar, requireSymbol, type GeometryText } from "./symbols";
 import { isTimed, masterOf, relayPinMarks, xrefText } from "./xref";
 import { resolveFields } from "./fields";
@@ -56,6 +56,11 @@ export function elementTexts(el: Element, project: Project): GeometryText {
     // On a supply: a block or rail is named after it, with its tag (CCT 4, design-wire-numbering §2).
     const d = isBar(el) && typeof el.params.dist === "string" && el.params.dist ? project.distributions.find((x) => x.id === el.params.dist) : undefined;
     if (isBar(el)) t.name = d ? [d.name, d.tag].filter((x) => x !== undefined && x !== "").join(" ") : String(el.params.name ?? "");
+    // A power rail is drawn by its supply's voltage (design-wire-numbering §4b).
+    if (el.symbol === "rail" && d) {
+      const band = voltageBand(d);
+      if (band) t.band = band;
+    }
     else {
       // A linked destination says what its source says, unless told not to (70).
       if (el.params.source === false && el.params.sameLabel !== false && el.links[0]) {

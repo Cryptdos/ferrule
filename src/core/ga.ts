@@ -427,7 +427,7 @@ export const SUITS: { key: string; label: string }[] = [
   { key: "socket", label: "Socket outlet" },
   { key: "connBlock", label: "Connector block" },
   { key: "plugSocket", label: "Connector (plug and socket)" },
-  { key: "block", label: "Busbar (distribution block)" },
+  { key: "block", label: "Distribution block" },
   { key: "lamp", label: "Indicator lamp" },
   { key: "pushbutton", label: "Push button" },
   { key: "selector", label: "Selector / keyswitch" },

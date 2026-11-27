@@ -179,7 +179,7 @@ IDs are kept when the document is revised: a withdrawn statement is struck throu
 - **SH-11** Every sheet is A4 landscape with a frame, 75 columns numbered below the frame every ten (10, 20 … 70) with ticks every five, and unlabelled ticks up the sides. There are no rows.
 - **SH-12** The drawing area is 150 × 90 units. Parts snap to the grid.
 - **SH-13** All drawing text is osifont. Sizes on paper: title 5 mm, heading 3.5 mm, tags, labels and terminal, pin and wire numbers 2.5 mm, notes 2.5 mm, detail (cross-references, pin ids, colours, ratings, contact tables) 1.8 mm. Nothing prints smaller than 1.8 mm.
-- **SH-14** Line weights on paper: symbols and wires 0.25 mm; ~~distribution blocks,~~ *(v0.5: A23)* the terminal block and plant outlines 0.5 mm; the frame 0.7 mm.
+- **SH-14** Line weights on paper: symbols and wires 0.25 mm; a power rail 0.35 mm on an extra-low-voltage supply (up to 50 V AC or 120 V DC, as BS 7671) and 0.5 mm on a low-voltage one; the terminal block and plant outlines 0.5 mm; distribution blocks and the frame 0.7 mm.
 - **SH-15** The title block along the bottom shows the logo, *Project*, *Panel name*, the sheet's title, *Sheet x of y*, job no. and client (three equal cells side by side), drawing ref., drawn by and date, checked by and date, and the latest four revisions with the newest at the bottom.
 
 ### Moving about
@@ -398,11 +398,12 @@ The electrical drawing: parts, wires, rails, plant views, numbering and links. I
 ### Distribution blocks, rails and distributions
 
 - **DR-48** *Distribution* (top bar) lists the project's supplies: name, **tag** (a whole number, given from 1 in the order they're added, changeable, 0 allowed), kind (AC line, AC neutral, DC +, DC 0 V, Earth), voltage, colour, function, and the sheets each is used on. New projects start with none. Below the list, **Wire colours by function**: a table of functions (phase, neutral, earth, 24 V +, 0 V, DC signal, AC signal, external supply, and any added) and their colours, empty to start. Colours are IEC codes: Bk, Bn, Rd, Og, Ye, Gn, Bu, Vt, Gy, Wh, Pk, Tq, GnYe.
-- **DR-49** A **Distribution block** is the physical busbar or block: drawn heavy, tagged W, placed on the GA, counted in the bill of materials. ~~A **Control rail** is the common rail of a control drawing: drawn lighter, no tag, not a GA part.~~ *(v0.5: A23)*
+- **DR-49** A **Distribution block** is the physical busbar or block: drawn heavy, tagged W, placed on the GA, counted in the bill of materials. A **Power rail** is the common of a drawing, not a part: no tag, not on the GA or the bill of materials, no ways. Its weight is read from its supply's voltage (SH-14), with no setting on the rail; on no supply, or one whose voltage has no number in it, it's drawn as extra-low voltage, and Properties says which.
 - **DR-50** A block, rail ~~or incoming supply terminal~~ *(v0.5: A57)* picks a distribution. Everything on the same distribution is joined on every sheet.
 - **DR-51** A block or rail on no distribution is *local* and joins nothing else. Deleting a distribution makes its blocks and rails local.
 - **DR-52** A block or rail's name sits at its left end beside its tag; on a supply it's the supply's name and number (`CCT 4`). *Name at both ends* prints it at both.
 - **DR-53** Length is 2 to 150 units. Colour and function come from the distribution unless set on the part.
+- **DR-90** A distribution block's **ways** are counted from the drawing: each wire drawn onto it needs one, a wire to a link arrow or a rail included. Nothing is typed in and there's no setting for spares; Properties shows *5 wires: needs at least 5 ways*. Each drawn block is its own part with its own ways, and a block doesn't span sheets.
 
 ### The panel boundary and terminals
 
@@ -478,7 +479,7 @@ Tag prefixes follow IEC 81346-2 as applied in `docs/designations.md`. Untagged p
 | **PT-13** | Transformer | T | *Earthed screen*; *Rating*; *Gives*; *Rating (VA)* | Terminals P1, P2, S1, S2 at switch pole pitch; a supply in Simulate once its primary is energised |
 | **PT-14** | Motor | M | *Rating*; *Phases*: three (U V W) or single (L N); *Type*: motor, fan or pump | Terminals at pole pitch, so it wires straight down from the contactor above. The type changes the picture and the name: a pump reads *Pump* in its properties and in the legend |
 | **PT-15** | Distribution block | W | See DR-48 to DR-53 | |
-| **PT-16** | ~~Control rail~~ | ~~none~~ | ~~As the block~~ | *(v0.5: A23)* |
+| **PT-16** | Power rail | none | As the block | Drawn by its supply's voltage (DR-49) |
 | **PT-17** | Earth | none | *Type*: earth, protective (PE), functional (FE), chassis, equipotential | The IEC 60417 symbol for the type |
 | **PT-18** | ~~Link arrow~~ | ~~none~~ | ~~See DR-40 to DR-47~~ | *(v0.5: A27)* |
 | **PT-19** | Terminal strip line | none | *Terminal strip*; length | See DR-62 |
@@ -580,7 +581,7 @@ General arrangement (GA) sheets drawn to scale. Positions and sizes are in milli
 
 ### Device table
 
-- **LA-33** *Device table…* holds real devices: name, maker, part number, the part each suits, width × height × depth, ~~*Relay pins* (`A1 A2 | 11 12 14 | 21 22 24`),~~ *Draw (VA)* and notes. *(v0.5: A70. The device table is reached from Design's Devices view, gains what a device takes and gives, and has a count of poles in place of Relay pins)*
+- **LA-33** *Device table…* holds real devices: name, maker, part number, the part each suits, width × height × depth, ~~*Relay pins* (`A1 A2 | 11 12 14 | 21 22 24`),~~ *Draw (VA)*, *Ways* for a distribution block, and notes. *(v0.5: A70. The device table is reached from Design's Devices view, gains what a device takes and gives, and has a count of poles in place of Relay pins)*
 - **LA-34** Sizes are generic per kind of part until a device is picked under *Device* in a part's properties. *Generic sizes…* in the sheet's settings sets them for the project; parts already placed keep their size. *(v0.5: A70. A device is picked in Design)*
 - **LA-35** Devices in the **shared library** can be used by any project and hold datasheets (PDF) and pictures, added with *Add files…* or dropped on the device.
 - **LA-36** A project keeps a copy of each library device it uses, so it opens anywhere. When the library entry changes, *Update* takes the new details.
@@ -672,6 +673,7 @@ The same sheets, live. Editing is off. Entering Simulate starts from everything 
 | **CK-50** | error | A part has two terminals of one number (a wire to it can't say which) |
 | **CK-51** | error | Two supplies have the same tag |
 | **CK-52** | info | A block or rail is on no supply, so its wires are numbered by position (as is right for switched power after a part) |
+| **CK-53** | warning | A wire joins blocks or rails on different supplies, straight or through terminals: joined, they're one supply |
 
 ### Supplies and loads
 
@@ -727,6 +729,7 @@ Design's findings appear only once a project uses Design.
 | **CK-47** | warning | A door back has no door front |
 | **CK-48** | info | A backplate is larger than its door's opening, or its door has gone |
 | **CK-49** | warning | A device or module on the GA is no longer on the schematic |
+| **CK-54** | warning | A distribution block has more wires than the device picked for it has ways |
 
 ---
 
@@ -739,7 +742,7 @@ Design's findings appear only once a project uses Design.
 - **SC-5** ~~**Markers:** two on every wire.~~ *(v0.5: A28)* A panel wire on a supply says the supply's number; any other panel wire says the terminal it lands on, or its own number when it reaches none. A field core's say the terminal at the panel end and the device's tag at the field end. *Group duplicates* gives each marker once with a count. Renumber first.
 - **SC-6** **IO points:** Controller, Module, Point, Form, Pins, Label, Wired to (followed through link arrows). With no controller it says *No controller yet (Design → Controller)*.
 - **SC-7** **Plant points:** Device, Description, Point, Form, Pins, Wired to.
-- **SC-8** **Bill of materials:** GA sheet, Item, Maker, Part number, Qty, Unit, Tags. It's counted from the GA sheets only: devices by the device picked (or their generic size), terminals each, label plates, and DIN rail and trunking by length. A schematic part never placed on a GA isn't on it (CK-41). *(v0.5: A71. Also as a table placed on a GA sheet)*
+- **SC-8** **Bill of materials:** GA sheet, Item, Maker, Part number, Qty, Unit, Tags. It's counted from the GA sheets only: devices by the device picked (or their generic size), each distribution block on a line of its own saying the ways it needs (*needs at least 5 ways*), terminals each, label plates, and DIN rail and trunking by length. A schematic part never placed on a GA isn't on it (CK-41). *(v0.5: A71. Also as a table placed on a GA sheet)*
 - **SC-9** **Export PDF** saves first, then downloads every sheet as one A4 landscape PDF on white, with osifont embedded.
 - **SC-10** PDF export uses Edge, or Chrome, in the background (or the browser named by `FERRULE_BROWSER`). If it can't, it says why and offers *Print → Save as PDF*, which makes the same sheets.
 - **SC-11** **Print** opens the same sheets in a new tab and opens the print dialog.

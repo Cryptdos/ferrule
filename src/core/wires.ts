@@ -173,6 +173,18 @@ export function connectionDots(page: Page): Vec[] {
 }
 
 /**
+ * How many wires land on a distribution block (v0.5 A23, design-wire-numbering
+ * §3): each needs a way of its own, so it's the fewest ways the block can have.
+ * Counted from the drawing, on the block's own sheet: a block doesn't span sheets.
+ */
+export function blockWays(project: Project, el: Element): number {
+  const page = project.pages.find((p) => p.elements.some((e) => e.id === el.id));
+  let n = 0;
+  for (const seg of page?.segments ?? []) for (const ref of [seg.from, seg.to]) if (ref[0] === el.id) n++;
+  return n;
+}
+
+/**
  * Where a wire's number is printed: beside the middle of its longest leg,
  * reading up the page on vertical legs. Null for legs too short to label.
  */

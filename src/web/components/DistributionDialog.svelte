@@ -38,8 +38,9 @@
 
 <Modal title="Distribution" {onclose} wide>
   <p class="hint">
-    The supplies this project distributes, each with a number, its <strong>tag</strong>, that every wire on it carries. Distribution blocks, control rails, link arrows and the incoming supply pick
-    one from this list, so everything on the same distribution is joined on every sheet. A block or rail on no distribution
+    The supplies this project distributes, each with a number, its <strong>tag</strong>, that every wire on it carries. Distribution blocks, power rails and the incoming supply pick
+    one from this list, so everything on the same distribution is joined on every sheet. A power rail is drawn heavier on a
+    low-voltage supply than on an extra-low one (up to 50 V AC or 120 V DC), read from the voltage here. A block or rail on no distribution
     is <strong>local</strong> and joins nothing else. Wires drawn from them take their colour and function from here unless they say otherwise.
   </p>
   {#if editor.project.distributions.length}

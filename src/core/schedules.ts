@@ -10,7 +10,7 @@ import { gaSizes, sizeKey } from "./ga";
 import { controllerName, controllerOfModule, controllersInOrder, moduleTypeName, pointLabel, viewsOf } from "./modules";
 import { formLabel, printedPin } from "./points";
 import { isBar } from "./symbols";
-import { isFieldWire } from "./wires";
+import { blockWays, isFieldWire } from "./wires";
 import { supplyOf } from "./conductors";
 
 export interface TerminalRow {
@@ -267,8 +267,10 @@ export function billOfMaterials(project: Project): BomRow[] {
         const tags = it.module ? [modTag] : strip ? [`${it.strip ?? first.params.strip ?? "X1"}`] : refs.map((e) => displayTag(e, project) + (it.part === "handle" ? " handle" : ""));
         const qty = strip ? refs.length : 1;
         const dev = it.device ? project.devices?.find((d) => d.id === it.device) : undefined;
+        // A distribution block is a line of its own, saying the ways it needs (v0.5 A23).
+        const block = first?.symbol === "busbar" ? waysNeeded(blockWays(project, first)) : "";
         if (dev) {
-          add(`dev:${dev.id}`, { item: dev.name, maker: dev.maker, part: dev.part, quantity: qty, unit: "each" }, tags);
+          add(block ? `blk:${it.id}` : `dev:${dev.id}`, { item: dev.name + block, maker: dev.maker, part: dev.part, quantity: qty, unit: "each" }, tags);
           continue;
         }
         // A device with no schematic part (v0.4.x M5): by its name, with its tag.
@@ -292,7 +294,7 @@ export function billOfMaterials(project: Project): BomRow[] {
         const key = it.part === "handle" ? "handle" : first ? (sizeKey(project, first)?.key ?? "other") : "other";
         const generic = key === "terminal" && first ? terminalKind(first) : key;
         const label = sizes[generic]?.label ?? (it.text || "Device");
-        add(`gen:${generic}`, { item: `${label} (no device picked)`, maker: "", part: "", quantity: qty, unit: "each" }, tags);
+        add(block ? `blk:${it.id}` : `gen:${generic}`, { item: `${label} (no device picked)${block}`, maker: "", part: "", quantity: qty, unit: "each" }, tags);
       }
     }
     const list = [...rows.values()].map(({ tagList, ...r }) => ({ ...r, quantity: Math.round(r.quantity * 1000) / 1000, tags: [...new Set(tagList)].sort(natural).join(" ") }));
@@ -300,6 +302,9 @@ export function billOfMaterials(project: Project): BomRow[] {
   }
   return out;
 }
+
+/** ", needs at least 5 ways": what a distribution block's line on the bill of materials adds. */
+const waysNeeded = (n: number) => `, needs at least ${n} way${n === 1 ? "" : "s"}`;
 
 /** A terminal's generic size: plain, fused or disconnect. */
 function terminalKind(el: Element): string {

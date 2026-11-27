@@ -15,8 +15,9 @@ export const FORMAT = "ferrule";
  * 7: v0.5 step 4c, a motor's picture is its type.
  * 8: v0.5 step 5, no numbering settings (position only; strips follow on).
  * 9: v0.5 step 6a, a supply's tag; a link arrow has no distribution or typed reference.
+ * 10: v0.5 step 6b, a device's ways (distribution blocks).
  */
-export const FORMAT_VERSION = 9;
+export const FORMAT_VERSION = 10;
 
 export type ParamValue = string | number | boolean;
 
@@ -632,6 +633,20 @@ export const DISTRIBUTION_KINDS: { value: DistributionKind; label: string }[] = 
   { value: "dc0", label: "DC 0 V" },
   { value: "earth", label: "Earth" },
 ];
+
+/**
+ * A supply's voltage band, as BS 7671 has it (v0.5 A23, design-wire-numbering
+ * §4b): extra-low up to 50 V AC or 120 V DC, low above that. Read from the
+ * first number in its voltage; DC when the voltage says so or the supply is a
+ * DC kind. A voltage with no number in it gives no band.
+ */
+export function voltageBand(d: Pick<Distribution, "voltage" | "kind">): "elv" | "lv" | undefined {
+  const m = /(\d+(?:[.,]\d+)?)/.exec(d.voltage);
+  if (!m) return undefined;
+  const v = Number(m[1]!.replace(",", "."));
+  const dc = /dc/i.test(d.voltage) || d.kind === "dc+" || d.kind === "dc0";
+  return v <= (dc ? 120 : 50) ? "elv" : "lv";
+}
 
 export interface Project {
   format: typeof FORMAT;

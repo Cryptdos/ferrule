@@ -12,6 +12,7 @@ import type { Element, Page, Project } from "./model";
 import { benchOf, contactKind, getSymbol, isBar, labelBlockRect, localGeometry, terminalNames } from "./symbols";
 import { numberingTerminal } from "./renumber";
 import { supplyOf } from "./conductors";
+import { blockWays } from "./wires";
 import { displayTag, elementTexts } from "./tags";
 import { isMaster, isSlave, masterOf, partnerOf, slavesOf } from "./xref";
 import { drawnOn, fieldPlant, needsChannel, onNetworkOnly } from "./design";
@@ -162,7 +163,7 @@ export function checkProject(project: Project, opts: { proofs?: Proofs | null } 
   }
 
   if (unnumbered) out.push({ level: "info", message: `${unnumbered} items not numbered yet: press Renumber`, ids: [] });
-  out.push(...terminalNumberChecks(project), ...supplyTagChecks(project));
+  out.push(...terminalNumberChecks(project), ...supplyTagChecks(project), ...supplyJoinChecks(project));
   // Detail sheets (design-v0.3 §6): a detail is shown in a frame; a frame shows a detail that's still there.
   for (const d of allDetails(project))
     if (!frameOf(project, d.it.id)) out.push({ level: "warning", message: `Sheet ${d.page.number}: detail ${d.it.letter ?? "?"} isn't shown on a detail sheet (Place detail…)`, pageId: d.page.id, ids: [d.it.id] });
@@ -266,6 +267,7 @@ export function checkProject(project: Project, opts: { proofs?: Proofs | null } 
         }
       }
     }
+    out.push(...blockWaysChecks(project));
   }
 
   const rank = { error: 0, warning: 1, info: 2 };
@@ -461,6 +463,63 @@ export function supplyTagChecks(project: Project): Finding[] {
       const what = el.symbol === "busbar" ? `distribution block ${displayTag(el, project) || ""}`.trim() : "a power rail";
       // Info, not a warning: a local rail after a switch carries switched power, numbered by position as it should be.
       out.push({ level: "info", message: `Sheet ${page.number}: ${what} is on no supply, so its wires are numbered by position, not by a supply`, pageId: page.id, ids: [el.id] });
+    }
+  }
+  return out;
+}
+
+/**
+ * Blocks and rails joined by a wire are one potential, so they're on one
+ * supply (v0.5 A23, design-wire-numbering §3). A wire between blocks or rails
+ * of different supplies, straight or through terminals, is reported where it's
+ * drawn. A block is a joint, so a wire through a part (a fuse, a contact) is two
+ * wires and isn't one of these.
+ */
+export function supplyJoinChecks(project: Project): Finding[] {
+  const out: Finding[] = [];
+  const byId = new Map(project.pages.flatMap((pg) => pg.elements.map((e) => [e.id, e] as const)));
+  for (const c of project.conductors) {
+    const on = new Map<string, string>();
+    for (const [id] of c.terminals) {
+      const el = byId.get(id);
+      if (!el || !isBar(el) || typeof el.params.dist !== "string" || !el.params.dist) continue;
+      const d = project.distributions.find((x) => x.id === el.params.dist);
+      if (d) on.set(d.id, d.name);
+    }
+    if (on.size < 2) continue;
+    const page = project.pages.find((pg) => !pg.ga && pg.segments.some((s) => s.conductor === c.id));
+    out.push({
+      level: "warning",
+      message: `${page ? `Sheet ${page.number}: a` : "A"} wire joins supplies ${[...on.values()].join(" and ")}. Blocks and rails joined by a wire are one supply: put them on the same one`,
+      ...(page ? { pageId: page.id } : {}),
+      ids: page ? page.segments.filter((s) => s.conductor === c.id).map((s) => s.id) : [],
+    });
+  }
+  return out;
+}
+
+/**
+ * A distribution block needs a way for each wire drawn onto it (v0.5 A23): a
+ * device picked for it on a GA with fewer ways is too small.
+ */
+export function blockWaysChecks(project: Project): Finding[] {
+  const out: Finding[] = [];
+  const byId = new Map(project.pages.flatMap((pg) => pg.elements.map((e) => [e.id, e] as const)));
+  for (const page of project.pages) {
+    if (!page.ga) continue;
+    for (const it of page.gaItems ?? []) {
+      if (it.kind !== "device" || !it.device) continue;
+      const el = byId.get(it.refs?.[0] ?? "");
+      const dev = project.devices?.find((d) => d.id === it.device);
+      if (el?.symbol !== "busbar" || !dev?.ways) continue;
+      const n = blockWays(project, el);
+      if (n > dev.ways)
+        out.push({
+          level: "warning",
+          message: `Sheet ${page.number}: distribution block ${displayTag(el, project)} has ${n} wires and its device, ${dev.name}, has ${dev.ways} ways`,
+          pageId: page.id,
+          ids: [it.id],
+        });
     }
   }
   return out;

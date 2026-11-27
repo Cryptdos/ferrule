@@ -111,7 +111,7 @@ describe("revision list and symbol legend", () => {
 });
 
 describe("GA device table", () => {
-  const relay: DeviceEntry = parseDeviceEntry({ id: "drm", name: "Relay 4CO", maker: "Weidmüller", part: "7760056085", kind: "relay", w: 30.6, h: 101.8, d: 82.3 });
+  const relay: DeviceEntry = parseDeviceEntry({ id: "relay-4co", name: "Relay 4CO", maker: "Maker", part: "1234567", kind: "relay", w: 30.6, h: 101.8, d: 82.3 });
 
   test("picking a device sizes the part; a hand-sized part keeps its size when the device changes", () => {
     const { p, pg } = project();
@@ -123,7 +123,7 @@ describe("GA device table", () => {
     const dev = useLibraryDevice(p, relay);
     setGaItemDevice(p, ga.id, a.id, dev.id);
     setGaItemDevice(p, ga.id, b.id, dev.id);
-    expect([a.w, a.h, a.device]).toEqual([30.6, 101.8, "drm"]);
+    expect([a.w, a.h, a.device]).toEqual([30.6, 101.8, "relay-4co"]);
     // b turned on its side, a sized by hand.
     rotateGaItems(p, ga.id, [b.id]);
     updateGaItem(p, ga.id, a.id, { w: 40 });
