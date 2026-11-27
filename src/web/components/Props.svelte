@@ -33,7 +33,7 @@
   import { controllerName, moduleTitle } from "../../core/modules";
   import { readImage } from "../images";
   import { address, contactMarks, relayPinMarks, contactType, isMaster, isSlave, masterOf, partnerOf, slavesOf } from "../../core/xref";
-  import { canRotate, isBar, paramApplies, partName, parsePlantPins, plantViewLayout, requireSymbol, terminalNames, viewSides, type ViewSide } from "../../core/symbols";
+  import { canRotate, isBar, paramApplies, partName, parsePlantPins, plantViewLayout, requireSymbol, viewSides, type ViewSide } from "../../core/symbols";
   import { WIRE_FUNCTIONS, conductorLooks, functionRows } from "../../core/wirecolours";
   import ColourSelect from "./ColourSelect.svelte";
   import { displayTag, tagPrefix } from "../../core/tags";
@@ -304,23 +304,6 @@
                   : "Drawn as extra-low voltage until it's on a supply"}.
         </p>
       {/if}
-    {:else if one.symbol === "supply"}
-      <div class="sub">Distribution each conductor feeds</div>
-      <p class="hint">
-        Only when its blocks and rails aren't wired from this supply. Everything on a distribution is joined, so wiring in
-        between (a main isolator, say) would be bypassed. Check warns when that happens.
-      </p>
-      {#each terminalNames(one) as t (t)}
-        <label>
-          {t}
-          <select value={String(one.params[`dist_${t}`] ?? "")} onchange={(e) => setParam(`dist_${t}`, e.currentTarget.value)}>
-            <option value="">None</option>
-            {#each editor.project.distributions as d (d.id)}
-              <option value={d.id}>{d.name}{d.voltage ? ` (${d.voltage})` : ""}</option>
-            {/each}
-          </select>
-        </label>
-      {/each}
     {/if}
     {#each def.params.filter((x) => !x.hidden && (!x.hideOff || paramApplies(x, one, editor.project))) as p (p.key)}
       {@const v = one.params[p.key] ?? p.default}

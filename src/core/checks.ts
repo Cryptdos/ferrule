@@ -169,7 +169,6 @@ export function checkProject(project: Project, opts: { proofs?: Proofs | null } 
     if (!frameOf(project, d.it.id)) out.push({ level: "warning", message: `Sheet ${d.page.number}: detail ${d.it.letter ?? "?"} isn't shown on a detail sheet (Place detail…)`, pageId: d.page.id, ids: [d.it.id] });
   for (const f of allFrames(project))
     if (!detailOf(project, f.it)) out.push({ level: "warning", message: `Sheet ${f.page.number}: a frame shows a detail that has been deleted`, pageId: f.page.id, ids: [f.it.id] });
-  out.push(...supplyBypasses(project));
   out.push(...pointChecks(project));
   out.push(...controllerChecks(project));
   out.push(...designChecks(project, { proofs: opts.proofs }));
@@ -326,8 +325,7 @@ export function pointChecks(project: Project): Finding[] {
       // A shared common (wired for its neighbour) doesn't make a point wired: its own pins do.
       const own = pt.pins.filter((t) => !(item.points ?? []).some((q) => q !== pt && q.pins.includes(t)));
       const any = (own.length ? own : pt.pins).some((t) => pinWired(item.id, t));
-      const fed = pt.form === "supply-out" && Object.values(pt.dists ?? {}).some(Boolean);
-      if (!any && !fed) {
+      if (!any) {
         if (isInputForm(pt.form) && pt.form !== "supply-in") {
           out.push({ level: "warning", message: `${lead}: input ${pt.name} isn't wired to anything`, ids: viewIds(item.id) });
         } else if (pt.form === "contact" || pt.form === "powered-out") {
@@ -352,62 +350,6 @@ export function pointChecks(project: Project): Finding[] {
   const mixed = [...kinds.values()].filter((k) => k.size > 1).length;
   if (mixed) {
     out.push({ level: "warning", message: `${mixed} conductor${mixed === 1 ? " joins" : "s join"} an analogue point to a digital one`, ids: [] });
-  }
-  return out;
-}
-
-/**
- * An incoming supply terminal set to feed a distribution that its own wiring
- * also reaches (through an isolator, say). Everything on a distribution is
- * one net, so the wiring in between is bypassed: opening the isolator would
- * leave the busbars live. The supply's distribution should be left empty.
- */
-export function supplyBypasses(project: Project): Finding[] {
-  const out: Finding[] = [];
-  const supplies = project.pages.flatMap((pg) =>
-    pg.elements.filter((e) => e.symbol === "supply").map((el) => ({ el, page: pg })),
-  );
-  if (!supplies.some(({ el }) => Object.keys(el.params).some((k) => k.startsWith("dist_") && el.params[k]))) return out;
-  const c = compile(project);
-  const node = new Map<string, string>();
-  for (const cd of project.conductors) for (const [id, t] of cd.terminals) node.set(`${id}:${t}`, cd.id);
-  for (const { el, page } of supplies) {
-    for (const [k, v] of Object.entries(el.params)) {
-      if (!k.startsWith("dist_") || typeof v !== "string" || !v) continue;
-      const term = k.slice(5);
-      const d = project.distributions.find((x) => x.id === v);
-      if (!d) continue;
-      // Join everything the wiring joins, whatever the switches' state, but not this supply's own distribution joins.
-      const parent = new Map<string, string>();
-      const find = (x: string): string => {
-        let r = x;
-        while (parent.has(r) && parent.get(r) !== r) r = parent.get(r)!;
-        return r;
-      };
-      const union = (a: string, b: string) => {
-        const ra = find(a);
-        const rb = find(b);
-        if (ra !== rb) parent.set(ra, rb);
-      };
-      for (const l of c.links) if (l.el !== el.id) union(l.a, l.b);
-      const from = find(node.get(`${el.id}:${term}`) ?? `${el.id}:${term}`);
-      const reached = project.pages.some((pg) =>
-        pg.elements.some(
-          (b) =>
-            isBar(b) &&
-            b.params.dist === v &&
-            project.conductors.some((cd) => cd.terminals.some(([id]) => id === b.id) && find(cd.id) === from),
-        ),
-      );
-      if (reached) {
-        out.push({
-          level: "warning",
-          message: `Sheet ${page.number}: the supply's ${term} feeds ${d.name} directly, and its wiring reaches ${d.name} too, so the parts in between (an isolator, say) are bypassed. Leave the supply's distribution for ${term} empty`,
-          pageId: page.id,
-          ids: [el.id],
-        });
-      }
-    }
   }
   return out;
 }

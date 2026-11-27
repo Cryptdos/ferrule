@@ -165,8 +165,6 @@ export function cleanPoints(points: IoPoint[], terminals: string[]): IoPoint[] {
       delete q.join;
       delete q.delay;
     }
-    if (q.form !== "supply-out") delete q.dists;
-    else if (q.dists) q.dists = Object.fromEntries(Object.entries(q.dists).filter(([k, v]) => pins.includes(k) && v));
     if (q.follows && !q.follows.length) delete q.follows;
     if (!q.follows) {
       delete q.join;

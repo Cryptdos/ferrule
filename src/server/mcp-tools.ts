@@ -93,7 +93,7 @@ function conditionsArg(p: Project, v: unknown): Condition[] {
   });
 }
 
-/** Points given to add_plant: [{name, form, pins, follows?, join?, delay?, dists?}]. */
+/** Points given to add_plant: [{name, form, pins, follows?, join?, delay?}]. */
 function pointsArg(p: Project, v: unknown, own?: { id: string; points: IoPoint[] }): IoPoint[] {
   const forms = new Set(POINT_FORMS.map((f) => f.value));
   return (Array.isArray(v) ? v : []).map((raw) => {
@@ -115,15 +115,6 @@ function pointsArg(p: Project, v: unknown, own?: { id: string; points: IoPoint[]
       pt.follows = list;
       if (o.join === "or") pt.join = "or";
       if (typeof o.delay === "number") pt.delay = o.delay;
-    }
-    if (o.dists && typeof o.dists === "object") {
-      const d: Record<string, string> = {};
-      for (const [pin, name] of Object.entries(o.dists as Record<string, unknown>)) {
-        const dist = p.distributions.find((x) => x.id === name || x.name === name);
-        if (!dist) throw new ArgError(`No distribution "${String(name)}"`);
-        d[pin] = dist.id;
-      }
-      pt.dists = d;
     }
     return pt;
   });
@@ -635,7 +626,7 @@ export const TOOLS: Tool[] = [
           type: "array",
           items: { type: "object" },
           description:
-            "Its signals (controller.md §3), replacing any it had: [{name, form, pins, follows?, join?, delay?, dists?}]. form: contact, powered-out, dry-in, powered-in, analogue-in, analogue-out, supply-in, supply-out, comms. An output (contact, powered-out, supply-out) is clicked in simulation unless it follows up to two conditions [{thing, on}] (thing: a coil/contact/lamp/switch tag, '<plant tag> <point>', or one of this device's own point names), joined by join 'and'/'or', after delay seconds. A supply out's dists maps pin → distribution name, e.g. {'+V': '24V DC'}",
+            "Its signals (controller.md §3), replacing any it had: [{name, form, pins, follows?, join?, delay?}]. form: contact, powered-out, dry-in, powered-in, analogue-in, analogue-out, supply-in, supply-out, comms. An output (contact, powered-out, supply-out) is clicked in simulation unless it follows up to two conditions [{thing, on}] (thing: a coil/contact/lamp/switch tag, '<plant tag> <point>', or one of this device's own point names), joined by join 'and'/'or', after delay seconds. A supply out is wired to the blocks or rails it feeds, like anything else.",
         },
         pins: { type: "object", description: "Pin labels beyond the number, by pin: {'61': {id: 'C', group: 'R1'}}" },
         info: { type: "string", description: "More lines under the box: model, rating, supply…" },
@@ -1113,7 +1104,7 @@ export const TOOLS: Tool[] = [
   {
     name: "add_distribution",
     description:
-      "Add a distribution (a supply the project distributes: L1, N, CCT, 0V…), or update one (give its name or id as 'distribution'). Each has a numerical tag, given from 1 if not set (0 is fine for the controls' 0 V): every wire on the supply carries it as its number. Distribution blocks and power rails pick one with params.dist, and the incoming supply with params.dist_<terminal>, e.g. dist_L1; everything on the same distribution is joined on every sheet. A block or rail with no distribution is local and gives no number. Returns the list.",
+      "Add a distribution (a supply the project distributes: L1, N, CCT, 0V…), or update one (give its name or id as 'distribution'). Each has a numerical tag, given from 1 if not set (0 is fine for the controls' 0 V): every wire on the supply carries it as its number. Distribution blocks and power rails pick one with params.dist, and everything on the same distribution is joined on every sheet. An incoming supply or a plant supply out is wired to its block or rail like anything else. With no incoming supply drawn, the blocks and rails stand in as the supply in simulation, except those a plant supply out reaches by wire. A block or rail with no distribution is local and gives no number. Returns the list.",
     inputSchema: obj(
       {
         project,

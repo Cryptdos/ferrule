@@ -399,7 +399,7 @@ The electrical drawing: parts, wires, rails, plant views, numbering and links. I
 
 - **DR-48** *Distribution* (top bar) lists the project's supplies: name, **tag** (a whole number, given from 1 in the order they're added, changeable, 0 allowed), kind (AC line, AC neutral, DC +, DC 0 V, Earth), voltage, colour, function, and the sheets each is used on. New projects start with none. Below the list, **Wire colours by function**: a table of functions (phase, neutral, earth, 24 V +, 0 V, DC signal, AC signal, external supply, and any added) and their colours, empty to start. Colours are IEC codes: Bk, Bn, Rd, Og, Ye, Gn, Bu, Vt, Gy, Wh, Pk, Tq, GnYe.
 - **DR-49** A **Distribution block** is the physical busbar or block: drawn heavy, tagged W, placed on the GA, counted in the bill of materials. A **Power rail** is the common of a drawing, not a part: no tag, not on the GA or the bill of materials, no ways. Its weight is read from its supply's voltage (SH-14), with no setting on the rail; on no supply, or one whose voltage has no number in it, it's drawn as extra-low voltage, and Properties says which.
-- **DR-50** A block, rail ~~or incoming supply terminal~~ *(v0.5: A57)* picks a distribution. Everything on the same distribution is joined on every sheet.
+- **DR-50** A block or rail picks a distribution. Everything on the same distribution is joined on every sheet. Nothing else picks one: an incoming supply or a plant's supply out is wired to its block or rail like any other part, so an isolator drawn in between switches what's after it.
 - **DR-51** A block or rail on no distribution is *local* and joins nothing else. Deleting a distribution makes its blocks and rails local.
 - **DR-52** A block or rail's name sits at its left end beside its tag; on a supply it's the supply's name and number (`CCT 4`). *Name at both ends* prints it at both.
 - **DR-53** Length is 2 to 150 units. Colour and function come from the distribution unless set on the part.
@@ -484,7 +484,7 @@ Tag prefixes follow IEC 81346-2 as applied in `docs/designations.md`. Untagged p
 | **PT-18** | ~~Link arrow~~ | ~~none~~ | ~~See DR-40 to DR-47~~ | *(v0.5: A27)* |
 | **PT-19** | Terminal strip line | none | *Terminal strip*; length | See DR-62 |
 | **PT-20** | Cable screen | none | *Width across the cores* 1–60 units; *Dashed* | No tag; its drain wire attaches at either end |
-| **PT-21** | Incoming supply | none | *System*: 3-phase + N, 3-phase, single phase, DC; *Gives*; ~~*Rating (VA)*~~ *(v0.5: A72)*; ~~a distribution per terminal~~ *(v0.5: A57)* | Where the simulator's power comes from |
+| **PT-21** | Incoming supply | none | *System*: 3-phase + N, 3-phase, single phase, DC; *Gives*; ~~*Rating (VA)*~~ *(v0.5: A72)* | Where the simulator's power comes from. It picks no distribution: it's wired to its blocks (DR-50) |
 
 - **PT-22** Multi-terminal parts keep the switch pole pitch (3 units) between terminals.
 - **PT-23** Text fields such as *Rating* show an example as greyed placeholder text.
@@ -618,8 +618,8 @@ The same sheets, live. Editing is off. Entering Simulate starts from everything 
 
 - **SM-13** Power comes from **Incoming supply** parts and from transformers once their primaries are energised. Phases are kept separate.
 - **SM-14** A short between phases, or two supplies feeding one conductor, is reported.
-- **SM-15** With no Incoming supply part, blocks and rails on an AC line or DC + distribution are the supply and those on an AC neutral or DC 0 V distribution the return.
-- **SM-16** ~~A plant **supply out** feeds the distributions it's set to, so an inverter, PSU or UPS powers its rails with no stand-in supply drawn.~~ *(v0.5: A57)*
+- **SM-15** With no Incoming supply part, blocks and rails on an AC line or DC + distribution are the supply and those on an AC neutral or DC 0 V distribution the return, except a distribution that a plant's supply out reaches by wire (through fuses and switches, whichever way they're set): that plant is its source, so switching it off takes those rails down.
+- **SM-16** A plant **supply out** feeds what it's wired to, like any other source: an inverter, PSU or UPS is wired to its block or rail, and picks no distribution. Two sources wired to one distribution (a battery and the UPS it backs) feed it together, which isn't a short.
 
 ### Plant
 
@@ -684,7 +684,7 @@ The same sheets, live. Editing is off. Entering Simulate starts from everything 
 | **CK-17** | warning | A distribution feeds parts and nothing supplies it |
 | **CK-18** | warning | A supply's worst-case load is over its rating *(v0.5: A72. Never an Incoming supply)* |
 | **CK-19** | ~~info~~ *(v0.5: A31)* | *n* parts have no draw set, so count as nothing |
-| **CK-20** | ~~warning~~ | ~~An incoming supply terminal feeds a distribution directly that its own wiring also reaches, bypassing what's in between (an isolator)~~ *(v0.5: A57)* |
+| **CK-20** | none | No check for a supply bypassing its isolator: an incoming supply picks no distribution, so there's nothing to bypass one (DR-50) |
 
 ### Plant, controller and Design
 

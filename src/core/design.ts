@@ -540,11 +540,6 @@ function copyRows(
       for (const pt of it.points ?? []) {
         delete pt.channel;
         for (const c of pt.follows ?? []) c.ref = remap(c.ref);
-        // A supply out's distributions from another project aren't this one's (a Design template, v0.4.x M1).
-        if (pt.dists) {
-          pt.dists = Object.fromEntries(Object.entries(pt.dists).filter(([, d]) => project.distributions.some((x) => x.id === d)));
-          if (!Object.keys(pt.dists).length) delete pt.dists;
-        }
       }
       for (const x of it.interlocks ?? []) {
         x.id = newId("il");

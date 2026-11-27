@@ -166,11 +166,11 @@ export function compile(project: Project): Circuit {
   const outputs = new Map<string, (s: SimState) => boolean>();
   const points = new Map<string, { form: string; plant: string; name: string }>();
   const states = new Map<string, (s: SimState) => boolean>();
-  /** Distributions already standing in as the supply (no Incoming supply part). */
-  const fallback = new Set<string>();
   const hasIncoming = project.pages.some((pg) => pg.elements.some((e) => e.symbol === "supply"));
-  // Distributions a plant supply out feeds aren't stood in for by their busbars: the plant is their source.
-  for (const item of project.plant) for (const pt of item.points ?? []) for (const d of Object.values(pt.dists ?? {})) fallback.add(d);
+  /** A node of each distribution's blocks and rails, the first found: with no Incoming supply part, what can stand in. */
+  const barNode = new Map<string, string>();
+  /** Plant supply outs: their supply's index, and the pin each feeds from (v0.5 A57: wired like anything else). */
+  const plantOuts: { i: number; sig: string; com?: string }[] = [];
 
   const byId = new Map<string, Element>();
   for (const pg of project.pages) for (const el of pg.elements) byId.set(el.id, el);
@@ -203,16 +203,11 @@ export function compile(project: Project): Circuit {
         case "rail": {
           const conds = project.conductors.filter((c) => c.terminals.some(([id]) => id === el.id)).map((c) => c.id);
           conds.forEach((c) => railNodes.add(c));
-          // Without an Incoming supply part, busbars on a line or DC + distribution are the
-          // supply, and those on a neutral or DC 0 V distribution the return, as drawn.
-          // One node per distribution is enough: the rest are joined to it.
+          // One node per distribution is enough: the rest are joined to it. Whether its
+          // blocks stand in as the supply is settled once the wiring is known (below).
           const d = project.distributions.find((x) => x.id === el.params.dist);
           const first = conds[0];
-          if (!hasIncoming && d && first && !fallback.has(d.id)) {
-            if (d.kind === "line" || d.kind === "dc+") supply.add(first);
-            if (d.kind === "neutral" || d.kind === "dc0") ret.add(first);
-            fallback.add(d.id);
-          }
+          if (d && first && !barNode.has(d.id)) barNode.set(d.id, first);
           break;
         }
         case "supply": {
@@ -354,7 +349,10 @@ export function compile(project: Project): Circuit {
       } else {
         // A powered output or supply out is a source while it's on: its first pin against its second.
         const { sig, com } = signalPins(pt);
-        if (sig) supplies.push({ el: key, phases: [pn(sig)], ret: com ? [pn(com)] : [], when: key, ...(pt.dists?.[sig] ? { dist: pt.dists[sig] } : {}) });
+        if (sig) {
+          plantOuts.push({ i: supplies.length, sig: pn(sig), ...(com ? { com: pn(com) } : {}) });
+          supplies.push({ el: key, phases: [pn(sig)], ret: com ? [pn(com)] : [], when: key });
+        }
       }
     }
   }
@@ -366,6 +364,29 @@ export function compile(project: Project): Circuit {
   }
   // Busbars and distributions join their wires electrically (each wire still has its own number).
   for (const j of netJoins(project)) links.push({ a: node.get(`${j.a[0]}:${j.a[1]}`) ?? `${j.a[0]}:${j.a[1]}`, b: node.get(`${j.b[0]}:${j.b[1]}`) ?? `${j.b[0]}:${j.b[1]}`, el: j.el, src: j.el, closed: () => true, fixed: true });
+  // A plant supply out feeds the distributions its wiring reaches, through switches and
+  // fuses whatever their state (v0.5 A57). Two sources reaching one distribution feed it
+  // together, which isn't a short.
+  const wiring = new UF();
+  for (const l of links) wiring.union(l.a, l.b);
+  const fedByPlant = new Set<string>();
+  for (const o of plantOuts) {
+    const reach = (from: string) => [...barNode].filter(([, at]) => wiring.find(at) === wiring.find(from)).map(([d]) => d);
+    const fed = reach(o.sig);
+    if (fed[0]) supplies[o.i]!.dist = fed[0];
+    for (const d of [...fed, ...(o.com ? reach(o.com) : [])]) fedByPlant.add(d);
+  }
+  // Without an Incoming supply part, busbars on a line or DC + distribution are the supply,
+  // and those on a neutral or DC 0 V distribution the return, as drawn: except where a plant
+  // supply out reaches them by wire, which is their source, so switching it off takes them down.
+  if (!hasIncoming) {
+    for (const [id, at] of barNode) {
+      const d = project.distributions.find((x) => x.id === id)!;
+      if (fedByPlant.has(id)) continue;
+      if (d.kind === "line" || d.kind === "dc+") supply.add(at);
+      if (d.kind === "neutral" || d.kind === "dc0") ret.add(at);
+    }
+  }
   if (supply.size && ret.size) supplies.push({ el: "rails", phases: [...supply], ret: [...ret] });
   // What each part's "on" is, for conditions: energised, lit, closed, operated.
   for (const [id, fn] of ops) {
